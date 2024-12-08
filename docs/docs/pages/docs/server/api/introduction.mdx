@@ -1,0 +1,13 @@
+# Introduction
+
+rrelayerr exposes an fully fledged REST API to manage everything. This API is used in the UI dashboard to do admin actions but also allows
+you to hit these endpoints directly if you ever needed to script something.
+
+We have 4 main areas of the API:
+
+- Network API: This is used to manage the networks that the relayer is connected to. This includes adding new networks, removing networks, and updating networks.
+- Relay API: Thie is used to manage all the relayer related settings. This includes adding new relayers, removing relayers, updating relayers, adding API keys and more.
+- Transaction API: This is used to manage all the transactions that the relayer is processing. This includes sending new transactions, getting transactions, updating transactions and more.
+- Gas API: This is used to get the current gas prices for the network and expose any other gas related stuff.
+
+Note this will cover the REST endpoints but all these calls are abstracted away in the SDKs we support.

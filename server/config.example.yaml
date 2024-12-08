@@ -1,0 +1,12 @@
+seed: ${SEED}
+admins: []
+networks:
+  - name: INSERT NETWORK NAME HERE
+    seed: ${NETWORK_NAME_SEED}
+    provider_urls:
+      - ${NETWORK_NAME_PROVIDER_URL}
+    gas_provider: infura
+gas_providers:
+  infura:
+    api_key: ${INFURA_API_KEY}
+    secret: ${INFURA_API_KEY_SECRET}

@@ -1,0 +1,286 @@
+# Getting started
+
+[ethers](https://docs.ethers.org) is a simple and easy to use library for interacting with the any EVM blockchain.
+If you are use to `ethers` then this will look very familiar to you.
+
+To integrate the relayer within your application with just a few code changes you can start using the relayer to send transactions, write to contracts, sign messages and typed data.
+
+We will explore both ethersv5 and ethersv6 and some interfaces have changed between the two versions.
+
+## Installation
+
+Lets install both `ethers` and `rrelayerr-ts`
+
+:::code-group
+
+```bash [npm]
+npm i rrelayerr-ts ethers
+```
+
+```bash [pnpm]
+pnpm i rrelayerr-ts ethers
+```
+
+```bash [bun]
+bun i rrelayerr-ts ethers
+```
+
+:::
+
+## Creating wallet client
+
+The rrelayerr client exposes ways for you to create an relayer client which exposes a ethereum provider you can use with `ethers`.
+
+:::code-group
+
+```ts [ethers@v6]
+import { BrowserProvider } from 'ethers';
+import { createRRelayerrClient } from 'rrelayerr-ts';
+
+const client = createRRelayerrClient({
+  // This is where the rrelayerr server is hosted
+  serverUrl: 'http://127.0.0.1:8000',
+  // This is your API secret access key you can have many
+  // of these but you generate them within the server itself
+  apiSecretAccessKey: 'INSERT_API_SECRET',
+});
+
+const relayer = await client.createRelayerClient({
+  // The relayer ID you want to connect to
+  relayerId: 'b12be8a1-7e95-4a5c-b46a-fbd124ee5771',
+  // The api key for that relayer ID
+  apiKey: 'API_KEY',
+});
+
+export provider = new BrowserProvider(relayer.ethereumProvider());
+```
+
+```ts [ethers@v5]
+import { ethers } from 'ethers';
+import { createRRelayerrClient } from 'rrelayerr-ts';
+
+const client = createRRelayerrClient({
+  // This is where the rrelayerr server is hosted
+  serverUrl: 'http://127.0.0.1:8000',
+  // This is your API secret access key you can have many
+  // of these but you generate them within the server itself
+  apiSecretAccessKey: 'INSERT_API_SECRET',
+});
+
+const relayer = await client.createRelayerClient({
+  // The relayer ID you want to connect to
+  relayerId: 'b12be8a1-7e95-4a5c-b46a-fbd124ee5771',
+  // The api key for that relayer ID
+  apiKey: 'API_KEY',
+});
+
+export const provider = new ethers.providers.Web3Provider(
+  relayer.ethereumProvider()
+);
+```
+
+:::
+
+Will now use ethers v6 example for the rest of the documentation but it is very similar if not the same.
+
+## Sign text
+
+You can sign text with the relayer
+
+:::code-group
+
+```ts [example]
+import { signer } from './config';
+
+const message = await signer.signMessage('sign me!');
+```
+
+```ts [config]
+import { BrowserProvider } from 'ethers';
+import { createRRelayerrClient } from 'rrelayerr-ts';
+
+const client = createRRelayerrClient({
+  // This is where the rrelayerr server is hosted
+  serverUrl: 'http://127.0.0.1:8000',
+  // This is your API secret access key you can have many
+  // of these but you generate them within the server itself
+  apiSecretAccessKey: 'INSERT_API_SECRET',
+});
+
+const relayer = await client.createRelayerClient({
+  // The relayer ID you want to connect to
+  relayerId: 'b12be8a1-7e95-4a5c-b46a-fbd124ee5771',
+  // The api key for that relayer ID
+  apiKey: 'API_KEY',
+});
+
+export const provider = new BrowserProvider(relayer.ethereumProvider());
+export const signer = await provider.getSigner();
+```
+
+:::
+
+## Sign typed data
+
+You can sign typed data with the relayer
+
+:::code-group
+
+```ts [example]
+import { signer } from './config';
+
+const signature = await signer._signTypedData({
+  {
+    name: 'Ether Mail',
+    version: '1',
+    chainId: 1,
+    verifyingContract: '0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC',
+  },
+  {
+    Person: [
+      { name: 'name', type: 'string' },
+      { name: 'wallet', type: 'address' },
+    ],
+    Mail: [
+      { name: 'from', type: 'Person' },
+      { name: 'to', type: 'Person' },
+      { name: 'contents', type: 'string' },
+    ],
+  },
+  {
+    from: {
+      name: 'Cow',
+      wallet: '0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826',
+    },
+    to: {
+      name: 'Bob',
+      wallet: '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB',
+    },
+    contents: 'Hello, Bob!',
+  },
+});
+```
+
+```ts [config]
+import { BrowserProvider } from 'ethers';
+import { createRRelayerrClient } from 'rrelayerr-ts';
+
+const client = createRRelayerrClient({
+  // This is where the rrelayerr server is hosted
+  serverUrl: 'http://127.0.0.1:8000',
+  // This is your API secret access key you can have many
+  // of these but you generate them within the server itself
+  apiSecretAccessKey: 'INSERT_API_SECRET',
+});
+
+const relayer = await client.createRelayerClient({
+  // The relayer ID you want to connect to
+  relayerId: 'b12be8a1-7e95-4a5c-b46a-fbd124ee5771',
+  // The api key for that relayer ID
+  apiKey: 'API_KEY',
+});
+
+export const provider = new BrowserProvider(relayer.ethereumProvider());
+export const signer = await provider.getSigner();
+```
+
+:::
+
+## Send transaction
+
+Send a transaction with the relayer
+
+:::code-group
+
+```ts [example]
+import { signer } from './config';
+
+const hash = await signer.sendTransaction({
+  account,
+  to: '0x70997970c51812dc3a010c7d01b50e0d17dc79c8',
+  value: 1000000000000000000n,
+});
+```
+
+```ts [config]
+import { BrowserProvider } from 'ethers';
+import { createRRelayerrClient } from 'rrelayerr-ts';
+
+const client = createRRelayerrClient({
+  // This is where the rrelayerr server is hosted
+  serverUrl: 'http://127.0.0.1:8000',
+  // This is your API secret access key you can have many
+  // of these but you generate them within the server itself
+  apiSecretAccessKey: 'INSERT_API_SECRET',
+});
+
+const relayer = await client.createRelayerClient({
+  // The relayer ID you want to connect to
+  relayerId: 'b12be8a1-7e95-4a5c-b46a-fbd124ee5771',
+  // The api key for that relayer ID
+  apiKey: 'API_KEY',
+});
+
+export const provider = new BrowserProvider(relayer.ethereumProvider());
+export const signer = await provider.getSigner();
+```
+
+:::
+
+## Write contract
+
+Write a contract with the relayer
+
+:::code-group
+
+```ts [example]
+import { signer } from './config';
+import { wagmiAbi } from './abi';
+
+const contract = new Contract(
+  '0xFBA3912Ca04dd458c843e2EE08967fC04f3579c2',
+  abi,
+  signer
+);
+
+const result = await contract.mint();
+```
+
+```ts [abi]
+export const wagmiAbi = [
+  ...
+  {
+    inputs: [],
+    name: "mint",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  ...
+] as const;
+```
+
+```ts [config]
+import { BrowserProvider } from 'ethers';
+import { createRRelayerrClient } from 'rrelayerr-ts';
+
+const client = createRRelayerrClient({
+  // This is where the rrelayerr server is hosted
+  serverUrl: 'http://127.0.0.1:8000',
+  // This is your API secret access key you can have many
+  // of these but you generate them within the server itself
+  apiSecretAccessKey: 'INSERT_API_SECRET',
+});
+
+const relayer = await client.createRelayerClient({
+  // The relayer ID you want to connect to
+  relayerId: 'b12be8a1-7e95-4a5c-b46a-fbd124ee5771',
+  // The api key for that relayer ID
+  apiKey: 'API_KEY',
+});
+
+export const provider = new BrowserProvider(relayer.ethereumProvider());
+export const signer = await provider.getSigner();
+```
+
+:::

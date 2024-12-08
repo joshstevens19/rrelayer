@@ -1,0 +1,109 @@
+## Network
+
+All the network related rrelayerr calls
+
+### Disable
+
+Disable a network
+
+:::code-group
+
+```ts [example]
+import { rrelayerrClient } from './config';
+
+await rrelayerrClient.networks.disable(1);
+```
+
+```ts [config]
+import { createRRelayerrClient } from 'rrelayerr-ts';
+
+export const rrelayerrClient = createRRelayerrClient({
+  // This is where the rrelayerr server is hosted
+  serverUrl: 'http://127.0.0.1:8000',
+  // This is your API secret access key you can have many
+  // of these but you generate them within the server itself
+  // This is a secret for a reason do not expose it on a client
+  apiSecretAccessKey: 'INSERT_API_SECRET',
+});
+```
+
+:::
+
+### Enable
+
+Enable a network
+
+:::code-group
+
+```ts [example]
+import { rrelayerrClient } from './config';
+
+await rrelayerrClient.networks.enable(1);
+```
+
+```ts [config]
+import { createRRelayerrClient } from 'rrelayerr-ts';
+
+export const rrelayerrClient = createRRelayerrClient({
+  // This is where the rrelayerr server is hosted
+  serverUrl: 'http://127.0.0.1:8000',
+  // This is your API secret access key you can have many
+  // of these but you generate them within the server itself
+  // This is a secret for a reason do not expose it on a client
+  apiSecretAccessKey: 'INSERT_API_SECRET',
+});
+```
+
+:::
+
+### Get
+
+Get the networks
+
+:::code-group
+
+```ts [get all]
+import { rrelayerrClient } from './config';
+
+const networks = await rrelayerrClient.network.get();
+```
+
+```ts [get enabled]
+import { NetworkStatus } from 'rrelayerr-ts';
+import { rrelayerrClient } from './config';
+
+const networks = await rrelayerrClient.network.get(NetworkStatus.ENABLED);
+```
+
+```ts [get disabled]
+import { NetworkStatus } from 'rrelayerr-ts';
+import { rrelayerrClient } from './config';
+
+const networks = await rrelayerrClient.network.get(NetworkStatus.DISABLED);
+```
+
+```ts [config]
+import { createRRelayerrClient } from 'rrelayerr-ts';
+
+export const rrelayerrClient = createRRelayerrClient({
+  // This is where the rrelayerr server is hosted
+  serverUrl: 'http://127.0.0.1:8000',
+  // This is your API secret access key you can have many
+  // of these but you generate them within the server itself
+  // This is a secret for a reason do not expose it on a client
+  apiSecretAccessKey: 'INSERT_API_SECRET',
+});
+```
+
+```ts [response]
+interface Network {
+  name: string;
+  chainId: number;
+  providerUrls: string[];
+  disabled: boolean;
+}
+
+type response = Network[];
+```
+
+:::

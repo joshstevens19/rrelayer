@@ -1,0 +1,49 @@
+[package]
+name = "rrelayerr_server"
+version = "0.1.0"
+resolver = "2"
+edition = "2021"
+
+[dependencies]
+tokio-postgres = { version="0.7", features=["with-uuid-1"] }
+tokio = { version = "1", features = ["full"] }
+axum = "0.7"
+tower-http = { version = "0.5", features = ["cors"] }
+dotenv = "0.15.0"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9.30"
+async-trait = "0.1"
+reqwest = { version = "0.12", features = ["json"] }
+lazy_static = "1.4"
+alloy = { version = "0.7.0", features = ["full", "signer-mnemonic", "eips", "eip712"] }
+alloy-rlp = "0.3.8"
+alloy-eips = "0.7.0"
+uuid = { version = "1.0", features = ["v4", "serde"] }
+rand = "0.8"
+aws-sdk-secretsmanager = "1.14.0"
+aws-config = "1.1.4"
+async-recursion = "1.0.5"
+base64 = "0.22.0"
+chrono = "0.4.19"
+bytes = "1.5.0"
+regex = "1.5.4"
+thiserror = "1.0"
+strum = "0.26.1"
+strum_macros = "0.26.1"
+jsonwebtoken = "9.2"
+futures = "0.3"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "time"] }
+
+jemallocator = { version = "0.5.0", optional = true }
+jemalloc-ctl = { version = "0.5.0", optional = true }
+
+[profile.maxperf]
+inherits = "release"
+lto = "fat"
+codegen-units = 1
+incremental = false
+
+[features]
+jemalloc = ["dep:jemallocator", "dep:jemalloc-ctl"]

@@ -1,0 +1,22 @@
+# Get networks
+
+This will return a list of networks which have been attached to rrelayerr.
+
+GET - `/networks`
+
+```json [response]
+[
+  {
+    "name": "polygon_mumbai",
+    "chainId": "0x13881",
+    "providerUrls": ["https://polygon-mumbai.g.alchemy.com/v2/key"],
+    "disabled": false
+  },
+  {
+    "name": "eth_mainnet",
+    "chainId": "0x1",
+    "providerUrls": ["https://ethereum.g.alchemy.com/v2/key"],
+    "disabled": true
+  }
+]
+```

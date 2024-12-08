@@ -1,0 +1,39 @@
+use std::collections::{HashMap, VecDeque};
+
+use crate::{
+    provider::EvmProvider,
+    relayer::types::Relayer,
+    transaction::{
+        nonce_manager::NonceManager,
+        types::{Transaction, TransactionId},
+    },
+};
+
+pub struct TransactionsQueueSetup {
+    pub relayer: Relayer,
+    pub evm_provider: EvmProvider,
+    pub nonce_manager: NonceManager,
+    pub pending_transactions: VecDeque<Transaction>,
+    pub inmempool_transactions: VecDeque<Transaction>,
+    pub mined_transactions: HashMap<TransactionId, Transaction>,
+}
+
+impl TransactionsQueueSetup {
+    pub fn new(
+        relayer: Relayer,
+        evm_provider: EvmProvider,
+        nonce_manager: NonceManager,
+        pending_transactions: VecDeque<Transaction>,
+        inmempool_transactions: VecDeque<Transaction>,
+        mined_transactions: HashMap<TransactionId, Transaction>,
+    ) -> Self {
+        TransactionsQueueSetup {
+            relayer,
+            evm_provider,
+            nonce_manager,
+            pending_transactions,
+            inmempool_transactions,
+            mined_transactions,
+        }
+    }
+}

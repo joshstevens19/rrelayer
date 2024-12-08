@@ -1,0 +1,23 @@
+# What is rrelayerr?
+
+rrelayerr is an opensource relayer build in rust which can be used to send gasless transactions, transaction migrations, L2 proof transactions, blob storage transactions, or general script usage.
+rrelayerr does not have a single usecase. rrelayerr gives you a full out the box solution. It will bump up transactions if gas changes and will get the transaction over the line for you.
+It supports any EVM network and can be extended to your needs.
+
+## Server
+
+The relayer server is written in rust and is the core component which is responsible for relaying transactions. It accepts transactions, adds them to a queue and processes them while keeping track
+if network gas changes. It has safe guards to prevent max spending, allowlist of addresses which can execute it and more. It exposes an API to allow you to programmatically interact with it.
+
+This uses by a Postgres database to save all the state but it uses inmemory cache for all the processing it does. Postgres is used for a source of truth
+for the data.
+
+## Dashboard
+
+rrelayerr ships with a fully fledger dashboard which you can read more about in the [dashboard section](/docs/dashboard/introduction).
+The dashboard allows you to create new relayers, add new API keys, config the relayers for their needs and more.
+
+## SDKs
+
+rrelayerr ships with a fully fledger SDKs to allow you to integrate it easily into your application. With full support in viem and ethers if you are using `typescript` in your application.
+Rust, Go and Python will also be supported to work just as easy; for now we advise hitting the API directly if using those languages.

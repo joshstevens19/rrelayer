@@ -1,0 +1,67 @@
+# Getting started
+
+rrelayerr supports full typescript integration. A note here is the call to the rrelayerr server must pass in a API secret, this secret must never be leaked client side. If you want to do actions on your client with the relayer
+you must build a nextJS server call and call it server side or if you using another language you must have a proxy between it. If you leak this API secret that means anyone can do anything with your relayer.
+
+## Installation
+
+First you should install the rrelayerr-ts package
+
+:::code-group
+
+```bash [npm]
+npm i rrelayerr-ts
+```
+
+```bash [pnpm]
+pnpm i rrelayerr-ts
+```
+
+```bash [bun]
+bun i rrelayerr-ts
+```
+
+:::
+
+## Creating a rrelayerr client
+
+The rrelayerr client is the main entry point for interacting with the rrelayerr server. You can create a client by calling the `createRRelayerrClient` function and passing in the server url and the api secret access key.
+
+```ts
+import { createRRelayerrClient } from 'rrelayerr-ts';
+
+const client = createRRelayerrClient({
+  // This is where the rrelayerr server is hosted
+  serverUrl: 'http://127.0.0.1:8000',
+  // This is your API secret access key you can have many
+  // of these but you generate them within the server itself
+  apiSecretAccessKey: 'INSERT_API_SECRET',
+});
+```
+
+## Creating a rrelayerr relayer client
+
+The rrelayerr client exposes ways for you to create an relayer client which exposes a ethereum provider you can use with `viem` or `ethers`.
+
+```ts
+import { createRRelayerrClient } from 'rrelayerr-ts';
+
+const client = createRRelayerrClient({
+  // This is where the rrelayerr server is hosted
+  serverUrl: 'http://127.0.0.1:8000',
+  // This is your API secret access key you can have many
+  // of these but you generate them within the server itself
+  apiSecretAccessKey: 'INSERT_API_SECRET',
+});
+
+const relayer = await client.createRelayerClient({
+  // The relayer ID you want to connect to
+  relayerId: 'b12be8a1-7e95-4a5c-b46a-fbd124ee5771',
+  // The api key for that relayer ID
+  apiKey: 'API_KEY',
+});
+```
+
+We talk more about the clients indepth functions within the [sdk](/docs/integration/typescript/sdk/rrelayerr-client) section.
+
+Now you know how to create a rrelayerr client and a rrelayerr relayer client lets look how you would integrate this with `viem` or `ethers`. We will start with `viem`.
