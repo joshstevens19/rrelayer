@@ -8,7 +8,6 @@ RUSTFLAGS="-C target-cpu=native" cargo run --profile maxperf --features jemalloc
 
 ## Server MVP
 
-- migrate to alloy
 - use proper ethereum typings
 - support blob storage transactions
 - support logs endpoints to see audit logs of activity with breakdown of transaction
