@@ -2,3 +2,8 @@
 
 ## Design
 
+- rrelayerr create
+   - relayer name
+   - network
+   - ...
+- rrelayerr ls
