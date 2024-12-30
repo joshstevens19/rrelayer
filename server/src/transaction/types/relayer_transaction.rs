@@ -74,7 +74,7 @@ pub struct RelayerTransaction {
 
     /// The time the transaction will expire
     #[serde(rename = "expiresAt", serialize_with = "serialize_system_time")]
-    pub expiries_at: SystemTime,
+    pub expires_at: SystemTime,
 
     /// The time the transaction was queued
     #[serde(rename = "queuedAt", serialize_with = "serialize_system_time")]

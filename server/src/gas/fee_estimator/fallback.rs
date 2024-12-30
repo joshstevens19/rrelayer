@@ -107,8 +107,9 @@ impl BaseGasFeeEstimator for FallbackGasFeeEstimator {
         let estimated_priority_fee = MaxPriorityFee::new(calculate_median(
             &mut priority_fees.iter().copied().map(u128::from).collect::<Vec<u128>>(),
         ));
-        let estimated_max_fee =
-            MaxFee::new(calculate_median(&mut max_fees.iter().copied().map(u128::from).collect::<Vec<u128>>()));
+        let estimated_max_fee = MaxFee::new(calculate_median(
+            &mut max_fees.iter().copied().map(u128::from).collect::<Vec<u128>>(),
+        ));
 
         // Use the estimated fees to populate GasEstimatorResult
         let gas_estimate_result = GasEstimatorResult {

@@ -37,7 +37,7 @@ pub async fn set_authentication_challenge_cache(
         .insert_with_expiry(
             build_authentication_cache_key(id, address).to_string(),
             CacheValue::AuthenticationChallenge(challenge.to_string()),
-            // 5 minutes its valid for the challenge
+            // 5 minutes it's valid for the challenge
             Duration::from_secs(300 * 10),
         )
         .await;

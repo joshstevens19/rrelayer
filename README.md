@@ -10,10 +10,10 @@ RUSTFLAGS="-C target-cpu=native" cargo run --profile maxperf --features jemalloc
 
 - use proper ethereum typings
 - support blob storage transactions
-- support logs endpoints to see audit logs of activity with breakdown of transaction
 - create clone feature which reuses the same PK 
 - create CLI tool to install to run the relayer
 - look at the vercel server API example
+- add tenderly support for gas prices
 
 # AWS env
 

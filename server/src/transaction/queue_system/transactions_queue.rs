@@ -395,7 +395,9 @@ impl TransactionsQueue {
             return Err(TransactionQueueSendTransactionError::GasPriceTooHigh);
         }
 
-        let transaction_request: TypedTransaction = if self.is_legacy_transactions() {
+        let transaction_request: TypedTransaction = if transaction.is_blob_transaction() {
+            transaction.to_blob_typed_transaction(Some(&gas_price))
+        } else if self.is_legacy_transactions() {
             transaction.to_legacy_typed_transaction(Some(&gas_price))
         } else {
             transaction.to_eip1559_typed_transaction(Some(&gas_price))

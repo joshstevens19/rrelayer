@@ -1,9 +1,15 @@
 use std::{fmt::Display, time::SystemTime};
 
 use alloy::{
-    consensus::{TxEip1559, TxLegacy, TypedTransaction},
+    consensus::{
+        TxEip1559, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxLegacy, TypedTransaction,
+    },
     eips::eip2930::AccessList,
-    primitives::TxKind,
+    primitives::{TxKind, U256},
+};
+use alloy_eips::eip4844::{
+    builder::{SidecarBuilder, SimpleCoder},
+    Blob, BlobTransactionSidecar,
 };
 use serde::{Deserialize, Serialize};
 
@@ -46,6 +52,8 @@ pub struct Transaction {
     pub gas_limit: Option<GasLimit>,
 
     pub status: TransactionStatus,
+
+    pub blobs: Option<Vec<Blob>>,
 
     #[serde(rename = "txHash", skip_serializing_if = "Option::is_none")]
     pub known_transaction_hash: Option<TransactionHash>,
@@ -130,7 +138,7 @@ impl Transaction {
         &self,
         override_gas_price: Option<&GasPriceResult>,
     ) -> TypedTransaction {
-        let gas_price = match override_gas_price {
+        let gas_price_result = match override_gas_price {
             Some(gas_price) => gas_price.legacy_gas_price(),
             None => self.sent_with_gas.as_ref().unwrap().legacy_gas_price(),
         };
@@ -141,8 +149,47 @@ impl Transaction {
             input: self.data.clone().into(),
             gas_limit: self.gas_limit.unwrap().into(),
             nonce: self.nonce.into(),
-            gas_price: gas_price.into(),
+            gas_price: gas_price_result.into(),
             chain_id: Some(self.chain_id.into()),
         })
+    }
+
+    pub fn to_blob_typed_transaction(
+        &self,
+        override_gas_price: Option<&GasPriceResult>,
+    ) -> TypedTransaction {
+        let gas_price_result = match override_gas_price {
+            Some(gas_price) => gas_price,
+            None => self.sent_with_gas.as_ref().unwrap(),
+        };
+
+        let blobs = self.blobs.clone().expect("No blobs found - should not be possible");
+
+        let builder: SidecarBuilder<SimpleCoder> =
+            blobs.iter().map(|blob| blob.as_slice()).collect();
+        let sidecar = builder.build().expect("Failed to build blobs");
+
+        let tx = TxEip4844 {
+            chain_id: self.chain_id.into(),
+            nonce: self.nonce.into(),
+            max_priority_fee_per_gas: gas_price_result.max_priority_fee.clone().into(),
+            max_fee_per_gas: gas_price_result.max_fee.into(),
+            gas_limit: self.gas_limit.unwrap().into(),
+            to: self.to.into(),
+            value: self.value.clone().into(),
+            access_list: Default::default(),
+            blob_versioned_hashes: vec![Default::default()],
+            max_fee_per_blob_gas: 1,
+            input: self.data.clone().into(),
+        };
+
+        TypedTransaction::Eip4844(TxEip4844Variant::TxEip4844WithSidecar(TxEip4844WithSidecar {
+            tx,
+            sidecar,
+        }))
+    }
+
+    pub fn is_blob_transaction(&self) -> bool {
+        self.blobs.is_some()
     }
 }

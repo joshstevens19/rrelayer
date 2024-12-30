@@ -24,7 +24,7 @@ impl PostgresClient {
         for table_name in TRANSACTION_TABLES.iter() {
             trans.execute(
             format!("
-                INSERT INTO {}(id, relayer_id, api_key, \"to\", \"from\", nonce, chain_id, data, value, speed, status, expiries_at, queued_at)
+                INSERT INTO {}(id, relayer_id, api_key, \"to\", \"from\", nonce, chain_id, data, value, speed, status, expires_at, queued_at)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13);
             ", table_name).as_str(),
             &[&transaction.id,
@@ -108,7 +108,7 @@ impl PostgresClient {
         for table_name in TRANSACTION_TABLES.iter() {
             trans.execute(
                 format!("
-                INSERT INTO {}(id, relayer_id, api_key, \"to\", nonce, chain_id, data, value, speed, status, expiries_at, queued_at, failed_at, failed_reason)
+                INSERT INTO {}(id, relayer_id, api_key, \"to\", nonce, chain_id, data, value, speed, status, expires_at, queued_at, failed_at, failed_reason)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW());
                 ", table_name).as_str(),
                 &[&transaction.id,

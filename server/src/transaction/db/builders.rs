@@ -17,9 +17,11 @@ pub fn build_transaction_from_transaction_view(row: &Row) -> Transaction {
         nonce: row.get("nonce"),
         gas_limit: row.get("gas_limit"),
         status: row.get("status"),
+        // TODO! load blobs from db
+        blobs: None,
         known_transaction_hash: row.get("hash"),
         queued_at: row.get("queued_at"),
-        expires_at: row.get("expiries_at"),
+        expires_at: row.get("expires_at"),
         sent_at: row.get("sent_at"),
         sent_with_gas: None,
         mined_at: row.get("mined_at"),

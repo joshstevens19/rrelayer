@@ -205,6 +205,7 @@ impl TransactionsQueues {
                 // it works this out later
                 gas_limit: None,
                 status: TransactionStatus::Pending,
+                blobs: transaction_to_send.blobs.clone(),
                 chain_id: transactions_queue.chain_id(),
                 known_transaction_hash: None,
                 queued_at: SystemTime::now(),
@@ -227,12 +228,13 @@ impl TransactionsQueues {
                 .await
                 .map_err(AddTransactionError::TransactionGasPriceError)?;
 
-            let transaction_request: TypedTransaction =
-                if transactions_queue.is_legacy_transactions() {
-                    transaction.to_legacy_typed_transaction(Some(&gas_price))
-                } else {
-                    transaction.to_eip1559_typed_transaction(Some(&gas_price))
-                };
+            let transaction_request: TypedTransaction = if transaction.is_blob_transaction() {
+                transaction.to_blob_typed_transaction(Some(&gas_price))
+            } else if transactions_queue.is_legacy_transactions() {
+                transaction.to_legacy_typed_transaction(Some(&gas_price))
+            } else {
+                transaction.to_eip1559_typed_transaction(Some(&gas_price))
+            };
 
             let simulated = transactions_queue
                 .simulate_transaction(&transaction_request)

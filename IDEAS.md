@@ -11,6 +11,7 @@
 - autotop ups
 - autotasks
 - webhooks alerts
+- support logs endpoints to see audit logs of activity with breakdown of transaction
 
 ## UI
 

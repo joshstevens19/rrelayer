@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use alloy::rpc::types::TransactionReceipt;
+use alloy_eips::eip4844::Blob;
 use axum::{
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
@@ -113,6 +114,9 @@ pub struct RelayTransactionRequest {
     #[serde(default)]
     pub data: TransactionData,
     pub speed: Option<TransactionSpeed>,
+
+    #[serde(default)]
+    pub blobs: Option<Vec<Blob>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -144,6 +148,7 @@ async fn send_transaction(
         transaction.value,
         transaction.data.clone(),
         transaction.speed.clone(),
+        transaction.blobs.clone(),
     );
 
     let result = state

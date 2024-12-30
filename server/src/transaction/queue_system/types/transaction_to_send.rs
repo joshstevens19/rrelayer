@@ -1,3 +1,5 @@
+use alloy_eips::eip4844::Blob;
+
 use crate::{
     shared::common_types::{ApiKey, EvmAddress},
     transaction::types::{TransactionData, TransactionId, TransactionSpeed, TransactionValue},
@@ -11,6 +13,7 @@ pub struct TransactionToSend {
     pub to: EvmAddress,
     pub value: TransactionValue,
     pub data: TransactionData,
+    pub blobs: Option<Vec<Blob>>,
 }
 
 impl TransactionToSend {
@@ -20,6 +23,7 @@ impl TransactionToSend {
         value: TransactionValue,
         data: TransactionData,
         speed: Option<TransactionSpeed>,
+        blobs: Option<Vec<Blob>>,
     ) -> Self {
         Self {
             id: TransactionId::new(),
@@ -29,6 +33,7 @@ impl TransactionToSend {
             // from,
             value,
             data,
+            blobs,
         }
     }
 }
