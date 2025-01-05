@@ -18,7 +18,7 @@ Cargo.lock
 *.pdb
 
 # App ignores
-cli/.env
+crates/cli/.env
 documentation/node_modules
 documentation/dist
 documentation/docs/dist

@@ -42,7 +42,7 @@ impl<'a> FromSql<'a> for TransactionValue {
 impl ToSql for TransactionValue {
     fn to_sql(
         &self,
-        ty: &Type,
+        _ty: &Type,
         out: &mut BytesMut,
     ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
         let value_as_string = self.0.to_string();

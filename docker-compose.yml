@@ -26,7 +26,7 @@ services:
       - .env
     command: -locations=filesystem:/flyway/sql -connectRetries=60 migrate
     volumes:
-      - ${PWD}/server/schema:/flyway/sql
+      - ${PWD}/crates/server/schema:/flyway/sql
     depends_on:
       postgresql:
         condition: service_healthy
