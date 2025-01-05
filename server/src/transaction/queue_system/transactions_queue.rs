@@ -257,10 +257,10 @@ impl TransactionsQueue {
     fn within_gas_price_bounds(&self, gas: &GasPriceResult) -> bool {
         if let Some(max) = &self.relayer.max_gas_price {
             if self.relayer.eip_1559_enabled {
-                return max.0 >= gas.max_fee.0
+                return max.into_u128() >= gas.max_fee.into_u128()
             }
 
-            return max.0 >= gas.legacy_gas_price().0;
+            return max.into_u128() >= gas.legacy_gas_price().into_u128();
         }
 
         true

@@ -201,7 +201,8 @@ impl EvmProvider {
         &self,
         transaction_hash: &TransactionHash,
     ) -> Result<Option<TransactionReceipt>, RpcError<TransportErrorKind>> {
-        let receipt = self.rpc_client().get_transaction_receipt(transaction_hash.0).await?;
+        let receipt =
+            self.rpc_client().get_transaction_receipt(transaction_hash.into_alloy_hash()).await?;
 
         Ok(receipt)
     }

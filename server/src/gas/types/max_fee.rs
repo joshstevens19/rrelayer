@@ -11,11 +11,15 @@ use serde::{Deserialize, Serialize};
 use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialOrd)]
-pub struct MaxFee(pub u128);
+pub struct MaxFee(u128);
 
 impl MaxFee {
     pub fn new(value: u128) -> Self {
         MaxFee(value)
+    }
+
+    pub fn into_u128(self) -> u128 {
+        self.0
     }
 }
 
@@ -71,7 +75,7 @@ impl<'a> FromSql<'a> for MaxFee {
     }
 
     fn accepts(ty: &Type) -> bool {
-        *ty == Type::INT4 || *ty == Type::VARCHAR
+        *ty == Type::NUMERIC
     }
 }
 
@@ -86,7 +90,7 @@ impl ToSql for MaxFee {
     }
 
     fn accepts(ty: &Type) -> bool {
-        *ty == Type::INT4 || *ty == Type::VARCHAR
+        *ty == Type::NUMERIC
     }
 
     tokio_postgres::types::to_sql_checked!();

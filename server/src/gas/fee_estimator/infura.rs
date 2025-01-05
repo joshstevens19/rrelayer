@@ -95,24 +95,24 @@ impl InfuraGasFeeEstimator {
         Self {
             base_url: "https://gas.api.infura.io/networks".to_string(),
             supported_chains: vec![
-                ChainId(1),        // EthereumMainnet
-                ChainId(5),        // EthereumGoerli
-                ChainId(11155111), // EthereumSepolia
-                ChainId(42161),    // ArbitrumMainnet
-                ChainId(42170),    // ArbitrumNova
-                ChainId(43114),    // Avalanche
-                ChainId(8453),     // Base
-                ChainId(56),       // Binance
-                ChainId(204),      // OpBnbLayer2
-                ChainId(25),       // Cronos
-                ChainId(250),      // Fantom
-                ChainId(314),      // Filecoin
-                ChainId(59144),    // LineaMainnet
-                ChainId(59140),    // LineaTestnet
-                ChainId(10),       // Optimism
-                ChainId(137),      // PolygonMainnet
-                ChainId(100),      // PolygonMumbai
-                ChainId(324),      // ZkSyncEraMainnet
+                ChainId::new(1),        // EthereumMainnet
+                ChainId::new(5),        // EthereumGoerli
+                ChainId::new(11155111), // EthereumSepolia
+                ChainId::new(42161),    // ArbitrumMainnet
+                ChainId::new(42170),    // ArbitrumNova
+                ChainId::new(43114),    // Avalanche
+                ChainId::new(8453),     // Base
+                ChainId::new(56),       // Binance
+                ChainId::new(204),      // OpBnbLayer2
+                ChainId::new(25),       // Cronos
+                ChainId::new(250),      // Fantom
+                ChainId::new(314),      // Filecoin
+                ChainId::new(59144),    // LineaMainnet
+                ChainId::new(59140),    // LineaTestnet
+                ChainId::new(10),       // Optimism
+                ChainId::new(137),      // PolygonMainnet
+                ChainId::new(100),      // PolygonMumbai
+                ChainId::new(324),      // ZkSyncEraMainnet
             ],
             api_key: api_key.to_string(),
             secret: secret.to_string(),

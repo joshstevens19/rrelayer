@@ -5,8 +5,6 @@ use bytes::BytesMut;
 use serde::{Deserialize, Serialize};
 use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 
-use crate::shared::{from_sql_u256, to_sql_u256};
-
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq)]
 pub struct TransactionValue(U256);
 
@@ -29,12 +27,15 @@ impl PartialEq for TransactionValue {
 }
 
 impl<'a> FromSql<'a> for TransactionValue {
-    fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
-        from_sql_u256(ty, raw).map(TransactionValue)
+    fn from_sql(_ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
+        let mut bytes = [0u8; 32];
+        bytes.copy_from_slice(raw);
+        let transaction_value = U256::from_be_bytes(bytes);
+        Ok(TransactionValue(transaction_value))
     }
 
     fn accepts(ty: &Type) -> bool {
-        *ty == Type::TEXT || *ty == Type::CHAR || *ty == Type::VARCHAR || *ty == Type::BPCHAR
+        *ty == Type::NUMERIC
     }
 }
 
@@ -44,11 +45,14 @@ impl ToSql for TransactionValue {
         ty: &Type,
         out: &mut BytesMut,
     ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
-        to_sql_u256(self.0, ty, out)
+        let value_as_string = self.0.to_string();
+
+        out.extend_from_slice(value_as_string.as_bytes());
+        Ok(IsNull::No)
     }
 
     fn accepts(ty: &Type) -> bool {
-        *ty == Type::TEXT || *ty == Type::CHAR || *ty == Type::VARCHAR || *ty == Type::BPCHAR
+        *ty == Type::NUMERIC
     }
 
     tokio_postgres::types::to_sql_checked!();

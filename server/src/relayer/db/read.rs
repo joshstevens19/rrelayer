@@ -15,7 +15,7 @@ impl PostgresClient {
             .query(
                 "
                     SELECT *
-                    FROM relayer_view
+                    FROM relayer.record
                     LIMIT $1
                     OFFSET $2;
                 ",
@@ -39,7 +39,7 @@ impl PostgresClient {
             .query(
                 "
                     SELECT *
-                    FROM relayer_view
+                    FROM relayer.record
                     WHERE chain_id = $1
                     AND deleted = FALSE
                     LIMIT $2
@@ -64,7 +64,7 @@ impl PostgresClient {
             .query_one_or_none(
                 "
                     SELECT *
-                    FROM relayer_view
+                    FROM relayer.record
                     WHERE id = $1
                     AND deleted = FALSE;
                 ",
@@ -87,7 +87,7 @@ impl PostgresClient {
             .query_one_or_none(
                 "
                     SELECT 1
-                    FROM relayer_api_key r
+                    FROM relayer.api_key r
                     WHERE r.relayer_id = $1
                     AND r.deleted = FALSE
                     AND r.api_key = $2;
@@ -113,7 +113,7 @@ impl PostgresClient {
                 "
                     SELECT 
                         r.api_key
-                    FROM relayer_api_key r
+                    FROM relayer.api_key r
                     WHERE r.relayer_id = $1
                     AND r.deleted = FALSE
                     ORDER BY r.created_at DESC
@@ -141,7 +141,7 @@ impl PostgresClient {
                 "
                     SELECT 
                         r.address
-                    FROM relayer_allowlisted_address r
+                    FROM relayer.allowlisted_address r
                     WHERE r.relayer_id = $1
                     ORDER BY r.created_at DESC
                     LIMIT $2
@@ -167,7 +167,7 @@ impl PostgresClient {
             .query_one_or_none(
                 "
                     SELECT 1
-                    FROM relayer_allowlisted_address r
+                    FROM relayer.allowlisted_address r
                     WHERE r.relayer_id = $1
                     AND r.address = $2;
                 ",

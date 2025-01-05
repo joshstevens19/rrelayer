@@ -13,7 +13,7 @@ impl PostgresClient {
 
         trans
             .execute(
-                "INSERT INTO network(chain_id, name) VALUES ($1, $2) ON CONFLICT DO NOTHING;",
+                "INSERT INTO network.record(chain_id, name) VALUES ($1, $2) ON CONFLICT DO NOTHING;",
                 &[chain_id, name],
             )
             .await?;
@@ -21,7 +21,7 @@ impl PostgresClient {
         for provider_url in provider_urls {
             trans
             .execute(
-                "INSERT INTO network_nodes(chain_id, provider_url) VALUES ($1, $2) ON CONFLICT DO NOTHING;",
+                "INSERT INTO network.node(chain_id, provider_url) VALUES ($1, $2) ON CONFLICT DO NOTHING;",
                 &[chain_id, provider_url],
             )
             .await?;
@@ -33,15 +33,21 @@ impl PostgresClient {
     }
 
     pub async fn disable_network(&self, chain_id: ChainId) -> Result<(), tokio_postgres::Error> {
-        self.execute("UPDATE network SET disabled = TRUE WHERE chain_id = $1;", &[&chain_id])
-            .await?;
+        self.execute(
+            "UPDATE network.record SET disabled = TRUE WHERE chain_id = $1;",
+            &[&chain_id],
+        )
+        .await?;
 
         Ok(())
     }
 
     pub async fn enable_network(&self, chain_id: ChainId) -> Result<(), tokio_postgres::Error> {
-        self.execute("UPDATE network SET disabled = FALSE WHERE chain_id = $1;", &[&chain_id])
-            .await?;
+        self.execute(
+            "UPDATE network.record SET disabled = FALSE WHERE chain_id = $1;",
+            &[&chain_id],
+        )
+        .await?;
 
         Ok(())
     }

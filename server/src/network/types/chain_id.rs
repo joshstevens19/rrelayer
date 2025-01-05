@@ -10,7 +10,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 
 #[derive(Debug, Copy, Clone, Serialize, Eq)]
-pub struct ChainId(pub u64);
+pub struct ChainId(u64);
 
 impl ChainId {
     pub fn new(id: u64) -> Self {
@@ -53,7 +53,7 @@ impl<'a> FromSql<'a> for ChainId {
     }
 
     fn accepts(ty: &Type) -> bool {
-        *ty == Type::INT4
+        *ty == Type::INT8
     }
 }
 

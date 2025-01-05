@@ -55,7 +55,7 @@ impl<'a> FromSql<'a> for GasLimit {
     }
 
     fn accepts(ty: &Type) -> bool {
-        *ty == Type::TEXT || *ty == Type::CHAR || *ty == Type::VARCHAR || *ty == Type::BPCHAR
+        *ty == Type::NUMERIC
     }
 }
 
@@ -70,7 +70,7 @@ impl ToSql for GasLimit {
     }
 
     fn accepts(ty: &Type) -> bool {
-        <String as ToSql>::accepts(ty)
+        *ty == Type::NUMERIC
     }
 
     tokio_postgres::types::to_sql_checked!();

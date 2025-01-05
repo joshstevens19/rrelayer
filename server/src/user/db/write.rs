@@ -10,7 +10,7 @@ impl PostgresClient {
     ) -> Result<(), tokio_postgres::Error> {
         self.execute(
             "
-                    UPDATE user
+                    UPDATE authentication.user_access
                     SET role = $2
                     WHERE address = $1;
                 ",
@@ -28,7 +28,7 @@ impl PostgresClient {
     ) -> Result<(), tokio_postgres::Error> {
         self.execute(
             "
-                   INSERT INTO \"user\" (address, role)
+                   INSERT INTO authentication.user_access(address, role)
                    VALUES ($1, $2)
                    ON CONFLICT DO NOTHING;
                 ",
@@ -53,7 +53,7 @@ impl PostgresClient {
     pub async fn delete_user(&self, address: &EvmAddress) -> Result<(), tokio_postgres::Error> {
         self.execute(
             "
-                   DELETE FROM user
+                   DELETE FROM authentication.user_access
                    WHERE address = $1;
                 ",
             &[address],

@@ -11,7 +11,7 @@ use fmt::Display;
 use serde::{Deserialize, Serialize};
 use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 
-use crate::shared::{from_param_u256, from_sql_u256, to_sql_u256};
+use crate::shared::from_param_u256;
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq)]
 pub struct BlockHash(B256);
@@ -35,26 +35,31 @@ impl PartialEq for BlockHash {
 }
 
 impl<'a> FromSql<'a> for BlockHash {
-    fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
-        from_sql_u256(ty, raw).map(|block_hash| BlockHash(block_hash.into()))
+    fn from_sql(_ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
+        let block_hash = B256::from_slice(raw);
+
+        Ok(BlockHash(block_hash))
     }
 
     fn accepts(ty: &Type) -> bool {
-        *ty == Type::BPCHAR
+        *ty == Type::BYTEA
     }
 }
 
 impl ToSql for BlockHash {
     fn to_sql(
         &self,
-        ty: &Type,
+        _ty: &Type,
         out: &mut BytesMut,
     ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
-        to_sql_u256(self.0.into(), ty, out)
+        let value_as_string = self.0.to_string();
+
+        out.extend_from_slice(value_as_string.as_bytes());
+        Ok(IsNull::No)
     }
 
     fn accepts(ty: &Type) -> bool {
-        *ty == Type::BPCHAR
+        *ty == Type::BYTEA
     }
 
     tokio_postgres::types::to_sql_checked!();

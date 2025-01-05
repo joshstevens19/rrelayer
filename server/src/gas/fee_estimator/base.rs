@@ -33,7 +33,7 @@ pub struct GasPriceResult {
 impl GasPriceResult {
     // Effective Gas Price = Base Fee + Priority Fee
     pub fn legacy_gas_price(&self) -> GasPrice {
-        GasPrice::new(self.max_fee.0 + self.max_priority_fee.0)
+        GasPrice::new(self.max_fee.into_u128() + self.max_priority_fee.into_u128())
     }
 }
 

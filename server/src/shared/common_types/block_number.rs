@@ -35,7 +35,7 @@ impl<'a> FromSql<'a> for BlockNumber {
     }
 
     fn accepts(ty: &Type) -> bool {
-        *ty == Type::INT4
+        *ty == Type::INT8
     }
 }
 
@@ -49,7 +49,7 @@ impl ToSql for BlockNumber {
     }
 
     fn accepts(ty: &Type) -> bool {
-        *ty == Type::INT4
+        *ty == Type::INT8
     }
 
     tokio_postgres::types::to_sql_checked!();

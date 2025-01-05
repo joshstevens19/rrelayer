@@ -11,11 +11,15 @@ use serde::{Deserialize, Serialize};
 use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialOrd)]
-pub struct MaxPriorityFee(pub u128);
+pub struct MaxPriorityFee(u128);
 
 impl MaxPriorityFee {
     pub fn new(value: u128) -> Self {
         MaxPriorityFee(value)
+    }
+
+    pub fn into_u128(self) -> u128 {
+        self.0
     }
 }
 
@@ -63,7 +67,7 @@ impl<'a> FromSql<'a> for MaxPriorityFee {
     }
 
     fn accepts(ty: &Type) -> bool {
-        *ty == Type::INT4 || *ty == Type::VARCHAR
+        *ty == Type::NUMERIC
     }
 }
 
@@ -78,7 +82,7 @@ impl ToSql for MaxPriorityFee {
     }
 
     fn accepts(ty: &Type) -> bool {
-        <String as ToSql>::accepts(ty)
+        *ty == Type::NUMERIC
     }
 
     tokio_postgres::types::to_sql_checked!();

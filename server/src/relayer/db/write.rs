@@ -21,9 +21,6 @@ pub enum CreateRelayerError {
     #[error("Relayer did not return init information - name: {0}, chainId: {1}")]
     NoSaveRelayerInitInfoReturnedDb(String, ChainId),
 
-    #[error("Relayer audit log could not be saved in DB - name: {0}, chainId: {1}: {0}")]
-    CouldNotSaveRelayerAuditLogDb(String, ChainId, tokio_postgres::Error),
-
     #[error("Wallet error - name: {0}, chainId: {1}: {0}")]
     WalletError(String, ChainId, LocalSignerError),
 }
@@ -40,10 +37,10 @@ impl PostgresClient {
         let query = "
             WITH new_wallet_index AS (
                 SELECT COALESCE(MAX(wallet_index), -1) + 1 AS wallet_index
-                FROM relayer
+                FROM relayer.record
                 WHERE chain_id = $3
             )
-            INSERT INTO relayer (id, name, chain_id, wallet_index)
+            INSERT INTO relayer.record (id, name, chain_id, wallet_index)
             SELECT $1, $2, $3, wallet_index
             FROM new_wallet_index
             RETURNING wallet_index;
@@ -53,7 +50,6 @@ impl PostgresClient {
             CreateRelayerError::CouldNotSaveRelayerDb(name.to_string(), *chain_id, e)
         })?;
 
-        // Assuming that one row will be returned
         if let Some(row) = rows.first() {
             let wallet_index: i32 = row.get("wallet_index");
             let address = emv_provider
@@ -65,7 +61,7 @@ impl PostgresClient {
             // we can now update the address
             self.execute(
                 "
-                UPDATE relayer 
+                UPDATE relayer.record 
                 SET address = $1 
                 WHERE chain_id = $2
                 AND wallet_index = $3
@@ -75,10 +71,6 @@ impl PostgresClient {
             .await
             .map_err(|e| {
                 CreateRelayerError::CouldNotUpdateRelayerInfoDb(name.to_string(), *chain_id, e)
-            })?;
-
-            self.relayer_audit_log_snapshot(&relayer_id).await.map_err(|e| {
-                CreateRelayerError::CouldNotSaveRelayerAuditLogDb(name.to_string(), *chain_id, e)
             })?;
 
             let relayer = self.get_relayer(&relayer_id).await.map_err(|e| {
@@ -104,15 +96,13 @@ impl PostgresClient {
         let _ = self
             .execute(
                 "
-                UPDATE relayer
+                UPDATE relayer.record
                 SET deleted = TRUE
                 WHERE id = $1
                 ",
                 &[relayer_id],
             )
             .await?;
-
-        self.relayer_audit_log_snapshot(relayer_id).await?;
 
         Ok(())
     }
@@ -121,15 +111,13 @@ impl PostgresClient {
         let _ = self
             .execute(
                 "
-                UPDATE relayer
+                UPDATE relayer.record
                 SET paused = TRUE
                 WHERE id = $1
                 ",
                 &[relayer_id],
             )
             .await?;
-
-        self.relayer_audit_log_snapshot(relayer_id).await?;
 
         Ok(())
     }
@@ -141,15 +129,13 @@ impl PostgresClient {
         let _ = self
             .execute(
                 "
-                UPDATE relayer
+                UPDATE relayer.record
                 SET paused = FALSE
                 WHERE id = $1
                 ",
                 &[relayer_id],
             )
             .await?;
-
-        self.relayer_audit_log_snapshot(relayer_id).await?;
 
         Ok(())
     }
@@ -162,7 +148,7 @@ impl PostgresClient {
         let _ = self
             .execute(
                 "
-                INSERT INTO relayer_api_key(api_key, relayer_id)
+                INSERT INTO relayer.api_key(api_key, relayer_id)
                 VALUES ($1, $2)
                 ",
                 &[&api_key, relayer_id],
@@ -180,7 +166,7 @@ impl PostgresClient {
         let _ = self
             .execute(
                 "
-                UPDATE relayer_api_key
+                UPDATE relayer.api_key
                 SET deleted = TRUE
                 WHERE api_key = $1
                 AND relayer_id = $2
@@ -200,15 +186,13 @@ impl PostgresClient {
         let _ = self
             .execute(
                 "
-                UPDATE relayer
+                UPDATE relayer.record
                 SET max_gas_price_cap = $1
                 WHERE id = $2
                 ",
                 &[&cap, relayer_id],
             )
             .await?;
-
-        self.relayer_audit_log_snapshot(relayer_id).await?;
 
         Ok(())
     }
@@ -221,15 +205,13 @@ impl PostgresClient {
         let _ = self
             .execute(
                 "
-                UPDATE relayer
+                UPDATE relayer.record
                 SET eip_1559_enabled = $1
                 AND id = $2
                 ",
                 &[enable, relayer_id],
             )
             .await?;
-
-        self.relayer_audit_log_snapshot(relayer_id).await?;
 
         Ok(())
     }
@@ -242,7 +224,7 @@ impl PostgresClient {
         let _ = self
             .execute(
                 "
-                INSERT INTO relayer_allowlisted_address(address, relayer_id)
+                INSERT INTO relayer.allowlisted_address(address, relayer_id)
                 VALUES ($1, $2)
                 ON CONFLICT DO NOTHING;
                 ",
@@ -263,7 +245,7 @@ impl PostgresClient {
         let _ = self
             .execute(
                 "
-                DELETE FROM relayer_allowlisted_address
+                DELETE FROM relayer.allowlisted_address
                 WHERE address = $1
                 AND relayer_id = $2;
                 ",
@@ -283,39 +265,17 @@ impl PostgresClient {
         let _ = self
             .execute(
                 "
-                UPDATE relayer
+                UPDATE relayer.record
                 SET allowlisted_addresses_only = COALESCE(
                     (
                         SELECT TRUE 
-                        FROM relayer_api_key 
+                        FROM relayer.api_key 
                         WHERE relayer_id = $1 
                         AND deleted = FALSE 
                         LIMIT 1
                     ), 
                     FALSE)
                 WHERE id = $1
-                ",
-                &[relayer_id],
-            )
-            .await?;
-
-        self.relayer_audit_log_snapshot(relayer_id).await?;
-
-        Ok(())
-    }
-
-    async fn relayer_audit_log_snapshot(
-        &self,
-        relayer_id: &RelayerId,
-    ) -> Result<(), tokio_postgres::Error> {
-        let _ = self
-            .execute(
-                "
-                INSERT INTO public.relayer_audit_log
-                (id, name, chain_id, address, wallet_index, max_gas_price_cap, paused, allowlisted_addresses_only, eip_1559_enabled, deleted, created_at)
-                SELECT id, name, chain_id, address, wallet_index, max_gas_price_cap, paused, allowlisted_addresses_only, eip_1559_enabled, deleted, created_at
-                FROM relayer
-                WHERE id = $1;
                 ",
                 &[relayer_id],
             )

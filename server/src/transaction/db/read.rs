@@ -15,7 +15,7 @@ impl PostgresClient {
             .query_one_or_none(
                 "
                     SELECT *
-                    FROM relayer_transaction_view
+                    FROM relayer.transaction
                     WHERE id = $1;
                 ",
                 &[id],
@@ -37,7 +37,7 @@ impl PostgresClient {
             .query(
                 "
                     SELECT *
-                    FROM relayer_transaction_view
+                    FROM relayer.transaction
                     WHERE relayer_id = $1
                     LIMIT $2
                     OFFSET $3;
@@ -64,7 +64,7 @@ impl PostgresClient {
             .query(
                 "
                     SELECT *
-                    FROM relayer_transaction_view
+                    FROM relayer.transaction
                     WHERE relayer_id = $1
                     AND status = $2
                     ORDER BY nonce ASC

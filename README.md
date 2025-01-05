@@ -8,7 +8,6 @@ RUSTFLAGS="-C target-cpu=native" cargo run --profile maxperf --features jemalloc
 
 ## Server MVP
 
-- use proper ethereum typings
 - create clone feature which reuses the same PK 
 - create CLI tool to install to run the relayer
 - look at the vercel server API example

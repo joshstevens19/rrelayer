@@ -32,7 +32,7 @@ impl WalletManager {
                 .phrase::<&str>(&self.mnemonic)
                 .index(index)?
                 .build()?
-                .with_chain_id(Some(chain_id.0));
+                .with_chain_id(Some((*chain_id).into()));
 
             wallets.insert(index, wallet.clone());
 

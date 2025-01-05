@@ -28,8 +28,8 @@ impl PostgresClient {
                 n.chain_id,
                 n.disabled,
                 nn.provider_url
-            FROM network n 
-            INNER JOIN network_nodes nn ON nn.chain_id = n.chain_id
+            FROM network.record n 
+            INNER JOIN network.node nn ON nn.chain_id = n.chain_id
             {filter_sql};
             "#,
             filter_sql = filter_sql

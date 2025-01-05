@@ -10,11 +10,15 @@ use serde::{Deserialize, Serialize};
 use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq)]
-pub struct GasPrice(pub u128);
+pub struct GasPrice(u128);
 
 impl GasPrice {
     pub fn new(gas_price: u128) -> Self {
         GasPrice(gas_price)
+    }
+
+    pub fn into_u128(self) -> u128 {
+        self.0
     }
 }
 
@@ -38,7 +42,7 @@ impl<'a> FromSql<'a> for GasPrice {
     }
 
     fn accepts(ty: &Type) -> bool {
-        *ty == Type::TEXT || *ty == Type::CHAR || *ty == Type::VARCHAR || *ty == Type::BPCHAR
+        *ty == Type::NUMERIC
     }
 }
 
@@ -53,7 +57,7 @@ impl ToSql for GasPrice {
     }
 
     fn accepts(ty: &Type) -> bool {
-        <String as ToSql>::accepts(ty)
+        *ty == Type::NUMERIC
     }
 
     tokio_postgres::types::to_sql_checked!();

@@ -14,7 +14,7 @@ impl PostgresClient {
             .query_one_or_none(
                 "
                     SELECT *
-                    FROM \"user\"
+                    FROM authentication.user_access
                     WHERE address = $1;
                 ",
                 &[address],

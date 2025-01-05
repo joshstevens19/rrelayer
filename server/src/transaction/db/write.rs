@@ -11,7 +11,7 @@ use crate::{
     transaction::types::{Transaction, TransactionHash, TransactionId, TransactionStatus},
 };
 
-const TRANSACTION_TABLES: [&str; 2] = ["relayer_transaction", "relayer_transaction_audit_log"];
+const TRANSACTION_TABLES: [&str; 2] = ["relayer.transaction", "relayer.transaction_audit_log"];
 
 impl PostgresClient {
     pub async fn save_transaction(

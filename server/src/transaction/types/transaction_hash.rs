@@ -5,13 +5,15 @@ use std::{
     str::FromStr,
 };
 
-use alloy::primitives::TxHash;
+use alloy::primitives::{TxHash, B256};
 use bytes::BytesMut;
 use serde::{Deserialize, Serialize};
 use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 
+use crate::shared::common_types::BlockHash;
+
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq)]
-pub struct TransactionHash(pub TxHash);
+pub struct TransactionHash(TxHash);
 
 impl TransactionHash {
     pub fn hex(&self) -> String {
@@ -20,6 +22,10 @@ impl TransactionHash {
 
     pub fn from_alloy_hash(hash: &TxHash) -> Self {
         Self(hash.clone())
+    }
+
+    pub fn into_alloy_hash(self) -> TxHash {
+        self.0
     }
 }
 
@@ -42,32 +48,31 @@ impl PartialEq for TransactionHash {
 }
 
 impl<'a> FromSql<'a> for TransactionHash {
-    fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
-        if *ty == Type::BPCHAR {
-            let hash = String::from_utf8(raw.to_vec())?;
+    fn from_sql(_ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
+        let tx_hash = TxHash::from_slice(raw);
 
-            Ok(TransactionHash(TxHash::from_str(&hash)?))
-        } else {
-            Err("Expected type BPCHAR for TransactionHash".into())
-        }
+        Ok(TransactionHash(tx_hash))
     }
 
     fn accepts(ty: &Type) -> bool {
-        *ty == Type::BPCHAR
+        *ty == Type::BYTEA
     }
 }
 
 impl ToSql for TransactionHash {
-    fn to_sql(&self, _: &Type, out: &mut BytesMut) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
-        let hash = self.0.to_string();
+    fn to_sql(
+        &self,
+        _ty: &Type,
+        out: &mut BytesMut,
+    ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+        let value_as_string = self.0.to_string();
 
-        out.extend_from_slice(hash.as_bytes());
-
+        out.extend_from_slice(value_as_string.as_bytes());
         Ok(IsNull::No)
     }
 
     fn accepts(ty: &Type) -> bool {
-        *ty == Type::BPCHAR
+        *ty == Type::BYTEA
     }
 
     tokio_postgres::types::to_sql_checked!();

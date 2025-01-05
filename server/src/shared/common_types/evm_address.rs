@@ -3,7 +3,7 @@ use std::{error::Error, fmt::Display, str::FromStr};
 use alloy::primitives::Address;
 use bytes::BytesMut;
 use serde::{Deserialize, Serialize};
-use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
+use tokio_postgres::types::{to_sql_checked, FromSql, IsNull, ToSql, Type};
 
 #[derive(Debug, Copy, Clone, Serialize, PartialEq, Deserialize)]
 pub struct EvmAddress(Address);
@@ -16,6 +16,10 @@ impl EvmAddress {
     pub fn new(address: Address) -> Self {
         EvmAddress(address)
     }
+
+    pub fn into_address(self) -> Address {
+        self.0
+    }
 }
 
 impl Display for EvmAddress {
@@ -25,35 +29,37 @@ impl Display for EvmAddress {
 }
 
 impl<'a> FromSql<'a> for EvmAddress {
-    fn from_sql(_: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
-        let s = String::from_utf8(raw.to_vec())?;
-
-        if s.len() == 42 {
-            Ok(EvmAddress(s.parse::<Address>()?))
-        } else {
-            Err("Invalid length for EVM address".into())
+    fn from_sql(_ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
+        // Ensure the byte slice is the correct length for an Ethereum address (20 bytes)
+        if raw.len() != 20 {
+            return Err("Invalid byte length for Ethereum address".into());
         }
+
+        let address = Address::from_slice(raw);
+
+        Ok(EvmAddress(address))
     }
 
     fn accepts(ty: &Type) -> bool {
-        *ty == Type::TEXT || *ty == Type::CHAR || *ty == Type::VARCHAR || *ty == Type::BPCHAR
+        *ty == Type::BYTEA
     }
 }
 
 impl ToSql for EvmAddress {
-    fn to_sql(&self, _: &Type, out: &mut BytesMut) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
-        let address_str = self.hex();
-
-        out.extend_from_slice(address_str.as_bytes());
-
+    fn to_sql(
+        &self,
+        _ty: &Type,
+        out: &mut BytesMut,
+    ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+        out.extend_from_slice(self.into_address().as_slice());
         Ok(IsNull::No)
     }
 
     fn accepts(ty: &Type) -> bool {
-        *ty == Type::TEXT || *ty == Type::CHAR || *ty == Type::VARCHAR || *ty == Type::BPCHAR
+        *ty == Type::BYTEA
     }
 
-    tokio_postgres::types::to_sql_checked!();
+    to_sql_checked!();
 }
 
 #[derive(Debug)]
