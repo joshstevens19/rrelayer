@@ -8,7 +8,7 @@ use super::base::{
 };
 use crate::{
     gas::types::{MaxFee, MaxPriorityFee},
-    network::types::{Chain, ChainId},
+    network::types::ChainId,
 };
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -62,7 +62,7 @@ impl CustomGasEstimateResult {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct CustomGasFeeEstimator {
     pub endpoint: String,
-    pub supported_chains: Vec<Chain>,
+    pub supported_chains: Vec<ChainId>,
     pub auth_header: Option<String>,
 }
 
@@ -105,11 +105,7 @@ impl BaseGasFeeEstimator for CustomGasFeeEstimator {
         Ok(gas_estimate_result.to_base_result().map_err(GasEstimatorError::UnitsError)?)
     }
 
-    fn get_supported_chains(&self) -> Vec<Chain> {
-        self.supported_chains.clone()
-    }
-
     fn is_chain_supported(&self, chain_id: &ChainId) -> bool {
-        self.supported_chains.iter().any(|&id| chain_id == &id.chain_id())
+        self.supported_chains.iter().any(|&id| chain_id == &id)
     }
 }

@@ -11,7 +11,7 @@ use thiserror::Error;
 use super::infura::InfuraGasFeeEstimator;
 use crate::{
     gas::types::{GasPrice, GasProvider, MaxFee, MaxPriorityFee},
-    network::types::{Chain, ChainId},
+    network::types::ChainId,
     setup::yaml::{NetworkSetupConfig, SetupConfig},
 };
 
@@ -90,7 +90,6 @@ pub trait BaseGasFeeEstimator {
         &self,
         chain_id: &ChainId,
     ) -> Result<GasEstimatorResult, GasEstimatorError>;
-    fn get_supported_chains(&self) -> Vec<Chain>;
     fn is_chain_supported(&self, chain_id: &ChainId) -> bool;
 }
 

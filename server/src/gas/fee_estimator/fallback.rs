@@ -14,7 +14,7 @@ use strum::IntoEnumIterator;
 use super::base::{BaseGasFeeEstimator, GasEstimatorError, GasEstimatorResult, GasPriceResult};
 use crate::{
     gas::types::{MaxFee, MaxPriorityFee},
-    network::types::{Chain, ChainId},
+    network::types::ChainId,
     provider::RelayerProvider,
     shared::common_types::BlockNumber,
 };
@@ -140,10 +140,6 @@ impl BaseGasFeeEstimator for FallbackGasFeeEstimator {
         };
 
         Ok(gas_estimate_result)
-    }
-
-    fn get_supported_chains(&self) -> Vec<Chain> {
-        Chain::iter().collect()
     }
 
     fn is_chain_supported(&self, _: &ChainId) -> bool {

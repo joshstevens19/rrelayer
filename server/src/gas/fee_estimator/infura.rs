@@ -9,7 +9,7 @@ use super::base::{
 };
 use crate::{
     gas::types::{MaxFee, MaxPriorityFee},
-    network::types::{Chain, ChainId},
+    network::types::ChainId,
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -85,7 +85,7 @@ impl InfuraGasEstimateResult {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct InfuraGasFeeEstimator {
     base_url: String,
-    supported_chains: Vec<Chain>,
+    supported_chains: Vec<ChainId>,
     api_key: String,
     secret: String,
 }
@@ -95,24 +95,24 @@ impl InfuraGasFeeEstimator {
         Self {
             base_url: "https://gas.api.infura.io/networks".to_string(),
             supported_chains: vec![
-                Chain::EthereumMainnet,
-                Chain::EthereumGoerli,
-                Chain::EthereumSepolia,
-                Chain::ArbitrumMainnet,
-                Chain::ArbitrumNova,
-                Chain::Avalanche,
-                Chain::Base,
-                Chain::Binance,
-                Chain::OpBnbLayer2,
-                Chain::Cronos,
-                Chain::Fantom,
-                Chain::Filecoin,
-                Chain::LineaMainnet,
-                Chain::LineaTestnet,
-                Chain::Optimism,
-                Chain::PolygonMainnet,
-                Chain::PolygonMumbai,
-                Chain::ZkSyncEraMainnet,
+                ChainId(1),        // EthereumMainnet
+                ChainId(5),        // EthereumGoerli
+                ChainId(11155111), // EthereumSepolia
+                ChainId(42161),    // ArbitrumMainnet
+                ChainId(42170),    // ArbitrumNova
+                ChainId(43114),    // Avalanche
+                ChainId(8453),     // Base
+                ChainId(56),       // Binance
+                ChainId(204),      // OpBnbLayer2
+                ChainId(25),       // Cronos
+                ChainId(250),      // Fantom
+                ChainId(314),      // Filecoin
+                ChainId(59144),    // LineaMainnet
+                ChainId(59140),    // LineaTestnet
+                ChainId(10),       // Optimism
+                ChainId(137),      // PolygonMainnet
+                ChainId(100),      // PolygonMumbai
+                ChainId(324),      // ZkSyncEraMainnet
             ],
             api_key: api_key.to_string(),
             secret: secret.to_string(),
@@ -158,11 +158,7 @@ impl BaseGasFeeEstimator for InfuraGasFeeEstimator {
         Ok(gas_estimate_result.to_base_result().map_err(GasEstimatorError::UnitsError)?)
     }
 
-    fn get_supported_chains(&self) -> Vec<Chain> {
-        self.supported_chains.clone()
-    }
-
     fn is_chain_supported(&self, chain_id: &ChainId) -> bool {
-        self.supported_chains.iter().any(|&id| chain_id == &id.chain_id())
+        self.supported_chains.iter().any(|&id| chain_id == &id)
     }
 }
