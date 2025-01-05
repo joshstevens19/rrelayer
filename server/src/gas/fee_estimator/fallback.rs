@@ -9,7 +9,6 @@ use alloy::{
 };
 use async_trait::async_trait;
 use futures::future::join_all;
-use strum::IntoEnumIterator;
 
 use super::base::{BaseGasFeeEstimator, GasEstimatorError, GasEstimatorResult, GasPriceResult};
 use crate::{

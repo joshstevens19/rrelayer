@@ -8,13 +8,12 @@ signing_key:
     session_token: ${AWS_SESSION_TOKEN}
     region: ${AWS_REGION}
 networks:
-  - name: polygon_mumbai
-    seed: sight desk enter magnet sun belt wise vacuum cattle album chronic rack butter brass gaze box work oppose client win flight person excuse replace
+  - name: base
+    # seed: sight desk enter magnet sun belt wise vacuum cattle album chronic rack butter brass gaze box work oppose client win flight person excuse replace
     provider_urls:
-      - https://polygon-mumbai.g.alchemy.com/v2/vK2vT6YDAHvjRHVjD1MXj95Kl1V_IbSV
-      - https://polygon-mumbai.g.alchemy.com/v2/vK2vT6YDAHvjRHVjD1MXj95Kl1V_IbSV
-    gas_provider: infura
-gas_providers:
-  infura:
-    - api_key: ${INFURA_API_KEY}
-      secret: ${INFURA_API_SECRET}
+      - https://base.gateway.tenderly.co
+    #gas_provider: infura
+#gas_providers:
+#  infura:
+#    - api_key: ${INFURA_API_KEY}
+#      secret: ${INFURA_API_SECRET}
