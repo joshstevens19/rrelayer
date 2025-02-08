@@ -20,19 +20,6 @@ services:
       timeout: 10s
       retries: 10
 
-  flyway:
-    image: flyway/flyway:10.10.0
-    env_file:
-      - .env
-    command: -locations=filesystem:/flyway/sql -connectRetries=60 migrate
-    volumes:
-      - ${PWD}/crates/server/schema:/flyway/sql
-    depends_on:
-      postgresql:
-        condition: service_healthy
-    links:
-      - postgresql
-
   # app:
   #   build: .
   #   depends_on:

@@ -1,10 +1,8 @@
-use startup::start;
-use tracing::error;
-
 mod app_state;
 mod authentication;
 mod gas;
 mod logger;
+pub use logger::setup_info_logger;
 mod middleware;
 mod network;
 mod postgres;
@@ -13,15 +11,6 @@ mod relayer;
 mod setup;
 mod shared;
 mod startup;
+pub use startup::start;
 mod transaction;
 mod user;
-
-#[tokio::main]
-async fn main() {
-    logger::setup_info_logger();
-    let result = start().await;
-
-    if let Err(e) = result {
-        error!("Error starting the server: {}", e);
-    }
-}

@@ -8,8 +8,14 @@ RUSTFLAGS="-C target-cpu=native" cargo run --profile maxperf --features jemalloc
 
 ## Server MVP
 
-- create clone feature which reuses the same PK 
-- create CLI tool to install to run the relayer
+- support more signing options
+  - aws signer
+  - gcp signer
+  - keystore signer
+- create CLI tool to install and run the relayer
+- work out how to get blob gas estimates
+- create clone feature which reuses the same PK
+- review whole codebase and tidy up
 - look at the vercel server API example
 
 # AWS env
