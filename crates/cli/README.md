@@ -3,8 +3,8 @@
 ## Design
 
 - relayer init - creates a new relayer project
-   - rrelayer project name - required
-   - project description - optional
+   - enter rrelayer project name - required
+   - enter project description - optional
    - docker support out of the box? [yes, no]
  creates you a new project with a rrelayer.yaml file in it + .env file with stuff in
 
@@ -26,7 +26,9 @@
 - relayer unpause <relayer_id> - unpauses the relayer by id
 - relayer update_eip1559_status <relayer_id> <status> - updates the EIP1559 status for the relayer by id
 - relayer update_max_gas_price <relayer_id> <cap> - updates the max gas price for the relayer by id
-- 
+- relayer balance <relayer_id> - gets the native balance for the relayer by id
+- relayer balance <relayer_id> --token <token_address> - gets the ERC20 balance for the relayer by id and token address
+
 - relayer api_key add <relayer_id> - adds an API key for the relayer by id
 - relayer api_key list <relayer_id> - lists all the API keys for the relayer by id
 - relayer api_key delete <relayer_id> <api_key> - deletes an API key for the relayer by id
