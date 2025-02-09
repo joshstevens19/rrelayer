@@ -18,6 +18,7 @@ pub struct AwsSigningKey {
     pub secret_name: String,
     pub access_key_id: String,
     pub secret_access_key: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub session_token: Option<String>,
     pub region: String,
 }
@@ -29,8 +30,16 @@ pub struct SigningKeyRaw {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SigningKey {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub raw: Option<SigningKeyRaw>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub aws_secret_manager: Option<AwsSigningKey>,
+}
+
+impl Default for SigningKey {
+    fn default() -> Self {
+        Self { raw: Some(SigningKeyRaw { mnemonic: "${MNEMONIC}".to_string() }), aws_secret_manager: None }
+    }
 }
 
 impl SigningKey {
@@ -50,25 +59,35 @@ impl SigningKey {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NetworkSetupConfig {
     pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub signing_key: Option<SigningKey>,
     pub provider_urls: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub block_explorer_url: Option<String>,
-    #[serde(deserialize_with = "deserialize_gas_provider")]
+    #[serde(deserialize_with = "deserialize_gas_provider", skip_serializing_if = "Option::is_none")]
     pub gas_provider: Option<GasProvider>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GasProviders {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub infura: Option<InfuraGasProviderSetupConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub custom: Option<CustomGasFeeEstimator>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SetupConfig {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub signing_key: Option<SigningKey>,
     pub admins: Vec<EvmAddress>,
     pub networks: Vec<NetworkSetupConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub gas_providers: Option<GasProviders>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_origins: Option<Vec<String>>,
 }
 

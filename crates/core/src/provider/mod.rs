@@ -10,6 +10,7 @@ use crate::{
 };
 
 mod wallet_manager;
+pub use wallet_manager::generate_seed_phrase;
 
 mod evm_provider;
 pub use evm_provider::{EvmProvider, RelayerProvider, SendTransactionError};

@@ -10,7 +10,7 @@ pub enum ApiKeyCommand {
     Delete { api_key: String },
 }
 
-pub fn handle_api_key(
+pub async fn handle_api_key(
     relayer_id: &str,
     command: &ApiKeyCommand,
 ) -> Result<(), Box<dyn std::error::Error>> {

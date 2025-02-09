@@ -13,7 +13,7 @@ pub struct BalanceArgs {
     pub token: Option<String>,
 }
 
-pub fn handle_balance(args: &BalanceArgs) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn handle_balance(args: &BalanceArgs) -> Result<(), Box<dyn std::error::Error>> {
     match &args.token {
         Some(token) => {
             println!("Getting ERC20 balance for relayer {} and token {}", args.relayer_id, token);

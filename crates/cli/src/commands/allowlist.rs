@@ -10,7 +10,7 @@ pub enum AllowlistCommand {
     Delete { address: String },
 }
 
-pub fn handle_allowlist(
+pub async fn handle_allowlist(
     relayer_id: &str,
     command: &AllowlistCommand,
 ) -> Result<(), Box<dyn std::error::Error>> {

@@ -35,7 +35,7 @@ pub enum TxStatus {
     Success,
 }
 
-pub fn handle_tx(command: &TxCommand) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn handle_tx(command: &TxCommand) -> Result<(), Box<dyn std::error::Error>> {
     match command {
         TxCommand::Get { tx_id } => handle_get(tx_id),
         TxCommand::Status { tx_id } => handle_status(tx_id),

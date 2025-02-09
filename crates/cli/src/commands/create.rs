@@ -11,7 +11,7 @@ pub struct CreateArgs {
     pub network_name: String,
 }
 
-pub fn handle_create(args: &CreateArgs) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn handle_create(args: &CreateArgs) -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating new relayer '{}' on network '{}'", args.name, args.network_name);
 
     // Validate network exists

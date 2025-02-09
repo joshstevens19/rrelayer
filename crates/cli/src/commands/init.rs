@@ -1,47 +1,90 @@
 use std::{fs, path::Path};
 
 use dialoguer::{Confirm, Input};
+use rrelayerr::{NetworkSetupConfig, SetupConfig, SigningKey, WriteFileError, generate_docker_file, write_file, generate_seed_phrase};
+use serde_yaml;
 
-pub fn handle_init() -> Result<(), Box<dyn std::error::Error>> {
-    // Project name input (required)
-    let project_name: String =
-        Input::new().with_prompt("Enter relayer project name").interact_text()?;
+use crate::console::print_error_message;
 
-    // Project description input (optional)
+fn write_docker_compose(path: &Path) -> Result<(), WriteFileError> {
+    write_file(&path.join("docker-compose.yml"), generate_docker_file())
+}
+
+fn write_gitignore(path: &Path) -> Result<(), WriteFileError> {
+    write_file(
+        &path.join(".gitignore"),
+        r#".env
+    "#,
+    )
+}
+
+pub async fn handle_init(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let project_name: String = Input::new().with_prompt("Enter project name").interact_text()?;
+
     let project_description: String = Input::new()
         .with_prompt("Enter project description (optional)")
         .allow_empty(true)
         .interact_text()?;
 
-    // Docker support confirmation
     let docker_support = Confirm::new()
         .with_prompt("Do you want Docker support out of the box?")
         .default(true)
         .interact()?;
 
-    // Create project directory
-    fs::create_dir(&project_name)?;
+    let project_path = path.join(&project_name);
 
-    // Create rrelayer.yaml
-    let yaml_content = format!(
-        "project_name: {}\ndescription: {}\ndocker_support: {}\n",
-        project_name, project_description, docker_support
-    );
-    fs::write(Path::new(&project_name).join("rrelayer.yaml"), yaml_content)?;
+    fs::create_dir(&project_path)?;
 
-    // Create .env file
-    let env_content = format!("PROJECT_NAME={}\nDOCKER_ENABLED={}\n", project_name, docker_support);
-    fs::write(Path::new(&project_name).join("../../../../.env"), env_content)?;
+    let yaml_content: SetupConfig = SetupConfig {
+        name: project_name.clone(),
+        description: if !project_description.is_empty() { Some(project_description) } else { None },
+        signing_key: Some(SigningKey::default()),
+        admins: vec![],
+        networks: vec![NetworkSetupConfig {
+            name: "sepolia_ethereum".to_string(),
+            signing_key: None,
+            provider_urls: vec!["https://sepolia.gateway.tenderly.co".to_string()],
+            block_explorer_url: Some("https://sepolia.etherscan.io".to_string()),
+            gas_provider: None,
+        }],
+        gas_providers: None,
+        allowed_origins: None,
+    };
+    fs::write(project_path.join("rrelayerr.yaml"), serde_yaml::to_string(&yaml_content)?)?;
 
-    // Create Dockerfile if docker support is enabled
+    let new_mnemonic = Confirm::new()
+        .with_prompt("Do you want rrelayerr to generate a new mnemonic for you?")
+        .default(true)
+        .interact()?;
+    
+    let mut env = if new_mnemonic {
+        let seed_phrase = generate_seed_phrase()?;
+        format!("MNEMONIC=\"{}\"\"\n", seed_phrase)
+    } else {"MNEMONIC=INSERT_YOUR_MNEMONIC_HERE\n".to_string() };
+
     if docker_support {
-        let dockerfile_content = r#"FROM rust:latest
-WORKDIR /app
-COPY . .
-RUN cargo build --release
-CMD ["./target/release/relayer"]"#;
-        fs::write(Path::new(&project_name).join("Dockerfile"), dockerfile_content)?;
+        env += r#"DATABASE_URL=postgresql://postgres:rrelayerr@localhost:5440/postgres
+POSTGRES_PASSWORD=rrelayerr"#;
+
+        write_docker_compose(&project_path).map_err(|e| {
+            print_error_message(&format!("Failed to write docker compose file: {}", e));
+            e
+        })?;
+    } else {
+        let env = r#"DATABASE_URL=postgresql://[user[:password]@][host][:port][/dbname]"#;
+
+        write_file(&project_path.join(".env"), env).map_err(|e| {
+            print_error_message(&format!("Failed to write .env file: {}", e));
+            e
+        })?;
     }
+
+    write_file(&project_path.join(".env"), &env).map_err(|e| {
+        print_error_message(&format!("Failed to write .env file: {}", e));
+        e
+    })?;
+
+    write_gitignore(&project_path)?;
 
     println!("\nProject '{}' initialized successfully!", project_name);
     Ok(())

@@ -37,7 +37,7 @@ impl Debug for UserRole {
     }
 }
 
-pub fn handle_user(command: &UserCommand) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn handle_user(command: &UserCommand) -> Result<(), Box<dyn std::error::Error>> {
     match command {
         UserCommand::List => handle_list(),
         UserCommand::Edit { user_address, role } => handle_edit(user_address, role),

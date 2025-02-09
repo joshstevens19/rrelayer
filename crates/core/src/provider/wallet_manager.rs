@@ -4,6 +4,8 @@ use alloy::signers::{
     local::{coins_bip39::English, LocalSignerError, MnemonicBuilder, PrivateKeySigner},
     Signer,
 };
+use alloy::signers::local::coins_bip39::Mnemonic;
+use rand::thread_rng;
 use tokio::sync::Mutex;
 
 use crate::network::types::ChainId;
@@ -39,4 +41,13 @@ impl WalletManager {
             Ok(wallet)
         }
     }
+}
+
+pub fn generate_seed_phrase() -> Result<String, Box<dyn std::error::Error>> {
+    let mut rng = thread_rng();
+    let mnemonic = Mnemonic::<English>::new_with_count(&mut rng, 24)?;
+    
+    let phrase = mnemonic.to_phrase();
+
+    Ok(phrase)
 }

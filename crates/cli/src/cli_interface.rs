@@ -15,7 +15,11 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Commands {
     /// Initialize a new relayer project
-    Init,
+    Init {
+        /// optional - The path to create the project in, default will be where the command is run.
+        #[clap(long, short)]
+        path: Option<String>,
+    },
     /// Start the relayer service
     Start(start::StartArgs),
     /// Stop the relayer service

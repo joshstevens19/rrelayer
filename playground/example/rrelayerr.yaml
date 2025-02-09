@@ -1,0 +1,11 @@
+name: example
+description: 'This is an example yaml file'
+signing_key:
+  raw:
+    mnemonic: ${MNEMONIC}
+admins: []
+networks:
+- name: sepolia_ethereum
+  provider_urls:
+  - https://sepolia.gateway.tenderly.co
+  block_explorer_url: https://sepolia.etherscan.io

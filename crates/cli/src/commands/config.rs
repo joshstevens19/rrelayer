@@ -20,7 +20,7 @@ pub enum ConfigCommand {
     },
 }
 
-pub fn handle_config(
+pub async fn handle_config(
     relayer_id: &str,
     command: &ConfigCommand,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -35,25 +35,25 @@ pub fn handle_config(
     }
 }
 
-pub fn handle_get(relayer_id: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn handle_get(relayer_id: &str) -> Result<(), Box<dyn std::error::Error>> {
     println!("Getting relayer with ID: {}", relayer_id);
     // TODO: Implement actual relayer fetching logic
     Ok(())
 }
 
-pub fn handle_pause(relayer_id: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn handle_pause(relayer_id: &str) -> Result<(), Box<dyn std::error::Error>> {
     println!("Pausing relayer with ID: {}", relayer_id);
     // TODO: Implement actual relayer pausing logic
     Ok(())
 }
 
-pub fn handle_unpause(relayer_id: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn handle_unpause(relayer_id: &str) -> Result<(), Box<dyn std::error::Error>> {
     println!("Unpausing relayer with ID: {}", relayer_id);
     // TODO: Implement actual relayer unpausing logic
     Ok(())
 }
 
-pub fn handle_update_eip1559_status(
+fn handle_update_eip1559_status(
     relayer_id: &str,
     status: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -62,7 +62,7 @@ pub fn handle_update_eip1559_status(
     Ok(())
 }
 
-pub fn handle_update_max_gas_price(
+fn handle_update_max_gas_price(
     relayer_id: &str,
     cap: u64,
 ) -> Result<(), Box<dyn std::error::Error>> {

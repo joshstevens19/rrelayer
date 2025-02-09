@@ -1,4 +1,7 @@
+use std::{path::PathBuf, str::FromStr};
+
 use clap::Parser;
+use rrelayerr::load_env_from_project_path;
 
 use crate::{
     cli_interface::{Cli, Commands},
@@ -6,11 +9,26 @@ use crate::{
         allowlist, api_key, balance, config, create, init, list, network, sign, start, stop, tx,
         user,
     },
+    console::print_error_message,
 };
 
 mod authentication;
 mod cli_interface;
 mod commands;
+mod console;
+
+fn resolve_path(override_path: &Option<String>) -> Result<PathBuf, String> {
+    match override_path {
+        Some(path) => {
+            let path = PathBuf::from_str(path).map_err(|_| "Invalid path provided.".to_string())?;
+            Ok(path)
+        }
+        None => {
+            Ok(std::env::current_dir()
+                .map_err(|_| "Failed to get current directory.".to_string())?)
+        }
+    }
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -19,11 +37,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     authentication::check_token_and_refresh_if_needed().await?;
 
     match &cli.command {
-        Commands::Init => {
-            if let Err(e) = init::handle_init() {
-                eprintln!("Error: {}", e);
-                std::process::exit(1);
-            }
+        Commands::Init { path } => {
+            let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;
+            load_env_from_project_path(&resolved_path);
+
+            init::handle_init(&resolved_path).await?;
         }
         Commands::Start(args) => {
             start::handle_start(args).await?;
@@ -38,52 +56,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             list::handle_list(args).await?;
         }
         Commands::Config { relayer_id, command } => {
-            if let Err(e) = config::handle_config(relayer_id, command) {
-                eprintln!("Error: {}", e);
-                std::process::exit(1);
-            }
+            config::handle_config(relayer_id, command).await?;
         }
         Commands::Balance(args) => {
-            if let Err(e) = balance::handle_balance(args) {
-                eprintln!("Error: {}", e);
-                std::process::exit(1);
-            }
+            balance::handle_balance(args).await?;
         }
         Commands::ApiKey { relayer_id, command } => {
-            if let Err(e) = api_key::handle_api_key(relayer_id, command) {
-                eprintln!("Error: {}", e);
-                std::process::exit(1);
-            }
+            api_key::handle_api_key(relayer_id, command).await?;
         }
         Commands::Allowlist { relayer_id, command } => {
-            if let Err(e) = allowlist::handle_allowlist(relayer_id, command) {
-                eprintln!("Error: {}", e);
-                std::process::exit(1);
-            }
+            allowlist::handle_allowlist(relayer_id, command).await?;
         }
         Commands::Create(args) => {
-            if let Err(e) = create::handle_create(args) {
-                eprintln!("Error: {}", e);
-                std::process::exit(1);
-            }
+            create::handle_create(args).await?;
         }
         Commands::Sign { relayer_id, command } => {
-            if let Err(e) = sign::handle_sign(relayer_id, command) {
-                eprintln!("Error: {}", e);
-                std::process::exit(1);
-            }
+            sign::handle_sign(relayer_id, command).await?;
         }
         Commands::Tx { command } => {
-            if let Err(e) = tx::handle_tx(command) {
-                eprintln!("Error: {}", e);
-                std::process::exit(1);
-            }
+            tx::handle_tx(command).await?;
         }
         Commands::User { command } => {
-            if let Err(e) = user::handle_user(command) {
-                eprintln!("Error: {}", e);
-                std::process::exit(1);
-            }
+            user::handle_user(command).await?;
         }
     }
 

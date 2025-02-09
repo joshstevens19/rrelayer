@@ -8,7 +8,7 @@ pub enum SignCommand {
     TypedData,
 }
 
-pub fn handle_sign(
+pub async fn handle_sign(
     relayer_id: &str,
     command: &SignCommand,
 ) -> Result<(), Box<dyn std::error::Error>> {
