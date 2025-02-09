@@ -4,7 +4,7 @@ use thiserror::Error;
 use crate::{
     gas::types::GasPrice,
     network::types::ChainId,
-    postgres::PostgresClient,
+    postgres::{PostgresClient, PostgresError},
     provider::EvmProvider,
     relayer::types::{Relayer, RelayerId},
     shared::common_types::EvmAddress,
@@ -13,10 +13,10 @@ use crate::{
 #[derive(Error, Debug)]
 pub enum CreateRelayerError {
     #[error("Relayer could not be saved in DB - name: {0}, chainId: {1}: {0}")]
-    CouldNotSaveRelayerDb(String, ChainId, tokio_postgres::Error),
+    CouldNotSaveRelayerDb(String, ChainId, PostgresError),
 
     #[error("Relayer could not update DB - name: {0}, chainId: {1}: {2}")]
-    CouldNotUpdateRelayerInfoDb(String, ChainId, tokio_postgres::Error),
+    CouldNotUpdateRelayerInfoDb(String, ChainId, PostgresError),
 
     #[error("Relayer did not return init information - name: {0}, chainId: {1}")]
     NoSaveRelayerInitInfoReturnedDb(String, ChainId),
@@ -89,10 +89,7 @@ impl PostgresClient {
         }
     }
 
-    pub async fn delete_relayer(
-        &self,
-        relayer_id: &RelayerId,
-    ) -> Result<(), tokio_postgres::Error> {
+    pub async fn delete_relayer(&self, relayer_id: &RelayerId) -> Result<(), PostgresError> {
         let _ = self
             .execute(
                 "
@@ -107,7 +104,7 @@ impl PostgresClient {
         Ok(())
     }
 
-    pub async fn pause_relayer(&self, relayer_id: &RelayerId) -> Result<(), tokio_postgres::Error> {
+    pub async fn pause_relayer(&self, relayer_id: &RelayerId) -> Result<(), PostgresError> {
         let _ = self
             .execute(
                 "
@@ -122,10 +119,7 @@ impl PostgresClient {
         Ok(())
     }
 
-    pub async fn unpause_relayer(
-        &self,
-        relayer_id: &RelayerId,
-    ) -> Result<(), tokio_postgres::Error> {
+    pub async fn unpause_relayer(&self, relayer_id: &RelayerId) -> Result<(), PostgresError> {
         let _ = self
             .execute(
                 "
@@ -144,7 +138,7 @@ impl PostgresClient {
         &self,
         relayer_id: &RelayerId,
         api_key: &str,
-    ) -> Result<(), tokio_postgres::Error> {
+    ) -> Result<(), PostgresError> {
         let _ = self
             .execute(
                 "
@@ -162,7 +156,7 @@ impl PostgresClient {
         &self,
         relayer_id: &RelayerId,
         api_key: &str,
-    ) -> Result<(), tokio_postgres::Error> {
+    ) -> Result<(), PostgresError> {
         let _ = self
             .execute(
                 "
@@ -182,7 +176,7 @@ impl PostgresClient {
         &self,
         relayer_id: &RelayerId,
         cap: Option<GasPrice>,
-    ) -> Result<(), tokio_postgres::Error> {
+    ) -> Result<(), PostgresError> {
         let _ = self
             .execute(
                 "
@@ -201,7 +195,7 @@ impl PostgresClient {
         &self,
         relayer_id: &RelayerId,
         enable: &bool,
-    ) -> Result<(), tokio_postgres::Error> {
+    ) -> Result<(), PostgresError> {
         let _ = self
             .execute(
                 "
@@ -220,7 +214,7 @@ impl PostgresClient {
         &self,
         relayer_id: &RelayerId,
         address: &EvmAddress,
-    ) -> Result<(), tokio_postgres::Error> {
+    ) -> Result<(), PostgresError> {
         let _ = self
             .execute(
                 "
@@ -241,7 +235,7 @@ impl PostgresClient {
         &self,
         relayer_id: &RelayerId,
         address: &EvmAddress,
-    ) -> Result<(), tokio_postgres::Error> {
+    ) -> Result<(), PostgresError> {
         let _ = self
             .execute(
                 "
@@ -261,7 +255,7 @@ impl PostgresClient {
     async fn relayer_allowlist_addresses_only_sync_state(
         &self,
         relayer_id: &RelayerId,
-    ) -> Result<(), tokio_postgres::Error> {
+    ) -> Result<(), PostgresError> {
         let _ = self
             .execute(
                 "

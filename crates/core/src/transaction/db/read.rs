@@ -1,6 +1,6 @@
 use super::builders::build_transaction_from_transaction_view;
 use crate::{
-    postgres::PostgresClient,
+    postgres::{PostgresClient, PostgresError},
     relayer::types::RelayerId,
     shared::common_types::{PagingContext, PagingResult},
     transaction::types::{Transaction, TransactionId, TransactionStatus},
@@ -10,7 +10,7 @@ impl PostgresClient {
     pub async fn get_transaction(
         &self,
         id: &TransactionId,
-    ) -> Result<Option<Transaction>, tokio_postgres::Error> {
+    ) -> Result<Option<Transaction>, PostgresError> {
         let row = self
             .query_one_or_none(
                 "
@@ -32,7 +32,7 @@ impl PostgresClient {
         &self,
         id: &RelayerId,
         paging_context: &PagingContext,
-    ) -> Result<PagingResult<Transaction>, tokio_postgres::Error> {
+    ) -> Result<PagingResult<Transaction>, PostgresError> {
         let rows = self
             .query(
                 "
@@ -59,7 +59,7 @@ impl PostgresClient {
         id: &RelayerId,
         status: &TransactionStatus,
         paging_context: &PagingContext,
-    ) -> Result<PagingResult<Transaction>, tokio_postgres::Error> {
+    ) -> Result<PagingResult<Transaction>, PostgresError> {
         let rows = self
             .query(
                 "

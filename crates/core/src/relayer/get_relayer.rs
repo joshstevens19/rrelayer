@@ -5,7 +5,7 @@ use super::{
     types::{Relayer, RelayerId, RelayerProviderContext},
 };
 use crate::{
-    postgres::PostgresClient,
+    postgres::{PostgresClient, PostgresError},
     provider::{find_provider_for_chain_id, EvmProvider},
     shared::cache::Cache,
 };
@@ -14,7 +14,7 @@ pub async fn get_relayer(
     db: &PostgresClient,
     cache: &Arc<Cache>,
     relayer_id: &RelayerId,
-) -> Result<Option<Relayer>, tokio_postgres::Error> {
+) -> Result<Option<Relayer>, PostgresError> {
     if let Some(cached_result) = get_relayer_cache(cache, relayer_id).await {
         return Ok(Some(cached_result));
     }
@@ -31,7 +31,7 @@ pub async fn get_relayer_provider_context_by_relayer_id<'a>(
     cache: &Arc<Cache>,
     providers: &'a Vec<EvmProvider>,
     relayer_id: &RelayerId,
-) -> Result<Option<RelayerProviderContext<'a>>, tokio_postgres::Error> {
+) -> Result<Option<RelayerProviderContext<'a>>, PostgresError> {
     let relayer = get_relayer(db, cache, relayer_id).await?;
 
     match relayer {

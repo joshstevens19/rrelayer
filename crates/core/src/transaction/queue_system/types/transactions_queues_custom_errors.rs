@@ -10,6 +10,7 @@ use super::{
     SendTransactionGasPriceError, TransactionQueueSendTransactionError, TransactionSentWithRelayer,
 };
 use crate::{
+    postgres::PostgresError,
     relayer::types::RelayerId,
     shared::common_types::EvmAddress,
     transaction::types::{Transaction, TransactionId, TransactionStatus},
@@ -24,7 +25,7 @@ pub enum ReplaceTransactionError {
     TransactionNotFound(TransactionId),
 
     #[error("Could not read allowlists from db: {0}")]
-    CouldNotReadAllowlistsFromDb(tokio_postgres::Error),
+    CouldNotReadAllowlistsFromDb(PostgresError),
 
     #[error("Relayer {0} could not send transactions to {1}")]
     RelayerNotAllowedToSendTransactionTo(RelayerId, EvmAddress),
@@ -36,13 +37,13 @@ pub enum ReplaceTransactionError {
 #[derive(Error, Debug)]
 pub enum AddTransactionError {
     #[error("Transaction could not be saved in DB: {0}")]
-    CouldNotSaveTransactionDb(tokio_postgres::Error),
+    CouldNotSaveTransactionDb(PostgresError),
 
     #[error("Relayer could not be found: {0}")]
     RelayerNotFound(RelayerId),
 
     #[error("Could not read allowlists from db: {0}")]
-    CouldNotReadAllowlistsFromDb(tokio_postgres::Error),
+    CouldNotReadAllowlistsFromDb(PostgresError),
 
     #[error("Relayer {0} could not send transactions to {1}")]
     RelayerNotAllowedToSendTransactionTo(RelayerId, EvmAddress),
@@ -90,7 +91,7 @@ pub enum ProcessPendingTransactionError {
     TransactionEstimateGasError(RpcError<TransportErrorKind>),
 
     #[error("Transaction could not be updated in DB: {0}")]
-    DbError(tokio_postgres::Error),
+    DbError(PostgresError),
 }
 
 #[derive(Error, Debug)]
@@ -108,7 +109,7 @@ pub enum ProcessInmempoolTransactionError {
         RelayerId,
         Transaction,
         TransactionStatus,
-        tokio_postgres::Error,
+        PostgresError,
     ),
 
     #[error("{0}")]
@@ -129,7 +130,7 @@ pub enum ProcessMinedTransactionError {
     #[error(
         "Transaction confirmed not be saved to the database for relayer {0}: tx {1} - error {2}"
     )]
-    TransactionConfirmedNotSaveToDatabase(RelayerId, Transaction, tokio_postgres::Error),
+    TransactionConfirmedNotSaveToDatabase(RelayerId, Transaction, PostgresError),
 
     #[error("Relayer transaction has no mined at for relayer {0} - tx {1}")]
     NoMinedAt(RelayerId, Transaction),

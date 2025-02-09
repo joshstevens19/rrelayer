@@ -2,7 +2,7 @@ use alloy::rpc::types::TransactionReceipt;
 
 use crate::{
     gas::{fee_estimator::base::GasPriceResult, types::GasLimit},
-    postgres::PostgresClient,
+    postgres::{PostgresClient, PostgresError},
     relayer::types::RelayerId,
     shared::{
         common_types::{BlockHash, BlockNumber},
@@ -18,8 +18,9 @@ impl PostgresClient {
         &mut self,
         relayer_id: &RelayerId,
         transaction: &Transaction,
-    ) -> Result<(), tokio_postgres::Error> {
-        let trans: tokio_postgres::Transaction = self.transaction().await?;
+    ) -> Result<(), PostgresError> {
+        let mut conn = self.pool.get().await?;
+        let trans = conn.transaction().await.map_err(PostgresError::PgError)?;
 
         for table_name in TRANSACTION_TABLES.iter() {
             trans.execute(
@@ -55,8 +56,9 @@ impl PostgresClient {
         transaction_hash: &TransactionHash,
         sent_with_gas: &GasPriceResult,
         legacy_transaction: bool,
-    ) -> Result<(), tokio_postgres::Error> {
-        let trans: tokio_postgres::Transaction = self.transaction().await?;
+    ) -> Result<(), PostgresError> {
+        let mut conn = self.pool.get().await?;
+        let trans = conn.transaction().await.map_err(PostgresError::PgError)?;
 
         let max_priority_fee_option =
             option_if(!legacy_transaction, &sent_with_gas.max_priority_fee);
@@ -98,37 +100,41 @@ impl PostgresClient {
     }
 
     pub async fn transaction_failed_on_send(
-        &mut self,
+        &self,
         relayer_id: &RelayerId,
         transaction: &Transaction,
         failed_reason: &str,
-    ) -> Result<(), tokio_postgres::Error> {
-        let trans: tokio_postgres::Transaction = self.transaction().await?;
+    ) -> Result<(), PostgresError> {
+        let mut conn = self.pool.get().await?;
+        let trans = conn.transaction().await.map_err(PostgresError::PgError)?;
 
         for table_name in TRANSACTION_TABLES.iter() {
             trans.execute(
                 format!("
                 INSERT INTO {}(id, relayer_id, api_key, \"to\", nonce, chain_id, data, value, speed, status, expires_at, queued_at, failed_at, failed_reason)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW());
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), $13);
                 ", table_name).as_str(),
-                &[&transaction.id,
-                &relayer_id,
-                &transaction.from_api_key,
-                &transaction.to.hex(),
-                &transaction.nonce,
-                &transaction.chain_id,
-                &transaction.data,
-                &transaction.value,
-                &transaction.speed.to_string(),
-                &transaction.status.to_string(),
-                &transaction.expires_at,
-                &transaction.queued_at,
-                &failed_reason.chars().take(2000).collect::<String>()],
+                &[
+                    &transaction.id,
+                    &relayer_id,
+                    &transaction.from_api_key,
+                    &transaction.to.hex(),
+                    &transaction.nonce,
+                    &transaction.chain_id,
+                    &transaction.data,
+                    &transaction.value,
+                    &transaction.speed.to_string(),
+                    &transaction.status.to_string(),
+                    &transaction.expires_at,
+                    &transaction.queued_at,
+                    &failed_reason.chars().take(2000).collect::<String>(),
+                ],
             )
-            .await?;
+                .await
+                .map_err(PostgresError::PgError)?;
         }
 
-        trans.commit().await?;
+        trans.commit().await.map_err(PostgresError::PgError)?;
 
         Ok(())
     }
@@ -137,8 +143,9 @@ impl PostgresClient {
         &mut self,
         transaction_id: &TransactionId,
         reason: &str,
-    ) -> Result<(), tokio_postgres::Error> {
-        let trans: tokio_postgres::Transaction = self.transaction().await?;
+    ) -> Result<(), PostgresError> {
+        let mut conn = self.pool.get().await?;
+        let trans = conn.transaction().await.map_err(PostgresError::PgError)?;
 
         for table_name in TRANSACTION_TABLES.iter() {
             trans
@@ -172,8 +179,9 @@ impl PostgresClient {
         &mut self,
         transaction_id: &TransactionId,
         transaction_receipt: &TransactionReceipt,
-    ) -> Result<(), tokio_postgres::Error> {
-        let trans: tokio_postgres::Transaction = self.transaction().await?;
+    ) -> Result<(), PostgresError> {
+        let mut conn = self.pool.get().await?;
+        let trans = conn.transaction().await.map_err(PostgresError::PgError)?;
 
         for table_name in TRANSACTION_TABLES.iter() {
             trans
@@ -210,8 +218,9 @@ impl PostgresClient {
     pub async fn transaction_confirmed(
         &mut self,
         transaction_id: &TransactionId,
-    ) -> Result<(), tokio_postgres::Error> {
-        let trans: tokio_postgres::Transaction = self.transaction().await?;
+    ) -> Result<(), PostgresError> {
+        let mut conn = self.pool.get().await?;
+        let trans = conn.transaction().await.map_err(PostgresError::PgError)?;
 
         for table_name in TRANSACTION_TABLES.iter() {
             trans
@@ -239,8 +248,9 @@ impl PostgresClient {
     pub async fn transaction_expired(
         &mut self,
         transaction_id: &TransactionId,
-    ) -> Result<(), tokio_postgres::Error> {
-        let trans: tokio_postgres::Transaction = self.transaction().await?;
+    ) -> Result<(), PostgresError> {
+        let mut conn = self.pool.get().await?;
+        let trans = conn.transaction().await.map_err(PostgresError::PgError)?;
 
         for table_name in TRANSACTION_TABLES.iter() {
             trans

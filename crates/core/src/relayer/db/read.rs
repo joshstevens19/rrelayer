@@ -1,7 +1,7 @@
 use super::builders::build_relayer_from_relayer_view;
 use crate::{
     network::types::ChainId,
-    postgres::PostgresClient,
+    postgres::{PostgresClient, PostgresError},
     relayer::types::{Relayer, RelayerId},
     shared::common_types::{ApiKey, EvmAddress, PagingContext, PagingResult},
 };
@@ -10,7 +10,7 @@ impl PostgresClient {
     pub async fn get_relayers(
         &self,
         paging_context: &PagingContext,
-    ) -> Result<PagingResult<Relayer>, tokio_postgres::Error> {
+    ) -> Result<PagingResult<Relayer>, PostgresError> {
         let rows = self
             .query(
                 "
@@ -34,7 +34,7 @@ impl PostgresClient {
         &self,
         chain_id: &ChainId,
         paging_context: &PagingContext,
-    ) -> Result<PagingResult<Relayer>, tokio_postgres::Error> {
+    ) -> Result<PagingResult<Relayer>, PostgresError> {
         let rows = self
             .query(
                 "
@@ -59,7 +59,7 @@ impl PostgresClient {
     pub async fn get_relayer(
         &self,
         relayer_id: &RelayerId,
-    ) -> Result<Option<Relayer>, tokio_postgres::Error> {
+    ) -> Result<Option<Relayer>, PostgresError> {
         let row = self
             .query_one_or_none(
                 "
@@ -82,7 +82,7 @@ impl PostgresClient {
         &self,
         relayer_id: &RelayerId,
         api_key: &ApiKey,
-    ) -> Result<bool, tokio_postgres::Error> {
+    ) -> Result<bool, PostgresError> {
         let rows = self
             .query_one_or_none(
                 "
@@ -107,7 +107,7 @@ impl PostgresClient {
         &self,
         relayer_id: &RelayerId,
         paging_context: &PagingContext,
-    ) -> Result<PagingResult<String>, tokio_postgres::Error> {
+    ) -> Result<PagingResult<String>, PostgresError> {
         let rows = self
             .query(
                 "
@@ -135,7 +135,7 @@ impl PostgresClient {
         &self,
         relayer_id: &RelayerId,
         paging_context: &PagingContext,
-    ) -> Result<PagingResult<String>, tokio_postgres::Error> {
+    ) -> Result<PagingResult<String>, PostgresError> {
         let rows = self
             .query(
                 "
@@ -162,7 +162,7 @@ impl PostgresClient {
         &self,
         relayer_id: &RelayerId,
         address: &EvmAddress,
-    ) -> Result<bool, tokio_postgres::Error> {
+    ) -> Result<bool, PostgresError> {
         let rows = self
             .query_one_or_none(
                 "

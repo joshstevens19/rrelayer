@@ -1,7 +1,7 @@
 use alloy::transports::{RpcError, TransportErrorKind};
 use thiserror::Error;
 
-use crate::provider::SendTransactionError;
+use crate::{postgres::PostgresError, provider::SendTransactionError};
 
 #[derive(Error, Debug)]
 pub enum SendTransactionGasPriceError {
@@ -24,7 +24,7 @@ pub enum TransactionQueueSendTransactionError {
     TransactionSendError(SendTransactionError),
 
     #[error("Transaction could not be updated in DB: {0}")]
-    CouldNotUpdateTransactionDb(tokio_postgres::Error),
+    CouldNotUpdateTransactionDb(PostgresError),
 
     #[error("{0}")]
     SendTransactionGasPriceError(SendTransactionGasPriceError),

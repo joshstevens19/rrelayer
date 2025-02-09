@@ -1,9 +1,9 @@
 use std::{env, fs::File, io::Read, path::PathBuf};
 
-use regex::Regex;
+use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tracing::info;
+use tracing::{error, info};
 
 use crate::{
     gas::{
@@ -38,7 +38,10 @@ pub struct SigningKey {
 
 impl Default for SigningKey {
     fn default() -> Self {
-        Self { raw: Some(SigningKeyRaw { mnemonic: "${MNEMONIC}".to_string() }), aws_secret_manager: None }
+        Self {
+            raw: Some(SigningKeyRaw { mnemonic: "${MNEMONIC}".to_string() }),
+            aws_secret_manager: None,
+        }
     }
 }
 
@@ -64,7 +67,10 @@ pub struct NetworkSetupConfig {
     pub provider_urls: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub block_explorer_url: Option<String>,
-    #[serde(deserialize_with = "deserialize_gas_provider", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        deserialize_with = "deserialize_gas_provider",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub gas_provider: Option<GasProvider>,
 }
 
@@ -91,14 +97,19 @@ pub struct SetupConfig {
     pub allowed_origins: Option<Vec<String>>,
 }
 
-fn substitute_env_variables(contents: &str) -> Result<String, String> {
-    // safe unwrap here, because the regex is hardcoded
-    let re = Regex::new(r"\$\{([^}]+)\}").unwrap();
-    let result = re.replace_all(contents, |caps: &regex::Captures| {
+fn substitute_env_variables(contents: &str) -> Result<String, regex::Error> {
+    let re = Regex::new(r"\$\{([^}]+)\}")?;
+    let result = re.replace_all(contents, |caps: &Captures| {
         let var_name = &caps[1];
-        env::var(var_name).unwrap_or_else(|_| var_name.to_string())
+        match env::var(var_name) {
+            Ok(val) => val,
+            Err(_) => {
+                error!("Environment variable {} not found", var_name);
+                panic!("Environment variable {} not found", var_name)
+            }
+        }
     });
-    Ok(result.to_string())
+    Ok(result.into_owned())
 }
 
 #[derive(Error, Debug)]
@@ -113,7 +124,7 @@ pub enum ReadYamlError {
     SetupConfigInvalidYaml,
 
     #[error("Environment variable {} not found", {0})]
-    EnvironmentVariableNotFound(String),
+    EnvironmentVariableNotFound(#[from] regex::Error),
 
     #[error("No networks enabled in the yaml")]
     NoNetworksEnabled,
@@ -130,8 +141,7 @@ pub fn read(file_path: &PathBuf) -> Result<SetupConfig, ReadYamlError> {
     let mut contents = String::new();
     file.read_to_string(&mut contents).map_err(|_| ReadYamlError::CanNotReadYaml)?;
 
-    let substituted_contents =
-        substitute_env_variables(&contents).map_err(ReadYamlError::EnvironmentVariableNotFound)?;
+    let substituted_contents = substitute_env_variables(&contents)?;
 
     let config: SetupConfig = serde_yaml::from_str(&substituted_contents)
         .map_err(|_| ReadYamlError::SetupConfigInvalidYaml)?;

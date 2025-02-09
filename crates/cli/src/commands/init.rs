@@ -1,7 +1,10 @@
 use std::{fs, path::Path};
 
 use dialoguer::{Confirm, Input};
-use rrelayerr::{NetworkSetupConfig, SetupConfig, SigningKey, WriteFileError, generate_docker_file, write_file, generate_seed_phrase};
+use rrelayerr::{
+    NetworkSetupConfig, SetupConfig, SigningKey, WriteFileError, generate_docker_file,
+    generate_seed_phrase, write_file,
+};
 use serde_yaml;
 
 use crate::console::print_error_message;
@@ -56,11 +59,13 @@ pub async fn handle_init(path: &Path) -> Result<(), Box<dyn std::error::Error>> 
         .with_prompt("Do you want rrelayerr to generate a new mnemonic for you?")
         .default(true)
         .interact()?;
-    
+
     let mut env = if new_mnemonic {
         let seed_phrase = generate_seed_phrase()?;
         format!("MNEMONIC=\"{}\"\"\n", seed_phrase)
-    } else {"MNEMONIC=INSERT_YOUR_MNEMONIC_HERE\n".to_string() };
+    } else {
+        "MNEMONIC=INSERT_YOUR_MNEMONIC_HERE\n".to_string()
+    };
 
     if docker_support {
         env += r#"DATABASE_URL=postgresql://postgres:rrelayerr@localhost:5440/postgres

@@ -7,20 +7,18 @@ mod middleware;
 mod network;
 mod postgres;
 mod provider;
-pub use provider::{generate_seed_phrase};
+pub use provider::generate_seed_phrase;
 mod relayer;
 mod setup;
-pub use setup::yaml::{SetupConfig, read, SigningKey, NetworkSetupConfig};
+pub use setup::yaml::{read, NetworkSetupConfig, SetupConfig, SigningKey};
 mod shared;
 mod startup;
 pub use startup::start;
-mod transaction;
-mod user;
 mod docker;
 mod environment;
 mod file;
-pub use file::{write_file, WriteFileError};
-
-pub use environment::load_env_from_project_path;
-
+mod transaction;
+mod user;
 pub use docker::generate_docker_file;
+pub use environment::load_env_from_project_path;
+pub use file::{write_file, WriteFileError};

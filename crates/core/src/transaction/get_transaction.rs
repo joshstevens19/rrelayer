@@ -4,13 +4,16 @@ use super::{
     cache::{get_transaction_cache, set_transaction_cache},
     types::{Transaction, TransactionId},
 };
-use crate::{postgres::PostgresClient, shared::cache::Cache};
+use crate::{
+    postgres::{PostgresClient, PostgresError},
+    shared::cache::Cache,
+};
 
 pub async fn get_transaction_by_id(
     cache: &Arc<Cache>,
     db: &PostgresClient,
     id: TransactionId,
-) -> Result<Option<Transaction>, tokio_postgres::Error> {
+) -> Result<Option<Transaction>, PostgresError> {
     if let Some(cached_transaction) = get_transaction_cache(cache, &id).await {
         return Ok(Some(cached_transaction));
     }

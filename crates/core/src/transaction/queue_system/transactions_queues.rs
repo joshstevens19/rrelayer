@@ -22,7 +22,7 @@ use super::{
 };
 use crate::{
     gas::gas_oracle::GasOracleCache,
-    postgres::PostgresClient,
+    postgres::{PostgresClient, PostgresError},
     relayer::types::RelayerId,
     shared::{
         cache::Cache,
@@ -165,7 +165,7 @@ impl TransactionsQueues {
         &self,
         relayer_id: &RelayerId,
         to: &EvmAddress,
-    ) -> Result<bool, tokio_postgres::Error> {
+    ) -> Result<bool, PostgresError> {
         let relayer = self.db.is_relayer_allowlist_address(relayer_id, to).await?;
         Ok(relayer)
     }

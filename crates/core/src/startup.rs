@@ -1,11 +1,11 @@
-use std::{env, net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, path::PathBuf, sync::Arc};
 
 use axum::{http::HeaderValue, Router};
 use dotenv::dotenv;
 use thiserror::Error;
 use tokio::sync::Mutex;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
-use tracing::info;
+use tracing::{error, info};
 
 use crate::{
     app_state::AppState,
@@ -15,10 +15,11 @@ use crate::{
         gas_oracle::{gas_oracle, GasOracleCache},
     },
     network::api::create_network_routes,
-    postgres::{PostgresClient, PostgresConnectionError},
+    postgres::{PostgresClient, PostgresConnectionError, PostgresError},
     provider::{load_providers, EvmProvider, LoadProvidersError},
     relayer::api::create_relayer_routes,
     setup::yaml::{read, ReadYamlError},
+    setup_info_logger,
     shared::{cache::Cache, common_types::EvmAddress},
     transaction::{
         api::create_transactions_routes,
@@ -42,7 +43,7 @@ pub enum StartApiError {
     DatabaseConnectionError(PostgresConnectionError),
 
     #[error("Failed to save to the database: {0}")]
-    DatabaseSaveError(tokio_postgres::Error),
+    DatabaseSaveError(#[from] PostgresError),
 
     #[error("Failed to start the API: {0}")]
     ApiStartupError(#[from] std::io::Error),
@@ -60,8 +61,7 @@ async fn start_api(
     // save providers to database
     for provider in providers.as_ref() {
         db.save_enabled_network(&provider.chain_id, &provider.name, &provider.provider_urls)
-            .await
-            .map_err(StartApiError::DatabaseSaveError)?;
+            .await?;
     }
 
     let app_state = Arc::new(AppState {
@@ -94,14 +94,14 @@ async fn start_api(
         .nest("/relayers", create_relayer_routes())
         .nest("/transactions", create_transactions_routes())
         .nest("/users", create_user_routes())
-        // .layer(from_fn(auth_middleware))
+        // .layer(from_fn(auth_middleware)) // TODO: add auth middleware
         .layer(cors)
         .with_state(app_state)
         .into_make_service_with_connect_info::<SocketAddr>();
 
     let address = "localhost:8000".to_string();
 
-    let listener = tokio::net::TcpListener::bind(&address).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(&address).await?;
     info!("listening on http://{}", address);
     axum::serve(listener, app).await.map_err(StartApiError::ApiStartupError)?;
 
@@ -111,6 +111,9 @@ async fn start_api(
 #[derive(Error, Debug)]
 #[allow(clippy::enum_variant_names)]
 pub enum StartError {
+    #[error("Failed to find the yaml file")]
+    NoYamlFileFound,
+
     #[error("{0}")]
     ReadYamlError(ReadYamlError),
 
@@ -127,23 +130,27 @@ pub enum StartError {
     DatabaseConnectionError(PostgresConnectionError),
 
     #[error("Could not add admins to database: {0}")]
-    CouldNotAddAdmins(tokio_postgres::Error),
+    CouldNotAddAdmins(#[from] PostgresError),
 }
 
-pub async fn start() -> Result<(), StartError> {
+pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
+    setup_info_logger();
     dotenv().ok();
 
-    let mut path = env::current_dir().unwrap();
-    path.push("setup.yaml");
+    let yaml_path = project_path.join("rrelayerr.yaml");
+    if !yaml_path.exists() {
+        error!("Found rrelayerr.yaml in the current directory");
+        return Err(StartError::NoYamlFileFound);
+    }
 
-    let config = read(&path).map_err(StartError::ReadYamlError)?;
+    let config = read(&yaml_path).map_err(StartError::ReadYamlError)?;
 
     let postgres = PostgresClient::new().await.map_err(StartError::DatabaseConnectionError)?;
 
     let admins: Vec<(&EvmAddress, JwtRole)> =
         config.admins.iter().map(|address| (address, JwtRole::Admin)).collect();
 
-    postgres.add_users(&admins).await.map_err(StartError::CouldNotAddAdmins)?;
+    postgres.add_users(&admins).await?;
 
     let cache = Arc::new(Cache::new().await);
 

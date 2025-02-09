@@ -1,15 +1,12 @@
 use super::builders::build_user;
 use crate::{
-    postgres::PostgresClient,
+    postgres::{PostgresClient, PostgresError},
     shared::common_types::{EvmAddress, PagingContext, PagingResult},
     user::types::User,
 };
 
 impl PostgresClient {
-    pub async fn get_user(
-        &self,
-        address: &EvmAddress,
-    ) -> Result<Option<User>, tokio_postgres::Error> {
+    pub async fn get_user(&self, address: &EvmAddress) -> Result<Option<User>, PostgresError> {
         let row = self
             .query_one_or_none(
                 "
@@ -30,7 +27,7 @@ impl PostgresClient {
     pub async fn get_users(
         &self,
         paging_context: &PagingContext,
-    ) -> Result<PagingResult<User>, tokio_postgres::Error> {
+    ) -> Result<PagingResult<User>, PostgresError> {
         let rows = self
             .query(
                 "

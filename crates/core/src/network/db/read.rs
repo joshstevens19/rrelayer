@@ -2,14 +2,14 @@ use std::collections::HashMap;
 
 use crate::{
     network::types::{ChainId, Network, NetworksFilterState},
-    postgres::PostgresClient,
+    postgres::{PostgresClient, PostgresError},
 };
 
 impl PostgresClient {
     pub async fn get_networks(
         &self,
         filter: NetworksFilterState,
-    ) -> Result<Vec<Network>, tokio_postgres::Error> {
+    ) -> Result<Vec<Network>, PostgresError> {
         let mut filter_sql = String::from("");
         match filter {
             NetworksFilterState::All => {}

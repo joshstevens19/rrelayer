@@ -1,7 +1,4 @@
-use std::fs;
-use std::fs::File;
-use std::io::Write;
-use std::path::Path;
+use std::{fs, fs::File, io::Write, path::Path};
 
 #[derive(thiserror::Error, Debug)]
 pub enum WriteFileError {

@@ -8,7 +8,7 @@ use super::{transactions_queues::TransactionsQueues, types::TransactionRelayerSe
 use crate::{
     gas::gas_oracle::GasOracleCache,
     network::types::ChainId,
-    postgres::{PostgresClient, PostgresConnectionError},
+    postgres::{PostgresClient, PostgresConnectionError, PostgresError},
     provider::{find_provider_for_chain_id, EvmProvider},
     relayer::types::{Relayer, RelayerId},
     shared::{
@@ -110,11 +110,7 @@ async fn continuously_process_mined_transactions(
 #[derive(Error, Debug)]
 pub enum RepopulateTransactionsQueueError {
     #[error("Failed to load transactions with status {0} for relayer {1} from database: {1}")]
-    CouldNotGetTransactionsByStatusFromDatabase(
-        TransactionStatus,
-        RelayerId,
-        tokio_postgres::Error,
-    ),
+    CouldNotGetTransactionsByStatusFromDatabase(TransactionStatus, RelayerId, PostgresError),
 }
 
 async fn repopulate_transaction_queue(
@@ -154,7 +150,7 @@ async fn repopulate_transaction_queue(
     Ok(transactions_queue)
 }
 
-async fn load_relayers(db: &PostgresClient) -> Result<Vec<Relayer>, tokio_postgres::Error> {
+async fn load_relayers(db: &PostgresClient) -> Result<Vec<Relayer>, PostgresError> {
     let mut relayers: Vec<Relayer> = Vec::new();
     let mut paging_context = PagingContext::new(1000, 0);
     loop {
@@ -182,7 +178,7 @@ pub enum StartTransactionsQueuesError {
     DatabaseConnectionError(PostgresConnectionError),
 
     #[error("Failed to load relayers from database: {0}")]
-    CouldNotLoadRelayersFromDatabase(tokio_postgres::Error),
+    CouldNotLoadRelayersFromDatabase(PostgresError),
 
     #[error("Could not find provider for chai {0}")]
     CouldNotFindProviderForChainId(ChainId),
