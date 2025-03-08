@@ -18,6 +18,7 @@ use crate::{
     postgres::{PostgresClient, PostgresConnectionError, PostgresError},
     provider::{load_providers, EvmProvider, LoadProvidersError},
     relayer::api::create_relayer_routes,
+    schema::apply_schema,
     setup::yaml::{read, ReadYamlError},
     setup_info_logger,
     shared::{cache::Cache, common_types::EvmAddress},
@@ -58,7 +59,6 @@ async fn start_api(
 ) -> Result<(), StartApiError> {
     let mut db = PostgresClient::new().await.map_err(StartApiError::DatabaseConnectionError)?;
 
-    // save providers to database
     for provider in providers.as_ref() {
         db.save_enabled_network(&provider.chain_id, &provider.name, &provider.provider_urls)
             .await?;
@@ -137,20 +137,26 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
     setup_info_logger();
     dotenv().ok();
 
+    info!("Starting up rrelayer...");
+
     let yaml_path = project_path.join("rrelayerr.yaml");
     if !yaml_path.exists() {
         error!("Found rrelayerr.yaml in the current directory");
         return Err(StartError::NoYamlFileFound);
     }
 
-    let config = read(&yaml_path)?;
-
     let postgres = PostgresClient::new().await?;
+
+    apply_schema(&postgres).await?;
+    info!("Applied database schema");
+
+    let config = read(&yaml_path)?;
 
     let admins: Vec<(&EvmAddress, JwtRole)> =
         config.admins.iter().map(|address| (address, JwtRole::Admin)).collect();
 
     postgres.add_users(&admins).await?;
+    info!("Added admin users to database");
 
     let cache = Arc::new(Cache::new().await);
 

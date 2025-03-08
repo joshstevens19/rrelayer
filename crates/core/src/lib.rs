@@ -17,8 +17,10 @@ pub use startup::start;
 mod docker;
 mod environment;
 mod file;
+mod schema;
 mod transaction;
 mod user;
+
 pub use docker::generate_docker_file;
 pub use environment::load_env_from_project_path;
 pub use file::{write_file, WriteFileError};
