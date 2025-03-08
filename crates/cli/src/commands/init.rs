@@ -68,7 +68,7 @@ pub async fn handle_init(path: &Path) -> Result<(), Box<dyn std::error::Error>> 
     };
 
     if docker_support {
-        env += r#"DATABASE_URL=postgresql://postgres:rrelayerr@localhost:5440/postgres
+        env += r#"DATABASE_URL=postgresql://postgres:rrelayerr@localhost:5441/postgres
 POSTGRES_PASSWORD=rrelayerr"#;
 
         write_docker_compose(&project_path).map_err(|e| {

@@ -115,19 +115,19 @@ pub enum StartError {
     NoYamlFileFound,
 
     #[error("{0}")]
-    ReadYamlError(ReadYamlError),
+    ReadYamlError(#[from] ReadYamlError),
 
     #[error("Failed to start the API: {0}")]
-    ApiStartupError(StartApiError),
+    ApiStartupError(#[from] StartApiError),
 
     #[error("{0}")]
-    LoadProvidersError(LoadProvidersError),
+    LoadProvidersError(#[from] LoadProvidersError),
 
     #[error("Failed to start the transactions queues: {0}")]
-    StartTransactionsQueuesError(StartTransactionsQueuesError),
+    StartTransactionsQueuesError(#[from] StartTransactionsQueuesError),
 
     #[error("Failed to connect to the database: {0}")]
-    DatabaseConnectionError(PostgresConnectionError),
+    DatabaseConnectionError(#[from] PostgresConnectionError),
 
     #[error("Could not add admins to database: {0}")]
     CouldNotAddAdmins(#[from] PostgresError),
@@ -143,9 +143,9 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
         return Err(StartError::NoYamlFileFound);
     }
 
-    let config = read(&yaml_path).map_err(StartError::ReadYamlError)?;
+    let config = read(&yaml_path)?;
 
-    let postgres = PostgresClient::new().await.map_err(StartError::DatabaseConnectionError)?;
+    let postgres = PostgresClient::new().await?;
 
     let admins: Vec<(&EvmAddress, JwtRole)> =
         config.admins.iter().map(|address| (address, JwtRole::Admin)).collect();
@@ -154,35 +154,18 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
 
     let cache = Arc::new(Cache::new().await);
 
-    let providers = load_providers(&config).await;
-    match providers {
-        Ok(providers) => {
-            let providers = Arc::new(providers);
+    let providers = Arc::new(load_providers(&config).await?);
 
-            let gas_oracle_cache = Arc::new(Mutex::new(GasOracleCache::new()));
+    let gas_oracle_cache = Arc::new(Mutex::new(GasOracleCache::new()));
 
-            let transaction_queue = startup_transactions_queues(
-                gas_oracle_cache.clone(),
-                providers.clone(),
-                cache.clone(),
-            )
-            .await
-            .map_err(StartError::StartTransactionsQueuesError)?;
+    let transaction_queue =
+        startup_transactions_queues(gas_oracle_cache.clone(), providers.clone(), cache.clone())
+            .await?;
 
-            start_crons(gas_oracle_cache.clone(), providers.clone());
+    start_crons(gas_oracle_cache.clone(), providers.clone());
 
-            start_api(
-                gas_oracle_cache,
-                transaction_queue,
-                providers,
-                cache,
-                config.allowed_origins,
-            )
-            .await
-            .map_err(StartError::ApiStartupError)?;
+    start_api(gas_oracle_cache, transaction_queue, providers, cache, config.allowed_origins)
+        .await?;
 
-            Ok(())
-        }
-        Err(e) => Err(StartError::LoadProvidersError(e)),
-    }
+    Ok(())
 }
