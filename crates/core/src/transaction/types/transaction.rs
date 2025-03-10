@@ -55,7 +55,7 @@ pub struct Transaction {
 
     pub blobs: Option<Vec<Blob>>,
 
-    #[serde(rename = "txHash", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "txHash", skip_serializing_if = "Option::is_none", default)]
     pub known_transaction_hash: Option<TransactionHash>,
 
     #[serde(rename = "queuedAt", serialize_with = "serialize_system_time")]
@@ -67,26 +67,28 @@ pub struct Transaction {
     #[serde(
         rename = "sentAt",
         skip_serializing_if = "Option::is_none",
-        serialize_with = "serialize_system_time_option"
+        serialize_with = "serialize_system_time_option",
+        default
     )]
     pub sent_at: Option<SystemTime>,
 
-    #[serde(rename = "sentWithGas", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "sentWithGas", skip_serializing_if = "Option::is_none", default)]
     pub sent_with_gas: Option<GasPriceResult>,
 
     #[serde(
         rename = "minedAt",
         skip_serializing_if = "Option::is_none",
-        serialize_with = "serialize_system_time_option"
+        serialize_with = "serialize_system_time_option",
+        default
     )]
     pub mined_at: Option<SystemTime>,
 
     pub speed: TransactionSpeed,
 
-    #[serde(rename = "maxPriorityFee", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "maxPriorityFee", skip_serializing_if = "Option::is_none", default)]
     pub sent_with_max_priority_fee_per_gas: Option<MaxPriorityFee>,
 
-    #[serde(rename = "maxFee", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "maxFee", skip_serializing_if = "Option::is_none", default)]
     pub sent_with_max_fee_per_gas: Option<MaxFee>,
 
     #[serde(skip_serializing)]

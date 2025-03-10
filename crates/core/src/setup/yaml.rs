@@ -18,7 +18,7 @@ pub struct AwsSigningKey {
     pub secret_name: String,
     pub access_key_id: String,
     pub secret_access_key: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub session_token: Option<String>,
     pub region: String,
 }
@@ -30,9 +30,9 @@ pub struct SigningKeyRaw {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SigningKey {
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub raw: Option<SigningKeyRaw>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub aws_secret_manager: Option<AwsSigningKey>,
 }
 
@@ -62,38 +62,39 @@ impl SigningKey {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NetworkSetupConfig {
     pub name: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub signing_key: Option<SigningKey>,
     pub provider_urls: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub block_explorer_url: Option<String>,
     #[serde(
         deserialize_with = "deserialize_gas_provider",
-        skip_serializing_if = "Option::is_none"
+        skip_serializing_if = "Option::is_none",
+        default
     )]
     pub gas_provider: Option<GasProvider>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GasProviders {
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub infura: Option<InfuraGasProviderSetupConfig>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub custom: Option<CustomGasFeeEstimator>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SetupConfig {
     pub name: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub description: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub signing_key: Option<SigningKey>,
     pub admins: Vec<EvmAddress>,
     pub networks: Vec<NetworkSetupConfig>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub gas_providers: Option<GasProviders>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub allowed_origins: Option<Vec<String>>,
 }
 
@@ -120,8 +121,8 @@ pub enum ReadYamlError {
     #[error("Can not read yaml")]
     CanNotReadYaml,
 
-    #[error("Setup config is invalid yaml and does not match the struct")]
-    SetupConfigInvalidYaml,
+    #[error("Setup config is invalid yaml and does not match the struct - {0}")]
+    SetupConfigInvalidYaml(String),
 
     #[error("Environment variable {} not found", {0})]
     EnvironmentVariableNotFound(#[from] regex::Error),
@@ -144,7 +145,7 @@ pub fn read(file_path: &PathBuf) -> Result<SetupConfig, ReadYamlError> {
     let substituted_contents = substitute_env_variables(&contents)?;
 
     let config: SetupConfig = serde_yaml::from_str(&substituted_contents)
-        .map_err(|_| ReadYamlError::SetupConfigInvalidYaml)?;
+        .map_err(|e| ReadYamlError::SetupConfigInvalidYaml(e.to_string()))?;
 
     if config.networks.is_empty() {
         return Err(ReadYamlError::NoNetworksEnabled);
@@ -164,6 +165,5 @@ pub fn read(file_path: &PathBuf) -> Result<SetupConfig, ReadYamlError> {
         signing_key.validate().map_err(ReadYamlError::SigningKeyYamlError)?;
     }
 
-    info!("Config: {:?}", config);
     Ok(config)
 }

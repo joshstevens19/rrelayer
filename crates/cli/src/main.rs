@@ -23,13 +23,11 @@ fn resolve_path(override_path: &Option<String>) -> Result<PathBuf, String> {
             PathBuf::from_str(path).map_err(|_| format!("Invalid path provided: '{}'", path))?
         }
         None => {
-            std::env::current_dir()
-                .map_err(|_| "Failed to get current directory.".to_string())?
+            std::env::current_dir().map_err(|_| "Failed to get current directory.".to_string())?
         }
     };
 
-    path.canonicalize()
-        .map_err(|e| format!("Failed to resolve path '{}': {}", path.display(), e))
+    path.canonicalize().map_err(|e| format!("Failed to resolve path '{}': {}", path.display(), e))
 }
 
 #[tokio::main]

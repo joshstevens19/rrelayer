@@ -63,7 +63,7 @@ impl CustomGasEstimateResult {
 pub struct CustomGasFeeEstimator {
     pub endpoint: String,
     pub supported_chains: Vec<ChainId>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub auth_header: Option<String>,
 }
 

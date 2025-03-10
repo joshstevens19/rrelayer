@@ -47,23 +47,23 @@ pub struct RelayerTransaction {
     pub gas_price: Option<GasPrice>,
 
     /// The maximum priority fee per gas of the transaction
-    #[serde(rename = "maxPriorityFeePerGas", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "maxPriorityFeePerGas", skip_serializing_if = "Option::is_none", default)]
     pub max_priority_fee_per_gas: Option<MaxPriorityFee>,
 
     /// The maximum fee per gas of the transaction
-    #[serde(rename = "maxFeePerGas", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "maxFeePerGas", skip_serializing_if = "Option::is_none", default)]
     pub max_fee_per_gas: Option<MaxFee>,
 
     /// The block hash the transaction was included in
-    #[serde(rename = "blockHash", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "blockHash", skip_serializing_if = "Option::is_none", default)]
     pub block_hash: Option<BlockHash>,
 
     /// The block number the transaction was included in
-    #[serde(rename = "blockNumber", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "blockNumber", skip_serializing_if = "Option::is_none", default)]
     pub block_number: Option<BlockNumber>,
 
     /// The hash of the transaction
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub hash: Option<TransactionHash>,
 
     /// The speed at which the transaction was relayed
@@ -84,7 +84,8 @@ pub struct RelayerTransaction {
     #[serde(
         rename = "minedAt",
         skip_serializing_if = "Option::is_none",
-        serialize_with = "serialize_system_time_option"
+        serialize_with = "serialize_system_time_option",
+        default
     )]
     pub mined_at: Option<SystemTime>,
 
@@ -92,7 +93,8 @@ pub struct RelayerTransaction {
     #[serde(
         rename = "failedAt",
         skip_serializing_if = "Option::is_none",
-        serialize_with = "serialize_system_time_option"
+        serialize_with = "serialize_system_time_option",
+        default
     )]
     pub failed_at: Option<SystemTime>,
 
@@ -100,7 +102,8 @@ pub struct RelayerTransaction {
     #[serde(
         rename = "sentAt",
         skip_serializing_if = "Option::is_none",
-        serialize_with = "serialize_system_time_option"
+        serialize_with = "serialize_system_time_option",
+        default
     )]
     pub sent_at: Option<SystemTime>,
 
@@ -108,7 +111,8 @@ pub struct RelayerTransaction {
     #[serde(
         rename = "confirmedAt",
         skip_serializing_if = "Option::is_none",
-        serialize_with = "serialize_system_time_option"
+        serialize_with = "serialize_system_time_option",
+        default
     )]
     pub confirmed_at: Option<SystemTime>,
 }

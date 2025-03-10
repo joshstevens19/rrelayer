@@ -29,7 +29,7 @@ pub struct Relayer {
     pub wallet_index: u32,
 
     /// The max gas price
-    #[serde(rename = "maxGasPrice", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "maxGasPrice", skip_serializing_if = "Option::is_none", default)]
     pub max_gas_price: Option<GasPrice>,
 
     /// If the relayer is paused
