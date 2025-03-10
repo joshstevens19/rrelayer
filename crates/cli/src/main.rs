@@ -1,7 +1,7 @@
 use std::{path::PathBuf, str::FromStr};
 
 use clap::Parser;
-use rrelayerr::load_env_from_project_path;
+use rrelayerr::{load_env_from_project_path, setup_info_logger};
 
 use crate::{
     cli_interface::{Cli, Commands},
@@ -18,21 +18,24 @@ mod commands;
 mod console;
 
 fn resolve_path(override_path: &Option<String>) -> Result<PathBuf, String> {
-    match override_path {
+    let path = match override_path {
         Some(path) => {
-            let path = PathBuf::from_str(path).map_err(|_| "Invalid path provided.".to_string())?;
-            Ok(path)
+            PathBuf::from_str(path).map_err(|_| format!("Invalid path provided: '{}'", path))?
         }
         None => {
-            Ok(std::env::current_dir()
-                .map_err(|_| "Failed to get current directory.".to_string())?)
+            std::env::current_dir()
+                .map_err(|_| "Failed to get current directory.".to_string())?
         }
-    }
+    };
+
+    path.canonicalize()
+        .map_err(|e| format!("Failed to resolve path '{}': {}", path.display(), e))
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
+    setup_info_logger();
 
     authentication::check_token_and_refresh_if_needed().await?;
 
@@ -44,7 +47,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             init::handle_init(&resolved_path).await?;
         }
         Commands::Start(args) => {
-            start::handle_start(args).await?;
+            let resolved_path = resolve_path(&args.path).inspect_err(|e| print_error_message(e))?;
+            load_env_from_project_path(&resolved_path);
+
+            start::handle_start(args, &resolved_path).await?;
         }
         Commands::Stop => {
             stop::handle_stop().await?;

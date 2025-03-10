@@ -137,7 +137,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
     setup_info_logger();
     dotenv().ok();
 
-    info!("Starting up rrelayer...");
+    info!("Starting up the server");
 
     let yaml_path = project_path.join("rrelayerr.yaml");
     if !yaml_path.exists() {
