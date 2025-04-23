@@ -9,7 +9,6 @@
  creates you a new project with a rrelayer.yaml file in it + .env file with stuff in
 
 - relayer start - starts the relayer
-- relayer stop - stops the relayer
 
 - relayer network add - adds a network to the relayer
    - network name - required

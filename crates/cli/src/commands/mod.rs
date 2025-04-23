@@ -8,6 +8,5 @@ pub mod list;
 pub mod network;
 pub mod sign;
 pub mod start;
-pub mod stop;
 pub mod tx;
 pub mod user;

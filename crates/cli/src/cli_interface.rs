@@ -22,8 +22,6 @@ pub enum Commands {
     },
     /// Start the relayer service
     Start(start::StartArgs),
-    /// Stop the relayer service
-    Stop,
     /// Manage network configurations and settings
     Network(network::NetworkArgs),
     /// List all configured relayers

@@ -6,8 +6,7 @@ use rrelayerr::{load_env_from_project_path, setup_info_logger};
 use crate::{
     cli_interface::{Cli, Commands},
     commands::{
-        allowlist, api_key, balance, config, create, init, list, network, sign, start, stop, tx,
-        user,
+        allowlist, api_key, balance, config, create, init, list, network, sign, start, tx, user,
     },
     console::print_error_message,
 };
@@ -49,9 +48,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             load_env_from_project_path(&resolved_path);
 
             start::handle_start(args, &resolved_path).await?;
-        }
-        Commands::Stop => {
-            stop::handle_stop().await?;
         }
         Commands::Network(args) => {
             network::handle_network(args).await?;

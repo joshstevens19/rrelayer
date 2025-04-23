@@ -86,7 +86,7 @@ pub fn setup_logger(log_level: LevelFilter) {
 
     if tracing::subscriber::set_global_default(subscriber).is_err() {
         // Use println! here since logging might not be set up yet
-        println!("Logger has already been set up, continuing...");
+        // println!("Logger has already been set up, continuing...");
     }
 }
 

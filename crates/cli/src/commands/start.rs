@@ -3,7 +3,7 @@ use std::{env, path::PathBuf, process::Command, thread, time::Duration};
 use clap::Args;
 use rrelayerr::{PostgresClient, rrelayerr_error, rrelayerr_info, start};
 
-use crate::console::print_error_message;
+use crate::console::{print_error_message, print_success_message};
 
 #[derive(Args)]
 pub struct StartArgs {
@@ -126,8 +126,8 @@ fn start_docker_compose(project_path: &PathBuf) -> Result<(), String> {
     let status = Command::new("docker")
         .args(["compose", "up", "-d"])
         .current_dir(project_path)
-        // .stdout(std::process::Stdio::null())
-        // .stderr(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
         .status()
         .map_err(|e| {
             let error = format!("Docker command could not be executed make sure docker is running on the machine: {}", e);
