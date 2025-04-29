@@ -187,7 +187,7 @@ pub enum StartTransactionsQueuesError {
     RepopulateTransactionsQueueError(RepopulateTransactionsQueueError),
 
     #[error("Failed to init transactions queues: {0}")]
-    CouuldNotInitTransactionsQueues(WalletOrProviderError),
+    CouldNotInitTransactionsQueues(#[from] WalletOrProviderError),
 }
 
 pub async fn startup_transactions_queues(
@@ -250,9 +250,7 @@ pub async fn startup_transactions_queues(
     }
 
     let transactions_queues = Arc::new(Mutex::new(
-        TransactionsQueues::new(transaction_relayer_setups, gas_oracle_cache, cache)
-            .await
-            .map_err(StartTransactionsQueuesError::CouuldNotInitTransactionsQueues)?,
+        TransactionsQueues::new(transaction_relayer_setups, gas_oracle_cache, cache).await?,
     ));
 
     spawn_processing_tasks(transactions_queues.clone()).await;

@@ -1,0 +1,17 @@
+[package]
+name = "rrelayerr_sdk"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+reqwest = { version = "0.12.15", features = ["json", "native-tls", "cookies"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = "2.0.6"
+chrono = { version = "0.4.38", features = ["serde"] }
+alloy = { workspace = true, features = ["full", "signer-mnemonic", "eips", "eip712"] }
+alloy-rlp = { workspace = true }
+alloy-eips = { workspace = true }
+rrelayerr_core = { path = "../core" }
+

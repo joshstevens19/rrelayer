@@ -1,7 +1,7 @@
 use std::{fs, path::Path};
 
 use dialoguer::{Confirm, Input};
-use rrelayerr::{
+use rrelayerr_core::{
     NetworkSetupConfig, SetupConfig, SigningKey, WriteFileError, generate_docker_file,
     generate_seed_phrase, write_file,
 };

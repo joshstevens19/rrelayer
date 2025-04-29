@@ -3,4 +3,13 @@ resolver = "2"
 members = [
     "crates/cli",
     "crates/core",
+    "crates/sdk",
 ]
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0.98"
+alloy = { version = "0.7.0", features = ["full", "signer-mnemonic", "eips", "eip712"] }
+alloy-rlp = "0.3.8"
+alloy-eips = "0.7.0"

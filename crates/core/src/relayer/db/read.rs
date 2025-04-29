@@ -135,7 +135,7 @@ impl PostgresClient {
         &self,
         relayer_id: &RelayerId,
         paging_context: &PagingContext,
-    ) -> Result<PagingResult<String>, PostgresError> {
+    ) -> Result<PagingResult<EvmAddress>, PostgresError> {
         let rows = self
             .query(
                 "
@@ -151,7 +151,7 @@ impl PostgresClient {
             )
             .await?;
 
-        let results: Vec<String> = rows.iter().map(|row| row.get("address")).collect();
+        let results: Vec<EvmAddress> = rows.iter().map(|row| row.get("address")).collect();
 
         let result_count = results.len();
 

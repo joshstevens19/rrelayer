@@ -1,4 +1,4 @@
-mod sign;
+pub mod sign;
 use std::sync::Arc;
 
 use axum::{
@@ -123,7 +123,7 @@ async fn get_relayers(
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GetRelayerResult {
     pub relayer: Relayer,
     #[serde(rename = "providerUrls")]
@@ -235,8 +235,8 @@ async fn update_relay_max_gas_price(
     }
 }
 
-#[derive(Debug, Serialize)]
-struct CreateRelayerApiResult {
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateRelayerApiResult {
     #[serde(rename = "apiKey")]
     pub api_key: String,
 }
@@ -314,7 +314,7 @@ async fn get_allowlist_addresses(
     Path(relayer_id): Path<RelayerId>,
     Query(query): Query<GetAllowlistAddressesQuery>,
     headers: HeaderMap,
-) -> Result<Json<PagingResult<String>>, StatusCode> {
+) -> Result<Json<PagingResult<EvmAddress>>, StatusCode> {
     if auth_guard.is_api_key() &&
         !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await
     {

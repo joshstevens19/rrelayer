@@ -1,7 +1,7 @@
 use std::{path::PathBuf, str::FromStr};
 
 use clap::Parser;
-use rrelayerr::{load_env_from_project_path, setup_info_logger};
+use rrelayerr_core::{load_env_from_project_path, setup_info_logger};
 
 use crate::{
     cli_interface::{Cli, Commands},

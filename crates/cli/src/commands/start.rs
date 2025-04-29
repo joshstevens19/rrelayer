@@ -1,7 +1,7 @@
 use std::{env, path::PathBuf, process::Command, thread, time::Duration};
 
 use clap::Args;
-use rrelayerr::{PostgresClient, rrelayerr_error, rrelayerr_info, start};
+use rrelayerr_core::{PostgresClient, rrelayerr_error, rrelayerr_info, start};
 
 use crate::console::{print_error_message, print_success_message};
 
@@ -103,7 +103,7 @@ fn check_docker_compose_status(project_path: &PathBuf, max_retries: u32) -> Resu
                     let error = "DATABASE_URL not set.".to_string();
                     rrelayerr_error!(error);
                     Err(error)
-                }
+                };
             }
         } else {
             let error = format!("docker compose ps exited with status: {}", ps_status.status);

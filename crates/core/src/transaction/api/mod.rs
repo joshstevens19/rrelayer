@@ -38,7 +38,7 @@ async fn get_transaction_by_id_api(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct RelayTransactionStatusResult {
     pub hash: Option<TransactionHash>,
     pub status: TransactionStatus,
@@ -106,7 +106,7 @@ async fn get_transaction_status(
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct RelayTransactionRequest {
     pub to: EvmAddress,
     #[serde(default)]
@@ -119,7 +119,7 @@ pub struct RelayTransactionRequest {
     pub blobs: Option<Vec<Blob>>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct SendTransactionResult {
     pub id: TransactionId,
     pub hash: TransactionHash,

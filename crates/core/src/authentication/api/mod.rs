@@ -23,10 +23,11 @@ struct GenerateSecretRequest {
     pub address: EvmAddress,
 }
 
-#[derive(Debug, Serialize)]
-struct GenerateSecretResult {
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GenerateSecretResult {
     pub id: Uuid,
     pub challenge: String,
+    pub address: EvmAddress,
 }
 
 async fn generate_auth_secret(
@@ -51,14 +52,14 @@ async fn generate_auth_secret(
             )
             .await;
 
-            Ok(Json(GenerateSecretResult { id, challenge }))
+            Ok(Json(GenerateSecretResult { id, challenge, address: secret_request.address }))
         }
         Err(_) => Err(StatusCode::UNAUTHORIZED),
     }
 }
 
-#[derive(Debug, Deserialize)]
-struct AuthenticateRequest {
+#[derive(Debug, Deserialize, Serialize)]
+pub struct AuthenticateRequest {
     pub id: Uuid,
 
     #[serde(rename = "signedBy")]

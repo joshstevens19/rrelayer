@@ -58,7 +58,7 @@ async fn sign_text(
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct SignTypedDataResult {
+pub struct SignTypedDataResult {
     pub signature: PrimitiveSignature,
 }
 
