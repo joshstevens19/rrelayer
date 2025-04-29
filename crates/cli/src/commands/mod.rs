@@ -1,9 +1,11 @@
 pub mod allowlist;
 pub mod api_key;
+pub mod auth;
 pub mod balance;
 pub mod config;
 pub mod create;
 pub mod init;
+pub mod keystore;
 pub mod list;
 pub mod network;
 pub mod sign;

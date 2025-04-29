@@ -3,6 +3,7 @@ use std::{path::PathBuf, str::FromStr};
 use clap::Parser;
 use rrelayerr_core::{load_env_from_project_path, setup_info_logger};
 
+use crate::commands::keystore;
 use crate::{
     cli_interface::{Cli, Commands},
     commands::{
@@ -78,6 +79,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Commands::User { command } => {
             user::handle_user(command).await?;
+        }
+        Commands::Keystore { command } => {
+            keystore::handle_keystore_command(command).await?;
         }
     }
 

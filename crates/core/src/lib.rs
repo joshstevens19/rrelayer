@@ -11,7 +11,10 @@ mod provider;
 pub use provider::generate_seed_phrase;
 pub mod relayer;
 mod setup;
-pub use setup::yaml::{read, NetworkSetupConfig, SetupConfig, SigningKey};
+pub use setup::{
+    signing_key_providers::keystore,
+    yaml::{read, NetworkSetupConfig, SetupConfig, SigningKey},
+};
 mod shared;
 pub use shared::common_types;
 mod startup;

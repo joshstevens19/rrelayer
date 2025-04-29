@@ -1,7 +1,8 @@
 use clap::{Parser, Subcommand};
 
 use crate::commands::{
-    allowlist, api_key, balance, config, create, list, network, sign, start, tx, user,
+    allowlist, api_key, balance, config, create, keystore::KeystoreCommands, list, network, sign,
+    start, tx, user,
 };
 
 #[derive(Parser)]
@@ -19,6 +20,11 @@ pub enum Commands {
         /// optional - The path to create the project in, default will be where the command is run.
         #[clap(long, short)]
         path: Option<String>,
+    },
+    /// Keystore management commands
+    Keystore {
+        #[clap(subcommand)]
+        command: KeystoreCommands,
     },
     /// Start the relayer service
     Start(start::StartArgs),
