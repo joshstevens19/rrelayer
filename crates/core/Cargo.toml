@@ -43,6 +43,7 @@ bb8 = "0.8.3"
 bb8-postgres = "0.8.1"
 postgres-native-tls = "0.5"
 eth-keystore = "0.5.0"
+hex = "0.4.3"
 
 [profile.maxperf]
 inherits = "release"
