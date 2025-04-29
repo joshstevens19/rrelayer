@@ -1,8 +1,7 @@
 mod api;
 mod types;
 
-use alloy::primitives::Address;
-use alloy::signers;
+use alloy::{primitives::Address, signers};
 pub use api::{Authentication, GasApi, NetworkApi, RelayerApi, SignApi, TransactionApi, UserApi};
 use rrelayerr_core::authentication::{
     api::{AuthenticateRequest, GenerateSecretResult},
@@ -10,7 +9,7 @@ use rrelayerr_core::authentication::{
 };
 
 use crate::{
-    api::{http::HttpClient, ApiResult, ApiSdkError},
+    api::{ApiResult, ApiSdkError, http::HttpClient},
     types::SdkContext,
 };
 

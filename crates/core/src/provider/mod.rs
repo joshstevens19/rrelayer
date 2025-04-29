@@ -3,10 +3,7 @@ use thiserror::Error;
 use crate::{
     gas::fee_estimator::base::get_gas_estimator,
     network::types::ChainId,
-    setup::{
-        get_mnemonic_from_signing_key,
-        yaml::{SetupConfig, SigningKey},
-    },
+    setup::yaml::{SetupConfig, SigningKey},
 };
 
 mod wallet_manager;
@@ -16,6 +13,7 @@ mod evm_provider;
 pub use evm_provider::{EvmProvider, RelayerProvider, SendTransactionError};
 
 use self::evm_provider::EvmProviderNewError;
+use crate::setup::signing_key_providers::get_mnemonic_from_signing_key;
 
 #[derive(Error, Debug)]
 pub enum LoadProvidersError {

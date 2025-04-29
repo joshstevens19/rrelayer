@@ -24,14 +24,25 @@ pub struct AwsSigningKey {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct SigningKeyRaw {
+pub struct RawSigningKey {
     pub mnemonic: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct KeystoreSigningKey {
+    pub path: String,
+    pub account_name: String,
+    // pub dangerous_define_raw_password:
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SigningKey {
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub raw: Option<SigningKeyRaw>,
+    pub keystore: Option<RawSigningKey>,
+
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub raw: Option<RawSigningKey>,
+
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub aws_secret_manager: Option<AwsSigningKey>,
 }
@@ -39,7 +50,8 @@ pub struct SigningKey {
 impl Default for SigningKey {
     fn default() -> Self {
         Self {
-            raw: Some(SigningKeyRaw { mnemonic: "${MNEMONIC}".to_string() }),
+            raw: Some(RawSigningKey { mnemonic: "${MNEMONIC}".to_string() }),
+            keystore: None,
             aws_secret_manager: None,
         }
     }
@@ -47,12 +59,20 @@ impl Default for SigningKey {
 
 impl SigningKey {
     pub fn validate(&self) -> Result<(), String> {
-        if self.raw.is_none() && self.aws_secret_manager.is_none() {
+        if self.raw.is_none() && self.aws_secret_manager.is_none() && self.keystore.is_none() {
             return Err("Signing key is not set".to_string());
         }
 
         if self.raw.is_some() && self.aws_secret_manager.is_some() {
-            return Err("Signing key can not be both raw and from aws secret manager".to_string());
+            return Err("Signing key can not be both raw and aws secret manager".to_string());
+        }
+
+        if self.raw.is_some() && self.keystore.is_some() {
+            return Err("Signing key can not be both raw and keystore".to_string());
+        }
+
+        if self.aws_secret_manager.is_some() && self.keystore.is_some() {
+            return Err("Signing key can not be both aws secret manager and keystore".to_string());
         }
 
         Ok(())

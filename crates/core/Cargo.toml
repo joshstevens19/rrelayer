@@ -18,7 +18,7 @@ serde_yaml = "0.9.30"
 async-trait = "0.1"
 reqwest = { version = "0.12", features = ["json"] }
 lazy_static = "1.4"
-alloy = { workspace = true, features = ["full", "signer-mnemonic", "eips", "eip712"] }
+alloy = { workspace = true, features = ["full", "signer-mnemonic", "eips", "eip712", "signer-keystore"] }
 alloy-rlp = { workspace = true }
 alloy-eips = { workspace = true }
 uuid = { version = "1.0", features = ["v4", "serde"] }
@@ -42,6 +42,7 @@ native-tls = "0.2.12"
 bb8 = "0.8.3"
 bb8-postgres = "0.8.1"
 postgres-native-tls = "0.5"
+eth-keystore = "0.5.0"
 
 [profile.maxperf]
 inherits = "release"

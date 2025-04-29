@@ -1,7 +1,7 @@
-use self::aws_secret_manager::get_aws_secret;
-use super::yaml::SigningKey;
+use crate::{setup::signing_key_providers::aws_secret_manager::get_aws_secret, SigningKey};
 
-mod aws_secret_manager;
+pub mod aws_secret_manager;
+pub mod keystore;
 
 pub async fn get_mnemonic_from_signing_key(
     signing_key: &SigningKey,
