@@ -3,13 +3,18 @@ use std::{fs, path::PathBuf, str::FromStr};
 use alloy::signers::local::{LocalSigner, MnemonicBuilder, coins_bip39::English};
 use clap::Subcommand;
 use dialoguer::Password;
-use rrelayerr_core::keystore::{
-    KeystoreDecryptResult, create_new_mnemonic_in_keystore, create_new_private_key_in_keystore,
-    decrypt_keystore, store_mnemonic_in_keystore, store_private_key_in_keystore,
+use rrelayerr_core::{
+    SetupConfig,
+    keystore::{
+        KeyStorePasswordManager, KeystoreDecryptResult, create_new_mnemonic_in_keystore,
+        create_new_private_key_in_keystore, decrypt_keystore, store_mnemonic_in_keystore,
+        store_private_key_in_keystore,
+    },
+    read,
 };
 
 #[derive(Subcommand)]
-pub enum KeystoreCommands {
+pub enum KeystoreCommand {
     /// Create a new keystore from a mnemonic phrase
     CreateFromMnemonic {
         /// Use an existing mnemonic phrase
@@ -69,31 +74,57 @@ impl ProjectLocation {
         self.output_dir.join("keystores")
     }
 
+    fn keystore_already_exists(&self, name: &str) -> bool {
+        self.get_keystore_dir().join(name).exists()
+    }
+
+    fn get_account_keystore_dir(&self) -> PathBuf {
+        self.output_dir.join("keystores").join("accounts")
+    }
+
+    pub fn get_account_keystore(&self, account: &str) -> PathBuf {
+        self.output_dir.join("keystores").join("accounts").join(account)
+    }
+
     fn create_keystore_dir(&self) -> Result<(), Box<dyn std::error::Error>> {
         fs::create_dir_all(&self.get_keystore_dir())?;
         Ok(())
     }
+
+    fn create_account_keystore_dir(&self) -> Result<(), Box<dyn std::error::Error>> {
+        fs::create_dir_all(&self.get_account_keystore_dir())?;
+        Ok(())
+    }
+
+    fn account_already_exists(&self, name: &str) -> bool {
+        self.get_account_keystore_dir().join(name).exists()
+    }
+
+    pub fn setup_config(&self) -> Result<SetupConfig, Box<dyn std::error::Error>> {
+        let yaml = read(&self.output_dir.join("rrelayerr.yaml"))?;
+        Ok(yaml)
+    }
 }
 
 pub async fn handle_keystore_command(
-    cmd: &KeystoreCommands,
+    cmd: &KeystoreCommand,
 ) -> Result<(), Box<dyn std::error::Error>> {
     match cmd {
-        KeystoreCommands::CreateFromMnemonic { mnemonic, generate, name, output_dir } => {
+        KeystoreCommand::CreateFromMnemonic { mnemonic, generate, name, output_dir } => {
             let dir = match output_dir {
                 Some(path) => path.clone(),
                 None => std::env::current_dir()?,
             };
             create_from_mnemonic(mnemonic, *generate, name, ProjectLocation::new(dir), None)?;
         }
-        KeystoreCommands::CreateFromPrivateKey { private_key, generate, name, output_dir } => {
+        KeystoreCommand::CreateFromPrivateKey { private_key, generate, name, output_dir } => {
             let dir = match output_dir {
                 Some(path) => path.clone(),
                 None => std::env::current_dir()?,
             };
             create_from_private_key(private_key, *generate, name, ProjectLocation::new(dir))?;
         }
-        KeystoreCommands::Decrypt { path } => {
+        KeystoreCommand::Decrypt { path } => {
             decrypt(path)?;
         }
     }
@@ -109,6 +140,9 @@ pub fn create_from_mnemonic(
     password: Option<String>,
 ) -> Result<PathBuf, Box<dyn std::error::Error>> {
     project_location.create_keystore_dir()?;
+    if project_location.keystore_already_exists(name) {
+        return Err(format!("Keystore already exists: {}", name).into());
+    }
 
     if let Some(phrase) = mnemonic {
         // Throws if the seed phrase is invalid
@@ -134,6 +168,9 @@ pub fn create_from_mnemonic(
         create_new_mnemonic_in_keystore(&password, &project_location.get_keystore_dir(), name)?;
     };
 
+    let password_manager = KeyStorePasswordManager::new(&project_location.setup_config()?.name);
+    password_manager.save(name, &password)?;
+
     let file_location = project_location.get_keystore_dir().join(name);
 
     println!("\n✅ Successfully created keystore - {:?}", file_location);
@@ -142,13 +179,17 @@ pub fn create_from_mnemonic(
     Ok(file_location)
 }
 
-fn create_from_private_key(
+pub fn create_from_private_key(
     private_key: &Option<String>,
     generate: bool,
     name: &str,
     project_location: ProjectLocation,
 ) -> Result<PathBuf, Box<dyn std::error::Error>> {
-    project_location.create_keystore_dir()?;
+    project_location.create_account_keystore_dir()?;
+
+    if project_location.account_already_exists(name) {
+        return Err(format!("Account already exists: {}", name).into());
+    }
 
     if let Some(pk) = private_key {
         let pk_str = pk.trim().trim_start_matches("0x");
@@ -164,7 +205,7 @@ fn create_from_private_key(
     };
 
     let password = Password::new()
-        .with_prompt("Enter password to encrypt keystore")
+        .with_prompt("Enter password to encrypt account")
         .with_confirmation("Confirm password", "Passwords don't match")
         .interact()?;
 
@@ -173,16 +214,23 @@ fn create_from_private_key(
         store_private_key_in_keystore(
             private_key,
             &password,
-            &project_location.get_keystore_dir(),
+            &project_location.get_account_keystore_dir(),
             Some(name),
         )?;
     } else {
-        create_new_private_key_in_keystore(&password, &project_location.get_keystore_dir(), name)?;
+        create_new_private_key_in_keystore(
+            &password,
+            &project_location.get_account_keystore_dir(),
+            name,
+        )?;
     }
 
-    let file_location = project_location.get_keystore_dir().join(name);
+    let password_manager = KeyStorePasswordManager::new(&project_location.setup_config()?.name);
+    password_manager.save(name, &password)?;
 
-    println!("\n✅ Successfully created keystore - {:?}", file_location);
+    let file_location = project_location.get_account_keystore_dir().join(name);
+
+    println!("\n✅ Successfully created encrypted account - {:?}", file_location);
     println!("Account: {}", name);
 
     Ok(file_location)

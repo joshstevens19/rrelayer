@@ -5,7 +5,9 @@ use alloy::signers::{
     local::{coins_bip39::English, LocalSigner, MnemonicBuilder, PrivateKeySigner},
 };
 use eth_keystore::{decrypt_key, encrypt_key};
+use keyring::Entry;
 use rand::thread_rng;
+use thiserror::Error;
 
 use crate::generate_seed_phrase;
 
@@ -113,4 +115,49 @@ pub fn decrypt_keystore(
             Err("Could not determine keystore type - not a valid mnemonic or private key".into())
         }
     }
+}
+
+#[derive(Error, Debug)]
+pub enum PasswordError {
+    #[error("Keyring error: {0}")]
+    KeyringError(#[from] keyring::Error),
+
+    #[error("Password not found")]
+    NotFound,
+}
+
+pub struct KeyStorePasswordManager {
+    app_name: String,
+}
+
+impl KeyStorePasswordManager {
+    /// Create a new password manager
+    pub fn new(app_name: &str) -> Self {
+        Self { app_name: app_name.to_string() }
+    }
+
+    /// Save a password for a key
+    pub fn save(&self, key: &str, password: &str) -> Result<(), PasswordError> {
+        let entry = Entry::new(&self.app_name, key)?;
+        entry.set_password(password)?;
+        Ok(())
+    }
+
+    /// Load a password for a key
+    pub fn load(&self, key: &str) -> Result<String, PasswordError> {
+        let entry = Entry::new(&self.app_name, key)?;
+        match entry.get_password() {
+            Ok(password) => Ok(password),
+            Err(_) => Err(PasswordError::NotFound),
+        }
+    }
+
+    // /// Delete a password for a key
+    // pub fn delete(&self, key: &str) -> Result<(), PasswordError> {
+    //     let entry = Entry::new(&self.app_name, key)?;
+    //     match entry.delete_credential() {
+    //         Ok(_) => Ok(()),
+    //         Err(_) => Err(PasswordError::NotFound),
+    //     }
+    // }
 }

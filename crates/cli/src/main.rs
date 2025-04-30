@@ -6,8 +6,8 @@ use rrelayerr_core::{load_env_from_project_path, setup_info_logger};
 use crate::{
     cli_interface::{Cli, Commands},
     commands::{
-        allowlist, api_key, balance, config, create, init, keystore, list, network, sign, start,
-        tx, user,
+        allowlist, api_key, auth, balance, config, create, init, keystore, list, network, sign,
+        start, tx, user,
     },
     console::print_error_message,
 };
@@ -43,6 +43,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             load_env_from_project_path(&resolved_path);
 
             init::handle_init(&resolved_path).await?;
+        }
+        Commands::Auth { path, command } => {
+            let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;
+            load_env_from_project_path(&resolved_path);
+            auth::handle_auth_command(command, resolved_path).await?;
         }
         Commands::Start(args) => {
             let resolved_path = resolve_path(&args.path).inspect_err(|e| print_error_message(e))?;

@@ -26,3 +26,4 @@ documentation/vocs.config.ts*
 .env
 !.env.example
 node_modules
+playground/**/keystores
