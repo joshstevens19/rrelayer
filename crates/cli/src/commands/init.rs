@@ -37,7 +37,7 @@ pub async fn handle_init(path: &Path) -> Result<(), Box<dyn std::error::Error>> 
         .default(true)
         .interact()?;
 
-    let password = Password::new()
+    let mnemonic_password = Password::new()
         .with_prompt("Enter password to encrypt keystore file for the relayers seed phrase")
         .with_confirmation("Confirm password", "Passwords don't match")
         .interact()?;
@@ -46,13 +46,16 @@ pub async fn handle_init(path: &Path) -> Result<(), Box<dyn std::error::Error>> 
 
     fs::create_dir(&project_path)?;
 
+    let mut project_location = ProjectLocation::new(project_path.clone());
+    project_location.override_project_name(&project_name);
+
     let account_name = "rrelayerr_signing_key";
     let created_path = create_from_mnemonic(
         &None,
         true,
         &account_name,
-        ProjectLocation::new(project_path.clone()),
-        Some(password),
+        project_location,
+        Some(mnemonic_password),
     )?;
 
     let relative_path = if created_path.starts_with(&project_path) {

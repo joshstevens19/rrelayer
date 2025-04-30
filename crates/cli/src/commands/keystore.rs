@@ -63,11 +63,16 @@ pub enum KeystoreCommand {
 
 pub struct ProjectLocation {
     output_dir: PathBuf,
+    override_project_name: Option<String>,
 }
 
 impl ProjectLocation {
     pub fn new(output_dir: PathBuf) -> Self {
-        Self { output_dir }
+        Self { output_dir, override_project_name: None }
+    }
+
+    pub fn override_project_name(&mut self, name: &str) {
+        self.override_project_name = Some(name.to_string());
     }
 
     fn get_keystore_dir(&self) -> PathBuf {
@@ -103,6 +108,12 @@ impl ProjectLocation {
     pub fn setup_config(&self) -> Result<SetupConfig, Box<dyn std::error::Error>> {
         let yaml = read(&self.output_dir.join("rrelayerr.yaml"))?;
         Ok(yaml)
+    }
+
+    pub fn get_project_name(&self) -> String {
+        self.override_project_name
+            .clone()
+            .unwrap_or_else(|| self.setup_config().unwrap().name.clone())
     }
 }
 
@@ -168,7 +179,7 @@ pub fn create_from_mnemonic(
         create_new_mnemonic_in_keystore(&password, &project_location.get_keystore_dir(), name)?;
     };
 
-    let password_manager = KeyStorePasswordManager::new(&project_location.setup_config()?.name);
+    let password_manager = KeyStorePasswordManager::new(&project_location.get_project_name());
     password_manager.save(name, &password)?;
 
     let file_location = project_location.get_keystore_dir().join(name);
@@ -225,7 +236,7 @@ pub fn create_from_private_key(
         )?;
     }
 
-    let password_manager = KeyStorePasswordManager::new(&project_location.setup_config()?.name);
+    let password_manager = KeyStorePasswordManager::new(&project_location.get_project_name());
     password_manager.save(name, &password)?;
 
     let file_location = project_location.get_account_keystore_dir().join(name);

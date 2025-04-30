@@ -1,11 +1,14 @@
 name: example
-description: 'This is an example yaml file'
 signing_key:
-  raw:
-    mnemonic: ${MNEMONIC}
+  keystore:
+    path: ./keystores/rrelayerr_signing_key
+    account_name: rrelayerr_signing_key
 admins: []
 networks:
 - name: sepolia_ethereum
   provider_urls:
   - https://sepolia.gateway.tenderly.co
   block_explorer_url: https://sepolia.etherscan.io
+gas_providers:
+  tenderly:
+    enabled: true

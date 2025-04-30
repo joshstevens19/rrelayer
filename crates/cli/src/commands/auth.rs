@@ -2,9 +2,9 @@ use std::path::PathBuf;
 
 use clap::Subcommand;
 use dialoguer::Password;
-use rrelayerr_core::keystore::{decrypt_keystore, KeyStorePasswordManager};
+use rrelayerr_core::keystore::{KeyStorePasswordManager, decrypt_keystore};
 
-use crate::commands::keystore::{create_from_private_key, ProjectLocation};
+use crate::commands::keystore::{ProjectLocation, create_from_private_key};
 
 #[derive(Subcommand)]
 pub enum AuthCommand {
