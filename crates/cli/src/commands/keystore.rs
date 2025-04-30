@@ -1,11 +1,11 @@
 use std::{fs, path::PathBuf, str::FromStr};
 
-use alloy::signers::local::{coins_bip39::English, LocalSigner, MnemonicBuilder};
+use alloy::signers::local::{LocalSigner, MnemonicBuilder, coins_bip39::English};
 use clap::Subcommand;
 use dialoguer::Password;
 use rrelayerr_core::keystore::{
-    create_new_mnemonic_in_keystore, create_new_private_key_in_keystore, decrypt_keystore,
-    store_mnemonic_in_keystore, store_private_key_in_keystore, KeystoreDecryptResult,
+    KeystoreDecryptResult, create_new_mnemonic_in_keystore, create_new_private_key_in_keystore,
+    decrypt_keystore, store_mnemonic_in_keystore, store_private_key_in_keystore,
 };
 
 #[derive(Subcommand)]
@@ -75,7 +75,9 @@ impl ProjectLocation {
     }
 }
 
-pub async fn handle_keystore_command(cmd: &KeystoreCommands) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn handle_keystore_command(
+    cmd: &KeystoreCommands,
+) -> Result<(), Box<dyn std::error::Error>> {
     match cmd {
         KeystoreCommands::CreateFromMnemonic { mnemonic, generate, name, output_dir } => {
             let dir = match output_dir {
@@ -236,7 +238,7 @@ fn decrypt(path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
                             "Failed to decrypt after {} attempts. Incorrect password.",
                             MAX_ATTEMPTS
                         )
-                            .into())
+                        .into())
                     } else {
                         Err(e)
                     };

@@ -12,6 +12,7 @@ use crate::{
     authentication::{api::create_authentication_routes, types::JwtRole},
     gas::{
         api::create_gas_routes,
+        blob_gas_oracle::{blob_gas_oracle, BlobGasOracleCache},
         gas_oracle::{gas_oracle, GasOracleCache},
     },
     network::api::create_network_routes,
@@ -32,9 +33,14 @@ use crate::{
     user::api::create_user_routes,
 };
 
-fn start_crons(gas_oracle_cache: Arc<Mutex<GasOracleCache>>, providers: Arc<Vec<EvmProvider>>) {
+fn start_crons(
+    gas_oracle_cache: Arc<Mutex<GasOracleCache>>,
+    blob_gas_oracle_cache: Arc<Mutex<BlobGasOracleCache>>,
+    providers: Arc<Vec<EvmProvider>>,
+) {
     info!("Running cron task...");
-    tokio::spawn(gas_oracle(providers, gas_oracle_cache));
+    tokio::spawn(gas_oracle(Arc::clone(&providers), gas_oracle_cache));
+    tokio::spawn(blob_gas_oracle(providers, blob_gas_oracle_cache));
 }
 
 #[derive(Error, Debug)]
@@ -52,6 +58,7 @@ pub enum StartApiError {
 
 async fn start_api(
     gas_oracle_cache: Arc<Mutex<GasOracleCache>>,
+    blob_gas_oracle_cache: Arc<Mutex<BlobGasOracleCache>>,
     transactions_queues: Arc<Mutex<TransactionsQueues>>,
     providers: Arc<Vec<EvmProvider>>,
     cache: Arc<Cache>,
@@ -68,6 +75,7 @@ async fn start_api(
         db: Arc::new(db),
         evm_providers: providers,
         gas_oracle_cache,
+        blob_gas_oracle_cache,
         transactions_queues,
         cache,
     });
@@ -163,15 +171,27 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
     let providers = Arc::new(load_providers(&config).await?);
 
     let gas_oracle_cache = Arc::new(Mutex::new(GasOracleCache::new()));
+    let blob_gas_oracle_cache = Arc::new(Mutex::new(BlobGasOracleCache::new()));
 
-    let transaction_queue =
-        startup_transactions_queues(gas_oracle_cache.clone(), providers.clone(), cache.clone())
-            .await?;
+    let transaction_queue = startup_transactions_queues(
+        gas_oracle_cache.clone(),
+        blob_gas_oracle_cache.clone(),
+        providers.clone(),
+        cache.clone(),
+    )
+    .await?;
 
-    start_crons(gas_oracle_cache.clone(), providers.clone());
+    start_crons(gas_oracle_cache.clone(), blob_gas_oracle_cache.clone(), providers.clone());
 
-    start_api(gas_oracle_cache, transaction_queue, providers, cache, config.allowed_origins)
-        .await?;
+    start_api(
+        gas_oracle_cache,
+        blob_gas_oracle_cache,
+        transaction_queue,
+        providers,
+        cache,
+        config.allowed_origins,
+    )
+    .await?;
 
     Ok(())
 }

@@ -18,7 +18,12 @@ use super::types::{
     TransactionQueueSendTransactionError, TransactionSentWithRelayer, TransactionsQueueSetup,
 };
 use crate::{
-    gas::{fee_estimator::base::GasPriceResult, gas_oracle::GasOracleCache, types::GasLimit},
+    gas::{
+        blob_gas_oracle::{BlobGasOracleCache, BlobGasPriceResult, BLOB_GAS_PER_BLOB},
+        fee_estimator::base::GasPriceResult,
+        gas_oracle::GasOracleCache,
+        types::GasLimit,
+    },
     network::types::ChainId,
     postgres::PostgresClient,
     provider::EvmProvider,
@@ -38,6 +43,7 @@ pub struct TransactionsQueue {
     relayer: Relayer,
     pub nonce_manager: NonceManager,
     gas_oracle_cache: Arc<Mutex<GasOracleCache>>,
+    blob_oracle_cache: Arc<Mutex<BlobGasOracleCache>>,
     confirmations: u64,
 }
 
@@ -45,6 +51,7 @@ impl TransactionsQueue {
     pub fn new(
         setup: TransactionsQueueSetup,
         gas_oracle_cache: Arc<Mutex<GasOracleCache>>,
+        blob_oracle_cache: Arc<Mutex<BlobGasOracleCache>>,
     ) -> Self {
         Self {
             pending_transactions: Mutex::new(setup.pending_transactions),
@@ -54,6 +61,7 @@ impl TransactionsQueue {
             relayer: setup.relayer,
             nonce_manager: setup.nonce_manager,
             gas_oracle_cache,
+            blob_oracle_cache,
             confirmations: 12,
         }
     }
@@ -257,7 +265,7 @@ impl TransactionsQueue {
     fn within_gas_price_bounds(&self, gas: &GasPriceResult) -> bool {
         if let Some(max) = &self.relayer.max_gas_price {
             if self.relayer.eip_1559_enabled {
-                return max.into_u128() >= gas.max_fee.into_u128()
+                return max.into_u128() >= gas.max_fee.into_u128();
             }
 
             return max.into_u128() >= gas.legacy_gas_price().into_u128();
@@ -315,6 +323,35 @@ impl TransactionsQueue {
         }
 
         Ok(gas_price)
+    }
+
+    pub async fn compute_blob_gas_price_for_transaction(
+        &self,
+        transaction_speed: &TransactionSpeed,
+        sent_last_with: &Option<BlobGasPriceResult>,
+    ) -> Result<BlobGasPriceResult, SendTransactionGasPriceError> {
+        // Get blob gas price from oracle
+        let blob_gas_oracle = self.blob_oracle_cache.lock().await;
+        let mut blob_gas_price = blob_gas_oracle
+            .get_blob_gas_price_for_speed(&self.relayer.chain_id, transaction_speed)
+            .await
+            .ok_or(SendTransactionGasPriceError::BlobGasCalculationError)?;
+
+        // If we've sent this transaction before, consider its previous blob gas price
+        if let Some(sent_blob_gas) = sent_last_with {
+            // If the oracle's blob gas price is lower than what we used last time,
+            // increase by 10% from the previous price
+            if blob_gas_price.blob_gas_price < sent_blob_gas.blob_gas_price {
+                blob_gas_price.blob_gas_price =
+                    sent_blob_gas.blob_gas_price + (sent_blob_gas.blob_gas_price / 10);
+
+                // Recalculate total fee based on new blob gas price
+                blob_gas_price.total_fee_for_blob =
+                    blob_gas_price.blob_gas_price * BLOB_GAS_PER_BLOB;
+            }
+        }
+
+        Ok(blob_gas_price)
     }
 
     pub async fn compute_tx_hash(
@@ -396,7 +433,13 @@ impl TransactionsQueue {
         }
 
         let transaction_request: TypedTransaction = if transaction.is_blob_transaction() {
-            transaction.to_blob_typed_transaction(Some(&gas_price))
+            let blob_gas_price = self
+                .compute_blob_gas_price_for_transaction(
+                    &transaction.speed,
+                    &transaction.sent_with_blob_gas,
+                )
+                .await?;
+            transaction.to_blob_typed_transaction(Some(&gas_price), Some(&blob_gas_price))
         } else if self.is_legacy_transactions() {
             transaction.to_legacy_typed_transaction(Some(&gas_price))
         } else {

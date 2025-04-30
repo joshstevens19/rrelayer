@@ -6,7 +6,7 @@ use tracing::{error, info};
 
 use super::{transactions_queues::TransactionsQueues, types::TransactionRelayerSetup};
 use crate::{
-    gas::gas_oracle::GasOracleCache,
+    gas::{blob_gas_oracle::BlobGasOracleCache, gas_oracle::GasOracleCache},
     network::types::ChainId,
     postgres::{PostgresClient, PostgresConnectionError, PostgresError},
     provider::{find_provider_for_chain_id, EvmProvider},
@@ -192,6 +192,7 @@ pub enum StartTransactionsQueuesError {
 
 pub async fn startup_transactions_queues(
     gas_oracle_cache: Arc<Mutex<GasOracleCache>>,
+    blob_gas_oracle_cache: Arc<Mutex<BlobGasOracleCache>>,
     providers: Arc<Vec<EvmProvider>>,
     cache: Arc<Cache>,
 ) -> Result<Arc<Mutex<TransactionsQueues>>, StartTransactionsQueuesError> {
@@ -250,7 +251,13 @@ pub async fn startup_transactions_queues(
     }
 
     let transactions_queues = Arc::new(Mutex::new(
-        TransactionsQueues::new(transaction_relayer_setups, gas_oracle_cache, cache).await?,
+        TransactionsQueues::new(
+            transaction_relayer_setups,
+            gas_oracle_cache,
+            blob_gas_oracle_cache,
+            cache,
+        )
+        .await?,
     ));
 
     spawn_processing_tasks(transactions_queues.clone()).await;

@@ -8,6 +8,9 @@ pub enum SendTransactionGasPriceError {
     #[error("Gas calculation error")]
     GasCalculationError,
 
+    #[error("Blob gas calculation error")]
+    BlobGasCalculationError,
+
     #[error("Transaction has no last sent gas price object")]
     NoLastSentGas,
 }
@@ -27,7 +30,7 @@ pub enum TransactionQueueSendTransactionError {
     CouldNotUpdateTransactionDb(PostgresError),
 
     #[error("{0}")]
-    SendTransactionGasPriceError(SendTransactionGasPriceError),
+    SendTransactionGasPriceError(#[from] SendTransactionGasPriceError),
 
     #[error("Transaction estimate gas error: {0}")]
     TransactionEstimateGasError(RpcError<TransportErrorKind>),

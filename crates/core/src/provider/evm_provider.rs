@@ -29,6 +29,7 @@ use tracing::info;
 use super::wallet_manager::WalletManager;
 use crate::{
     gas::{
+        blob_gas_oracle::{BlobGasEstimatorResult, BlobGasPriceResult},
         fee_estimator::{
             base::{BaseGasFeeEstimator, GasEstimatorError, GasEstimatorResult},
             fallback::FallbackGasFeeEstimator,
@@ -320,5 +321,59 @@ impl EvmProvider {
 
     pub async fn calculate_gas_price(&self) -> Result<GasEstimatorResult, GasEstimatorError> {
         self.gas_estimator.get_gas_prices(&self.chain_id).await
+    }
+
+    pub fn supports_blob_transactions(&self) -> bool {
+        // Ethereum mainnet and testnet chain IDs that support blobs
+        matches!(
+            self.chain_id.u64(),
+            1 |      // Ethereum Mainnet
+           17000 |  // Holesky Testnet
+           11155111 // Sepolia Testnet
+        )
+    }
+
+    pub async fn calculate_ethereum_blob_gas_price(
+        &self,
+    ) -> Result<BlobGasEstimatorResult, anyhow::Error> {
+        let base_fee_per_blob_gas = match self.rpc_client().get_blob_base_fee().await {
+            Ok(fee) => fee, // This is already a u128 value
+            Err(_) => return Err(anyhow::anyhow!("Chain does not support blob transactions")),
+        };
+
+        // Base price calculations
+        // Blob gas for a single blob is 128KB (131,072 gas units)
+        let blob_gas_per_blob = 131_072; // 128 * 1024
+
+        // Calculate fees with different multipliers for speeds
+        let super_fast_multiplier = 1.5;
+        let fast_multiplier = 1.2;
+        let medium_multiplier = 1.0;
+        let slow_multiplier = 0.8;
+
+        let super_fast_price = (base_fee_per_blob_gas as f64 * super_fast_multiplier) as u128;
+        let fast_price = (base_fee_per_blob_gas as f64 * fast_multiplier) as u128;
+        let medium_price = base_fee_per_blob_gas;
+        let slow_price = (base_fee_per_blob_gas as f64 * slow_multiplier) as u128;
+
+        let super_fast_total = super_fast_price * blob_gas_per_blob;
+        let fast_total = fast_price * blob_gas_per_blob;
+        let medium_total = medium_price * blob_gas_per_blob;
+        let slow_total = slow_price * blob_gas_per_blob;
+
+        Ok(BlobGasEstimatorResult {
+            super_fast: BlobGasPriceResult {
+                blob_gas_price: super_fast_price,
+                total_fee_for_blob: super_fast_total,
+            },
+            fast: BlobGasPriceResult { blob_gas_price: fast_price, total_fee_for_blob: fast_total },
+            medium: BlobGasPriceResult {
+                blob_gas_price: medium_price,
+                total_fee_for_blob: medium_total,
+            },
+            slow: BlobGasPriceResult { blob_gas_price: slow_price, total_fee_for_blob: slow_total },
+            base_fee_per_blob_gas,
+            timestamp: chrono::Utc::now().timestamp() as u64,
+        })
     }
 }

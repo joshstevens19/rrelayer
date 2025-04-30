@@ -7,7 +7,7 @@ use crate::console::{print_error_message, print_success_message};
 
 #[derive(Args)]
 pub struct StartArgs {
-    /// optional - To start the project from, default will be where the command is run.
+    /// optional - To start the project from, the default will be where the command is run.
     #[clap(long, short)]
     pub path: Option<String>,
 }

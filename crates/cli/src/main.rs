@@ -3,11 +3,11 @@ use std::{path::PathBuf, str::FromStr};
 use clap::Parser;
 use rrelayerr_core::{load_env_from_project_path, setup_info_logger};
 
-use crate::commands::keystore;
 use crate::{
     cli_interface::{Cli, Commands},
     commands::{
-        allowlist, api_key, balance, config, create, init, list, network, sign, start, tx, user,
+        allowlist, api_key, balance, config, create, init, keystore, list, network, sign, start,
+        tx, user,
     },
     console::print_error_message,
 };

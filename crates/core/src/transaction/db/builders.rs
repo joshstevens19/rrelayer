@@ -23,7 +23,10 @@ pub fn build_transaction_from_transaction_view(row: &Row) -> Transaction {
         queued_at: row.get("queued_at"),
         expires_at: row.get("expires_at"),
         sent_at: row.get("sent_at"),
+        // TODO! load from db
         sent_with_gas: None,
+        // TODO! load from db
+        sent_with_blob_gas: None,
         mined_at: row.get("mined_at"),
         speed: row.get("speed"),
         sent_with_max_priority_fee_per_gas: row.get("sent_max_priority_fee_per_gas"),

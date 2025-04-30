@@ -5,11 +5,11 @@ use alloy::{
         TxEip1559, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxLegacy, TypedTransaction,
     },
     eips::eip2930::AccessList,
-    primitives::{TxKind, U256},
+    primitives::TxKind,
 };
 use alloy_eips::eip4844::{
     builder::{SidecarBuilder, SimpleCoder},
-    Blob, BlobTransactionSidecar,
+    Blob,
 };
 use serde::{Deserialize, Serialize};
 
@@ -19,6 +19,7 @@ use super::{
 };
 use crate::{
     gas::{
+        blob_gas_oracle::BlobGasPriceResult,
         fee_estimator::base::GasPriceResult,
         types::{GasLimit, MaxFee, MaxPriorityFee},
     },
@@ -74,6 +75,9 @@ pub struct Transaction {
 
     #[serde(rename = "sentWithGas", skip_serializing_if = "Option::is_none", default)]
     pub sent_with_gas: Option<GasPriceResult>,
+
+    #[serde(rename = "sentWithBlobGas", skip_serializing_if = "Option::is_none", default)]
+    pub sent_with_blob_gas: Option<BlobGasPriceResult>,
 
     #[serde(
         rename = "minedAt",
@@ -159,10 +163,18 @@ impl Transaction {
     pub fn to_blob_typed_transaction(
         &self,
         override_gas_price: Option<&GasPriceResult>,
+        override_blob_gas_price: Option<&BlobGasPriceResult>,
     ) -> TypedTransaction {
         let gas_price_result = match override_gas_price {
             Some(gas_price) => gas_price,
-            None => self.sent_with_gas.as_ref().unwrap(),
+            None => self.sent_with_gas.as_ref().expect("No gas price found"),
+        };
+
+        let blob_gas_price = match override_blob_gas_price {
+            Some(blob_price) => blob_price.blob_gas_price,
+            None => {
+                self.sent_with_blob_gas.as_ref().expect("No blob gas price found").blob_gas_price
+            }
         };
 
         let blobs = self.blobs.clone().expect("No blobs found - should not be possible");
@@ -171,17 +183,19 @@ impl Transaction {
             blobs.iter().map(|blob| blob.as_slice()).collect();
         let sidecar = builder.build().expect("Failed to build blobs");
 
+        let blob_versioned_hashes = sidecar.versioned_hashes().collect::<Vec<_>>();
+
         let tx = TxEip4844 {
             chain_id: self.chain_id.into(),
             nonce: self.nonce.into(),
-            max_priority_fee_per_gas: gas_price_result.max_priority_fee.clone().into(),
+            max_priority_fee_per_gas: gas_price_result.max_priority_fee.into(),
             max_fee_per_gas: gas_price_result.max_fee.into(),
             gas_limit: self.gas_limit.unwrap().into(),
             to: self.to.into(),
             value: self.value.clone().into(),
             access_list: Default::default(),
-            blob_versioned_hashes: vec![Default::default()],
-            max_fee_per_blob_gas: 1,
+            blob_versioned_hashes,
+            max_fee_per_blob_gas: blob_gas_price.into(),
             input: self.data.clone().into(),
         };
 

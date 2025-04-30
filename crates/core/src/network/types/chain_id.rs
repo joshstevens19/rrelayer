@@ -16,6 +16,10 @@ impl ChainId {
     pub fn new(id: u64) -> Self {
         ChainId(id)
     }
+
+    pub fn u64(&self) -> u64 {
+        self.0
+    }
 }
 
 impl<'de> Deserialize<'de> for ChainId {

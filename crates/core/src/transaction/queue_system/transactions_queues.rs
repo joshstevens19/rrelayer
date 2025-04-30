@@ -21,7 +21,7 @@ use super::{
     },
 };
 use crate::{
-    gas::gas_oracle::GasOracleCache,
+    gas::{blob_gas_oracle::BlobGasOracleCache, gas_oracle::GasOracleCache},
     postgres::{PostgresClient, PostgresError},
     relayer::types::RelayerId,
     shared::{
@@ -41,6 +41,7 @@ pub struct TransactionsQueues {
     pub queues: Arc<Mutex<HashMap<RelayerId, TransactionsQueue>>>,
     pub relayer_block_times_ms: HashMap<RelayerId, u64>,
     gas_oracle_cache: Arc<Mutex<GasOracleCache>>,
+    blob_gas_oracle_cache: Arc<Mutex<BlobGasOracleCache>>,
     db: PostgresClient,
     cache: Arc<Cache>,
 }
@@ -49,6 +50,7 @@ impl TransactionsQueues {
     pub async fn new(
         setups: Vec<TransactionRelayerSetup>,
         gas_oracle_cache: Arc<Mutex<GasOracleCache>>,
+        blob_gas_oracle_cache: Arc<Mutex<BlobGasOracleCache>>,
         cache: Arc<Cache>,
     ) -> Result<Self, WalletOrProviderError> {
         let mut queues = HashMap::new();
@@ -71,6 +73,7 @@ impl TransactionsQueues {
                         setup.mined_transactions,
                     ),
                     gas_oracle_cache.clone(),
+                    blob_gas_oracle_cache.clone(),
                 ),
             );
         }
@@ -79,6 +82,7 @@ impl TransactionsQueues {
             queues: Arc::new(Mutex::new(queues)),
             relayer_block_times_ms,
             gas_oracle_cache,
+            blob_gas_oracle_cache,
             db: PostgresClient::new().await.expect("Failed to create PostgreSQL connection"),
             cache,
         })
@@ -122,6 +126,7 @@ impl TransactionsQueues {
                     HashMap::new(),
                 ),
                 self.gas_oracle_cache.clone(),
+                self.blob_gas_oracle_cache.clone(),
             ),
         );
 
@@ -218,6 +223,7 @@ impl TransactionsQueues {
                 is_noop: false,
                 from_api_key: transaction_to_send.from_api_key.clone(),
                 sent_with_gas: None,
+                sent_with_blob_gas: None,
             };
 
             // have to add gas logic else we cant compute transaction hash
@@ -229,7 +235,11 @@ impl TransactionsQueues {
                 .map_err(AddTransactionError::TransactionGasPriceError)?;
 
             let transaction_request: TypedTransaction = if transaction.is_blob_transaction() {
-                transaction.to_blob_typed_transaction(Some(&gas_price))
+                let blob_gas_price = transactions_queue
+                    .compute_blob_gas_price_for_transaction(&transaction_to_send.speed, &None)
+                    .await
+                    .map_err(AddTransactionError::TransactionGasPriceError)?;
+                transaction.to_blob_typed_transaction(Some(&gas_price), Some(&blob_gas_price))
             } else if transactions_queue.is_legacy_transactions() {
                 transaction.to_legacy_typed_transaction(Some(&gas_price))
             } else {
@@ -405,7 +415,7 @@ impl TransactionsQueues {
                         Ok(transaction_sent) => {
                             transactions_queue
                                 .move_pending_to_inmempool(&transaction_sent)
-                                .await.map_err( ProcessPendingTransactionError::MovePendingTransactionToInmempoolError)?;
+                                .await.map_err(ProcessPendingTransactionError::MovePendingTransactionToInmempoolError)?;
                             self.invalidate_transaction_cache(&transaction.id).await;
                         }
                         Err(e) => {
