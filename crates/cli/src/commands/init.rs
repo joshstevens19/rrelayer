@@ -2,7 +2,8 @@ use std::{fs, path::Path};
 
 use dialoguer::{Confirm, Input};
 use rrelayerr_core::{
-    NetworkSetupConfig, SetupConfig, SigningKey, WriteFileError, generate_docker_file,
+    GasProviders, NetworkSetupConfig, SetupConfig, SigningKey, WriteFileError,
+    gas::fee_estimator::tenderly::TenderlyGasProviderSetupConfig, generate_docker_file,
     generate_seed_phrase, write_file,
 };
 use serde_yaml;
@@ -50,7 +51,11 @@ pub async fn handle_init(path: &Path) -> Result<(), Box<dyn std::error::Error>> 
             block_explorer_url: Some("https://sepolia.etherscan.io".to_string()),
             gas_provider: None,
         }],
-        gas_providers: None,
+        gas_providers: Some(GasProviders {
+            infura: None,
+            tenderly: Some(TenderlyGasProviderSetupConfig { enabled: true, api_key: None }),
+            custom: None,
+        }),
         allowed_origins: None,
     };
     fs::write(project_path.join("rrelayerr.yaml"), serde_yaml::to_string(&yaml_content)?)?;

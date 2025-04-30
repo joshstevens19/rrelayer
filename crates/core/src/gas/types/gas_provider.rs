@@ -5,6 +5,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 #[derive(Debug, Serialize, Deserialize)]
 pub enum GasProvider {
     Infura,
+    Tenderly,
     Custom,
 }
 
@@ -19,6 +20,7 @@ impl FromStr for GasProvider {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "infura" => Ok(GasProvider::Infura),
+            "tenderly" => Ok(GasProvider::Tenderly),
             "custom" => Ok(GasProvider::Custom),
             // Add other cases as needed
             _ => Err(ConversionError { message: format!("Unsupported gas provider: {}", s) }),

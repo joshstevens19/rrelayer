@@ -10,7 +10,10 @@ use thiserror::Error;
 
 use super::infura::InfuraGasFeeEstimator;
 use crate::{
-    gas::types::{GasPrice, GasProvider, MaxFee, MaxPriorityFee},
+    gas::{
+        fee_estimator::tenderly::TenderlyGasFeeEstimator,
+        types::{GasPrice, GasProvider, MaxFee, MaxPriorityFee},
+    },
     network::types::ChainId,
     setup::yaml::{NetworkSetupConfig, SetupConfig},
 };
@@ -101,6 +104,10 @@ pub fn get_gas_estimator(
         Some(setup_gas_providers) => {
             if let Some(network_gas_provider) = &network.gas_provider {
                 return match network_gas_provider {
+                    GasProvider::Tenderly => match &setup_gas_providers.tenderly {
+                        Some(setup) => Some(Arc::new(TenderlyGasFeeEstimator::new(&setup.api_key))),
+                        None => None,
+                    },
                     GasProvider::Infura => match &setup_gas_providers.infura {
                         Some(setup) => Some(Arc::new(InfuraGasFeeEstimator::new(
                             &setup.api_key,
@@ -112,10 +119,11 @@ pub fn get_gas_estimator(
                         Some(setup) => Some(Arc::new(setup.to_owned())),
                         None => None,
                     },
-                }
+                };
             }
         }
-        None => return None,
+        // fallback to tenderly as they have a free plan
+        None => return Some(Arc::new(TenderlyGasFeeEstimator::new(&None))),
     }
 
     None

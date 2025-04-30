@@ -7,7 +7,10 @@ use tracing::{error, info};
 
 use crate::{
     gas::{
-        fee_estimator::{custom::CustomGasFeeEstimator, infura::InfuraGasProviderSetupConfig},
+        fee_estimator::{
+            custom::CustomGasFeeEstimator, infura::InfuraGasProviderSetupConfig,
+            tenderly::TenderlyGasProviderSetupConfig,
+        },
         types::{deserialize_gas_provider, GasProvider},
     },
     shared::common_types::EvmAddress,
@@ -99,6 +102,8 @@ pub struct NetworkSetupConfig {
 pub struct GasProviders {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub infura: Option<InfuraGasProviderSetupConfig>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub tenderly: Option<TenderlyGasProviderSetupConfig>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub custom: Option<CustomGasFeeEstimator>,
 }
