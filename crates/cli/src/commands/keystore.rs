@@ -56,12 +56,12 @@ pub enum KeystoreCommands {
     },
 }
 
-struct ProjectLocation {
+pub struct ProjectLocation {
     output_dir: PathBuf,
 }
 
 impl ProjectLocation {
-    fn new(output_dir: PathBuf) -> Self {
+    pub fn new(output_dir: PathBuf) -> Self {
         Self { output_dir }
     }
 
@@ -84,7 +84,7 @@ pub async fn handle_keystore_command(
                 Some(path) => path.clone(),
                 None => std::env::current_dir()?,
             };
-            create_from_mnemonic(mnemonic, *generate, name, ProjectLocation::new(dir))?;
+            create_from_mnemonic(mnemonic, *generate, name, ProjectLocation::new(dir), None)?;
         }
         KeystoreCommands::CreateFromPrivateKey { private_key, generate, name, output_dir } => {
             let dir = match output_dir {
@@ -101,11 +101,12 @@ pub async fn handle_keystore_command(
     Ok(())
 }
 
-fn create_from_mnemonic(
+pub fn create_from_mnemonic(
     mnemonic: &Option<String>,
     generate: bool,
     name: &str,
     project_location: ProjectLocation,
+    password: Option<String>,
 ) -> Result<PathBuf, Box<dyn std::error::Error>> {
     project_location.create_keystore_dir()?;
 
@@ -118,10 +119,14 @@ fn create_from_mnemonic(
         return Err("Either --mnemonic or --generate must be specified".into());
     };
 
-    let password = Password::new()
-        .with_prompt("Enter password to encrypt keystore")
-        .with_confirmation("Confirm password", "Passwords don't match")
-        .interact()?;
+    let password = if password.is_some() {
+        password.unwrap()
+    } else {
+        Password::new()
+            .with_prompt("Enter password to encrypt keystore")
+            .with_confirmation("Confirm password", "Passwords don't match")
+            .interact()?
+    };
 
     if let Some(phrase) = mnemonic {
         store_mnemonic_in_keystore(&phrase, &password, &project_location.get_keystore_dir(), name)?;

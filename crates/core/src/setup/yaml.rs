@@ -41,7 +41,7 @@ pub struct KeystoreSigningKey {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SigningKey {
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub keystore: Option<RawSigningKey>,
+    pub keystore: Option<KeystoreSigningKey>,
 
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub raw: Option<RawSigningKey>,
@@ -50,13 +50,9 @@ pub struct SigningKey {
     pub aws_secret_manager: Option<AwsSigningKey>,
 }
 
-impl Default for SigningKey {
-    fn default() -> Self {
-        Self {
-            raw: Some(RawSigningKey { mnemonic: "${MNEMONIC}".to_string() }),
-            keystore: None,
-            aws_secret_manager: None,
-        }
+impl SigningKey {
+    pub fn from_keystore(keystore: KeystoreSigningKey) -> Self {
+        Self { keystore: Some(keystore), raw: None, aws_secret_manager: None }
     }
 }
 

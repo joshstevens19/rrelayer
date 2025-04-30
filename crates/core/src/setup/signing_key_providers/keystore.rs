@@ -2,22 +2,19 @@ use std::path::PathBuf;
 
 use alloy::signers::{
     k256::ecdsa::SigningKey,
-    local::{
-        coins_bip39::{English, Mnemonic},
-        LocalSigner, MnemonicBuilder, PrivateKeySigner,
-    },
+    local::{coins_bip39::English, LocalSigner, MnemonicBuilder, PrivateKeySigner},
 };
 use eth_keystore::{decrypt_key, encrypt_key};
 use rand::thread_rng;
+
+use crate::generate_seed_phrase;
 
 pub fn create_new_mnemonic_in_keystore(
     password: &str,
     output_path: &PathBuf,
     filename: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Generate a new random 24-word mnemonic
-    let mnemonic = Mnemonic::<English>::new_with_count(&mut thread_rng(), 24)?;
-    let phrase = mnemonic.to_phrase();
+    let phrase = generate_seed_phrase()?;
 
     store_mnemonic_in_keystore(&phrase, password, output_path, filename)
 }

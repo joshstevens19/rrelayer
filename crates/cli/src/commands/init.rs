@@ -1,14 +1,16 @@
 use std::{fs, path::Path};
 
-use dialoguer::{Confirm, Input};
+use dialoguer::{Confirm, Input, Password};
 use rrelayerr_core::{
-    GasProviders, NetworkSetupConfig, SetupConfig, SigningKey, WriteFileError,
-    gas::fee_estimator::tenderly::TenderlyGasProviderSetupConfig, generate_docker_file,
-    generate_seed_phrase, write_file,
+    GasProviders, KeystoreSigningKey, NetworkSetupConfig, SetupConfig, SigningKey, WriteFileError,
+    gas::fee_estimator::tenderly::TenderlyGasProviderSetupConfig, generate_docker_file, write_file,
 };
 use serde_yaml;
 
-use crate::console::print_error_message;
+use crate::{
+    commands::keystore::{ProjectLocation, create_from_mnemonic},
+    console::print_error_message,
+};
 
 fn write_docker_compose(path: &Path) -> Result<(), WriteFileError> {
     write_file(&path.join("docker-compose.yml"), generate_docker_file())
@@ -31,18 +33,45 @@ pub async fn handle_init(path: &Path) -> Result<(), Box<dyn std::error::Error>> 
         .interact_text()?;
 
     let docker_support = Confirm::new()
-        .with_prompt("Do you want Docker support out of the box?")
+        .with_prompt("Do you want Docker support out of the box (will make it easy to run)?")
         .default(true)
+        .interact()?;
+
+    let password = Password::new()
+        .with_prompt("Enter password to encrypt keystore file for the relayers seed phrase")
+        .with_confirmation("Confirm password", "Passwords don't match")
         .interact()?;
 
     let project_path = path.join(&project_name);
 
     fs::create_dir(&project_path)?;
 
+    let account_name = "rrelayerr_signing_key";
+    let created_path = create_from_mnemonic(
+        &None,
+        true,
+        &account_name,
+        ProjectLocation::new(project_path.clone()),
+        Some(password),
+    )?;
+
+    let relative_path = if created_path.starts_with(&project_path) {
+        let path_diff = created_path
+            .strip_prefix(&project_path)
+            .map(|p| format!("./{}", p.display()))
+            .unwrap_or_else(|_| format!("./keystores/{}", account_name));
+        path_diff
+    } else {
+        format!("./keystores/{}", account_name)
+    };
+
     let yaml_content: SetupConfig = SetupConfig {
         name: project_name.clone(),
         description: if !project_description.is_empty() { Some(project_description) } else { None },
-        signing_key: Some(SigningKey::default()),
+        signing_key: Some(SigningKey::from_keystore(KeystoreSigningKey {
+            path: relative_path,
+            account_name: account_name.to_string(),
+        })),
         admins: vec![],
         networks: vec![NetworkSetupConfig {
             name: "sepolia_ethereum".to_string(),
@@ -60,24 +89,17 @@ pub async fn handle_init(path: &Path) -> Result<(), Box<dyn std::error::Error>> 
     };
     fs::write(project_path.join("rrelayerr.yaml"), serde_yaml::to_string(&yaml_content)?)?;
 
-    let new_mnemonic = Confirm::new()
-        .with_prompt("Do you want rrelayerr to generate a new mnemonic for you?")
-        .default(true)
-        .interact()?;
-
-    let mut env = if new_mnemonic {
-        let seed_phrase = generate_seed_phrase()?;
-        format!("MNEMONIC=\"{}\"\"\n", seed_phrase)
-    } else {
-        "MNEMONIC=INSERT_YOUR_MNEMONIC_HERE\n".to_string()
-    };
-
     if docker_support {
-        env += r#"DATABASE_URL=postgresql://postgres:rrelayerr@localhost:5441/postgres
+        let env = r#"DATABASE_URL=postgresql://postgres:rrelayerr@localhost:5441/postgres
 POSTGRES_PASSWORD=rrelayerr"#;
 
         write_docker_compose(&project_path).map_err(|e| {
             print_error_message(&format!("Failed to write docker compose file: {}", e));
+            e
+        })?;
+
+        write_file(&project_path.join(".env"), &env).map_err(|e| {
+            print_error_message(&format!("Failed to write .env file: {}", e));
             e
         })?;
     } else {
@@ -88,11 +110,6 @@ POSTGRES_PASSWORD=rrelayerr"#;
             e
         })?;
     }
-
-    write_file(&project_path.join(".env"), &env).map_err(|e| {
-        print_error_message(&format!("Failed to write .env file: {}", e));
-        e
-    })?;
 
     write_gitignore(&project_path)?;
 

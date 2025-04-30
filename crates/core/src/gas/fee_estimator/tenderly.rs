@@ -14,6 +14,7 @@ use crate::{
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TenderlyGasProviderSetupConfig {
     pub enabled: bool,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub api_key: Option<String>,
 }
 
