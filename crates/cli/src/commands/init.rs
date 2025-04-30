@@ -38,7 +38,7 @@ pub async fn handle_init(path: &Path) -> Result<(), Box<dyn std::error::Error>> 
         .interact()?;
 
     let mnemonic_password = Password::new()
-        .with_prompt("Enter password to encrypt keystore file for the relayers seed phrase")
+        .with_prompt("Enter password to encrypt keystore file for the relayers signing key")
         .with_confirmation("Confirm password", "Passwords don't match")
         .interact()?;
 

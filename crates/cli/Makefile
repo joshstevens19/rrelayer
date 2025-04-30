@@ -8,3 +8,5 @@ auth_new_account:
 	cargo run -- auth --path $(CURDIR)/../../playground/example new-account --account josh3
 auth_login:
 	cargo run -- auth --path $(CURDIR)/../../playground/example login --account josh3
+auth_list_accounts:
+	cargo run -- auth --path $(CURDIR)/../../playground/example list-accounts
