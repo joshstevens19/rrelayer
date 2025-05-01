@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use thiserror::Error;
 
 use crate::{
@@ -31,6 +33,7 @@ pub enum LoadProvidersError {
 }
 
 pub async fn load_providers(
+    project_path: &PathBuf,
     setup_config: &SetupConfig,
 ) -> Result<Vec<EvmProvider>, LoadProvidersError> {
     let mut providers = Vec::new();
@@ -50,7 +53,8 @@ pub async fn load_providers(
             setup_config.signing_key.as_ref().unwrap()
         };
 
-        let result = get_mnemonic_from_signing_key(signing_key).await;
+        let result =
+            get_mnemonic_from_signing_key(project_path, &setup_config.name, signing_key).await;
 
         match result {
             Ok(mnemonic) => {

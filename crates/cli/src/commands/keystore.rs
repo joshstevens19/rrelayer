@@ -61,6 +61,7 @@ pub enum KeystoreCommand {
     },
 }
 
+#[derive(Debug, Clone)]
 pub struct ProjectLocation {
     output_dir: PathBuf,
     override_project_name: Option<String>,
@@ -133,7 +134,7 @@ pub async fn handle_keystore_command(
                 Some(path) => path.clone(),
                 None => std::env::current_dir()?,
             };
-            create_from_private_key(private_key, *generate, name, ProjectLocation::new(dir))?;
+            create_from_private_key(private_key, *generate, name, ProjectLocation::new(dir), None)?;
         }
         KeystoreCommand::Decrypt { path } => {
             decrypt(path)?;
@@ -195,6 +196,7 @@ pub fn create_from_private_key(
     generate: bool,
     name: &str,
     project_location: ProjectLocation,
+    password: Option<String>,
 ) -> Result<PathBuf, Box<dyn std::error::Error>> {
     project_location.create_account_keystore_dir()?;
 
@@ -215,10 +217,14 @@ pub fn create_from_private_key(
         return Err("Either --private-key or --generate must be specified".into());
     };
 
-    let password = Password::new()
-        .with_prompt("Enter password to encrypt account")
-        .with_confirmation("Confirm password", "Passwords don't match")
-        .interact()?;
+    let password = if password.is_some() {
+        password.unwrap()
+    } else {
+        Password::new()
+            .with_prompt("Enter password to encrypt account")
+            .with_confirmation("Confirm password", "Passwords don't match")
+            .interact()?
+    };
 
     if let Some(pk) = private_key {
         let private_key = LocalSigner::from_str(&pk)?;

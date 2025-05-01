@@ -102,7 +102,7 @@ fn new_account(
     account: &str,
     project_location: ProjectLocation,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    create_from_private_key(&None, true, account, project_location)?;
+    create_from_private_key(&None, true, account, project_location, None)?;
 
     Ok(())
 }

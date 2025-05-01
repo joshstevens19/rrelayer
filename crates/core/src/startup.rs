@@ -168,7 +168,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
 
     let cache = Arc::new(Cache::new().await);
 
-    let providers = Arc::new(load_providers(&config).await?);
+    let providers = Arc::new(load_providers(&project_path, &config).await?);
 
     let gas_oracle_cache = Arc::new(Mutex::new(GasOracleCache::new()));
     let blob_gas_oracle_cache = Arc::new(Mutex::new(BlobGasOracleCache::new()));

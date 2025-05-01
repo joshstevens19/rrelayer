@@ -36,12 +36,10 @@ pub fn store_mnemonic_in_keystore(
 pub fn recover_mnemonic_from_keystore(
     keystore_path: &PathBuf,
     password: &str,
-) -> Result<MnemonicBuilder, Box<dyn std::error::Error>> {
+) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
     let mnemonic_bytes = decrypt_key(keystore_path, password)?;
 
-    let mnemonic = String::from_utf8(mnemonic_bytes)?;
-
-    Ok(MnemonicBuilder::<English>::default().phrase(&mnemonic))
+    Ok(String::from_utf8(mnemonic_bytes)?)
 }
 
 pub fn create_new_private_key_in_keystore(
@@ -69,7 +67,7 @@ pub fn store_private_key_in_keystore(
 pub fn recover_wallet_from_keystore(
     keystore_path: &PathBuf,
     password: &str,
-) -> Result<LocalSigner<SigningKey>, Box<dyn std::error::Error>> {
+) -> Result<LocalSigner<SigningKey>, Box<dyn std::error::Error + Send + Sync>> {
     let private_key = decrypt_key(keystore_path, password)?;
 
     let wallet = LocalSigner::from_slice(&private_key)?;
@@ -134,7 +132,7 @@ impl KeyStorePasswordManager {
         // Create .rrelayerr/accounts directory in user's home directory
         let home_dir = dirs::home_dir().expect("Could not find home directory");
         let storage_dir = home_dir.join(".rrelayerr").join("accounts");
-        
+
         fs::create_dir_all(&storage_dir).expect("Failed to create account storage directory");
 
         Self { app_name: app_name.to_string(), storage_dir }

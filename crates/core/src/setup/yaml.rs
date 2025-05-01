@@ -34,8 +34,9 @@ pub struct RawSigningKey {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct KeystoreSigningKey {
     pub path: String,
-    pub account_name: String,
-    // pub dangerous_define_raw_password:
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub dangerous_define_raw_password: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

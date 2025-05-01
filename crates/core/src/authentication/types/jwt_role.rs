@@ -35,20 +35,39 @@ impl JwtRole {
 }
 
 impl<'a> FromSql<'a> for JwtRole {
-    fn from_sql(_: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
-        let role = from_utf8(raw).map_err(|err| format!("Invalid UTF-8 sequence: {}", err))?;
+    fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
+        if ty.name() == "user_role" {
+            let role = from_utf8(raw).map_err(|err| format!("Invalid UTF-8 sequence: {}", err))?;
 
-        match role {
-            "ADMIN" => Ok(JwtRole::Admin),
-            "READONLY" => Ok(JwtRole::ReadOnly),
-            "MANAGER" => Ok(JwtRole::Manager),
-            "INTEGRATOR" => Ok(JwtRole::Integrator),
-            _ => Err(format!("Unknown JwtRole: {}", role).into()),
+            match role {
+                "ADMIN" => Ok(JwtRole::Admin),
+                "READONLY" => Ok(JwtRole::ReadOnly),
+                "MANAGER" => Ok(JwtRole::Manager),
+                "INTEGRATOR" => Ok(JwtRole::Integrator),
+                _ => Err(format!("Unknown JwtRole: {}", role).into()),
+            }
+        } else if *ty == Type::TEXT ||
+            *ty == Type::CHAR ||
+            *ty == Type::VARCHAR ||
+            *ty == Type::BPCHAR
+        {
+            let role = from_utf8(raw).map_err(|err| format!("Invalid UTF-8 sequence: {}", err))?;
+
+            match role {
+                "ADMIN" => Ok(JwtRole::Admin),
+                "READONLY" => Ok(JwtRole::ReadOnly),
+                "MANAGER" => Ok(JwtRole::Manager),
+                "INTEGRATOR" => Ok(JwtRole::Integrator),
+                _ => Err(format!("Unknown JwtRole: {}", role).into()),
+            }
+        } else {
+            Err(format!("Unexpected type for JwtRole: {}", ty).into())
         }
     }
 
     fn accepts(ty: &Type) -> bool {
-        *ty == Type::TEXT || *ty == Type::CHAR || *ty == Type::VARCHAR || *ty == Type::BPCHAR
+        (*ty == Type::TEXT || *ty == Type::CHAR || *ty == Type::VARCHAR || *ty == Type::BPCHAR) ||
+            (ty.name() == "user_role")
     }
 }
 
@@ -59,7 +78,7 @@ impl ToSql for JwtRole {
         out: &mut BytesMut,
     ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
         if !<Self as ToSql>::accepts(ty) {
-            return Err(format!("Unexpected type: {}", ty).into());
+            return Err(format!("Unexpected type for JwtRole: {}", ty).into());
         }
 
         let status_str = match self {
@@ -75,7 +94,8 @@ impl ToSql for JwtRole {
     }
 
     fn accepts(ty: &Type) -> bool {
-        *ty == Type::TEXT || *ty == Type::CHAR || *ty == Type::VARCHAR || *ty == Type::BPCHAR
+        (*ty == Type::TEXT || *ty == Type::CHAR || *ty == Type::VARCHAR || *ty == Type::BPCHAR) ||
+            (ty.name() == "user_role")
     }
 
     tokio_postgres::types::to_sql_checked!();

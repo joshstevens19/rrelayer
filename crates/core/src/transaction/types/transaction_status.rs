@@ -39,22 +39,45 @@ impl TransactionStatus {
 }
 
 impl<'a> FromSql<'a> for TransactionStatus {
-    fn from_sql(_: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
-        let status = from_utf8(raw).map_err(|err| format!("Invalid UTF-8 sequence: {}", err))?;
+    fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
+        if ty.name() == "tx_status" {
+            let status =
+                from_utf8(raw).map_err(|err| format!("Invalid UTF-8 sequence: {}", err))?;
 
-        match status {
-            "PENDING" => Ok(TransactionStatus::Pending),
-            "INMEMPOOL" => Ok(TransactionStatus::Inmempool),
-            "MINED" => Ok(TransactionStatus::Mined),
-            "CONFIRMED" => Ok(TransactionStatus::Confirmed),
-            "FAILED" => Ok(TransactionStatus::Failed),
-            "EXPIRED" => Ok(TransactionStatus::Expired),
-            _ => Err(format!("Unknown TransactionStatus: {}", status).into()),
+            match status {
+                "PENDING" => Ok(TransactionStatus::Pending),
+                "INMEMPOOL" => Ok(TransactionStatus::Inmempool),
+                "MINED" => Ok(TransactionStatus::Mined),
+                "CONFIRMED" => Ok(TransactionStatus::Confirmed),
+                "FAILED" => Ok(TransactionStatus::Failed),
+                "EXPIRED" => Ok(TransactionStatus::Expired),
+                _ => Err(format!("Unknown TransactionStatus: {}", status).into()),
+            }
+        } else if *ty == Type::TEXT ||
+            *ty == Type::CHAR ||
+            *ty == Type::VARCHAR ||
+            *ty == Type::BPCHAR
+        {
+            let status =
+                from_utf8(raw).map_err(|err| format!("Invalid UTF-8 sequence: {}", err))?;
+
+            match status {
+                "PENDING" => Ok(TransactionStatus::Pending),
+                "INMEMPOOL" => Ok(TransactionStatus::Inmempool),
+                "MINED" => Ok(TransactionStatus::Mined),
+                "CONFIRMED" => Ok(TransactionStatus::Confirmed),
+                "FAILED" => Ok(TransactionStatus::Failed),
+                "EXPIRED" => Ok(TransactionStatus::Expired),
+                _ => Err(format!("Unknown TransactionStatus: {}", status).into()),
+            }
+        } else {
+            Err(format!("Unexpected type for TransactionStatus: {}", ty).into())
         }
     }
 
     fn accepts(ty: &Type) -> bool {
-        *ty == Type::TEXT || *ty == Type::CHAR || *ty == Type::VARCHAR || *ty == Type::BPCHAR
+        (*ty == Type::TEXT || *ty == Type::CHAR || *ty == Type::VARCHAR || *ty == Type::BPCHAR) ||
+            (ty.name() == "tx_status")
     }
 }
 
@@ -65,7 +88,7 @@ impl ToSql for TransactionStatus {
         out: &mut BytesMut,
     ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
         if !<Self as ToSql>::accepts(ty) {
-            return Err(format!("Unexpected type: {}", ty).into());
+            return Err(format!("Unexpected type for TransactionStatus: {}", ty).into());
         }
 
         let status_str = match self {
@@ -83,7 +106,8 @@ impl ToSql for TransactionStatus {
     }
 
     fn accepts(ty: &Type) -> bool {
-        *ty == Type::TEXT || *ty == Type::CHAR || *ty == Type::VARCHAR || *ty == Type::BPCHAR
+        (*ty == Type::TEXT || *ty == Type::CHAR || *ty == Type::VARCHAR || *ty == Type::BPCHAR) ||
+            (ty.name() == "tx_status")
     }
 
     tokio_postgres::types::to_sql_checked!();
