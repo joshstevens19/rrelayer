@@ -78,12 +78,9 @@ async fn authenticate(
     )
         .await
     {
-        println!("Challenge: {}", cached_result);
         let address = EvmAddress::new(
             authenticate_request.signature.recover_address_from_msg(cached_result.as_bytes()).unwrap(),
         );
-        println!("Address: {}", address.hex());
-        println!("Signed by: {}", authenticate_request.signed_by.hex());
         let is_valid = address == authenticate_request.signed_by;
 
         if !is_valid {
