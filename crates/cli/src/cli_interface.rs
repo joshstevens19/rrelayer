@@ -1,9 +1,8 @@
 use clap::{Parser, Subcommand};
 
-use crate::commands::network::NetworkCommands;
 use crate::commands::{
     allowlist, api_key, auth::AuthCommand, balance, config, create, keystore::KeystoreCommand,
-    list, sign, start, tx, user,
+    list, network::NetworkCommands, sign, start, tx, user,
 };
 
 #[derive(Parser)]

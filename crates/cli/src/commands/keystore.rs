@@ -106,19 +106,28 @@ impl ProjectLocation {
         self.get_account_keystore_dir().join(name).exists()
     }
 
-    pub fn setup_config(&self) -> Result<SetupConfig, Box<dyn std::error::Error>> {
-        let yaml = read(&self.output_dir.join("rrelayerr.yaml"))?;
+    pub fn setup_config(&self, raw_yaml: bool) -> Result<SetupConfig, Box<dyn std::error::Error>> {
+        let yaml = read(&self.output_dir.join("rrelayerr.yaml"), raw_yaml)?;
         Ok(yaml)
+    }
+
+    pub fn overwrite_setup_config(
+        &self,
+        config: SetupConfig,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let yaml = serde_yaml::to_string(&config)?;
+        fs::write(&self.output_dir.join("rrelayerr.yaml"), yaml)?;
+        Ok(())
     }
 
     pub fn get_project_name(&self) -> String {
         self.override_project_name
             .clone()
-            .unwrap_or_else(|| self.setup_config().unwrap().name.clone())
+            .unwrap_or_else(|| self.setup_config(false).unwrap().name.clone())
     }
 
     pub fn get_api_url(&self) -> Result<String, Box<dyn std::error::Error>> {
-        let setup_config = self.setup_config()?;
+        let setup_config = self.setup_config(false)?;
         Ok(format!("http://localhost:{}", setup_config.api_config.port))
     }
 }

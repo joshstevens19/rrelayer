@@ -8,7 +8,7 @@ pub mod network;
 mod postgres;
 pub use postgres::PostgresClient;
 mod provider;
-pub use provider::generate_seed_phrase;
+pub use provider::{create_retry_client, generate_seed_phrase};
 pub mod relayer;
 mod setup;
 pub use setup::{

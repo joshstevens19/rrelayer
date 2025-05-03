@@ -12,7 +12,7 @@ mod wallet_manager;
 pub use wallet_manager::generate_seed_phrase;
 
 mod evm_provider;
-pub use evm_provider::{EvmProvider, RelayerProvider, SendTransactionError};
+pub use evm_provider::{create_retry_client, EvmProvider, RelayerProvider, SendTransactionError};
 
 use self::evm_provider::EvmProviderNewError;
 use crate::setup::signing_key_providers::get_mnemonic_from_signing_key;
@@ -65,7 +65,7 @@ pub async fn load_providers(
                         &mnemonic,
                         get_gas_estimator(setup_config, config),
                     )
-                    .await?,
+                        .await?,
                 );
             }
             Err(e) => return Err(LoadProvidersError::SigningKeyError(e.to_string())),

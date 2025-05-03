@@ -176,7 +176,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
     apply_schema(&postgres).await?;
     info!("Applied database schema");
 
-    let config = read(&yaml_path)?;
+    let config = read(&yaml_path, false)?;
 
     let password_manager = KeyStorePasswordManager::new(&config.name);
     let mut admins: Vec<(EvmAddress, JwtRole)> = vec![];
@@ -189,7 +189,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
                             &project_path.join("keystores").join("accounts").join(account),
                             &password,
                         )
-                        .expect("Failed to recover wallet");
+                            .expect("Failed to recover wallet");
                         let address: EvmAddress = signer.address().into();
                         admins.push((address, JwtRole::Admin))
                     }
@@ -221,7 +221,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
         providers.clone(),
         cache.clone(),
     )
-    .await?;
+        .await?;
 
     start_crons(gas_oracle_cache.clone(), blob_gas_oracle_cache.clone(), providers.clone());
 
@@ -233,7 +233,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
         providers,
         cache,
     )
-    .await?;
+        .await?;
 
     Ok(())
 }

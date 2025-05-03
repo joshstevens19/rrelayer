@@ -1,6 +1,7 @@
-use std::io::{self};
-
+use alloy::providers::Provider;
 use clap::{Args, Subcommand};
+use dialoguer::{Confirm, Input};
+use rrelayerr_core::{NetworkSetupConfig, create_retry_client};
 use rrelayerr_sdk::SDK;
 
 use crate::{
@@ -13,7 +14,7 @@ pub enum NetworkCommands {
     Add(AddArgs),
     /// List all networks
     List(ListArgs),
-    /// Network specific commands
+    /// Network-specific commands
     #[command(arg_required_else_help = true)]
     Network {
         network_name: String,
@@ -25,13 +26,13 @@ pub enum NetworkCommands {
 #[derive(Args)]
 struct AddArgs {}
 
-#[derive(Args)]
+#[derive(Args, Copy, Clone)]
 struct ListArgs {
     #[arg(long, value_enum)]
     filter: Option<NetworkFilter>,
 }
 
-#[derive(clap::ValueEnum, Clone)]
+#[derive(clap::ValueEnum, Clone, Copy)]
 enum NetworkFilter {
     Enabled,
     Disabled,
@@ -53,7 +54,7 @@ pub async fn handle_network(
     sdk: &mut SDK,
 ) -> Result<(), Box<dyn std::error::Error>> {
     match &command {
-        NetworkCommands::Add(_) => handle_add(),
+        NetworkCommands::Add(_) => handle_add(project_path).await,
         NetworkCommands::List(list_args) => handle_list(list_args, project_path, sdk).await,
         NetworkCommands::Network { network_name, command } => match command {
             NetworkSubCommands::Gas => handle_gas(network_name),
@@ -63,45 +64,71 @@ pub async fn handle_network(
     }
 }
 
-fn handle_add() -> Result<(), Box<dyn std::error::Error>> {
-    println!("Enter network name:");
-    let mut network_name = String::new();
-    io::stdin().read_line(&mut network_name)?;
-    let network_name = network_name.trim();
+async fn handle_add(project_path: &ProjectLocation) -> Result<(), Box<dyn std::error::Error>> {
+    let mut setup_config = project_path.setup_config(true)?;
+
+    let network_name: String = Input::new()
+        .with_prompt("Enter network name")
+        .validate_with(|input: &String| -> Result<(), &str> {
+            if input.trim().is_empty() { Err("Network name cannot be empty") } else { Ok(()) }
+        })
+        .interact_text()?;
+
+    if setup_config.networks.iter().any(|network| network.name == network_name) {
+        println!("Network '{}' already exists.", network_name);
+        return Ok(());
+    }
 
     let mut provider_urls = Vec::new();
-    loop {
-        println!("Enter provider URL (or press enter to finish):");
-        let mut url = String::new();
-        io::stdin().read_line(&mut url)?;
-        let url = url.trim();
 
-        if url.is_empty() {
+    loop {
+        let url: String = Input::new()
+            .with_prompt("Enter provider URL (or press enter to finish) - you can use ${ENV_PARAM} if you wish")
+            .allow_empty(true)
+            .interact_text()?;
+
+        let provider = create_retry_client(&url)
+            .map_err(|e| format!("RPC provider is not valid as cannot get chain ID: {}", e))?;
+        provider
+            .get_chain_id()
+            .await
+            .map_err(|e| format!("RPC provider is not valid as cannot get chain ID: {}", e))?;
+
+        if url.trim().is_empty() {
             if provider_urls.is_empty() {
                 println!("At least one provider URL is required.");
                 continue;
             }
             break;
         }
-        provider_urls.push(url.to_string());
+
+        provider_urls.push(url);
+
+        if !Confirm::new().with_prompt("Add another provider URL?").default(true).interact()? {
+            break;
+        }
     }
 
-    println!("Select gas provider:");
-    println!("1. Infura");
-    println!("2. Tenderly");
-    println!("3. Built in");
-    let mut choice = String::new();
-    io::stdin().read_line(&mut choice)?;
-    let gas_provider = match choice.trim() {
-        "1" => "infura",
-        "2" => "tenderly",
-        "3" => "built_in",
-        _ => return Err("Invalid gas provider choice".into()),
-    };
+    let block_explorer: String = Input::new()
+        .with_prompt("Enter block explorer url (or press enter to use default)")
+        .allow_empty(true)
+        .interact_text()?;
 
-    // Save network configuration
-    // TODO: Implement actual config saving logic
-    println!("Network '{}' added successfully!", network_name);
+    setup_config.networks.push(NetworkSetupConfig {
+        name: network_name.clone(),
+        signing_key: None,
+        provider_urls,
+        block_explorer_url: if block_explorer.is_empty() { None } else { Some(block_explorer) },
+        gas_provider: None,
+    });
+
+    project_path.overwrite_setup_config(setup_config)?;
+
+    println!(
+        "Network '{}' added successfully - for networks to be added to rrelayerr you have to restart the server",
+        network_name
+    );
+
     Ok(())
 }
 
@@ -112,7 +139,19 @@ async fn handle_list(
 ) -> Result<(), Box<dyn std::error::Error>> {
     handle_authenticate(sdk, "account1", project_path).await?;
 
-    let networks = sdk.network.get_all_networks().await?;
+    let networks = if let Some(filter) = args.filter {
+        match filter {
+            NetworkFilter::Enabled => sdk.network.get_enabled_networks().await?,
+            NetworkFilter::Disabled => sdk.network.get_disabled_networks().await?,
+        }
+    } else {
+        sdk.network.get_all_networks().await?
+    };
+
+    if networks.is_empty() {
+        println!("No networks found.");
+        return Ok(());
+    }
 
     let mut rows = Vec::new();
     for network in networks.iter() {

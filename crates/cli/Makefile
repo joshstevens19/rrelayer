@@ -14,3 +14,9 @@ auth_list_accounts:
 	cargo run -- auth --path $(CURDIR)/../../playground/example list-accounts
 network_list:
 	cargo run -- network --path $(CURDIR)/../../playground/example list
+network_list_disabled:
+	cargo run -- network --path $(CURDIR)/../../playground/example list --filter disabled
+network_list_enabled:
+	cargo run -- network --path $(CURDIR)/../../playground/example list --filter enabled
+network_add:
+	cargo run -- network --path $(CURDIR)/../../playground/example add

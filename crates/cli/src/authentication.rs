@@ -8,12 +8,12 @@ use std::{
 
 use alloy::{
     primitives::{Address, B256},
-    signers::{local::PrivateKeySigner, Signer},
+    signers::{Signer, local::PrivateKeySigner},
 };
 use dialoguer::Password;
 use rrelayerr_core::{
     authentication::types::TokenPair,
-    keystore::{decrypt_keystore, KeyStorePasswordManager, KeystoreDecryptResult, PasswordError},
+    keystore::{KeyStorePasswordManager, KeystoreDecryptResult, PasswordError, decrypt_keystore},
 };
 use rrelayerr_sdk::SDK;
 use serde::{Deserialize, Serialize};
@@ -180,7 +180,7 @@ pub async fn handle_authenticate(
             sdk.login(&challenge_result, signature).await?;
 
             save_token_to_cache(sdk, &project_name, account, address)?;
-            
+
             Ok(())
         }
         KeystoreDecryptResult::Mnemonic { .. } => {
