@@ -18,7 +18,7 @@ impl PostgresClient {
                 ",
             &[address, new_role],
         )
-        .await?;
+            .await?;
 
         Ok(())
     }
@@ -36,14 +36,14 @@ impl PostgresClient {
                 ",
             &[address, role],
         )
-        .await?;
+            .await?;
 
         Ok(())
     }
 
     pub async fn add_users(
         &self,
-        users: &Vec<(&EvmAddress, JwtRole)>,
+        users: &Vec<(EvmAddress, JwtRole)>,
     ) -> Result<(), PostgresError> {
         for (address, role) in users {
             self.add_user(address, role).await?;
@@ -60,7 +60,7 @@ impl PostgresClient {
                 ",
             &[address],
         )
-        .await?;
+            .await?;
 
         Ok(())
     }

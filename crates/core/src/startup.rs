@@ -15,6 +15,7 @@ use crate::{
         blob_gas_oracle::{blob_gas_oracle, BlobGasOracleCache},
         gas_oracle::{gas_oracle, GasOracleCache},
     },
+    keystore::{recover_wallet_from_keystore, KeyStorePasswordManager, PasswordError},
     network::api::create_network_routes,
     postgres::{PostgresClient, PostgresConnectionError, PostgresError},
     provider::{load_providers, EvmProvider, LoadProvidersError},
@@ -31,6 +32,7 @@ use crate::{
         },
     },
     user::api::create_user_routes,
+    AdminIdentifier,
 };
 
 fn start_crons(
@@ -139,6 +141,9 @@ pub enum StartError {
 
     #[error("Could not add admins to database: {0}")]
     CouldNotAddAdmins(#[from] PostgresError),
+
+    #[error("Could not load keystore admin: {0} - make sure you have logged in with that account")]
+    CouldNotLoadKeystoreAdmin(String),
 }
 
 pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
@@ -160,8 +165,32 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
 
     let config = read(&yaml_path)?;
 
-    let admins: Vec<(&EvmAddress, JwtRole)> =
-        config.admins.iter().map(|address| (address, JwtRole::Admin)).collect();
+    let password_manager = KeyStorePasswordManager::new(&config.name);
+    let mut admins: Vec<(EvmAddress, JwtRole)> = vec![];
+    for admin in config.admins.iter() {
+        match admin {
+            AdminIdentifier::Name(account) => {
+                match password_manager.load(account) {
+                    Ok(password) => {
+                        let signer = recover_wallet_from_keystore(
+                            &project_path.join("keystores").join("accounts").join(account),
+                            &password,
+                        )
+                            .expect("Failed to recover wallet");
+                        let address: EvmAddress = signer.address().into();
+                        admins.push((address, JwtRole::Admin))
+                    }
+                    Err(_) => {
+                        return Err(StartError::CouldNotLoadKeystoreAdmin(account.to_string()))
+                    }
+                }
+                if !password_manager.load(account).is_ok() {
+                    return Err(StartError::CouldNotLoadKeystoreAdmin(account.to_string()));
+                }
+            }
+            AdminIdentifier::EvmAddress(address) => admins.push((address.clone(), JwtRole::Admin)),
+        }
+    }
 
     postgres.add_users(&admins).await?;
     info!("Added admin users to database");
@@ -179,7 +208,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
         providers.clone(),
         cache.clone(),
     )
-    .await?;
+        .await?;
 
     start_crons(gas_oracle_cache.clone(), blob_gas_oracle_cache.clone(), providers.clone());
 
@@ -191,7 +220,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
         cache,
         config.allowed_origins,
     )
-    .await?;
+        .await?;
 
     Ok(())
 }

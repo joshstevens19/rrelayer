@@ -106,13 +106,20 @@ pub struct GasProviders {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum AdminIdentifier {
+    EvmAddress(EvmAddress),
+    Name(String),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct SetupConfig {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub signing_key: Option<SigningKey>,
-    pub admins: Vec<EvmAddress>,
+    pub admins: Vec<AdminIdentifier>,
     pub networks: Vec<NetworkSetupConfig>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub gas_providers: Option<GasProviders>,

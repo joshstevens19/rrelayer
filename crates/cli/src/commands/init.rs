@@ -1,16 +1,16 @@
 use std::{fs, path::Path};
 
 use dialoguer::{Confirm, Input};
-use rand::{distributions::Alphanumeric, Rng};
+use rand::{Rng, distributions::Alphanumeric};
 use rrelayerr_core::{
-    gas::fee_estimator::tenderly::TenderlyGasProviderSetupConfig, generate_docker_file, keystore::recover_wallet_from_keystore, rrelayerr_info, write_file, GasProviders,
-    KeystoreSigningKey, NetworkSetupConfig,
-    SetupConfig, SigningKey, WriteFileError,
+    AdminIdentifier, GasProviders, KeystoreSigningKey, NetworkSetupConfig, SetupConfig, SigningKey,
+    WriteFileError, gas::fee_estimator::tenderly::TenderlyGasProviderSetupConfig,
+    generate_docker_file, keystore::recover_wallet_from_keystore, rrelayerr_info, write_file,
 };
 use serde_yaml;
 
 use crate::{
-    commands::keystore::{create_from_mnemonic, create_from_private_key, ProjectLocation},
+    commands::keystore::{ProjectLocation, create_from_mnemonic, create_from_private_key},
     console::print_error_message,
 };
 
@@ -71,15 +71,18 @@ pub async fn handle_init(path: &Path) -> Result<(), Box<dyn std::error::Error>> 
     let account_password =
         rand::thread_rng().sample_iter(&Alphanumeric).take(24).map(char::from).collect::<String>();
 
+    let account_name = "account1";
+
     let account_path = create_from_private_key(
         &None,
         true,
-        "account1",
+        account_name,
         project_location,
         Some(account_password.clone()),
     )?;
 
-    let wallet = recover_wallet_from_keystore(&account_path, &account_password)
+    // make sure it works properly
+    recover_wallet_from_keystore(&account_path, &account_password)
         .expect("Failed to recover wallet");
 
     let yaml_content: SetupConfig = SetupConfig {
@@ -90,7 +93,7 @@ pub async fn handle_init(path: &Path) -> Result<(), Box<dyn std::error::Error>> 
             name: mnemonic_name.to_string(),
             dangerous_define_raw_password: None,
         })),
-        admins: vec![wallet.address().into()],
+        admins: vec![AdminIdentifier::Name(account_name.to_string())],
         networks: vec![NetworkSetupConfig {
             name: "sepolia_ethereum".to_string(),
             signing_key: None,

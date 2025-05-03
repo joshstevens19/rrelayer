@@ -13,7 +13,10 @@ pub mod relayer;
 mod setup;
 pub use setup::{
     signing_key_providers::keystore,
-    yaml::{read, GasProviders, KeystoreSigningKey, NetworkSetupConfig, SetupConfig, SigningKey},
+    yaml::{
+        read, AdminIdentifier, GasProviders, KeystoreSigningKey, NetworkSetupConfig, SetupConfig,
+        SigningKey,
+    },
 };
 mod shared;
 pub use shared::common_types;
