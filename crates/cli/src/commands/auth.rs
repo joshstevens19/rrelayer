@@ -2,7 +2,9 @@ use std::path::PathBuf;
 
 use clap::Subcommand;
 use dialoguer::Password;
-use rrelayerr_core::keystore::{KeyStorePasswordManager, PasswordError, decrypt_keystore};
+use rrelayerr_core::keystore::{
+    KeyStorePasswordManager, KeystoreDecryptResult, PasswordError, decrypt_keystore,
+};
 
 use crate::commands::keystore::{ProjectLocation, create_from_private_key};
 
@@ -29,6 +31,13 @@ pub enum AuthCommand {
         account: String,
     },
 
+    /// Display account information (address and private key)
+    Info {
+        /// Account name/profile to display information for
+        #[clap(long)]
+        account: String,
+    },
+
     ListAccounts,
 }
 
@@ -45,6 +54,9 @@ pub async fn handle_auth_command(
         }
         AuthCommand::Logout { account } => {
             logout(account, ProjectLocation::new(project_path))?;
+        }
+        AuthCommand::Info { account } => {
+            show_account_info(account, ProjectLocation::new(project_path))?;
         }
         AuthCommand::ListAccounts => {
             list_accounts(ProjectLocation::new(project_path))?;
@@ -103,6 +115,46 @@ fn new_account(
     project_location: ProjectLocation,
 ) -> Result<(), Box<dyn std::error::Error>> {
     create_from_private_key(&None, true, account, project_location, None)?;
+
+    Ok(())
+}
+
+fn show_account_info(
+    account: &str,
+    project_location: ProjectLocation,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let password_manager = KeyStorePasswordManager::new(&project_location.get_project_name());
+
+    let password = match password_manager.load(account) {
+        Ok(password) => password,
+        Err(PasswordError::NotFound) => {
+            let password = Password::new()
+                .with_prompt(format!("Enter password for account '{}'", account))
+                .interact()?;
+
+            match decrypt_keystore(&project_location.get_account_keystore(account), &password) {
+                Ok(_) => password,
+                Err(_) => return Err("Invalid password or keystore not found".into()),
+            }
+        }
+        Err(e) => return Err(format!("Error retrieving password: {}", e).into()),
+    };
+
+    let result = decrypt_keystore(&project_location.get_account_keystore(account), &password)?;
+
+    match result {
+        KeystoreDecryptResult::PrivateKey { hex_key, address, .. } => {
+            println!("Account information for '{}':", account);
+            println!("Address: {}", address);
+            println!("Private key: {}", hex_key);
+        }
+        KeystoreDecryptResult::Mnemonic { phrase, address } => {
+            println!("Account information for '{}':", account);
+            println!("Address: {}", address);
+            println!("Mnemonic phrase: {}", phrase);
+            println!("Note: This account uses a mnemonic phrase rather than a direct private key.");
+        }
+    }
 
     Ok(())
 }
