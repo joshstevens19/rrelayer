@@ -16,10 +16,7 @@ use super::{
     },
     types::{ChainId, Network, NetworksFilterState},
 };
-use crate::{
-    app_state::AppState,
-    authentication::guards::{admin_jwt_guard, read_only_or_above_jwt_guard},
-};
+use crate::{app_state::AppState, authentication::guards::{admin_jwt_guard, read_only_or_above_jwt_guard}, rrelayerr_error, rrelayerr_info};
 
 async fn networks(State(state): State<Arc<AppState>>) -> Result<Json<Vec<Network>>, StatusCode> {
     if let Some(cached_result) = get_networks_cache(&state.cache).await {
@@ -76,7 +73,10 @@ async fn disable_network(
             invalidate_disabled_networks_cache(&state.cache).await;
             StatusCode::CREATED
         }
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        Err(e) => {
+            rrelayerr_error!("Failed to disable network: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
     }
 }
 

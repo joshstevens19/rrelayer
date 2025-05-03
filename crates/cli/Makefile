@@ -20,3 +20,9 @@ network_list_enabled:
 	cargo run -- network --path $(CURDIR)/../../playground/example list --filter enabled
 network_add:
 	cargo run -- network --path $(CURDIR)/../../playground/example add
+network_enable:
+	cargo run -- network --path $(CURDIR)/../../playground/example enable --name sepolia_ethereum
+network_disable:
+	cargo run -- network --path $(CURDIR)/../../playground/example disable --name sepolia_ethereum
+network_gas:
+	cargo run -- network --path $(CURDIR)/../../playground/example gas --name sepolia_ethereum

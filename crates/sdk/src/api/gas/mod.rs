@@ -1,4 +1,4 @@
-use rrelayerr_core::{gas::fee_estimator::base::GasEstimatorResult, network::types::ChainId};
+use rrelayerr_core::gas::fee_estimator::base::GasEstimatorResult;
 
 use crate::api::{http::HttpClient, types::ApiResult};
 
@@ -20,7 +20,7 @@ impl GasApi {
     /// # Returns
     ///
     /// Returns a Result containing either the gas prices or an error
-    pub async fn get_gas_prices(&self, chain_id: ChainId) -> ApiResult<Option<GasEstimatorResult>> {
+    pub async fn get_gas_prices(&self, chain_id: u64) -> ApiResult<Option<GasEstimatorResult>> {
         let endpoint = format!("gas/price/{}", chain_id.to_string());
         self.client.get(&endpoint).await
     }

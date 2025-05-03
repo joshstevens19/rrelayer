@@ -1,7 +1,10 @@
 use alloy::providers::Provider;
 use clap::{Args, Subcommand};
 use dialoguer::{Confirm, Input};
-use rrelayerr_core::{NetworkSetupConfig, create_retry_client};
+use prettytable::{Cell, Row, Table, format};
+use rrelayerr_core::{
+    NetworkSetupConfig, create_retry_client, gas::fee_estimator::base::GasPriceResult,
+};
 use rrelayerr_sdk::SDK;
 
 use crate::{
@@ -14,12 +17,19 @@ pub enum NetworkCommands {
     Add(AddArgs),
     /// List all networks
     List(ListArgs),
-    /// Network-specific commands
-    #[command(arg_required_else_help = true)]
-    Network {
-        network_name: String,
-        #[command(subcommand)]
-        command: NetworkSubCommands,
+    /// Enable network
+    Enable {
+        #[arg(long)]
+        name: String,
+    },
+    /// Disable network
+    Disable {
+        #[arg(long)]
+        name: String,
+    },
+    Gas {
+        #[arg(long)]
+        name: String,
     },
 }
 
@@ -38,16 +48,6 @@ enum NetworkFilter {
     Disabled,
 }
 
-#[derive(Subcommand)]
-enum NetworkSubCommands {
-    /// Get gas prices for the network
-    Gas,
-    /// Enable the network
-    Enable,
-    /// Disable the network
-    Disable,
-}
-
 pub async fn handle_network(
     command: &NetworkCommands,
     project_path: &ProjectLocation,
@@ -56,11 +56,15 @@ pub async fn handle_network(
     match &command {
         NetworkCommands::Add(_) => handle_add(project_path).await,
         NetworkCommands::List(list_args) => handle_list(list_args, project_path, sdk).await,
-        NetworkCommands::Network { network_name, command } => match command {
-            NetworkSubCommands::Gas => handle_gas(network_name),
-            NetworkSubCommands::Enable => handle_enable(network_name),
-            NetworkSubCommands::Disable => handle_disable(network_name),
-        },
+        NetworkCommands::Disable { name: network_name } => {
+            handle_network_toggle(network_name, project_path, sdk, false).await
+        }
+        NetworkCommands::Enable { name: network_name } => {
+            handle_network_toggle(network_name, project_path, sdk, true).await
+        }
+        NetworkCommands::Gas { name: network_name } => {
+            handle_gas(network_name, project_path, sdk).await
+        }
     }
 }
 
@@ -183,20 +187,131 @@ async fn handle_list(
     Ok(())
 }
 
-fn handle_gas(network_name: &str) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Getting gas prices for network '{}'...", network_name);
-    // TODO: Implement actual gas price fetching logic
+fn get_wait_time(result: &GasPriceResult) -> String {
+    match (result.min_wait_time_estimate, result.max_wait_time_estimate) {
+        (Some(min), Some(max)) => format!("{}-{} sec", min, max),
+        (Some(min), None) => format!("Min: {} sec", min),
+        (None, Some(max)) => format!("Max: {} sec", max),
+        (None, None) => "Unknown".to_string(),
+    }
+}
+
+async fn handle_gas(
+    network_name: &str,
+    project_path: &ProjectLocation,
+    sdk: &mut SDK,
+) -> Result<(), Box<dyn std::error::Error>> {
+    handle_authenticate(sdk, "account1", project_path).await?;
+
+    let setup_config = project_path.setup_config(false)?;
+    let provider_url = setup_config
+        .networks
+        .iter()
+        .find(|network| network.name == network_name)
+        .ok_or_else(|| format!("Network not found: {}", network_name))?
+        .provider_urls[0]
+        .clone();
+
+    let provider = create_retry_client(&provider_url)
+        .map_err(|e| format!("RPC provider is not valid as cannot get chain ID: {}", e))?;
+    let chain_id = provider
+        .get_chain_id()
+        .await
+        .map_err(|e| format!("RPC provider is not valid as cannot get chain ID: {}", e))?;
+
+    let gas_prices = sdk.gas.get_gas_prices(chain_id).await?;
+    match gas_prices {
+        None => {
+            println!("No gas prices found for chain ID: {}", chain_id);
+            return Ok(());
+        }
+        Some(gas_prices) => {
+            let mut table = Table::new();
+            table.set_format(*format::consts::FORMAT_BOX_CHARS);
+
+            table.add_row(Row::new(vec![
+                Cell::new(&format!("Gas Prices for {} (Chain ID: {})", network_name, chain_id))
+                    .style_spec("b")
+                    .with_hspan(4),
+            ]));
+
+            table.add_row(Row::new(vec![
+                Cell::new("Priority").style_spec("b"),
+                Cell::new("Max Priority Fee").style_spec("b"),
+                Cell::new("Max Fee").style_spec("b"),
+                Cell::new("Wait Time").style_spec("b"),
+            ]));
+
+            table.add_row(Row::new(vec![
+                Cell::new("Slow"),
+                Cell::new(&gas_prices.slow.max_priority_fee.into_u128().to_string()),
+                Cell::new(&gas_prices.slow.max_fee.into_u128().to_string()),
+                Cell::new(&get_wait_time(&gas_prices.slow)),
+            ]));
+
+            table.add_row(Row::new(vec![
+                Cell::new("Medium"),
+                Cell::new(&gas_prices.medium.max_priority_fee.into_u128().to_string()),
+                Cell::new(&gas_prices.medium.max_fee.into_u128().to_string()),
+                Cell::new(&get_wait_time(&gas_prices.medium)),
+            ]));
+
+            table.add_row(Row::new(vec![
+                Cell::new("Fast"),
+                Cell::new(&gas_prices.fast.max_priority_fee.into_u128().to_string()),
+                Cell::new(&gas_prices.fast.max_fee.into_u128().to_string()),
+                Cell::new(&get_wait_time(&gas_prices.fast)),
+            ]));
+
+            table.add_row(Row::new(vec![
+                Cell::new("Super Fast"),
+                Cell::new(&gas_prices.super_fast.max_priority_fee.into_u128().to_string()),
+                Cell::new(&gas_prices.super_fast.max_fee.into_u128().to_string()),
+                Cell::new(&get_wait_time(&gas_prices.super_fast)),
+            ]));
+
+            table.printstd();
+        }
+    }
+
     Ok(())
 }
 
-fn handle_enable(network_name: &str) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Enabling network '{}'...", network_name);
-    // TODO: Implement actual network enabling logic
-    Ok(())
-}
+async fn handle_network_toggle(
+    network_name: &str,
+    project_path: &ProjectLocation,
+    sdk: &mut SDK,
+    enable: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    handle_authenticate(sdk, "account1", project_path).await?;
 
-fn handle_disable(network_name: &str) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Disabling network '{}'...", network_name);
-    // TODO: Implement actual network disabling logic
+    let setup_config = project_path.setup_config(false)?;
+    let provider_url = setup_config
+        .networks
+        .iter()
+        .find(|network| network.name == network_name)
+        .ok_or_else(|| format!("Network not found: {}", network_name))?
+        .provider_urls[0]
+        .clone();
+
+    let provider = create_retry_client(&provider_url)
+        .map_err(|e| format!("RPC provider is not valid as cannot get chain ID: {}", e))?;
+    let chain_id = provider
+        .get_chain_id()
+        .await
+        .map_err(|e| format!("RPC provider is not valid as cannot get chain ID: {}", e))?;
+
+    if enable {
+        sdk.network.enable_network(chain_id).await?;
+    } else {
+        sdk.network.disable_network(chain_id).await?;
+    }
+
+    println!(
+        "Network '{}' {} successfully.",
+        network_name,
+        if enable { "enabled" } else { "disabled" }
+    );
+
     Ok(())
 }

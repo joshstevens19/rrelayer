@@ -111,6 +111,23 @@ impl HttpClient {
         Ok(response.json().await?)
     }
 
+    pub async fn put_status<B>(&self, endpoint: &str, body: &B) -> ApiResult<()>
+    where
+        B: Serialize,
+    {
+        let url = self.build_url(endpoint);
+        let headers = self.build_headers(None);
+
+        self.client.put(&url)
+            .headers(headers)
+            .json(body)
+            .send()
+            .await?
+            .error_for_status()?;
+
+        Ok(())
+    }
+
     pub async fn delete<T>(&self, endpoint: &str) -> ApiResult<T>
     where
         T: DeserializeOwned,

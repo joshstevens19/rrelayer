@@ -1,4 +1,4 @@
-use rrelayerr_core::network::types::{ChainId, Network};
+use rrelayerr_core::network::types::Network;
 
 use crate::api::{http::HttpClient, types::ApiResult};
 
@@ -31,8 +31,8 @@ impl NetworkApi {
     /// # Arguments
     ///
     /// * `chain_id` - The chain ID of the network to enable
-    pub async fn enable_network(&self, chain_id: ChainId) -> ApiResult<()> {
-        self.client.put(&format!("enable/{}", chain_id.to_string()), &()).await
+    pub async fn enable_network(&self, chain_id: u64) -> ApiResult<()> {
+        self.client.put_status(&format!("networks/enable/{}", chain_id.to_string()), &()).await
     }
 
     /// Disable a network
@@ -40,7 +40,7 @@ impl NetworkApi {
     /// # Arguments
     ///
     /// * `chain_id` - The chain ID of the network to disable
-    pub async fn disable_network(&self, chain_id: ChainId) -> ApiResult<()> {
-        self.client.put(&format!("disable/{}", chain_id.to_string()), &()).await
+    pub async fn disable_network(&self, chain_id: u64) -> ApiResult<()> {
+        self.client.put_status(&format!("networks/disable/{}", chain_id.to_string()), &()).await
     }
 }
