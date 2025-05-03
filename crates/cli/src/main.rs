@@ -2,12 +2,13 @@ use std::{path::PathBuf, str::FromStr};
 
 use clap::Parser;
 use rrelayerr_core::{load_env_from_project_path, setup_info_logger};
+use rrelayerr_sdk::SDK;
 
 use crate::{
     cli_interface::{Cli, Commands},
     commands::{
-        allowlist, api_key, auth, balance, config, create, init, keystore, list, network, sign,
-        start, tx, user,
+        allowlist, api_key, auth, balance, config, create, init, keystore,
+        keystore::ProjectLocation, list, network, sign, start, tx, user,
     },
     console::print_error_message,
 };
@@ -35,8 +36,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
     setup_info_logger();
 
-    authentication::check_token_and_refresh_if_needed().await?;
-
     match &cli.command {
         Commands::Init { path } => {
             let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;
@@ -55,8 +54,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             start::handle_start(args, &resolved_path).await?;
         }
-        Commands::Network(args) => {
-            network::handle_network(args).await?;
+        Commands::Network { path, command } => {
+            let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;
+            load_env_from_project_path(&resolved_path);
+
+            let project_location = ProjectLocation::new(resolved_path);
+            let mut sdk = SDK::new(project_location.get_api_url()?);
+
+            network::handle_network(command, &project_location, &mut sdk).await?;
         }
         Commands::List(args) => {
             list::handle_list(args).await?;

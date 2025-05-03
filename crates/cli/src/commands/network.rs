@@ -1,18 +1,14 @@
-use std::{
-    fs,
-    io::{self, Write},
-};
+use std::io::{self};
 
 use clap::{Args, Subcommand};
+use rrelayerr_sdk::SDK;
 
-#[derive(Args)]
-pub struct NetworkArgs {
-    #[command(subcommand)]
-    command: NetworkCommands,
-}
+use crate::{
+    authentication::handle_authenticate, commands::keystore::ProjectLocation, console::print_table,
+};
 
 #[derive(Subcommand)]
-enum NetworkCommands {
+pub enum NetworkCommands {
     /// Add a new network
     Add(AddArgs),
     /// List all networks
@@ -51,10 +47,14 @@ enum NetworkSubCommands {
     Disable,
 }
 
-pub async fn handle_network(args: &NetworkArgs) -> Result<(), Box<dyn std::error::Error>> {
-    match &args.command {
+pub async fn handle_network(
+    command: &NetworkCommands,
+    project_path: &ProjectLocation,
+    sdk: &mut SDK,
+) -> Result<(), Box<dyn std::error::Error>> {
+    match &command {
         NetworkCommands::Add(_) => handle_add(),
-        NetworkCommands::List(list_args) => handle_list(list_args),
+        NetworkCommands::List(list_args) => handle_list(list_args, project_path, sdk).await,
         NetworkCommands::Network { network_name, command } => match command {
             NetworkSubCommands::Gas => handle_gas(network_name),
             NetworkSubCommands::Enable => handle_enable(network_name),
@@ -69,7 +69,6 @@ fn handle_add() -> Result<(), Box<dyn std::error::Error>> {
     io::stdin().read_line(&mut network_name)?;
     let network_name = network_name.trim();
 
-    // Collect provider URLs
     let mut provider_urls = Vec::new();
     loop {
         println!("Enter provider URL (or press enter to finish):");
@@ -106,13 +105,42 @@ fn handle_add() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn handle_list(args: &ListArgs) -> Result<(), Box<dyn std::error::Error>> {
-    // TODO: Implement actual config reading logic
-    match args.filter {
-        Some(NetworkFilter::Enabled) => println!("Listing enabled networks:"),
-        Some(NetworkFilter::Disabled) => println!("Listing disabled networks:"),
-        None => println!("Listing all networks:"),
+async fn handle_list(
+    args: &ListArgs,
+    project_path: &ProjectLocation,
+    sdk: &mut SDK,
+) -> Result<(), Box<dyn std::error::Error>> {
+    handle_authenticate(sdk, "account1", project_path).await?;
+
+    let networks = sdk.network.get_all_networks().await?;
+
+    let mut rows = Vec::new();
+    for network in networks.iter() {
+        let provider_str = if network.provider_urls.is_empty() {
+            "None".to_string()
+        } else if network.provider_urls.len() == 1 {
+            network.provider_urls[0].clone()
+        } else {
+            format!("{} endpoints", network.provider_urls.len())
+        };
+
+        let status = if network.disabled { "Disabled" } else { "Active" };
+
+        rows.push(vec![
+            network.name.clone(),
+            network.chain_id.to_string(),
+            provider_str,
+            status.to_string(),
+        ]);
     }
+
+    let headers = vec!["Network Name", "Chain ID", "Provider URLs", "Status"];
+
+    let title = format!("{} Networks Available:", networks.len());
+    let footer = "Tip: Run 'network info <name>' to see more details about a specific network.";
+
+    print_table(headers, rows, Some(&title), Some(footer));
+
     Ok(())
 }
 

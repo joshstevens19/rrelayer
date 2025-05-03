@@ -116,6 +116,11 @@ impl ProjectLocation {
             .clone()
             .unwrap_or_else(|| self.setup_config().unwrap().name.clone())
     }
+
+    pub fn get_api_url(&self) -> Result<String, Box<dyn std::error::Error>> {
+        let setup_config = self.setup_config()?;
+        Ok(format!("http://localhost:{}", setup_config.api_config.port))
+    }
 }
 
 pub async fn handle_keystore_command(

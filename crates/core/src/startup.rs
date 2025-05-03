@@ -1,6 +1,11 @@
 use std::{net::SocketAddr, path::PathBuf, sync::Arc};
 
-use axum::{http::HeaderValue, Router};
+use axum::{
+    http::{HeaderValue, StatusCode},
+    response::IntoResponse,
+    routing::get,
+    Router,
+};
 use dotenv::dotenv;
 use thiserror::Error;
 use tokio::sync::Mutex;
@@ -21,7 +26,7 @@ use crate::{
     provider::{load_providers, EvmProvider, LoadProvidersError},
     relayer::api::create_relayer_routes,
     schema::apply_schema,
-    setup::yaml::{read, ReadYamlError},
+    setup::yaml::{read, ApiConfig, ReadYamlError},
     setup_info_logger,
     shared::{cache::Cache, common_types::EvmAddress},
     transaction::{
@@ -58,13 +63,17 @@ pub enum StartApiError {
     ApiStartupError(#[from] std::io::Error),
 }
 
+async fn health_check() -> impl IntoResponse {
+    StatusCode::OK
+}
+
 async fn start_api(
+    api_config: ApiConfig,
     gas_oracle_cache: Arc<Mutex<GasOracleCache>>,
     blob_gas_oracle_cache: Arc<Mutex<BlobGasOracleCache>>,
     transactions_queues: Arc<Mutex<TransactionsQueues>>,
     providers: Arc<Vec<EvmProvider>>,
     cache: Arc<Cache>,
-    allowed_origins: Option<Vec<String>>,
 ) -> Result<(), StartApiError> {
     let mut db = PostgresClient::new().await.map_err(StartApiError::DatabaseConnectionError)?;
 
@@ -83,21 +92,25 @@ async fn start_api(
     });
 
     let cors = CorsLayer::new()
-        .allow_origin(if allowed_origins.as_ref().map_or(true, |origins| origins.is_empty()) {
-            AllowOrigin::any()
-        } else {
-            AllowOrigin::list(
-                allowed_origins
-                    .unwrap_or_default()
-                    .into_iter()
-                    .filter_map(|origin| HeaderValue::from_str(&origin).ok())
-                    .collect::<Vec<HeaderValue>>(),
-            )
-        })
+        .allow_origin(
+            if api_config.allowed_origins.as_ref().map_or(true, |origins| origins.is_empty()) {
+                AllowOrigin::any()
+            } else {
+                AllowOrigin::list(
+                    api_config
+                        .allowed_origins
+                        .unwrap_or_default()
+                        .into_iter()
+                        .filter_map(|origin| HeaderValue::from_str(&origin).ok())
+                        .collect::<Vec<HeaderValue>>(),
+                )
+            },
+        )
         .allow_methods(Any)
         .allow_headers(Any);
 
     let app = Router::new()
+        .route("/health", get(health_check))
         .nest("/authentication", create_authentication_routes())
         .nest("/gas", create_gas_routes())
         .nest("/networks", create_network_routes())
@@ -109,7 +122,7 @@ async fn start_api(
         .with_state(app_state)
         .into_make_service_with_connect_info::<SocketAddr>();
 
-    let address = "localhost:8000".to_string();
+    let address = format!("localhost:{}", api_config.port);
 
     let listener = tokio::net::TcpListener::bind(&address).await?;
     info!("listening on http://{}", address);
@@ -176,7 +189,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
                             &project_path.join("keystores").join("accounts").join(account),
                             &password,
                         )
-                            .expect("Failed to recover wallet");
+                        .expect("Failed to recover wallet");
                         let address: EvmAddress = signer.address().into();
                         admins.push((address, JwtRole::Admin))
                     }
@@ -208,19 +221,19 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
         providers.clone(),
         cache.clone(),
     )
-        .await?;
+    .await?;
 
     start_crons(gas_oracle_cache.clone(), blob_gas_oracle_cache.clone(), providers.clone());
 
     start_api(
+        config.api_config,
         gas_oracle_cache,
         blob_gas_oracle_cache,
         transaction_queue,
         providers,
         cache,
-        config.allowed_origins,
     )
-        .await?;
+    .await?;
 
     Ok(())
 }

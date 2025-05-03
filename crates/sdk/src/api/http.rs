@@ -1,8 +1,8 @@
 use reqwest::{
+    header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE},
     Client,
-    header::{AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderValue},
 };
-use serde::{Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Serialize};
 
 use crate::api::types::{ApiBaseConfig, ApiResult};
 
@@ -142,5 +142,18 @@ impl HttpClient {
             .error_for_status()?;
 
         Ok(response.json().await?)
+    }
+
+    pub async fn get_status(&self, endpoint: &str) -> ApiResult<()> {
+        let url = self.build_url(endpoint);
+        let headers = self.build_headers(None);
+
+        self.client.get(&url)
+            .headers(headers)
+            .send()
+            .await?
+            .error_for_status()?;
+
+        Ok(())
     }
 }

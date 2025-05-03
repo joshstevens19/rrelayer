@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use alloy::{primitives::eip191_hash_message, signers};
+use alloy::signers;
 use axum::{extract::State, http::StatusCode, middleware::from_fn, routing::post, Json, Router};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -50,7 +50,7 @@ async fn generate_auth_secret(
                 &secret_request.address,
                 &challenge,
             )
-            .await;
+                .await;
 
             Ok(Json(GenerateSecretResult { id, challenge, address: secret_request.address }))
         }
@@ -76,12 +76,14 @@ async fn authenticate(
         &authenticate_request.id,
         &authenticate_request.signed_by,
     )
-    .await
+        .await
     {
-        let message_hash = eip191_hash_message(&cached_result);
+        println!("Challenge: {}", cached_result);
         let address = EvmAddress::new(
-            authenticate_request.signature.recover_address_from_msg(message_hash).unwrap(),
+            authenticate_request.signature.recover_address_from_msg(cached_result.as_bytes()).unwrap(),
         );
+        println!("Address: {}", address.hex());
+        println!("Signed by: {}", authenticate_request.signed_by.hex());
         let is_valid = address == authenticate_request.signed_by;
 
         if !is_valid {
@@ -93,7 +95,7 @@ async fn authenticate(
             &authenticate_request.id,
             &authenticate_request.signed_by,
         )
-        .await;
+            .await;
 
         let user = state.db.get_user(&authenticate_request.signed_by).await;
 

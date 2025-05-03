@@ -3,8 +3,8 @@ use std::{fs, path::Path};
 use dialoguer::{Confirm, Input};
 use rand::{Rng, distributions::Alphanumeric};
 use rrelayerr_core::{
-    AdminIdentifier, GasProviders, KeystoreSigningKey, NetworkSetupConfig, SetupConfig, SigningKey,
-    WriteFileError, gas::fee_estimator::tenderly::TenderlyGasProviderSetupConfig,
+    AdminIdentifier, ApiConfig, GasProviders, KeystoreSigningKey, NetworkSetupConfig, SetupConfig,
+    SigningKey, WriteFileError, gas::fee_estimator::tenderly::TenderlyGasProviderSetupConfig,
     generate_docker_file, keystore::recover_wallet_from_keystore, rrelayerr_info, write_file,
 };
 use serde_yaml;
@@ -106,7 +106,7 @@ pub async fn handle_init(path: &Path) -> Result<(), Box<dyn std::error::Error>> 
             tenderly: Some(TenderlyGasProviderSetupConfig { enabled: true, api_key: None }),
             custom: None,
         }),
-        allowed_origins: None,
+        api_config: ApiConfig { port: 8000, allowed_origins: None },
     };
     fs::write(project_path.join("rrelayerr.yaml"), serde_yaml::to_string(&yaml_content)?)?;
 

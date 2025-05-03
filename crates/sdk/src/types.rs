@@ -4,8 +4,8 @@ use crate::api::ApiBaseConfig;
 
 #[derive(Clone)]
 pub struct SdkContext {
-    pub(crate) config: ApiBaseConfig,
-    pub(crate) token_pair: Option<TokenPair>,
+    pub config: ApiBaseConfig,
+    pub token_pair: Option<TokenPair>,
 }
 
 impl SdkContext {

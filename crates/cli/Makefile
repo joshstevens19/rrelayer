@@ -12,3 +12,5 @@ auth_info:
 	cargo run -- auth --path $(CURDIR)/../../playground/example info --account account1
 auth_list_accounts:
 	cargo run -- auth --path $(CURDIR)/../../playground/example list-accounts
+network_list:
+	cargo run -- network --path $(CURDIR)/../../playground/example list

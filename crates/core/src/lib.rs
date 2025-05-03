@@ -14,8 +14,8 @@ mod setup;
 pub use setup::{
     signing_key_providers::keystore,
     yaml::{
-        read, AdminIdentifier, GasProviders, KeystoreSigningKey, NetworkSetupConfig, SetupConfig,
-        SigningKey,
+        read, AdminIdentifier, ApiConfig, GasProviders, KeystoreSigningKey, NetworkSetupConfig,
+        SetupConfig, SigningKey,
     },
 };
 mod shared;

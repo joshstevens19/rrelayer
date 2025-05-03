@@ -13,3 +13,5 @@ networks:
 gas_providers:
   tenderly:
     enabled: true
+api_config:
+  port: 8000

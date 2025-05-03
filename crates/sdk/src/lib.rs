@@ -9,12 +9,12 @@ use rrelayerr_core::authentication::{
 };
 
 use crate::{
-    api::{ApiResult, ApiSdkError, http::HttpClient},
+    api::{http::HttpClient, ApiResult, ApiSdkError, HealthApi},
     types::SdkContext,
 };
 
 pub struct SDK {
-    context: SdkContext,
+    pub context: SdkContext,
     client: HttpClient,
     pub auth: Authentication,
     pub gas: GasApi,
@@ -23,6 +23,7 @@ pub struct SDK {
     pub sign: SignApi,
     pub transaction: TransactionApi,
     pub user: UserApi,
+    pub health: HealthApi,
 }
 
 impl SDK {
@@ -38,6 +39,7 @@ impl SDK {
             sign: SignApi::new(client.clone()),
             transaction: TransactionApi::new(client.clone()),
             user: UserApi::new(client.clone()),
+            health: HealthApi::new(client.clone()),
             client,
             context,
         }
@@ -84,7 +86,7 @@ impl SDK {
         self.context.token_pair.is_some()
     }
 
-    fn update_auth_token(&mut self, token_pair: TokenPair) {
+    pub fn update_auth_token(&mut self, token_pair: TokenPair) {
         self.context.token_pair = Some(token_pair.clone());
 
         let new_config = self.context.with_auth_token(token_pair.access_token);

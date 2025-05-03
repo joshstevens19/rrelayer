@@ -1,8 +1,9 @@
 use clap::{Parser, Subcommand};
 
+use crate::commands::network::NetworkCommands;
 use crate::commands::{
     allowlist, api_key, auth::AuthCommand, balance, config, create, keystore::KeystoreCommand,
-    list, network, sign, start, tx, user,
+    list, sign, start, tx, user,
 };
 
 #[derive(Parser)]
@@ -36,7 +37,13 @@ pub enum Commands {
     /// Start the relayer service
     Start(start::StartArgs),
     /// Manage network configurations and settings
-    Network(network::NetworkArgs),
+    Network {
+        #[clap(long, short)]
+        path: Option<String>,
+
+        #[command(subcommand)]
+        command: NetworkCommands,
+    },
     /// List all configured relayers
     List(list::ListArgs),
     /// Configure operations for a specific relayer
