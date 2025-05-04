@@ -81,8 +81,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             config::handle_config(command, &project_location, &mut sdk).await?;
         }
-        Commands::Balance(args) => {
-            balance::handle_balance(args).await?;
+        Commands::Balance { path, relayer, token } => {
+            let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;
+            load_env_from_project_path(&resolved_path);
+
+            let project_location = ProjectLocation::new(resolved_path);
+            let mut sdk = SDK::new(project_location.get_api_url()?);
+
+            balance::handle_balance(relayer, token, &project_location, &mut sdk).await?;
         }
         Commands::ApiKey { relayer: relayer_id, command } => {
             api_key::handle_api_key(relayer_id, command).await?;

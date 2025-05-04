@@ -1,7 +1,8 @@
 use clap::{Parser, Subcommand};
+use rrelayerr_core::{common_types::EvmAddress, relayer::types::RelayerId};
 
 use crate::commands::{
-    allowlist, api_key, auth::AuthCommand, balance, config, keystore::KeystoreCommand,
+    allowlist, api_key, auth::AuthCommand, config, keystore::KeystoreCommand,
     network::NetworkCommands, sign, tx, user,
 };
 
@@ -63,7 +64,18 @@ pub enum Commands {
         command: config::ConfigCommand,
     },
     /// Check the balance of a relayer's account
-    Balance(balance::BalanceArgs),
+    Balance {
+        #[clap(long, short)]
+        path: Option<String>,
+
+        /// The unique identifier of the relayer
+        #[clap(required = true)]
+        relayer: RelayerId,
+
+        /// The token address if you want an erc20/721 balance
+        #[arg(long)]
+        token: Option<EvmAddress>,
+    },
     /// Manage API keys for relayer access
     ApiKey {
         /// The unique identifier of the relayer

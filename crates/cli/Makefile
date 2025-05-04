@@ -58,3 +58,9 @@ config_gas_legacy:
 	cargo run -- config --path $(CURDIR)/../../playground/example gas 3c24e942-3109-4516-bd3b-6e2a904ef473 legacy
 config_gas_max_price:
 	cargo run -- config --path $(CURDIR)/../../playground/example gas 3c24e942-3109-4516-bd3b-6e2a904ef473 max-price 1000000
+
+balance:
+	cargo run -- balance --path $(CURDIR)/../../playground/example 3c24e942-3109-4516-bd3b-6e2a904ef473
+
+balance_token:
+	cargo run -- balance --path $(CURDIR)/../../playground/example 3c24e942-3109-4516-bd3b-6e2a904ef473 --token 0x73d219B3881E481394DA6B5008A081d623992200
