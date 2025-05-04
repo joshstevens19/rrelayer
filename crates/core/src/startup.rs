@@ -1,8 +1,11 @@
-use std::{net::SocketAddr, path::PathBuf, sync::Arc};
+use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Instant};
 
 use axum::{
-    http::{HeaderValue, StatusCode},
-    response::IntoResponse,
+    body::Body,
+    http::{HeaderValue, Request, StatusCode},
+    middleware,
+    middleware::Next,
+    response::{IntoResponse, Response},
     routing::get,
     Router,
 };
@@ -25,6 +28,7 @@ use crate::{
     postgres::{PostgresClient, PostgresConnectionError, PostgresError},
     provider::{load_providers, EvmProvider, LoadProvidersError},
     relayer::api::create_relayer_routes,
+    rrelayerr_error, rrelayerr_info,
     schema::apply_schema,
     setup::yaml::{read, ApiConfig, ReadYamlError},
     setup_info_logger,
@@ -65,6 +69,31 @@ pub enum StartApiError {
 
 async fn health_check() -> impl IntoResponse {
     StatusCode::OK
+}
+
+async fn activity_logger(req: Request<Body>, next: Next) -> Result<Response, StatusCode> {
+    let method = req.method().clone();
+    let uri = req.uri().clone();
+    let start = Instant::now();
+
+    let response = next.run(req).await;
+
+    let status = response.status();
+    let duration = start.elapsed();
+
+    if status.is_client_error() {
+        rrelayerr_error!("{} {} responded with {} after {:?}", method, uri, status, duration);
+
+        if status == StatusCode::BAD_REQUEST {
+            rrelayerr_error!("Bad request error: URI={}, method={}", uri, method);
+        }
+    } else if status.is_server_error() {
+        rrelayerr_error!("{} {} responded with {} after {:?}", method, uri, status, duration);
+    } else {
+        rrelayerr_info!("{} {} responded with {} after {:?}", method, uri, status, duration);
+    }
+
+    Ok(response)
 }
 
 async fn start_api(
@@ -117,6 +146,7 @@ async fn start_api(
         .nest("/relayers", create_relayer_routes())
         .nest("/transactions", create_transactions_routes())
         .nest("/users", create_user_routes())
+        .layer(middleware::from_fn(activity_logger))
         // .layer(from_fn(auth_middleware)) // TODO: add auth middleware
         .layer(cors)
         .with_state(app_state)
@@ -189,7 +219,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
                             &project_path.join("keystores").join("accounts").join(account),
                             &password,
                         )
-                            .expect("Failed to recover wallet");
+                        .expect("Failed to recover wallet");
                         let address: EvmAddress = signer.address().into();
                         admins.push((address, JwtRole::Admin))
                     }
@@ -221,7 +251,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
         providers.clone(),
         cache.clone(),
     )
-        .await?;
+    .await?;
 
     start_crons(gas_oracle_cache.clone(), blob_gas_oracle_cache.clone(), providers.clone());
 
@@ -233,7 +263,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
         providers,
         cache,
     )
-        .await?;
+    .await?;
 
     Ok(())
 }

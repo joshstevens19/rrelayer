@@ -1,72 +1,153 @@
 use std::fmt::{Debug, Display};
 
-use clap::{Args, Subcommand};
+use clap::{Subcommand, ValueEnum};
+use rrelayerr_core::{
+    authentication::types::JwtRole,
+    common_types::{EvmAddress, PagingQuery},
+};
+use rrelayerr_sdk::SDK;
+
+use crate::{
+    authentication::handle_authenticate, commands::keystore::ProjectLocation, console::print_table,
+};
 
 #[derive(Subcommand)]
 pub enum UserCommand {
     /// List all users
     List,
     /// Edit user role
-    Edit { user_address: String, role: UserRole },
+    Edit {
+        #[arg(long)]
+        address: EvmAddress,
+        #[arg(long, value_enum)]
+        role: CliJwtRole,
+    },
     /// Add a new user
-    Add { user_address: String, role: UserRole },
+    Add {
+        #[arg(long)]
+        address: EvmAddress,
+        #[arg(long, value_enum)]
+        role: CliJwtRole,
+    },
     /// Delete a user
-    Delete { user_address: String },
+    Delete {
+        #[arg(long)]
+        address: EvmAddress,
+    },
 }
 
-#[derive(clap::ValueEnum, Clone)]
-pub enum UserRole {
+#[derive(Clone, Debug, ValueEnum)]
+pub enum CliJwtRole {
     Admin,
-    Operator,
-    Viewer,
+    Manager,
+    Integrator,
+    ReadOnly,
 }
 
-impl Display for UserRole {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            UserRole::Admin => write!(f, "ADMIN"),
-            UserRole::Operator => write!(f, "OPERATOR"),
-            UserRole::Viewer => write!(f, "VIEWER"),
+impl From<CliJwtRole> for JwtRole {
+    fn from(role: CliJwtRole) -> Self {
+        match role {
+            CliJwtRole::Admin => JwtRole::Admin,
+            CliJwtRole::Manager => JwtRole::Manager,
+            CliJwtRole::Integrator => JwtRole::Integrator,
+            CliJwtRole::ReadOnly => JwtRole::ReadOnly,
         }
     }
 }
 
-impl Debug for UserRole {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self)
-    }
-}
-
-pub async fn handle_user(command: &UserCommand) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn handle_user(
+    command: &UserCommand,
+    project_path: &ProjectLocation,
+    sdk: &mut SDK,
+) -> Result<(), Box<dyn std::error::Error>> {
     match command {
-        UserCommand::List => handle_list(),
-        UserCommand::Edit { user_address, role } => handle_edit(user_address, role),
-        UserCommand::Add { user_address, role } => handle_add(user_address, role),
-        UserCommand::Delete { user_address } => handle_delete(user_address),
+        UserCommand::List => handle_list(project_path, sdk).await,
+        UserCommand::Edit { address, role } => handle_edit(address, role, project_path, sdk).await,
+        UserCommand::Add { address, role } => handle_add(address, role, project_path, sdk).await,
+        UserCommand::Delete { address } => handle_delete(address, project_path, sdk).await,
     }
 }
 
-fn handle_list() -> Result<(), Box<dyn std::error::Error>> {
-    println!("Listing all users");
-    // TODO: Implement user listing logic
+async fn handle_list(
+    project_path: &ProjectLocation,
+    sdk: &mut SDK,
+) -> Result<(), Box<dyn std::error::Error>> {
+    handle_authenticate(sdk, "account1", project_path).await?;
+
+    log_users(sdk).await?;
+
     Ok(())
 }
 
-fn handle_edit(user_address: &str, role: &UserRole) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Updating role to {:?} for user: {}", role, user_address);
-    // TODO: Implement user role update logic
+async fn handle_delete(
+    address: &EvmAddress,
+    project_path: &ProjectLocation,
+    sdk: &mut SDK,
+) -> Result<(), Box<dyn std::error::Error>> {
+    handle_authenticate(sdk, "account1", project_path).await?;
+
+    sdk.user.delete(address).await?;
+
+    println!("User {} deleted", address);
+
     Ok(())
 }
 
-fn handle_add(user_address: &str, role: &UserRole) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Adding new user {} with role {:?}", user_address, role);
-    // TODO: Implement user addition logic
-    // TODO: Add address validation
+async fn handle_add(
+    user_address: &EvmAddress,
+    role: &CliJwtRole,
+    project_path: &ProjectLocation,
+    sdk: &mut SDK,
+) -> Result<(), Box<dyn std::error::Error>> {
+    handle_authenticate(sdk, "account1", project_path).await?;
+
+    let jwt_role: JwtRole = role.clone().into();
+
+    sdk.user.add(user_address, &jwt_role).await?;
+
+    println!("User {} added as role {}", user_address, jwt_role);
+
     Ok(())
 }
 
-fn handle_delete(user_address: &str) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Deleting user: {}", user_address);
-    // TODO: Implement user deletion logic
+async fn handle_edit(
+    user_address: &EvmAddress,
+    role: &CliJwtRole,
+    project_path: &ProjectLocation,
+    sdk: &mut SDK,
+) -> Result<(), Box<dyn std::error::Error>> {
+    handle_authenticate(sdk, "account1", project_path).await?;
+
+    let jwt_role: JwtRole = role.clone().into();
+
+    sdk.user.edit(user_address, &jwt_role).await?;
+
+    println!("User {} role updated to {}", user_address, jwt_role);
+    Ok(())
+}
+
+async fn log_users(sdk: &mut SDK) -> Result<(), Box<dyn std::error::Error>> {
+    let users = sdk
+        .user
+        .get(&PagingQuery {
+            // don't handle paging just yet as probably not required
+            limit: 1000,
+            offset: 0,
+        })
+        .await?
+        .items;
+
+    let mut rows = Vec::new();
+    for user in users.iter() {
+        rows.push(vec![user.address.hex(), user.role.to_string()]);
+    }
+
+    let headers = vec!["Address", "Role"];
+
+    let title = format!("{} Users:", users.len());
+    let footer = "Roles can be admin, manager, integrator and readonly";
+
+    print_table(headers, rows, Some(&title), Some(footer));
+
     Ok(())
 }

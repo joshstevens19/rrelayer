@@ -87,8 +87,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Tx { command } => {
             tx::handle_tx(command).await?;
         }
-        Commands::User { command } => {
-            user::handle_user(command).await?;
+        Commands::User { path, command } => {
+            let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;
+            load_env_from_project_path(&resolved_path);
+
+            let project_location = ProjectLocation::new(resolved_path);
+            let mut sdk = SDK::new(project_location.get_api_url()?);
+
+            user::handle_user(command, &project_location, &mut sdk).await?;
         }
         Commands::Keystore { command } => {
             keystore::handle_keystore_command(command).await?;

@@ -47,7 +47,7 @@ impl<TResult: Serialize> PagingResult<TResult> {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct PagingQuery {
     pub limit: u32,
     pub offset: u32,

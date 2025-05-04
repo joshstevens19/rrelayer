@@ -1,4 +1,5 @@
 use rrelayerr_core::{
+    common_types::{PagingContext, PagingResult},
     relayer::types::RelayerId,
     transaction::{
         api::{RelayTransactionRequest, RelayTransactionStatusResult, SendTransactionResult},
@@ -6,10 +7,7 @@ use rrelayerr_core::{
     },
 };
 
-use crate::api::{
-    http::HttpClient,
-    types::{ApiResult, PagingContext, PagingResult},
-};
+use crate::api::{http::HttpClient, types::ApiResult};
 
 pub struct TransactionApi {
     client: HttpClient,

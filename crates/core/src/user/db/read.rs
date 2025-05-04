@@ -32,7 +32,7 @@ impl PostgresClient {
             .query(
                 "
                     SELECT *
-                    FROM \"user\"
+                    FROM authentication.user_access
                     LIMIT $1
                     OFFSET $2;
                 ",

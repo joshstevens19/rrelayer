@@ -177,11 +177,8 @@ pub fn read(file_path: &PathBuf, raw_yaml: bool) -> Result<SetupConfig, ReadYaml
     let mut contents = String::new();
     file.read_to_string(&mut contents).map_err(|_| ReadYamlError::CanNotReadYaml)?;
 
-    let substituted_contents = if raw_yaml {
-        contents
-    } else {
-        substitute_env_variables(&contents)?
-    };
+    let substituted_contents =
+        if raw_yaml { contents } else { substitute_env_variables(&contents)? };
 
     let config: SetupConfig = serde_yaml::from_str(&substituted_contents)
         .map_err(|e| ReadYamlError::SetupConfigInvalidYaml(e.to_string()))?;
@@ -206,5 +203,3 @@ pub fn read(file_path: &PathBuf, raw_yaml: bool) -> Result<SetupConfig, ReadYaml
 
     Ok(config)
 }
-
-

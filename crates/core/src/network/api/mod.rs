@@ -16,7 +16,11 @@ use super::{
     },
     types::{ChainId, Network, NetworksFilterState},
 };
-use crate::{app_state::AppState, authentication::guards::{admin_jwt_guard, read_only_or_above_jwt_guard}, rrelayerr_error, rrelayerr_info};
+use crate::{
+    app_state::AppState,
+    authentication::guards::{admin_jwt_guard, read_only_or_above_jwt_guard},
+    rrelayerr_error, rrelayerr_info,
+};
 
 async fn networks(State(state): State<Arc<AppState>>) -> Result<Json<Vec<Network>>, StatusCode> {
     if let Some(cached_result) = get_networks_cache(&state.cache).await {

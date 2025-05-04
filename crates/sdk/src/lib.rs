@@ -9,7 +9,7 @@ use rrelayerr_core::authentication::{
 };
 
 use crate::{
-    api::{http::HttpClient, ApiResult, ApiSdkError, HealthApi},
+    api::{ApiResult, ApiSdkError, HealthApi, http::HttpClient},
     types::SdkContext,
 };
 

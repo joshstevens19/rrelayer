@@ -65,7 +65,7 @@ pub async fn load_providers(
                         &mnemonic,
                         get_gas_estimator(setup_config, config),
                     )
-                        .await?,
+                    .await?,
                 );
             }
             Err(e) => return Err(LoadProvidersError::SigningKeyError(e.to_string())),

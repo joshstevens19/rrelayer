@@ -4,6 +4,7 @@ mod api_keys;
 pub use allowlist::RelayerAllowlist;
 pub use api_keys::RelayerApiKeys;
 use rrelayerr_core::{
+    common_types::{PagingContext, PagingResult},
     network::types::ChainId,
     relayer::{
         api::{CreateRelayerApiResult, GetRelayerResult},
@@ -13,7 +14,7 @@ use rrelayerr_core::{
 
 use crate::api::{
     http::HttpClient,
-    types::{ApiResult, ApiSdkError, PagingContext, PagingResult},
+    types::{ApiResult, ApiSdkError},
 };
 
 pub struct RelayerApi {

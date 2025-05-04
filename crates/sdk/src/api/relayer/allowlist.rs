@@ -1,10 +1,10 @@
 use alloy::primitives::Address;
-use rrelayerr_core::{common_types::EvmAddress, relayer::types::RelayerId};
-
-use crate::api::{
-    http::HttpClient,
-    types::{ApiResult, PagingContext, PagingResult},
+use rrelayerr_core::{
+    common_types::{EvmAddress, PagingContext, PagingResult},
+    relayer::types::RelayerId,
 };
+
+use crate::api::{http::HttpClient, types::ApiResult};
 
 pub struct RelayerAllowlist {
     client: HttpClient,

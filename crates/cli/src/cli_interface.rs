@@ -84,6 +84,9 @@ pub enum Commands {
     },
     /// Manage user access and permissions
     User {
+        #[clap(long, short)]
+        path: Option<String>,
+
         #[command(subcommand)]
         command: user::UserCommand,
     },

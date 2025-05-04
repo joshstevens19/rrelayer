@@ -1,8 +1,8 @@
 use reqwest::{
-    header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE},
     Client,
+    header::{AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderValue},
 };
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 
 use crate::api::types::{ApiBaseConfig, ApiResult};
 
@@ -97,6 +97,18 @@ impl HttpClient {
         Ok(response.json::<T>().await?)
     }
 
+    pub async fn post_status<B>(&self, endpoint: &str, body: &B) -> ApiResult<()>
+    where
+        B: Serialize,
+    {
+        let url = self.build_url(endpoint);
+        let headers = self.build_headers(None);
+
+        self.client.post(&url).headers(headers).json(body).send().await?.error_for_status()?;
+
+        Ok(())
+    }
+
     pub async fn put<T, B>(&self, endpoint: &str, body: &B) -> ApiResult<T>
     where
         T: DeserializeOwned,
@@ -118,12 +130,7 @@ impl HttpClient {
         let url = self.build_url(endpoint);
         let headers = self.build_headers(None);
 
-        self.client.put(&url)
-            .headers(headers)
-            .json(body)
-            .send()
-            .await?
-            .error_for_status()?;
+        self.client.put(&url).headers(headers).json(body).send().await?.error_for_status()?;
 
         Ok(())
     }
@@ -139,6 +146,15 @@ impl HttpClient {
             self.client.delete(&url).headers(headers).send().await?.error_for_status()?;
 
         Ok(response.json().await?)
+    }
+
+    pub async fn delete_status(&self, endpoint: &str) -> ApiResult<()> {
+        let url = self.build_url(endpoint);
+        let headers = self.build_headers(None);
+
+        self.client.delete(&url).headers(headers).send().await?.error_for_status()?;
+
+        Ok(())
     }
 
     pub async fn delete_with_body<T, B>(&self, endpoint: &str, body: &B) -> ApiResult<T>
@@ -165,11 +181,7 @@ impl HttpClient {
         let url = self.build_url(endpoint);
         let headers = self.build_headers(None);
 
-        self.client.get(&url)
-            .headers(headers)
-            .send()
-            .await?
-            .error_for_status()?;
+        self.client.get(&url).headers(headers).send().await?.error_for_status()?;
 
         Ok(())
     }

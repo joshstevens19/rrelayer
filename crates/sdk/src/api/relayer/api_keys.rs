@@ -1,9 +1,9 @@
-use rrelayerr_core::relayer::types::RelayerId;
-
-use crate::api::{
-    http::HttpClient,
-    types::{ApiResult, PagingContext, PagingResult},
+use rrelayerr_core::{
+    common_types::{PagingContext, PagingResult},
+    relayer::types::RelayerId,
 };
+
+use crate::api::{http::HttpClient, types::ApiResult};
 
 pub struct RelayerApiKeys {
     client: HttpClient,

@@ -50,7 +50,7 @@ async fn generate_auth_secret(
                 &secret_request.address,
                 &challenge,
             )
-                .await;
+            .await;
 
             Ok(Json(GenerateSecretResult { id, challenge, address: secret_request.address }))
         }
@@ -76,10 +76,13 @@ async fn authenticate(
         &authenticate_request.id,
         &authenticate_request.signed_by,
     )
-        .await
+    .await
     {
         let address = EvmAddress::new(
-            authenticate_request.signature.recover_address_from_msg(cached_result.as_bytes()).unwrap(),
+            authenticate_request
+                .signature
+                .recover_address_from_msg(cached_result.as_bytes())
+                .unwrap(),
         );
         let is_valid = address == authenticate_request.signed_by;
 
@@ -92,7 +95,7 @@ async fn authenticate(
             &authenticate_request.id,
             &authenticate_request.signed_by,
         )
-            .await;
+        .await;
 
         let user = state.db.get_user(&authenticate_request.signed_by).await;
 
