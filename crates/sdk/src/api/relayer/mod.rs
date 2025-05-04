@@ -34,7 +34,7 @@ impl RelayerApi {
 
     pub async fn get_all(
         &self,
-        chain_id: Option<ChainId>,
+        chain_id: Option<u64>,
         paging: &PagingContext,
     ) -> ApiResult<PagingResult<Relayer>> {
         let mut query = serde_json::Map::new();

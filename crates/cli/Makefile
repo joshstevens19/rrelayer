@@ -37,3 +37,6 @@ user_add:
 	cargo run -- user --path $(CURDIR)/../../playground/example add --address 0xb058b2eDFe8b2C5FdcED21EcE660C3e040ebd18D --role admin
 user_edit:
 	cargo run -- user --path $(CURDIR)/../../playground/example edit --address 0xb058b2eDFe8b2C5FdcED21EcE660C3e040ebd18D --role manager
+
+list:
+	cargo run -- list --path $(CURDIR)/../../playground/example

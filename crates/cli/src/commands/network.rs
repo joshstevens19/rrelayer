@@ -203,21 +203,7 @@ async fn handle_gas(
 ) -> Result<(), Box<dyn std::error::Error>> {
     handle_authenticate(sdk, "account1", project_path).await?;
 
-    let setup_config = project_path.setup_config(false)?;
-    let provider_url = setup_config
-        .networks
-        .iter()
-        .find(|network| network.name == network_name)
-        .ok_or_else(|| format!("Network not found: {}", network_name))?
-        .provider_urls[0]
-        .clone();
-
-    let provider = create_retry_client(&provider_url)
-        .map_err(|e| format!("RPC provider is not valid as cannot get chain ID: {}", e))?;
-    let chain_id = provider
-        .get_chain_id()
-        .await
-        .map_err(|e| format!("RPC provider is not valid as cannot get chain ID: {}", e))?;
+    let chain_id = get_chain_id_for_network(network_name, project_path).await?;
 
     let gas_prices = sdk.gas.get_gas_prices(chain_id).await?;
     match gas_prices {
@@ -285,6 +271,26 @@ async fn handle_network_toggle(
 ) -> Result<(), Box<dyn std::error::Error>> {
     handle_authenticate(sdk, "account1", project_path).await?;
 
+    let chain_id = get_chain_id_for_network(network_name, project_path).await?;
+    if enable {
+        sdk.network.enable_network(chain_id).await?;
+    } else {
+        sdk.network.disable_network(chain_id).await?;
+    }
+
+    println!(
+        "Network '{}' {} successfully.",
+        network_name,
+        if enable { "enabled" } else { "disabled" }
+    );
+
+    Ok(())
+}
+
+pub async fn get_chain_id_for_network(
+    network_name: &str,
+    project_path: &ProjectLocation,
+) -> Result<u64, Box<dyn std::error::Error>> {
     let setup_config = project_path.setup_config(false)?;
     let provider_url = setup_config
         .networks
@@ -301,17 +307,5 @@ async fn handle_network_toggle(
         .await
         .map_err(|e| format!("RPC provider is not valid as cannot get chain ID: {}", e))?;
 
-    if enable {
-        sdk.network.enable_network(chain_id).await?;
-    } else {
-        sdk.network.disable_network(chain_id).await?;
-    }
-
-    println!(
-        "Network '{}' {} successfully.",
-        network_name,
-        if enable { "enabled" } else { "disabled" }
-    );
-
-    Ok(())
+    Ok(chain_id)
 }

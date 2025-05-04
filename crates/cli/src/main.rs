@@ -63,8 +63,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             network::handle_network(command, &project_location, &mut sdk).await?;
         }
-        Commands::List(args) => {
-            list::handle_list(args).await?;
+        Commands::List { path, network } => {
+            let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;
+            load_env_from_project_path(&resolved_path);
+
+            let project_location = ProjectLocation::new(resolved_path);
+            let mut sdk = SDK::new(project_location.get_api_url()?);
+
+            list::handle_list(network, &project_location, &mut sdk).await?;
         }
         Commands::Config { relayer_id, command } => {
             config::handle_config(relayer_id, command).await?;
