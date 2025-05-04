@@ -71,22 +71,22 @@ impl RelayerApi {
     }
 
     pub async fn delete(&self, id: &RelayerId) -> ApiResult<()> {
-        self.client.delete(&format!("relayers/{}", id)).await
+        self.client.delete_status(&format!("relayers/{}", id)).await
     }
 
     pub async fn pause(&self, id: &RelayerId) -> ApiResult<()> {
-        self.client.put(&format!("relayers/{}/pause", id), &()).await
+        self.client.put_status(&format!("relayers/{}/pause", id), &()).await
     }
 
     pub async fn unpause(&self, id: &RelayerId) -> ApiResult<()> {
-        self.client.put(&format!("relayers/{}/unpause", id), &()).await
+        self.client.put_status(&format!("relayers/{}/unpause", id), &()).await
     }
 
     pub async fn update_eip1559_status(&self, id: &RelayerId, status: bool) -> ApiResult<()> {
-        self.client.put(&format!("relayers/{}/gas/eip1559/{}", id, status), &()).await
+        self.client.put_status(&format!("relayers/{}/gas/eip1559/{}", id, status), &()).await
     }
 
     pub async fn update_max_gas_price<T: ToString>(&self, id: &RelayerId, cap: T) -> ApiResult<()> {
-        self.client.put(&format!("relayers/{}/gas/max/{}", id, cap.to_string()), &()).await
+        self.client.put_status(&format!("relayers/{}/gas/max/{}", id, cap.to_string()), &()).await
     }
 }

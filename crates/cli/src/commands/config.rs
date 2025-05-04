@@ -52,7 +52,7 @@ pub async fn handle_config(
 ) -> Result<(), Box<dyn std::error::Error>> {
     match command {
         ConfigCommand::Get { relayer_id } => handle_get(relayer_id, project_path, sdk).await,
-        ConfigCommand::Pause { relayer_id } => handle_pause(relayer_id),
+        ConfigCommand::Pause { relayer_id } => handle_pause(relayer_id, project_path, sdk).await,
         ConfigCommand::Unpause { relayer_id } => handle_unpause(relayer_id),
         ConfigCommand::UpdateEip1559Status { relayer_id, status } => {
             handle_update_eip1559_status(relayer_id, *status)
@@ -121,9 +121,17 @@ pub async fn handle_get(
     Ok(())
 }
 
-fn handle_pause(relayer_id: &RelayerId) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Pausing relayer with ID: {}", relayer_id);
-    // TODO: Implement actual relayer pausing logic
+async fn handle_pause(
+    relayer_id: &RelayerId,
+    project_path: &ProjectLocation,
+    sdk: &mut SDK,
+) -> Result<(), Box<dyn std::error::Error>> {
+    handle_authenticate(sdk, "account1", project_path).await?;
+
+    sdk.relayer.pause(&relayer_id).await?;
+
+    println!("Paused relayer {}", relayer_id);
+
     Ok(())
 }
 
