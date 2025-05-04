@@ -11,32 +11,23 @@ use axum::{
 use rand::{distributions::Alphanumeric, Rng};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    app_state::AppState,
-    authentication::guards::{
-        admin_jwt_guard, integrator_or_above_jwt_guard, read_only_or_above_jwt_guard,
-        ManagerOrAboveJwtTokenOrApiKeyGuard, ReadOnlyOrAboveJwtTokenOrApiKeyGuard,
-    },
-    gas::types::GasPrice,
-    network::types::ChainId,
-    provider::{chain_enabled, find_provider_for_chain_id},
-    relayer::{
-        api::sign::create_sign_routes,
-        cache::invalidate_relayer_cache,
-        get_relayer, is_relayer_api_key,
-        types::{Relayer, RelayerId},
-    },
-    shared::common_types::{EvmAddress, PagingContext, PagingResult},
-    transaction::{queue_system::TransactionsQueueSetup, NonceManager},
-};
+use crate::{app_state::AppState, authentication::guards::{
+    admin_jwt_guard, integrator_or_above_jwt_guard, read_only_or_above_jwt_guard,
+    ManagerOrAboveJwtTokenOrApiKeyGuard, ReadOnlyOrAboveJwtTokenOrApiKeyGuard,
+}, gas::types::GasPrice, network::types::ChainId, provider::{chain_enabled, find_provider_for_chain_id}, relayer::{
+    api::sign::create_sign_routes,
+    cache::invalidate_relayer_cache,
+    get_relayer, is_relayer_api_key,
+    types::{Relayer, RelayerId},
+}, rrelayerr_error, shared::common_types::{EvmAddress, PagingContext, PagingResult}, transaction::{queue_system::TransactionsQueueSetup, NonceManager}};
 
 #[derive(Debug, Deserialize)]
 struct CreateRelayerRequest {
     pub name: String,
 }
 
-#[derive(Debug, Serialize)]
-struct CreateRelayerResult {
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateRelayerResult {
     pub id: RelayerId,
     pub address: EvmAddress,
 }
@@ -83,7 +74,10 @@ async fn create_relayer(
                     invalidate_relayer_cache(&state.cache, &id).await;
                     Ok(Json(CreateRelayerResult { id, address }))
                 }
-                Err(_) => Err(StatusCode::BAD_REQUEST),
+                Err(e) => {
+                    rrelayerr_error!("{}", e);
+                    Err(StatusCode::BAD_REQUEST)
+                }
             }
         }
         None => Err(StatusCode::NOT_FOUND),

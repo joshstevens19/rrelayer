@@ -52,7 +52,7 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
             chain_id BIGINT NOT NULL,
             address BYTEA NULL,
             wallet_index INT NOT NULL,
-            max_gas_price_cap VARCHAR(100) NULL,
+            max_gas_price_cap NUMERIC(78,0) NULL,
             paused BOOLEAN DEFAULT FALSE NOT NULL,
             allowlisted_addresses_only BOOLEAN DEFAULT FALSE NOT NULL,
             eip_1559_enabled BOOLEAN DEFAULT FALSE NOT NULL,

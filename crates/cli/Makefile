@@ -40,3 +40,6 @@ user_edit:
 
 list:
 	cargo run -- list --path $(CURDIR)/../../playground/example
+
+create:
+	cargo run -- create --path $(CURDIR)/../../playground/example --name relayer1 --network sepolia_ethereum

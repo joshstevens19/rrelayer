@@ -1,12 +1,11 @@
-use std::time::SystemTime;
-
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use super::RelayerId;
 use crate::{
     gas::types::GasPrice,
     network::types::ChainId,
-    shared::{common_types::EvmAddress, serializers::serialize_system_time},
+    shared::common_types::EvmAddress,
 };
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -25,7 +24,6 @@ pub struct Relayer {
     pub address: EvmAddress,
 
     /// The relayer wallet index
-    #[serde(skip_serializing)]
     pub wallet_index: u32,
 
     /// The max gas price
@@ -44,6 +42,6 @@ pub struct Relayer {
     pub eip_1559_enabled: bool,
 
     /// The relayer creation time
-    #[serde(rename = "createdAt", serialize_with = "serialize_system_time")]
-    pub created_at: SystemTime,
+    #[serde(rename = "createdAt")]
+    pub created_at: DateTime<Utc>,
 }

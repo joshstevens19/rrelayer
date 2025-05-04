@@ -57,7 +57,7 @@ async fn continuously_process_pending_transactions(
 
         match result {
             Ok(result) => {
-                info!("PENDING: {:?}", result);
+                // info!("PENDING: {:?}", result);
                 processes_next_break(&result.process_again_after).await;
             }
             Err(e) => error!("PENDING ERROR: {}", e),
@@ -77,7 +77,7 @@ async fn continuously_process_inmempool_transactions(
 
         match result {
             Ok(result) => {
-                info!("INMEMPOOL: {:?}", result);
+                // info!("INMEMPOOL: {:?}", result);
                 processes_next_break(&result.process_again_after).await;
             }
             Err(e) => error!("INMEMPOOL ERROR: {}", e),
@@ -99,7 +99,7 @@ async fn continuously_process_mined_transactions(
 
         match result {
             Ok(result) => {
-                info!("MINED: {:?}", result);
+                // info!("MINED: {:?}", result);
                 processes_next_break(&result.process_again_after).await;
             }
             Err(e) => error!("MINED ERROR: {}", e),
@@ -232,15 +232,15 @@ pub async fn startup_transactions_queues(
                         &relayer_id,
                         &TransactionStatus::Pending,
                     )
-                    .await
-                    .map_err(StartTransactionsQueuesError::RepopulateTransactionsQueueError)?,
+                        .await
+                        .map_err(StartTransactionsQueuesError::RepopulateTransactionsQueueError)?,
                     repopulate_transaction_queue(
                         &postgres,
                         &relayer_id,
                         &TransactionStatus::Inmempool,
                     )
-                    .await
-                    .map_err(StartTransactionsQueuesError::RepopulateTransactionsQueueError)?,
+                        .await
+                        .map_err(StartTransactionsQueuesError::RepopulateTransactionsQueueError)?,
                     mined_transactions
                         .into_iter()
                         .map(|transaction| (transaction.id, transaction))
@@ -257,7 +257,7 @@ pub async fn startup_transactions_queues(
             blob_gas_oracle_cache,
             cache,
         )
-        .await?,
+            .await?,
     ));
 
     spawn_processing_tasks(transactions_queues.clone()).await;

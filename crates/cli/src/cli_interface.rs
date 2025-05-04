@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 
 use crate::commands::{
-    allowlist, api_key, auth::AuthCommand, balance, config, create, keystore::KeystoreCommand,
+    allowlist, api_key, auth::AuthCommand, balance, config, keystore::KeystoreCommand,
     network::NetworkCommands, sign, tx, user,
 };
 
@@ -51,7 +51,7 @@ pub enum Commands {
         #[clap(long, short)]
         path: Option<String>,
 
-        #[arg(long)]
+        #[arg(long, short)]
         network: Option<String>,
     },
     /// Configure operations for a specific relayer
@@ -78,7 +78,18 @@ pub enum Commands {
         command: allowlist::AllowlistCommand,
     },
     /// Create a new relayer client instance
-    Create(create::CreateArgs),
+    Create {
+        #[clap(long, short)]
+        path: Option<String>,
+
+        /// Name of the relayer
+        #[arg(required = true, long)]
+        name: String,
+
+        /// Network name for the relayer
+        #[arg(required = true, long)]
+        network: String,
+    },
     /// Sign messages and transactions
     Sign {
         /// The unique identifier of the relayer

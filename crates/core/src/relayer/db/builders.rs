@@ -2,7 +2,7 @@ use tokio_postgres::Row;
 
 use crate::relayer::types::Relayer;
 
-pub fn build_relayer_from_relayer_view(row: &Row) -> Relayer {
+pub fn build_relayer(row: &Row) -> Relayer {
     Relayer {
         id: row.get("id"),
         name: row.get("name"),

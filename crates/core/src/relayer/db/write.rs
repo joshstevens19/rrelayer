@@ -30,7 +30,7 @@ impl PostgresClient {
         &self,
         name: &str,
         chain_id: &ChainId,
-        emv_provider: &EvmProvider,
+        evm_provider: &EvmProvider,
     ) -> Result<Relayer, CreateRelayerError> {
         let relayer_id = RelayerId::new();
 
@@ -52,7 +52,7 @@ impl PostgresClient {
 
         if let Some(row) = rows.first() {
             let wallet_index: i32 = row.get("wallet_index");
-            let address = emv_provider
+            let address = evm_provider
                 .get_address(wallet_index as u32)
                 .await
                 .map_err(|e| CreateRelayerError::WalletError(name.to_string(), *chain_id, e))?;
@@ -66,12 +66,12 @@ impl PostgresClient {
                 WHERE chain_id = $2
                 AND wallet_index = $3
                 ",
-                &[&address.hex(), chain_id, &wallet_index],
+                &[&address, chain_id, &wallet_index],
             )
-            .await
-            .map_err(|e| {
-                CreateRelayerError::CouldNotUpdateRelayerInfoDb(name.to_string(), *chain_id, e)
-            })?;
+                .await
+                .map_err(|e| {
+                    CreateRelayerError::CouldNotUpdateRelayerInfoDb(name.to_string(), *chain_id, e)
+                })?;
 
             let relayer = self.get_relayer(&relayer_id).await.map_err(|e| {
                 CreateRelayerError::CouldNotSaveRelayerDb(name.to_string(), *chain_id, e)

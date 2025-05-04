@@ -84,8 +84,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Allowlist { relayer_id, command } => {
             allowlist::handle_allowlist(relayer_id, command).await?;
         }
-        Commands::Create(args) => {
-            create::handle_create(args).await?;
+        Commands::Create { path, name, network } => {
+            let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;
+            load_env_from_project_path(&resolved_path);
+
+            let project_location = ProjectLocation::new(resolved_path);
+            let mut sdk = SDK::new(project_location.get_api_url()?);
+
+            create::handle_create(name, network, &project_location, &mut sdk).await?;
         }
         Commands::Sign { relayer_id, command } => {
             sign::handle_sign(relayer_id, command).await?;

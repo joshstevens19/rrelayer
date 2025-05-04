@@ -1,25 +1,36 @@
-use clap::Args;
+use rrelayerr_sdk::SDK;
 
-#[derive(Args)]
-pub struct CreateArgs {
-    /// Name of the relayer
-    #[arg(required = true)]
-    pub name: String,
+use crate::{
+    authentication::handle_authenticate,
+    commands::{keystore::ProjectLocation, network::get_chain_id_for_network},
+};
 
-    /// Network name for the relayer
-    #[arg(required = true)]
-    pub network_name: String,
-}
+pub async fn handle_create(
+    name: &str,
+    network: &str,
+    project_path: &ProjectLocation,
+    sdk: &mut SDK,
+) -> Result<(), Box<dyn std::error::Error>> {
+    handle_authenticate(sdk, "account1", project_path).await?;
 
-pub async fn handle_create(args: &CreateArgs) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Creating new relayer '{}' on network '{}'", args.name, args.network_name);
+    let setup_config = project_path.setup_config(false)?;
+    if !setup_config.networks.iter().any(|n| n.name == network) {
+        println!("Network {} does not exist", network);
+        return Ok(());
+    }
 
-    // Validate network exists
-    // TODO: Add network validation logic
+    let chain_id = get_chain_id_for_network(&network, project_path).await?;
 
-    // Create the relayer
-    // TODO: Implement relayer creation logic
+    let result = sdk.relayer.create(chain_id, name).await?;
+    
+    println!("\n✅  Relayer created successfully!");
+    println!("┌─────────────────────────────────────────────────");
+    println!("│ Name:      {}", name);
+    println!("│ ID:        {}", result.id);
+    println!("│ Network:   {} (Chain ID: {})", network, chain_id);
+    println!("│ Address:   {}", result.address);
+    println!("└─────────────────────────────────────────────────");
+    println!("\nUse 'relayer info {}' to view more details.", name);
 
-    println!("Successfully created relayer '{}'", args.name);
     Ok(())
 }

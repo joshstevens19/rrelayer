@@ -1,4 +1,4 @@
-use super::builders::build_relayer_from_relayer_view;
+use super::builders::build_relayer;
 use crate::{
     network::types::ChainId,
     postgres::{PostgresClient, PostgresError},
@@ -23,7 +23,7 @@ impl PostgresClient {
             )
             .await?;
 
-        let results: Vec<Relayer> = rows.iter().map(build_relayer_from_relayer_view).collect();
+        let results: Vec<Relayer> = rows.iter().map(build_relayer).collect();
 
         let result_count = results.len();
 
@@ -49,8 +49,8 @@ impl PostgresClient {
             )
             .await?;
 
-        let results: Vec<Relayer> = rows.iter().map(build_relayer_from_relayer_view).collect();
-
+        let results: Vec<Relayer> = rows.iter().map(build_relayer).collect();
+        
         let result_count = results.len();
 
         Ok(PagingResult::new(results, paging_context.next(result_count), paging_context.previous()))
@@ -74,7 +74,7 @@ impl PostgresClient {
 
         match row {
             None => Ok(None),
-            Some(row) => Ok(Some(build_relayer_from_relayer_view(&row))),
+            Some(row) => Ok(Some(build_relayer(&row))),
         }
     }
 

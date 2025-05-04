@@ -5,9 +5,8 @@ pub use allowlist::RelayerAllowlist;
 pub use api_keys::RelayerApiKeys;
 use rrelayerr_core::{
     common_types::{PagingContext, PagingResult},
-    network::types::ChainId,
     relayer::{
-        api::{CreateRelayerApiResult, GetRelayerResult},
+        api::{CreateRelayerResult, GetRelayerResult},
         types::{Relayer, RelayerId},
     },
 };
@@ -62,7 +61,7 @@ impl RelayerApi {
         self.client.get(&format!("relayers/{}", id)).await
     }
 
-    pub async fn create(&self, chain_id: ChainId, name: &str) -> ApiResult<CreateRelayerApiResult> {
+    pub async fn create(&self, chain_id: u64, name: &str) -> ApiResult<CreateRelayerResult> {
         self.client
             .post(
                 &format!("relayers/{}/new", chain_id.to_string()),

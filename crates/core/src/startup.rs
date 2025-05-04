@@ -1,7 +1,7 @@
 use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Instant};
 
 use axum::{
-    body::Body,
+    body::{to_bytes, Body},
     http::{HeaderValue, Request, StatusCode},
     middleware,
     middleware::Next,
@@ -81,19 +81,91 @@ async fn activity_logger(req: Request<Body>, next: Next) -> Result<Response, Sta
     let status = response.status();
     let duration = start.elapsed();
 
-    if status.is_client_error() {
-        rrelayerr_error!("{} {} responded with {} after {:?}", method, uri, status, duration);
+    if status.is_client_error() || status.is_server_error() {
+        let (parts, body) = response.into_parts();
 
-        if status == StatusCode::BAD_REQUEST {
-            rrelayerr_error!("Bad request error: URI={}, method={}", uri, method);
+        let bytes = match to_bytes(body, usize::MAX).await {
+            Ok(bytes) => bytes,
+            Err(_) => {
+                if status.is_client_error() {
+                    rrelayerr_error!(
+                        "{} {} responded with {} after {:?}",
+                        method,
+                        uri,
+                        status,
+                        duration
+                    );
+                } else {
+                    rrelayerr_error!(
+                        "{} {} responded with {} after {:?}",
+                        method,
+                        uri,
+                        status,
+                        duration
+                    );
+                }
+                return Ok(Response::builder().status(status).body(Body::empty()).unwrap());
+            }
+        };
+
+        let error_details = if !bytes.is_empty() {
+            match serde_json::from_slice::<serde_json::Value>(&bytes) {
+                Ok(json) => {
+                    if let Some(error) = json.get("error").and_then(|e| e.as_str()) {
+                        format!("Error: {}", error)
+                    } else if let Some(message) = json.get("message").and_then(|m| m.as_str()) {
+                        format!("Message: {}", message)
+                    } else {
+                        // Just grab a preview of the JSON
+                        let json_str = json.to_string();
+                        if json_str.len() > 500 {
+                            format!("Response: {}...", &json_str[0..500])
+                        } else {
+                            format!("Response: {}", json_str)
+                        }
+                    }
+                }
+                // If not JSON, try to display as string if it's UTF-8
+                Err(_) => match std::str::from_utf8(&bytes) {
+                    Ok(s) if !s.trim().is_empty() => {
+                        if s.len() > 500 {
+                            format!("Response: {}...", &s[0..500])
+                        } else {
+                            format!("Response: {}", s)
+                        }
+                    }
+                    _ => "".to_string(),
+                },
+            }
+        } else {
+            "".to_string()
+        };
+
+        let response = Response::from_parts(parts, Body::from(bytes));
+
+        if status.is_client_error() {
+            rrelayerr_error!("{} {} responded with {} after {:?}", method, uri, status, duration);
+
+            if !error_details.is_empty() {
+                rrelayerr_error!("Error details: {}", error_details);
+            }
+
+            if status == StatusCode::BAD_REQUEST {
+                rrelayerr_error!("Bad request error: URI={}, method={}", uri, method);
+            }
+        } else if status.is_server_error() {
+            rrelayerr_error!("{} {} responded with {} after {:?}", method, uri, status, duration);
+
+            if !error_details.is_empty() {
+                rrelayerr_error!("Error details: {}", error_details);
+            }
         }
-    } else if status.is_server_error() {
-        rrelayerr_error!("{} {} responded with {} after {:?}", method, uri, status, duration);
+
+        Ok(response)
     } else {
         rrelayerr_info!("{} {} responded with {} after {:?}", method, uri, status, duration);
+        Ok(response)
     }
-
-    Ok(response)
 }
 
 async fn start_api(
@@ -219,7 +291,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
                             &project_path.join("keystores").join("accounts").join(account),
                             &password,
                         )
-                        .expect("Failed to recover wallet");
+                            .expect("Failed to recover wallet");
                         let address: EvmAddress = signer.address().into();
                         admins.push((address, JwtRole::Admin))
                     }
@@ -251,7 +323,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
         providers.clone(),
         cache.clone(),
     )
-    .await?;
+        .await?;
 
     start_crons(gas_oracle_cache.clone(), blob_gas_oracle_cache.clone(), providers.clone());
 
@@ -263,7 +335,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
         providers,
         cache,
     )
-    .await?;
+        .await?;
 
     Ok(())
 }

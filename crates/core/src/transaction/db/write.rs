@@ -24,25 +24,25 @@ impl PostgresClient {
 
         for table_name in TRANSACTION_TABLES.iter() {
             trans.execute(
-            format!("
+                format!("
                 INSERT INTO {}(id, relayer_id, api_key, \"to\", \"from\", nonce, chain_id, data, value, speed, status, expires_at, queued_at)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13);
             ", table_name).as_str(),
-            &[&transaction.id,
-              &relayer_id,
-              &transaction.from_api_key,
-              &transaction.to.hex(),
-              &transaction.from.hex(),
-              &transaction.nonce,
-              &transaction.chain_id,
-              &transaction.data,
-              &transaction.value,
-              &transaction.speed.to_string(),
-              &transaction.status.to_string(),
-              &transaction.expires_at,
-              &transaction.queued_at],
-        )
-        .await?;
+                &[&transaction.id,
+                    &relayer_id,
+                    &transaction.from_api_key,
+                    &transaction.to,
+                    &transaction.from,
+                    &transaction.nonce,
+                    &transaction.chain_id,
+                    &transaction.data,
+                    &transaction.value,
+                    &transaction.speed.to_string(),
+                    &transaction.status.to_string(),
+                    &transaction.expires_at,
+                    &transaction.queued_at],
+            )
+                .await?;
         }
 
         trans.commit().await?;
@@ -81,11 +81,11 @@ impl PostgresClient {
                         ",
                         table_name
                     )
-                    .as_str(),
+                        .as_str(),
                     &[
                         &transaction_id,
                         &TransactionStatus::Inmempool.to_string(),
-                        &transaction_hash.hex(),
+                        &transaction_hash,
                         &max_priority_fee_option,
                         &max_fee_fee_option,
                         &legacy_gas_price,
@@ -118,7 +118,7 @@ impl PostgresClient {
                     &transaction.id,
                     &relayer_id,
                     &transaction.from_api_key,
-                    &transaction.to.hex(),
+                    &transaction.to,
                     &transaction.nonce,
                     &transaction.chain_id,
                     &transaction.data,
@@ -160,7 +160,7 @@ impl PostgresClient {
                         ",
                         table_name
                     )
-                    .as_str(),
+                        .as_str(),
                     &[
                         &transaction_id,
                         &TransactionStatus::Failed.to_string(),
@@ -198,7 +198,7 @@ impl PostgresClient {
                         ",
                         table_name
                     )
-                    .as_str(),
+                        .as_str(),
                     &[
                         &transaction_id,
                         &TransactionStatus::Mined.to_string(),
@@ -234,7 +234,7 @@ impl PostgresClient {
                         ",
                         table_name
                     )
-                    .as_str(),
+                        .as_str(),
                     &[&transaction_id, &TransactionStatus::Confirmed.to_string()],
                 )
                 .await?;
@@ -264,7 +264,7 @@ impl PostgresClient {
                         ",
                         table_name
                     )
-                    .as_str(),
+                        .as_str(),
                     &[&transaction_id, &TransactionStatus::Expired.to_string()],
                 )
                 .await?;
