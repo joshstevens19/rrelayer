@@ -2,7 +2,7 @@ use clap::{Parser, Subcommand};
 
 use crate::commands::{
     allowlist, api_key, auth::AuthCommand, balance, config, create, keystore::KeystoreCommand,
-    list, network::NetworkCommands, sign, start, tx, user,
+    list, network::NetworkCommands, sign, tx, user,
 };
 
 #[derive(Parser)]
@@ -34,7 +34,10 @@ pub enum Commands {
         command: KeystoreCommand,
     },
     /// Start the relayer service
-    Start(start::StartArgs),
+    Start {
+        #[clap(long, short)]
+        path: Option<String>,
+    },
     /// Manage network configurations and settings
     Network {
         #[clap(long, short)]

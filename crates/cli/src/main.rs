@@ -48,11 +48,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             load_env_from_project_path(&resolved_path);
             auth::handle_auth_command(command, resolved_path).await?;
         }
-        Commands::Start(args) => {
-            let resolved_path = resolve_path(&args.path).inspect_err(|e| print_error_message(e))?;
+        Commands::Start { path } => {
+            let resolved_path = resolve_path(&path).inspect_err(|e| print_error_message(e))?;
             load_env_from_project_path(&resolved_path);
 
-            start::handle_start(args, &resolved_path).await?;
+            start::handle_start(&resolved_path).await?;
         }
         Commands::Network { path, command } => {
             let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;

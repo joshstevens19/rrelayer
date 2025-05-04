@@ -5,17 +5,7 @@ use rrelayerr_core::{PostgresClient, rrelayerr_error, rrelayerr_info, start};
 
 use crate::console::{print_error_message, print_success_message};
 
-#[derive(Args)]
-pub struct StartArgs {
-    /// optional - To start the project from, the default will be where the command is run.
-    #[clap(long, short)]
-    pub path: Option<String>,
-}
-
-pub async fn handle_start(
-    _args: &StartArgs,
-    project_path: &PathBuf,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn handle_start(project_path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     rrelayerr_info!("Loading from path {:?}", project_path);
     let rrelayerr_yaml_path = project_path.join("rrelayerr.yaml");
     if !rrelayerr_yaml_path.exists() {
