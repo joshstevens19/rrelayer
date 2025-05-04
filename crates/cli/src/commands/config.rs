@@ -5,6 +5,20 @@ use rrelayerr_sdk::SDK;
 use crate::{authentication::handle_authenticate, commands::keystore::ProjectLocation};
 
 #[derive(Subcommand)]
+enum GasCommand {
+    /// Add an address to allowlist
+    MaxPrice {
+        /// Maximum gas price in wei
+        #[clap(required = true)]
+        cap: u128,
+    },
+    /// Enable legacy transactions gas support which will be none 1559
+    Legacy,
+    /// Enable the latest gas standard for transactions which is 1559
+    Latest,
+}
+
+#[derive(Subcommand)]
 pub enum ConfigCommand {
     /// Get detailed information about the relayer
     Get {
@@ -24,24 +38,13 @@ pub enum ConfigCommand {
         #[clap(required = true)]
         relayer_id: RelayerId,
     },
-    /// Configure EIP1559 transaction support for a relayer
-    UpdateEip1559Status {
+    Gas {
         /// The unique identifier of the relayer
         #[clap(required = true)]
         relayer_id: RelayerId,
 
-        /// Enable or disable EIP1559 support
-        #[clap(required = true)]
-        status: bool,
-    },
-    /// Set the maximum gas price limit for a relayer
-    UpdateMaxGasPrice {
-        /// The unique identifier of the relayer
-        #[clap(required = true)]
-        relayer_id: RelayerId,
-        /// Maximum gas price in wei
-        #[clap(required = true)]
-        cap: u64,
+        #[command(subcommand)]
+        command: GasCommand,
     },
 }
 
@@ -53,13 +56,20 @@ pub async fn handle_config(
     match command {
         ConfigCommand::Get { relayer_id } => handle_get(relayer_id, project_path, sdk).await,
         ConfigCommand::Pause { relayer_id } => handle_pause(relayer_id, project_path, sdk).await,
-        ConfigCommand::Unpause { relayer_id } => handle_unpause(relayer_id, project_path, sdk).await,
-        ConfigCommand::UpdateEip1559Status { relayer_id, status } => {
-            handle_update_eip1559_status(relayer_id, *status)
+        ConfigCommand::Unpause { relayer_id } => {
+            handle_unpause(relayer_id, project_path, sdk).await
         }
-        ConfigCommand::UpdateMaxGasPrice { relayer_id, cap } => {
-            handle_update_max_gas_price(relayer_id, *cap)
-        }
+        ConfigCommand::Gas { relayer_id, command } => match command {
+            GasCommand::MaxPrice { cap } => {
+                handle_update_max_gas_price(relayer_id, *cap, project_path, sdk).await
+            }
+            GasCommand::Legacy => {
+                handle_update_eip1559_status(relayer_id, false, project_path, sdk).await
+            }
+            GasCommand::Latest => {
+                handle_update_eip1559_status(relayer_id, true, project_path, sdk).await
+            }
+        },
     }
 }
 
@@ -149,20 +159,32 @@ async fn handle_unpause(
     Ok(())
 }
 
-fn handle_update_eip1559_status(
+async fn handle_update_eip1559_status(
     relayer_id: &RelayerId,
     status: bool,
+    project_path: &ProjectLocation,
+    sdk: &mut SDK,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Updating EIP1559 status for relayer {} to: {}", relayer_id, status);
-    // TODO: Implement actual EIP1559 status update logic
+    handle_authenticate(sdk, "account1", project_path).await?;
+
+    sdk.relayer.update_eip1559_status(&relayer_id, status).await?;
+
+    println!("Updated relayer {} eip1559 status to {}", relayer_id, status);
+
     Ok(())
 }
 
-fn handle_update_max_gas_price(
+async fn handle_update_max_gas_price(
     relayer_id: &RelayerId,
-    cap: u64,
+    cap: u128,
+    project_path: &ProjectLocation,
+    sdk: &mut SDK,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Updating max gas price for relayer {} to: {}", relayer_id, cap);
-    // TODO: Implement actual max gas price update logic
+    handle_authenticate(sdk, "account1", project_path).await?;
+
+    sdk.relayer.update_max_gas_price(&relayer_id, cap).await?;
+
+    println!("Updated relayer {} max gas price to {}", relayer_id, cap);
+
     Ok(())
 }

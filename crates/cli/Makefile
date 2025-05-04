@@ -52,3 +52,9 @@ config_pause:
 	cargo run -- config --path $(CURDIR)/../../playground/example pause 3c24e942-3109-4516-bd3b-6e2a904ef473
 config_unpause:
 	cargo run -- config --path $(CURDIR)/../../playground/example unpause 3c24e942-3109-4516-bd3b-6e2a904ef473
+config_gas_latest:
+	cargo run -- config --path $(CURDIR)/../../playground/example gas 3c24e942-3109-4516-bd3b-6e2a904ef473 latest
+config_gas_legacy:
+	cargo run -- config --path $(CURDIR)/../../playground/example gas 3c24e942-3109-4516-bd3b-6e2a904ef473 legacy
+config_gas_max_price:
+	cargo run -- config --path $(CURDIR)/../../playground/example gas 3c24e942-3109-4516-bd3b-6e2a904ef473 max-price 1000000

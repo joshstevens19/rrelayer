@@ -232,10 +232,16 @@ async fn update_relay_max_gas_price(
                 invalidate_relayer_cache(&state.cache, &relayer_id).await;
                 StatusCode::NO_CONTENT
             }
-            Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Err(e) => {
+                rrelayerr_error!("{}", e);
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
         },
         Ok(None) => StatusCode::NOT_FOUND,
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        Err(e) => {
+            rrelayerr_error!("{}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
     }
 }
 
