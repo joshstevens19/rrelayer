@@ -43,3 +43,6 @@ list:
 
 create:
 	cargo run -- create --path $(CURDIR)/../../playground/example --name relayer1 --network sepolia_ethereum
+
+config_get:
+	cargo run -- config --path $(CURDIR)/../../playground/example get 3c24e942-3109-4516-bd3b-6e2a904ef473

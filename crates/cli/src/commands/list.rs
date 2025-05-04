@@ -57,6 +57,7 @@ async fn log_relayers(
         let status = if relayer.paused { "Paused" } else { "Active" };
 
         rows.push(vec![
+            relayer.id.to_string(),
             relayer.name.clone(),
             relayer.chain_id.to_string(),
             relayer.address.hex(),
@@ -68,6 +69,7 @@ async fn log_relayers(
     }
 
     let headers = vec![
+        "Id",
         "Name",
         "Chain ID",
         "Address",
@@ -78,9 +80,7 @@ async fn log_relayers(
     ];
 
     let title = format!("{} Relayers:", relayers.len());
-    let footer = "Use 'relayer info <name>' to see more details about a specific relayer.";
-
-    print_table(headers, rows, Some(&title), Some(footer));
+    print_table(headers, rows, Some(&title), None);
 
     Ok(())
 }

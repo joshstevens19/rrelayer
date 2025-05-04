@@ -81,7 +81,7 @@ impl PostgresClient {
                         ",
                         table_name
                     )
-                        .as_str(),
+                    .as_str(),
                     &[
                         &transaction_id,
                         &TransactionStatus::Inmempool.to_string(),
@@ -160,7 +160,7 @@ impl PostgresClient {
                         ",
                         table_name
                     )
-                        .as_str(),
+                    .as_str(),
                     &[
                         &transaction_id,
                         &TransactionStatus::Failed.to_string(),
@@ -198,7 +198,7 @@ impl PostgresClient {
                         ",
                         table_name
                     )
-                        .as_str(),
+                    .as_str(),
                     &[
                         &transaction_id,
                         &TransactionStatus::Mined.to_string(),
@@ -234,7 +234,7 @@ impl PostgresClient {
                         ",
                         table_name
                     )
-                        .as_str(),
+                    .as_str(),
                     &[&transaction_id, &TransactionStatus::Confirmed.to_string()],
                 )
                 .await?;
@@ -264,7 +264,7 @@ impl PostgresClient {
                         ",
                         table_name
                     )
-                        .as_str(),
+                    .as_str(),
                     &[&transaction_id, &TransactionStatus::Expired.to_string()],
                 )
                 .await?;

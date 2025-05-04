@@ -50,7 +50,7 @@ impl PostgresClient {
             .await?;
 
         let results: Vec<Relayer> = rows.iter().map(build_relayer).collect();
-        
+
         let result_count = results.len();
 
         Ok(PagingResult::new(results, paging_context.next(result_count), paging_context.previous()))

@@ -22,7 +22,7 @@ pub async fn handle_create(
     let chain_id = get_chain_id_for_network(&network, project_path).await?;
 
     let result = sdk.relayer.create(chain_id, name).await?;
-    
+
     println!("\n✅  Relayer created successfully!");
     println!("┌─────────────────────────────────────────────────");
     println!("│ Name:      {}", name);

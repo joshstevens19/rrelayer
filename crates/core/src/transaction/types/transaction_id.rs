@@ -27,7 +27,7 @@ impl PartialEq for TransactionId {
 
 impl Display for TransactionId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "0x{}", self.0)
+        write!(f, "{}", self.0)
     }
 }
 

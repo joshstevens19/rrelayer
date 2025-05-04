@@ -56,8 +56,9 @@ pub enum Commands {
     },
     /// Configure operations for a specific relayer
     Config {
-        /// The unique identifier of the relayer
-        relayer_id: String,
+        #[clap(long, short)]
+        path: Option<String>,
+
         #[command(subcommand)]
         command: config::ConfigCommand,
     },
@@ -66,14 +67,14 @@ pub enum Commands {
     /// Manage API keys for relayer access
     ApiKey {
         /// The unique identifier of the relayer
-        relayer_id: String,
+        relayer: String,
         #[command(subcommand)]
         command: api_key::ApiKeyCommand,
     },
     /// Manage allowlist addresses for restricted access
     Allowlist {
         /// The unique identifier of the relayer
-        relayer_id: String,
+        relayer: String,
         #[command(subcommand)]
         command: allowlist::AllowlistCommand,
     },

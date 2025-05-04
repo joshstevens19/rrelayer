@@ -35,7 +35,7 @@ impl<'de> Deserialize<'de> for ChainId {
 
 impl Display for ChainId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "0x{}", self.0)
+        write!(f, "{}", self.0)
     }
 }
 

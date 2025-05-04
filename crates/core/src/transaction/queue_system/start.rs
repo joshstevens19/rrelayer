@@ -232,15 +232,15 @@ pub async fn startup_transactions_queues(
                         &relayer_id,
                         &TransactionStatus::Pending,
                     )
-                        .await
-                        .map_err(StartTransactionsQueuesError::RepopulateTransactionsQueueError)?,
+                    .await
+                    .map_err(StartTransactionsQueuesError::RepopulateTransactionsQueueError)?,
                     repopulate_transaction_queue(
                         &postgres,
                         &relayer_id,
                         &TransactionStatus::Inmempool,
                     )
-                        .await
-                        .map_err(StartTransactionsQueuesError::RepopulateTransactionsQueueError)?,
+                    .await
+                    .map_err(StartTransactionsQueuesError::RepopulateTransactionsQueueError)?,
                     mined_transactions
                         .into_iter()
                         .map(|transaction| (transaction.id, transaction))
@@ -257,7 +257,7 @@ pub async fn startup_transactions_queues(
             blob_gas_oracle_cache,
             cache,
         )
-            .await?,
+        .await?,
     ));
 
     spawn_processing_tasks(transactions_queues.clone()).await;

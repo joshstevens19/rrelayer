@@ -5,12 +5,10 @@ use std::{
     str::FromStr,
 };
 
-use alloy::primitives::{TxHash, B256};
+use alloy::primitives::TxHash;
 use bytes::BytesMut;
 use serde::{Deserialize, Serialize};
 use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
-
-use crate::shared::common_types::BlockHash;
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq)]
 pub struct TransactionHash(TxHash);
@@ -31,7 +29,7 @@ impl TransactionHash {
 
 impl Display for TransactionHash {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "0x{}", self.0)
+        write!(f, "{}", self.0)
     }
 }
 
