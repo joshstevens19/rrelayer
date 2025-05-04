@@ -13,28 +13,28 @@ pub enum AuthCommand {
     /// Login with a keystore account
     Login {
         /// Account name/profile to log in with
-        #[clap(long)]
+        #[clap(required = true)]
         account: String,
     },
 
     /// Logout from a keystore account
     Logout {
         /// Account name/profile to log out from
-        #[clap(long)]
+        #[clap(required = true)]
         account: String,
     },
 
     /// Create a new keystore account
     NewAccount {
         /// Account name/profile to log out from
-        #[clap(long)]
+        #[clap(required = true)]
         account: String,
     },
 
     /// Display account information (address and private key)
     Info {
         /// Account name/profile to display information for
-        #[clap(long)]
+        #[clap(required = true)]
         account: String,
     },
 

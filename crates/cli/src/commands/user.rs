@@ -17,21 +17,28 @@ pub enum UserCommand {
     List,
     /// Edit user role
     Edit {
-        #[arg(long)]
+        /// The address to edit
+        #[clap(required = true)]
         address: EvmAddress,
-        #[arg(long, value_enum)]
+
+        /// The role to assign
+        #[clap(required = true, value_enum)]
         role: CliJwtRole,
     },
     /// Add a new user
     Add {
-        #[arg(long)]
+        /// The address to add
+        #[clap(required = true)]
         address: EvmAddress,
-        #[arg(long, value_enum)]
+
+        /// The role to assign
+        #[clap(required = true, value_enum)]
         role: CliJwtRole,
     },
     /// Delete a user
     Delete {
-        #[arg(long)]
+        /// The address to delete
+        #[clap(required = true)]
         address: EvmAddress,
     },
 }

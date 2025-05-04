@@ -19,16 +19,19 @@ pub enum NetworkCommands {
     List(ListArgs),
     /// Enable network
     Enable {
-        #[arg(long)]
+        /// The network name
+        #[clap(required = true)]
         name: String,
     },
     /// Disable network
     Disable {
-        #[arg(long)]
+        /// The network name
+        #[clap(required = true)]
         name: String,
     },
     Gas {
-        #[arg(long)]
+        /// The network name
+        #[clap(required = true)]
         name: String,
     },
 }

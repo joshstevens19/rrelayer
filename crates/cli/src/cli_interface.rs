@@ -83,17 +83,18 @@ pub enum Commands {
         #[clap(long, short)]
         path: Option<String>,
 
-        /// Name of the relayer
-        #[arg(required = true, long)]
+        /// The relayer name
+        #[clap(required = true)]
         name: String,
 
-        /// Network name for the relayer
+        /// Networks to assign it to
         #[arg(required = true, long)]
         network: String,
     },
     /// Sign messages and transactions
     Sign {
         /// The unique identifier of the relayer
+        #[clap(required = true)]
         relayer_id: String,
         #[command(subcommand)]
         command: sign::SignCommand,

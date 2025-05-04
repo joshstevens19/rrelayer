@@ -9,30 +9,38 @@ pub enum ConfigCommand {
     /// Get detailed information about the relayer
     Get {
         /// The unique identifier of the relayer
+        #[clap(required = true)]
         relayer_id: RelayerId,
     },
     /// Pause operations for a specific relayer
     Pause {
         /// The unique identifier of the relayer
+        #[clap(required = true)]
         relayer_id: RelayerId,
     },
     /// Resume operations for a paused relayer
     Unpause {
         /// The unique identifier of the relayer
+        #[clap(required = true)]
         relayer_id: RelayerId,
     },
     /// Configure EIP1559 transaction support for a relayer
     UpdateEip1559Status {
         /// The unique identifier of the relayer
+        #[clap(required = true)]
         relayer_id: RelayerId,
+
         /// Enable or disable EIP1559 support
+        #[clap(required = true)]
         status: bool,
     },
     /// Set the maximum gas price limit for a relayer
     UpdateMaxGasPrice {
         /// The unique identifier of the relayer
+        #[clap(required = true)]
         relayer_id: RelayerId,
         /// Maximum gas price in wei
+        #[clap(required = true)]
         cap: u64,
     },
 }
@@ -49,7 +57,9 @@ pub async fn handle_config(
         ConfigCommand::UpdateEip1559Status { relayer_id, status } => {
             handle_update_eip1559_status(relayer_id, *status)
         }
-        ConfigCommand::UpdateMaxGasPrice { relayer_id, cap } => handle_update_max_gas_price(relayer_id, *cap),
+        ConfigCommand::UpdateMaxGasPrice { relayer_id, cap } => {
+            handle_update_max_gas_price(relayer_id, *cap)
+        }
     }
 }
 
