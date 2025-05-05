@@ -53,7 +53,7 @@ pub async fn handle_balance(
 
                     let token_symbol = match erc20.symbol().call().await {
                         Ok(result) => result._0,
-                        Err(_) => "Unknown".to_string()
+                        Err(_) => "Unknown".to_string(),
                     };
 
                     let divisor = U256::from(10).pow(U256::from(decimals));

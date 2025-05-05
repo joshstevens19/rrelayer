@@ -90,8 +90,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             balance::handle_balance(relayer, token, &project_location, &mut sdk).await?;
         }
-        Commands::ApiKey { relayer: relayer_id, command } => {
-            api_key::handle_api_key(relayer_id, command).await?;
+        Commands::ApiKey { path, command } => {
+            let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;
+            load_env_from_project_path(&resolved_path);
+
+            let project_location = ProjectLocation::new(resolved_path);
+            let mut sdk = SDK::new(project_location.get_api_url()?);
+
+            api_key::handle_api_key(command, &project_location, &mut sdk).await?;
         }
         Commands::Allowlist { relayer: relayer_id, command } => {
             allowlist::handle_allowlist(relayer_id, command).await?;

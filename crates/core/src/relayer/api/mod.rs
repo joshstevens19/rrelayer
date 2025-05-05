@@ -11,6 +11,7 @@ use axum::{
 use rand::{distributions::Alphanumeric, Rng};
 use serde::{Deserialize, Serialize};
 
+use crate::common_types::ApiKey;
 use crate::{
     app_state::AppState,
     authentication::guards::{
@@ -248,7 +249,7 @@ async fn update_relay_max_gas_price(
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateRelayerApiResult {
     #[serde(rename = "apiKey")]
-    pub api_key: String,
+    pub api_key: ApiKey,
 }
 
 async fn create_relayer_api_key(

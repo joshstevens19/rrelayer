@@ -64,3 +64,10 @@ balance:
 
 balance_token:
 	cargo run -- balance --path $(CURDIR)/../../playground/example 3c24e942-3109-4516-bd3b-6e2a904ef473 --token 0x73d219B3881E481394DA6B5008A081d623992200
+
+api_keys_create:
+	cargo run -- api-key --path $(CURDIR)/../../playground/example add 3c24e942-3109-4516-bd3b-6e2a904ef473
+api_keys_list:
+	cargo run -- api-key --path $(CURDIR)/../../playground/example list 3c24e942-3109-4516-bd3b-6e2a904ef473
+api_keys_delete:
+	cargo run -- api-key --path $(CURDIR)/../../playground/example delete 3c24e942-3109-4516-bd3b-6e2a904ef473 IwJ1VsmZSQsGl1WXnFcrnknV8B0O0WTp

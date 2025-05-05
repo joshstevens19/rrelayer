@@ -78,8 +78,9 @@ pub enum Commands {
     },
     /// Manage API keys for relayer access
     ApiKey {
-        /// The unique identifier of the relayer
-        relayer: String,
+        #[clap(long, short)]
+        path: Option<String>,
+
         #[command(subcommand)]
         command: api_key::ApiKeyCommand,
     },
