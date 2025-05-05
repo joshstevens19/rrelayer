@@ -17,6 +17,10 @@ impl GasLimit {
     pub fn new(gas_limit: u128) -> Self {
         GasLimit(gas_limit)
     }
+
+    pub fn into_inner(self) -> u128 {
+        self.0
+    }
 }
 
 impl PartialEq for GasLimit {

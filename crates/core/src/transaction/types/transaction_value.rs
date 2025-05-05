@@ -12,6 +12,10 @@ impl TransactionValue {
     pub fn zero() -> TransactionValue {
         TransactionValue(U256::from(0))
     }
+
+    pub fn into_inner(self) -> U256 {
+        self.0
+    }
 }
 
 impl Default for TransactionValue {

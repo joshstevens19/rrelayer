@@ -24,6 +24,14 @@ impl TransactionData {
     pub fn empty() -> Self {
         Self(Bytes::new())
     }
+
+    pub fn into_inner(self) -> Bytes {
+        self.0
+    }
+
+    pub fn hex(&self) -> String {
+        hex::encode(&self.0)
+    }
 }
 
 impl Default for TransactionData {

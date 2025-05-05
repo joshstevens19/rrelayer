@@ -93,7 +93,8 @@ async fn handle_sign_typed_data(
 
     let result = sdk.sign.sign_typed_data(relayer_id, &typed_data).await?;
 
-    let pretty_json = serde_json::to_string_pretty(&typed_data).unwrap_or_else(|_| "Could not format typed data".to_string());
+    let pretty_json = serde_json::to_string_pretty(&typed_data)
+        .unwrap_or_else(|_| "Could not format typed data".to_string());
 
     println!("\n┌─────────────────────────────────────────────────────────────────────");
     println!("│ TYPED DATA");

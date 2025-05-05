@@ -115,6 +115,9 @@ pub enum Commands {
     },
     /// Manage and monitor transactions
     Tx {
+        #[clap(long, short)]
+        path: Option<String>,
+
         #[command(subcommand)]
         command: tx::TxCommand,
     },

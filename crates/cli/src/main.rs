@@ -126,8 +126,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             sign::handle_sign(command, &project_location, &mut sdk).await?;
         }
-        Commands::Tx { command } => {
-            tx::handle_tx(command).await?;
+        Commands::Tx { path, command } => {
+            let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;
+            load_env_from_project_path(&resolved_path);
+
+            let project_location = ProjectLocation::new(resolved_path);
+            let mut sdk = SDK::new(project_location.get_api_url()?);
+
+            tx::handle_tx(command, &project_location, &mut sdk).await?;
         }
         Commands::User { path, command } => {
             let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;

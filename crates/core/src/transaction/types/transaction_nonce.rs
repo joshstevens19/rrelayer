@@ -17,6 +17,10 @@ impl TransactionNonce {
     pub fn new(nonce: u64) -> Self {
         TransactionNonce(nonce)
     }
+
+    pub fn into_inner(self) -> u64 {
+        self.0
+    }
 }
 
 impl Hash for TransactionNonce {
