@@ -117,8 +117,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             create::handle_create(name, network, &project_location, &mut sdk).await?;
         }
-        Commands::Sign { relayer_id, command } => {
-            sign::handle_sign(relayer_id, command).await?;
+        Commands::Sign { path, command } => {
+            let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;
+            load_env_from_project_path(&resolved_path);
+
+            let project_location = ProjectLocation::new(resolved_path);
+            let mut sdk = SDK::new(project_location.get_api_url()?);
+
+            sign::handle_sign(command, &project_location, &mut sdk).await?;
         }
         Commands::Tx { command } => {
             tx::handle_tx(command).await?;

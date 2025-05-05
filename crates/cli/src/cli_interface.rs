@@ -107,9 +107,9 @@ pub enum Commands {
     },
     /// Sign messages and transactions
     Sign {
-        /// The unique identifier of the relayer
-        #[clap(required = true)]
-        relayer_id: String,
+        #[clap(long, short)]
+        path: Option<String>,
+
         #[command(subcommand)]
         command: sign::SignCommand,
     },

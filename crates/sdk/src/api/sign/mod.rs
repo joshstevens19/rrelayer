@@ -14,7 +14,7 @@ impl SignApi {
         Self { client }
     }
 
-    pub async fn sign_text(&self, relayer_id: RelayerId, text: &str) -> ApiResult<SignTextResult> {
+    pub async fn sign_text(&self, relayer_id: &RelayerId, text: &str) -> ApiResult<SignTextResult> {
         self.client
             .post(
                 &format!("relayers/{}/sign/message", relayer_id),
@@ -25,7 +25,7 @@ impl SignApi {
 
     pub async fn sign_typed_data(
         &self,
-        relayer_id: RelayerId,
+        relayer_id: &RelayerId,
         typed_data: &alloy::dyn_abi::TypedData,
     ) -> ApiResult<SignTypedDataResult> {
         self.client.post(&format!("relayers/{}/sign/typed-data", relayer_id), typed_data).await
