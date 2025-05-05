@@ -1,4 +1,3 @@
-use alloy::primitives::Address;
 use rrelayerr_core::{
     common_types::{EvmAddress, PagingContext, PagingResult},
     relayer::types::RelayerId,
@@ -15,12 +14,12 @@ impl RelayerAllowlist {
         Self { client }
     }
 
-    pub async fn add(&self, relayer_id: &RelayerId, address: &Address) -> ApiResult<()> {
-        self.client.post(&format!("relayers/{}/allowlists/{}", relayer_id, address), &()).await
+    pub async fn add(&self, relayer_id: &RelayerId, address: &EvmAddress) -> ApiResult<()> {
+        self.client.post_status(&format!("relayers/{}/allowlists/{}", relayer_id, address.hex()), &()).await
     }
 
-    pub async fn delete(&self, relayer_id: &RelayerId, address: &Address) -> ApiResult<()> {
-        self.client.delete(&format!("relayers/{}/allowlists/{}", relayer_id, address)).await
+    pub async fn delete(&self, relayer_id: &RelayerId, address: &EvmAddress) -> ApiResult<()> {
+        self.client.delete_status(&format!("relayers/{}/allowlists/{}", relayer_id, address.hex())).await
     }
 
     pub async fn get_all(

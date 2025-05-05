@@ -47,7 +47,9 @@ pub async fn handle_api_key(
         ApiKeyCommand::List { relayer_id } => {
             handle_api_key_list(relayer_id, project_path, sdk).await
         }
-        ApiKeyCommand::Delete { relayer_id, api_key } => handle_api_key_delete(relayer_id, api_key, project_path, sdk).await,
+        ApiKeyCommand::Delete { relayer_id, api_key } => {
+            handle_api_key_delete(relayer_id, api_key, project_path, sdk).await
+        }
     }
 }
 
