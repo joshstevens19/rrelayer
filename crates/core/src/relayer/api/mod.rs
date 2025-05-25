@@ -52,47 +52,41 @@ async fn create_relayer(
     Path(chain_id): Path<ChainId>,
     Json(relayer): Json<CreateRelayerRequest>,
 ) -> Result<Json<CreateRelayerResult>, StatusCode> {
-    let provider = find_provider_for_chain_id(&state.evm_providers, &chain_id).await;
+    let provider = find_provider_for_chain_id(&state.evm_providers, &chain_id)
+        .await
+        .ok_or(StatusCode::NOT_FOUND)?;
 
-    match provider {
-        Some(provider) => {
-            let result = state.db.create_relayer(&relayer.name, &chain_id, provider).await;
+    let relayer =
+        state.db.create_relayer(&relayer.name, &chain_id, provider).await.map_err(|e| {
+            rrelayerr_error!("{}", e);
+            StatusCode::BAD_REQUEST
+        })?;
 
-            match result {
-                Ok(relayer) => {
-                    let current_nonce = provider
-                        .get_nonce(&relayer.wallet_index)
-                        .await
-                        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let current_nonce = provider
+        .get_nonce(&relayer.wallet_index)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-                    let id = relayer.id;
-                    let address = relayer.address;
-                    state
-                        .transactions_queues
-                        .lock()
-                        .await
-                        .add_new_relayer(TransactionsQueueSetup::new(
-                            relayer,
-                            provider.clone(),
-                            NonceManager::new(current_nonce),
-                            Default::default(),
-                            Default::default(),
-                            Default::default(),
-                        ))
-                        .await
-                        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let id = relayer.id;
+    let address = relayer.address;
 
-                    invalidate_relayer_cache(&state.cache, &id).await;
-                    Ok(Json(CreateRelayerResult { id, address }))
-                }
-                Err(e) => {
-                    rrelayerr_error!("{}", e);
-                    Err(StatusCode::BAD_REQUEST)
-                }
-            }
-        }
-        None => Err(StatusCode::NOT_FOUND),
-    }
+    state
+        .transactions_queues
+        .lock()
+        .await
+        .add_new_relayer(TransactionsQueueSetup::new(
+            relayer,
+            provider.clone(),
+            NonceManager::new(current_nonce),
+            Default::default(),
+            Default::default(),
+            Default::default(),
+        ))
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    invalidate_relayer_cache(&state.cache, &id).await;
+    Ok(Json(CreateRelayerResult { id, address }))
 }
 
 #[derive(Debug, Deserialize)]
@@ -147,17 +141,15 @@ async fn get_relayer_api(
         return Err(StatusCode::UNAUTHORIZED);
     }
 
-    let result = get_relayer(&state.db, &state.cache, &relayer_id).await;
-    match result {
-        Ok(Some(relayer)) => {
-            let provider =
-                find_provider_for_chain_id(&state.evm_providers, &relayer.chain_id).await;
-            let provider_urls = provider.map(|p| p.provider_urls.clone()).unwrap_or_default();
-            Ok(Json(GetRelayerResult { relayer, provider_urls }))
-        }
-        Ok(None) => Err(StatusCode::NOT_FOUND),
-        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
-    }
+    let relayer = get_relayer(&state.db, &state.cache, &relayer_id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    let provider = find_provider_for_chain_id(&state.evm_providers, &relayer.chain_id).await;
+    let provider_urls = provider.map(|p| p.provider_urls.clone()).unwrap_or_default();
+
+    Ok(Json(GetRelayerResult { relayer, provider_urls }))
 }
 
 async fn delete_relayer(
@@ -167,8 +159,7 @@ async fn delete_relayer(
     match state.db.delete_relayer(&relayer_id).await {
         Ok(_) => {
             invalidate_relayer_cache(&state.cache, &relayer_id).await;
-            state.transactions_queues.lock().await.delete_queue(&relayer_id).await;
-
+            state.transactions_queues.lock().await.delete_queue(&relayer_id);
             StatusCode::NO_CONTENT
         }
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -285,17 +276,19 @@ async fn create_relayer_api_key(
     State(state): State<Arc<AppState>>,
     Path(relayer_id): Path<RelayerId>,
 ) -> Result<Json<CreateRelayerApiResult>, StatusCode> {
-    match get_relayer(&state.db, &state.cache, &relayer_id).await {
-        Ok(Some(_)) => {
-            let new_api_key = generate_api_key();
-            match state.db.create_relayer_api_key(&relayer_id, &new_api_key).await {
-                Ok(_) => Ok(Json(CreateRelayerApiResult { api_key: new_api_key })),
-                Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
-            }
-        }
-        Ok(None) => Err(StatusCode::NOT_FOUND),
-        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
-    }
+    get_relayer(&state.db, &state.cache, &relayer_id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    let new_api_key = generate_api_key();
+    state
+        .db
+        .create_relayer_api_key(&relayer_id, &new_api_key)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(Json(CreateRelayerApiResult { api_key: new_api_key }))
 }
 
 #[derive(Debug, Deserialize)]
@@ -309,16 +302,17 @@ async fn get_relayer_api_keys(
     Path(relayer_id): Path<RelayerId>,
     Query(query): Query<GetRelayerApiKeysQuery>,
 ) -> Result<Json<PagingResult<String>>, StatusCode> {
-    match get_relayer(&state.db, &state.cache, &relayer_id).await {
-        Ok(Some(_)) => state
-            .db
-            .get_relayer_api_keys(&relayer_id, &PagingContext::new(query.limit, query.offset))
-            .await
-            .map(Json)
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR),
-        Ok(None) => Err(StatusCode::NOT_FOUND),
-        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
-    }
+    get_relayer(&state.db, &state.cache, &relayer_id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    state
+        .db
+        .get_relayer_api_keys(&relayer_id, &PagingContext::new(query.limit, query.offset))
+        .await
+        .map(Json)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -361,19 +355,20 @@ async fn get_allowlist_addresses(
         return Err(StatusCode::UNAUTHORIZED);
     }
 
-    match get_relayer(&state.db, &state.cache, &relayer_id).await {
-        Ok(Some(_)) => state
-            .db
-            .relayer_get_allowlist_addresses(
-                &relayer_id,
-                &PagingContext::new(query.limit, query.offset),
-            )
-            .await
-            .map(Json)
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR),
-        Ok(None) => Err(StatusCode::NOT_FOUND),
-        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
-    }
+    get_relayer(&state.db, &state.cache, &relayer_id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    state
+        .db
+        .relayer_get_allowlist_addresses(
+            &relayer_id,
+            &PagingContext::new(query.limit, query.offset),
+        )
+        .await
+        .map(Json)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
 }
 
 async fn add_allowlist_address(
@@ -422,20 +417,23 @@ async fn delete_allowlist_address(
     }
 
     match state.db.relayer_delete_allowlist_address(&relayer_id, &address).await {
-        Ok(_) => {
-            let relayer = state.db.get_relayer(&relayer_id).await.unwrap().unwrap(); // TODO: make safe
-            if !relayer.allowlisted_only {
-                state
-                    .transactions_queues
-                    .lock()
-                    .await
-                    .get_transactions_queue_unsafe(&relayer_id)
-                    .lock()
-                    .await
-                    .set_is_allowlisted_only(false);
+        Ok(_) => match state.db.get_relayer(&relayer_id).await {
+            Ok(Some(relayer)) => {
+                if !relayer.allowlisted_only {
+                    state
+                        .transactions_queues
+                        .lock()
+                        .await
+                        .get_transactions_queue_unsafe(&relayer_id)
+                        .lock()
+                        .await
+                        .set_is_allowlisted_only(false);
+                }
+                StatusCode::NO_CONTENT
             }
-            StatusCode::NO_CONTENT
-        }
+            Ok(None) => StatusCode::NOT_FOUND,
+            Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        },
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
     }
 }
@@ -461,7 +459,7 @@ async fn update_relay_eip1559_status(
                 .get_transactions_queue_unsafe(&relayer_id)
                 .lock()
                 .await
-                .set_is_legacy_transactions(enabled);
+                .set_is_legacy_transactions(!enabled); // Fixed: EIP-1559 enabled = NOT legacy
 
             StatusCode::NO_CONTENT
         }

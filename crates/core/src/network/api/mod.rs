@@ -27,7 +27,9 @@ async fn networks(State(state): State<Arc<AppState>>) -> Result<Json<Vec<Network
         return Ok(Json(cached_result));
     }
 
-    let networks = state.db.get_networks(NetworksFilterState::All)
+    let networks = state
+        .db
+        .get_networks(NetworksFilterState::All)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
@@ -42,7 +44,9 @@ async fn enabled_networks(
         return Ok(Json(cached_result));
     }
 
-    let enabled_networks = state.db.get_networks(NetworksFilterState::Enabled)
+    let enabled_networks = state
+        .db
+        .get_networks(NetworksFilterState::Enabled)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
@@ -57,7 +61,9 @@ async fn disabled_networks(
         return Ok(Json(cached_result));
     }
 
-    let disabled_networks = state.db.get_networks(NetworksFilterState::Disabled)
+    let disabled_networks = state
+        .db
+        .get_networks(NetworksFilterState::Disabled)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
