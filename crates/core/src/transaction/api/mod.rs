@@ -35,7 +35,7 @@ async fn get_transaction_by_id_api(
 ) -> Result<Json<Option<Transaction>>, StatusCode> {
     get_transaction_by_id(&state.cache, &state.db, id)
         .await
-        .map(|transaction| Json(transaction))
+        .map(Json)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
 }
 
@@ -51,60 +51,47 @@ async fn get_transaction_status(
     State(state): State<Arc<AppState>>,
     Path(id): Path<TransactionId>,
 ) -> Result<Json<RelayTransactionStatusResult>, StatusCode> {
-    let transaction = get_transaction_by_id(&state.cache, &state.db, id).await;
+    let transaction = get_transaction_by_id(&state.cache, &state.db, id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
 
-    match transaction {
-        Ok(Some(transaction)) => {
-            if transaction.status == TransactionStatus::Pending ||
-                transaction.status == TransactionStatus::Inmempool ||
-                transaction.status == TransactionStatus::Expired
-            {
-                return Ok(Json(RelayTransactionStatusResult {
-                    hash: transaction.known_transaction_hash,
-                    status: transaction.status,
-                    receipt: None,
-                }));
-            }
-
-            let relayer = get_relayer(&state.db, &state.cache, &transaction.relayer_id)
-                .await
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-            match relayer {
-                Some(relayer) => match transaction.known_transaction_hash {
-                    Some(hash) => {
-                        let provider =
-                            find_provider_for_chain_id(&state.evm_providers, &relayer.chain_id)
-                                .await;
-
-                        match provider {
-                            Some(provider) => {
-                                let receipt = provider
-                                    .get_receipt(&hash)
-                                    .await
-                                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-                                Ok(Json(RelayTransactionStatusResult {
-                                    hash: Some(hash),
-                                    status: transaction.status,
-                                    receipt,
-                                }))
-                            }
-                            None => Err(StatusCode::INTERNAL_SERVER_ERROR),
-                        }
-                    }
-                    None => Ok(Json(RelayTransactionStatusResult {
-                        hash: None,
-                        status: transaction.status,
-                        receipt: None,
-                    })),
-                },
-                None => Err(StatusCode::NOT_FOUND),
-            }
-        }
-        Ok(None) => Err(StatusCode::NOT_FOUND),
-        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+    // Early return for statuses that don't need receipt lookup
+    if matches!(
+        transaction.status,
+        TransactionStatus::Pending | TransactionStatus::Inmempool | TransactionStatus::Expired
+    ) {
+        return Ok(Json(RelayTransactionStatusResult {
+            hash: transaction.known_transaction_hash,
+            status: transaction.status,
+            receipt: None,
+        }));
     }
+
+    let relayer = get_relayer(&state.db, &state.cache, &transaction.relayer_id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    let hash = match transaction.known_transaction_hash {
+        Some(hash) => hash,
+        None => {
+            return Ok(Json(RelayTransactionStatusResult {
+                hash: None,
+                status: transaction.status,
+                receipt: None,
+            }));
+        }
+    };
+
+    let provider = find_provider_for_chain_id(&state.evm_providers, &relayer.chain_id)
+        .await
+        .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let receipt =
+        provider.get_receipt(&hash).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(Json(RelayTransactionStatusResult { hash: Some(hash), status: transaction.status, receipt }))
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -115,7 +102,6 @@ pub struct RelayTransactionRequest {
     #[serde(default)]
     pub data: TransactionData,
     pub speed: Option<TransactionSpeed>,
-
     #[serde(default)]
     pub blobs: Option<Vec<Blob>>,
 }
@@ -132,44 +118,39 @@ async fn send_transaction(
     headers: HeaderMap,
     Json(transaction): Json<RelayTransactionRequest>,
 ) -> Result<Json<SendTransactionResult>, StatusCode> {
-    // Check if the API key is valid for the relayer
-    // if !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await {
-    //     return Err(StatusCode::UNAUTHORIZED);
-    // }
-    //
-    // // Extract API key from headers
-    // let api_key = headers
-    //     .get("x-api-Key")
-    //     .and_then(|value| value.to_str().ok())
-    //     .ok_or(StatusCode::UNAUTHORIZED)?;
+    if !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
+    let api_key = headers
+        .get("x-api-key")
+        .and_then(|value| value.to_str().ok())
+        .ok_or(StatusCode::UNAUTHORIZED)?;
 
     let transaction_to_send = TransactionToSend::new(
         transaction.to,
-        // api_key.to_string(),
-        "hello".to_string(),
+        api_key.to_string(),
         transaction.value,
         transaction.data.clone(),
         transaction.speed.clone(),
         transaction.blobs.clone(),
     );
 
-    let result = state
+    let transaction = state
         .transactions_queues
         .lock()
         .await
         .add_transaction(&relayer_id, &transaction_to_send)
-        .await;
-
-    match result {
-        Ok(transaction) => Ok(Json(SendTransactionResult {
-            id: transaction.id,
-            hash: transaction.known_transaction_hash.expect("Transaction hash should be set"),
-        })),
-        Err(e) => {
+        .await
+        .map_err(|e| {
             rrelayerr_error!("{}", e);
-            Err(StatusCode::BAD_REQUEST)
-        }
-    }
+            StatusCode::BAD_REQUEST
+        })?;
+
+    Ok(Json(SendTransactionResult {
+        id: transaction.id,
+        hash: transaction.known_transaction_hash.expect("Transaction hash should be set"),
+    }))
 }
 
 async fn replace_transaction(
@@ -187,17 +168,15 @@ async fn replace_transaction(
         return Err(StatusCode::UNAUTHORIZED);
     }
 
-    let result = state
+    let status = state
         .transactions_queues
         .lock()
         .await
         .replace_transaction(&transaction, &replace_with)
-        .await;
+        .await
+        .map_err(|_| StatusCode::BAD_REQUEST)?;
 
-    match result {
-        Ok(status) => Ok(Json(status)),
-        Err(_) => Err(StatusCode::BAD_REQUEST),
-    }
+    Ok(Json(status))
 }
 
 async fn cancel_transaction(
@@ -214,12 +193,15 @@ async fn cancel_transaction(
         return Err(StatusCode::UNAUTHORIZED);
     }
 
-    let result = state.transactions_queues.lock().await.cancel_transaction(&transaction).await;
+    let status = state
+        .transactions_queues
+        .lock()
+        .await
+        .cancel_transaction(&transaction)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    match result {
-        Ok(status) => Ok(Json(status)),
-        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
-    }
+    Ok(Json(status))
 }
 
 // TODO! add paged caching
@@ -260,6 +242,7 @@ async fn get_transactions_pending_count(
 
     Ok(Json(count))
 }
+
 async fn get_transactions_inmempool_count(
     State(state): State<Arc<AppState>>,
     Path(relayer_id): Path<RelayerId>,
