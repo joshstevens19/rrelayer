@@ -1,9 +1,17 @@
 use std::time::SystemTime;
 
+use alloy::primitives::U256;
 use clap::Subcommand;
 use rrelayerr_core::{
+    common_types::EvmAddress,
     relayer::types::RelayerId,
-    transaction::types::{Transaction, TransactionId, TransactionStatus},
+    transaction::{
+        api::RelayTransactionRequest,
+        types::{
+            Transaction, TransactionData, TransactionId, TransactionSpeed, TransactionStatus,
+            TransactionValue,
+        },
+    },
 };
 use rrelayerr_sdk::SDK;
 
@@ -59,6 +67,38 @@ pub enum TxCommand {
         #[clap(required = true)]
         relayer_id: RelayerId,
     },
+    /// Withdraw tokens from the relayer to somewhere else
+    Withdraw {
+        /// Relayer ID
+        #[clap(required = true)]
+        relayer_id: RelayerId,
+
+        /// Destination for the funds to go to
+        #[clap(required = true)]
+        to: EvmAddress,
+
+        /// Amount to send
+        #[clap(required = true)]
+        amount: U256,
+
+        /// The token address if you want an erc20/721 balance
+        #[arg(long)]
+        token: Option<EvmAddress>,
+    },
+    /// Fund tokens from a wallet to your relayer
+    Fund {
+        /// Relayer ID
+        #[clap(required = true)]
+        relayer_id: RelayerId,
+
+        /// Amount to send
+        #[clap(required = true)]
+        amount: U256,
+
+        /// The token address if you want an erc20/721 balance
+        #[arg(long)]
+        token: Option<EvmAddress>,
+    },
 }
 
 #[derive(clap::ValueEnum, Clone)]
@@ -76,6 +116,9 @@ pub async fn handle_tx(
 ) -> Result<(), Box<dyn std::error::Error>> {
     match command {
         TxCommand::Get { tx_id } => handle_get(tx_id, project_path, sdk).await,
+        TxCommand::Withdraw { relayer_id, to, amount, token } => {
+            handle_withdraw(relayer_id, to, amount, project_path, sdk).await
+        }
         // TxCommand::Status { tx_id } => handle_status(tx_id),
         // TxCommand::List(args) => handle_list(&args.relayer_id, args.status.as_ref()),
         // TxCommand::Queue { relayer_id } => handle_queue(relayer_id),
@@ -101,6 +144,36 @@ async fn handle_get(
     } else {
         println!("Transaction {} not found.", tx_id);
     }
+    Ok(())
+}
+
+async fn handle_withdraw(
+    relayer_id: &RelayerId,
+    to: &EvmAddress,
+    amount: &U256,
+    project_path: &ProjectLocation,
+    sdk: &mut SDK,
+) -> Result<(), Box<dyn std::error::Error>> {
+    handle_authenticate(sdk, "account1", project_path).await?;
+
+    let tx = sdk
+        .transaction
+        .send_transaction(
+            relayer_id,
+            &RelayTransactionRequest {
+                to: *to,
+                value: TransactionValue::new(*amount),
+                data: TransactionData::empty(),
+                speed: Some(TransactionSpeed::Fast),
+                blobs: None,
+            },
+        )
+        .await?;
+
+    println!("Transaction sent..");
+    println!("Transaction id: {}", tx.id);
+    println!("Transaction hash: {}", tx.hash);
+
     Ok(())
 }
 
@@ -238,7 +311,7 @@ fn format_time(time: &SystemTime) -> String {
                 duration.as_secs() as i64,
                 duration.subsec_nanos(),
             )
-                .unwrap_or_default();
+            .unwrap_or_default();
             dt.format("%Y-%m-%d %H:%M:%S UTC").to_string()
         }
         Err(_) => "Invalid time".to_string(),

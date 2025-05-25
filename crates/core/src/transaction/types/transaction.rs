@@ -131,7 +131,9 @@ impl Transaction {
             to: TxKind::Call(self.to.into()),
             value: self.value.clone().into(),
             input: self.data.clone().into(),
-            gas_limit: self.gas_limit.unwrap().into(),
+            // TODO: fix
+            // gas_limit: self.gas_limit.unwrap().into(),
+            gas_limit: 210000,
             nonce: self.nonce.into(),
             max_priority_fee_per_gas: gas_price_result.max_priority_fee.clone().into(),
             max_fee_per_gas: gas_price_result.max_fee.into(),

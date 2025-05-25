@@ -37,8 +37,9 @@ impl PostgresClient {
                     &transaction.chain_id,
                     &transaction.data,
                     &transaction.value,
-                    &transaction.speed.to_string(),
-                    &transaction.status.to_string(),
+                    // &0i64,
+                    &transaction.speed,
+                    &transaction.status,
                     &transaction.expires_at,
                     &transaction.queued_at],
             )
@@ -84,7 +85,7 @@ impl PostgresClient {
                     .as_str(),
                     &[
                         &transaction_id,
-                        &TransactionStatus::Inmempool.to_string(),
+                        &TransactionStatus::Inmempool,
                         &transaction_hash,
                         &max_priority_fee_option,
                         &max_fee_fee_option,
@@ -123,8 +124,8 @@ impl PostgresClient {
                     &transaction.chain_id,
                     &transaction.data,
                     &transaction.value,
-                    &transaction.speed.to_string(),
-                    &transaction.status.to_string(),
+                    &transaction.speed,
+                    &transaction.status,
                     &transaction.expires_at,
                     &transaction.queued_at,
                     &failed_reason.chars().take(2000).collect::<String>(),
@@ -163,7 +164,7 @@ impl PostgresClient {
                     .as_str(),
                     &[
                         &transaction_id,
-                        &TransactionStatus::Failed.to_string(),
+                        &TransactionStatus::Failed,
                         &reason.chars().take(2000).collect::<String>(),
                     ],
                 )
@@ -201,7 +202,7 @@ impl PostgresClient {
                     .as_str(),
                     &[
                         &transaction_id,
-                        &TransactionStatus::Mined.to_string(),
+                        &TransactionStatus::Mined,
                         &GasLimit::from(transaction_receipt.gas_used),
                         &transaction_receipt.block_hash.map(|h| BlockHash::new(h)),
                         &transaction_receipt.block_number.map(|n| BlockNumber::new(n)),
@@ -235,7 +236,7 @@ impl PostgresClient {
                         table_name
                     )
                     .as_str(),
-                    &[&transaction_id, &TransactionStatus::Confirmed.to_string()],
+                    &[&transaction_id, &TransactionStatus::Confirmed],
                 )
                 .await?;
         }
@@ -265,7 +266,7 @@ impl PostgresClient {
                         table_name
                     )
                     .as_str(),
-                    &[&transaction_id, &TransactionStatus::Expired.to_string()],
+                    &[&transaction_id, &TransactionStatus::Expired],
                 )
                 .await?;
         }

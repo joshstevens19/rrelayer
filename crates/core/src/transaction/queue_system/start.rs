@@ -21,22 +21,22 @@ use crate::{
 
 async fn spawn_processing_tasks(transaction_queue: Arc<Mutex<TransactionsQueues>>) {
     let relay_ids: Vec<RelayerId> =
-        { transaction_queue.lock().await.queues.lock().await.keys().cloned().collect() };
+        { transaction_queue.lock().await.queues.keys().cloned().collect() };
 
     for relayer_id in relay_ids {
         let queue_clone_pending = transaction_queue.clone();
         tokio::spawn(async move {
-            continuously_process_pending_transactions(queue_clone_pending, relayer_id).await;
+            continuously_process_pending_transactions(queue_clone_pending, &relayer_id).await;
         });
 
         let queue_clone_inmempool = transaction_queue.clone();
         tokio::spawn(async move {
-            continuously_process_inmempool_transactions(queue_clone_inmempool, relayer_id).await;
+            continuously_process_inmempool_transactions(queue_clone_inmempool, &relayer_id).await;
         });
 
         let queue_clone_mined = transaction_queue.clone();
         tokio::spawn(async move {
-            continuously_process_mined_transactions(queue_clone_mined, relayer_id).await;
+            continuously_process_mined_transactions(queue_clone_mined, &relayer_id).await;
         });
     }
 }
@@ -47,12 +47,12 @@ async fn processes_next_break(process_again_after_ms: &u64) {
 
 async fn continuously_process_pending_transactions(
     queue: Arc<Mutex<TransactionsQueues>>,
-    relayer_id: RelayerId,
+    relayer_id: &RelayerId,
 ) {
     loop {
         let result = {
             let mut tq = queue.lock().await;
-            tq.process_single_pending(&relayer_id).await
+            tq.process_single_pending(relayer_id).await
         };
 
         match result {
@@ -67,12 +67,12 @@ async fn continuously_process_pending_transactions(
 
 async fn continuously_process_inmempool_transactions(
     queue: Arc<Mutex<TransactionsQueues>>,
-    relayer_id: RelayerId,
+    relayer_id: &RelayerId,
 ) {
     loop {
         let result = {
             let mut tq = queue.lock().await;
-            tq.process_single_inmempool(&relayer_id).await
+            tq.process_single_inmempool(relayer_id).await
         };
 
         match result {
@@ -87,14 +87,14 @@ async fn continuously_process_inmempool_transactions(
 
 async fn continuously_process_mined_transactions(
     queue: Arc<Mutex<TransactionsQueues>>,
-    relayer_id: RelayerId,
+    relayer_id: &RelayerId,
 ) {
     loop {
         let result = {
             // Lock the mutex to get a reference to the TransactionQueue
             let mut tq = queue.lock().await;
             // Call process_single_mined on the TransactionQueue reference
-            tq.process_single_mined(&relayer_id).await
+            tq.process_single_mined(relayer_id).await
         };
 
         match result {

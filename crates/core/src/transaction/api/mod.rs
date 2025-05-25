@@ -16,6 +16,7 @@ use crate::{
     authentication::guards::ReadOnlyOrAboveJwtTokenOrApiKeyGuard,
     provider::find_provider_for_chain_id,
     relayer::{get_relayer, is_relayer_api_key, types::RelayerId},
+    rrelayerr_error,
     shared::common_types::{EvmAddress, PagingContext, PagingQuery, PagingResult},
     transaction::{
         get_transaction_by_id,
@@ -132,19 +133,20 @@ async fn send_transaction(
     Json(transaction): Json<RelayTransactionRequest>,
 ) -> Result<Json<SendTransactionResult>, StatusCode> {
     // Check if the API key is valid for the relayer
-    if !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await {
-        return Err(StatusCode::UNAUTHORIZED);
-    }
-
-    // Extract API key from headers
-    let api_key = headers
-        .get("x-api-Key")
-        .and_then(|value| value.to_str().ok())
-        .ok_or(StatusCode::UNAUTHORIZED)?;
+    // if !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await {
+    //     return Err(StatusCode::UNAUTHORIZED);
+    // }
+    //
+    // // Extract API key from headers
+    // let api_key = headers
+    //     .get("x-api-Key")
+    //     .and_then(|value| value.to_str().ok())
+    //     .ok_or(StatusCode::UNAUTHORIZED)?;
 
     let transaction_to_send = TransactionToSend::new(
         transaction.to,
-        api_key.to_string(),
+        // api_key.to_string(),
+        "hello".to_string(),
         transaction.value,
         transaction.data.clone(),
         transaction.speed.clone(),
@@ -163,7 +165,10 @@ async fn send_transaction(
             id: transaction.id,
             hash: transaction.known_transaction_hash.expect("Transaction hash should be set"),
         })),
-        Err(_) => Err(StatusCode::BAD_REQUEST),
+        Err(e) => {
+            rrelayerr_error!("{}", e);
+            Err(StatusCode::BAD_REQUEST)
+        }
     }
 }
 

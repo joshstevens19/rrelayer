@@ -22,7 +22,7 @@ use crate::{
         blob_gas_oracle::{BlobGasOracleCache, BlobGasPriceResult, BLOB_GAS_PER_BLOB},
         fee_estimator::base::GasPriceResult,
         gas_oracle::GasOracleCache,
-        types::GasLimit,
+        types::{GasLimit, GasPrice},
     },
     network::types::ChainId,
     postgres::PostgresClient,
@@ -250,12 +250,36 @@ impl TransactionsQueue {
         !self.relayer.eip_1559_enabled
     }
 
+    pub fn set_is_legacy_transactions(&mut self, is_legacy_transactions: bool) {
+        self.relayer.eip_1559_enabled = is_legacy_transactions;
+    }
+
     pub fn is_allowlisted_only(&self) -> bool {
-        self.relayer.allowlisted_only
+        self.relayer.allowlisted_only // TODO: needs to be dynamic
+    }
+
+    pub fn set_is_allowlisted_only(&mut self, is_allowlisted_only: bool) {
+        self.relayer.allowlisted_only = is_allowlisted_only;
     }
 
     pub fn is_paused(&self) -> bool {
-        self.relayer.paused
+        self.relayer.paused // TODO: needs to be dynamic
+    }
+
+    pub fn set_is_paused(&mut self, is_paused: bool) {
+        self.relayer.paused = is_paused;
+    }
+
+    pub fn set_name(&mut self, name: &str) {
+        self.relayer.name = name.to_string();
+    }
+
+    pub fn max_gas_price(&self) -> Option<GasPrice> {
+        self.relayer.max_gas_price
+    }
+
+    pub fn set_max_gas_price(&mut self, max_gas_price: Option<GasPrice>) {
+        self.relayer.max_gas_price = max_gas_price;
     }
 
     pub fn chain_id(&self) -> ChainId {
@@ -263,7 +287,7 @@ impl TransactionsQueue {
     }
 
     fn within_gas_price_bounds(&self, gas: &GasPriceResult) -> bool {
-        if let Some(max) = &self.relayer.max_gas_price {
+        if let Some(max) = &self.max_gas_price() {
             if self.relayer.eip_1559_enabled {
                 return max.into_u128() >= gas.max_fee.into_u128();
             }
@@ -293,20 +317,6 @@ impl TransactionsQueue {
             .get_gas_price_for_speed(&self.relayer.chain_id, transaction_speed)
             .await
             .ok_or(SendTransactionGasPriceError::GasCalculationError)?;
-
-        if let Some(sent_gas) = sent_last_with {
-            // Check if the oracle's max fee is lower than the transaction's max fee
-            if gas_price.max_fee < sent_gas.max_fee {
-                // If so, set the gas price's max fee to 10% higher than the transaction's max fee
-                gas_price.max_fee = sent_gas.max_fee + (sent_gas.max_fee / 10);
-            }
-
-            // Similarly, check and adjust the max priority fee
-            if gas_price.max_priority_fee < sent_gas.max_priority_fee {
-                gas_price.max_priority_fee =
-                    sent_gas.max_priority_fee + (sent_gas.max_priority_fee / 10);
-            }
-        }
 
         if let Some(sent_gas) = sent_last_with {
             // Check if the oracle's max fee is lower than the transaction's max fee

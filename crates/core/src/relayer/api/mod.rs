@@ -11,13 +11,13 @@ use axum::{
 use rand::{distributions::Alphanumeric, Rng};
 use serde::{Deserialize, Serialize};
 
-use crate::common_types::ApiKey;
 use crate::{
     app_state::AppState,
     authentication::guards::{
         admin_jwt_guard, integrator_or_above_jwt_guard, read_only_or_above_jwt_guard,
         ManagerOrAboveJwtTokenOrApiKeyGuard, ReadOnlyOrAboveJwtTokenOrApiKeyGuard,
     },
+    common_types::ApiKey,
     gas::types::GasPrice,
     network::types::ChainId,
     provider::{chain_enabled, find_provider_for_chain_id},
@@ -167,6 +167,8 @@ async fn delete_relayer(
     match state.db.delete_relayer(&relayer_id).await {
         Ok(_) => {
             invalidate_relayer_cache(&state.cache, &relayer_id).await;
+            state.transactions_queues.lock().await.delete_queue(&relayer_id).await;
+
             StatusCode::NO_CONTENT
         }
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -188,6 +190,15 @@ async fn pause_relayer(
     match state.db.pause_relayer(&relayer_id).await {
         Ok(_) => {
             invalidate_relayer_cache(&state.cache, &relayer_id).await;
+            state
+                .transactions_queues
+                .lock()
+                .await
+                .get_transactions_queue_unsafe(&relayer_id)
+                .lock()
+                .await
+                .set_is_paused(true);
+
             StatusCode::NO_CONTENT
         }
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -209,6 +220,15 @@ async fn unpause_relayer(
     match state.db.unpause_relayer(&relayer_id).await {
         Ok(_) => {
             invalidate_relayer_cache(&state.cache, &relayer_id).await;
+            state
+                .transactions_queues
+                .lock()
+                .await
+                .get_transactions_queue_unsafe(&relayer_id)
+                .lock()
+                .await
+                .set_is_paused(false);
+
             StatusCode::NO_CONTENT
         }
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -231,6 +251,15 @@ async fn update_relay_max_gas_price(
         Ok(Some(_)) => match state.db.update_relayer_max_gas_price(&relayer_id, cap).await {
             Ok(_) => {
                 invalidate_relayer_cache(&state.cache, &relayer_id).await;
+                state
+                    .transactions_queues
+                    .lock()
+                    .await
+                    .get_transactions_queue_unsafe(&relayer_id)
+                    .lock()
+                    .await
+                    .set_max_gas_price(cap);
+
                 StatusCode::NO_CONTENT
             }
             Err(e) => {
@@ -361,7 +390,18 @@ async fn add_allowlist_address(
 
     match get_relayer(&state.db, &state.cache, &relayer_id).await {
         Ok(Some(_)) => match state.db.relayer_add_allowlist_address(&relayer_id, &address).await {
-            Ok(_) => StatusCode::NO_CONTENT,
+            Ok(_) => {
+                state
+                    .transactions_queues
+                    .lock()
+                    .await
+                    .get_transactions_queue_unsafe(&relayer_id)
+                    .lock()
+                    .await
+                    .set_is_allowlisted_only(true);
+
+                StatusCode::NO_CONTENT
+            }
             Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
         },
         Ok(None) => StatusCode::NOT_FOUND,
@@ -382,7 +422,20 @@ async fn delete_allowlist_address(
     }
 
     match state.db.relayer_delete_allowlist_address(&relayer_id, &address).await {
-        Ok(_) => StatusCode::NO_CONTENT,
+        Ok(_) => {
+            let relayer = state.db.get_relayer(&relayer_id).await.unwrap().unwrap(); // TODO: make safe
+            if !relayer.allowlisted_only {
+                state
+                    .transactions_queues
+                    .lock()
+                    .await
+                    .get_transactions_queue_unsafe(&relayer_id)
+                    .lock()
+                    .await
+                    .set_is_allowlisted_only(false);
+            }
+            StatusCode::NO_CONTENT
+        }
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
     }
 }
@@ -400,7 +453,18 @@ async fn update_relay_eip1559_status(
     }
 
     match state.db.update_relayer_eip_1559_status(&relayer_id, &enabled).await {
-        Ok(_) => StatusCode::NO_CONTENT,
+        Ok(_) => {
+            state
+                .transactions_queues
+                .lock()
+                .await
+                .get_transactions_queue_unsafe(&relayer_id)
+                .lock()
+                .await
+                .set_is_legacy_transactions(enabled);
+
+            StatusCode::NO_CONTENT
+        }
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
     }
 }

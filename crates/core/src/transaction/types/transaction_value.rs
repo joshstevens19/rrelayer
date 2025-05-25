@@ -16,6 +16,10 @@ impl TransactionValue {
     pub fn into_inner(self) -> U256 {
         self.0
     }
+
+    pub fn new(value: U256) -> Self {
+        TransactionValue(value)
+    }
 }
 
 impl Default for TransactionValue {
@@ -46,13 +50,11 @@ impl<'a> FromSql<'a> for TransactionValue {
 impl ToSql for TransactionValue {
     fn to_sql(
         &self,
-        _ty: &Type,
+        ty: &Type,
         out: &mut BytesMut,
     ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
         let value_as_string = self.0.to_string();
-
-        out.extend_from_slice(value_as_string.as_bytes());
-        Ok(IsNull::No)
+        value_as_string.to_sql(ty, out)
     }
 
     fn accepts(ty: &Type) -> bool {

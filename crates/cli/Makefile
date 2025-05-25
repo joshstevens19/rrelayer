@@ -86,3 +86,5 @@ sign_typed_data:
 
 tx_get:
 	cargo run -- tx --path $(CURDIR)/../../playground/example get 3c24e942-3109-4516-bd3b-6e2a904ef473
+tx_withdraw:
+	cargo run -- tx --path $(CURDIR)/../../playground/example withdraw 3c24e942-3109-4516-bd3b-6e2a904ef473 0x10AE77B225626C1341bae10C4e6528D5520E1E33 10000000
