@@ -27,13 +27,12 @@ async fn networks(State(state): State<Arc<AppState>>) -> Result<Json<Vec<Network
         return Ok(Json(cached_result));
     }
 
-    match state.db.get_networks(NetworksFilterState::All).await {
-        Ok(networks) => {
-            set_networks_cache(&state.cache, &networks).await;
-            Ok(Json(networks))
-        }
-        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
-    }
+    let networks = state.db.get_networks(NetworksFilterState::All)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    set_networks_cache(&state.cache, &networks).await;
+    Ok(Json(networks))
 }
 
 async fn enabled_networks(
@@ -43,13 +42,12 @@ async fn enabled_networks(
         return Ok(Json(cached_result));
     }
 
-    match state.db.get_networks(NetworksFilterState::Enabled).await {
-        Ok(enabled_networks) => {
-            set_enabled_networks_cache(&state.cache, &enabled_networks).await;
-            Ok(Json(enabled_networks))
-        }
-        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
-    }
+    let enabled_networks = state.db.get_networks(NetworksFilterState::Enabled)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    set_enabled_networks_cache(&state.cache, &enabled_networks).await;
+    Ok(Json(enabled_networks))
 }
 
 async fn disabled_networks(
@@ -59,13 +57,12 @@ async fn disabled_networks(
         return Ok(Json(cached_result));
     }
 
-    match state.db.get_networks(NetworksFilterState::Disabled).await {
-        Ok(disabled_networks) => {
-            set_disabled_networks_cache(&state.cache, &disabled_networks).await;
-            Ok(Json(disabled_networks))
-        }
-        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
-    }
+    let disabled_networks = state.db.get_networks(NetworksFilterState::Disabled)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    set_disabled_networks_cache(&state.cache, &disabled_networks).await;
+    Ok(Json(disabled_networks))
 }
 
 async fn disable_network(
