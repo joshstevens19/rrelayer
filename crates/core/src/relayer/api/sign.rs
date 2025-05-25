@@ -23,7 +23,6 @@ pub struct SignTextDto {
 pub struct SignTextResult {
     #[serde(rename = "messageSigned")]
     pub message_signed: String,
-
     pub signature: PrimitiveSignature,
 }
 
@@ -33,28 +32,23 @@ async fn sign_text(
     Path(relayer_id): Path<RelayerId>,
     Json(sign): Json<SignTextDto>,
 ) -> Result<Json<SignTextResult>, StatusCode> {
-    let result = get_relayer_provider_context_by_relayer_id(
+    let relayer_provider_context = get_relayer_provider_context_by_relayer_id(
         &state.db,
         &state.cache,
         &state.evm_providers,
         &relayer_id,
     )
-    .await;
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+    .ok_or(StatusCode::NOT_FOUND)?;
 
-    match result {
-        Ok(Some(relayer_provider_context)) => {
-            match relayer_provider_context
-                .provider
-                .sign_text(&relayer_provider_context.relayer.wallet_index, &sign.text)
-                .await
-            {
-                Ok(signature) => Ok(Json(SignTextResult { message_signed: sign.text, signature })),
-                Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
-            }
-        }
-        Ok(None) => Err(StatusCode::NOT_FOUND),
-        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
-    }
+    let signature = relayer_provider_context
+        .provider
+        .sign_text(&relayer_provider_context.relayer.wallet_index, &sign.text)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(Json(SignTextResult { message_signed: sign.text, signature }))
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -68,29 +62,25 @@ async fn sign_typed_data(
     Path(relayer_id): Path<RelayerId>,
     Json(typed_data): Json<TypedData>,
 ) -> Result<Json<SignTypedDataResult>, StatusCode> {
-    let result = get_relayer_provider_context_by_relayer_id(
+    let relayer_provider_context = get_relayer_provider_context_by_relayer_id(
         &state.db,
         &state.cache,
         &state.evm_providers,
         &relayer_id,
     )
-    .await;
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+    .ok_or(StatusCode::NOT_FOUND)?;
 
-    match result {
-        Ok(Some(relayer_provider_context)) => {
-            match relayer_provider_context
-                .provider
-                .sign_typed_data(&relayer_provider_context.relayer.wallet_index, &typed_data)
-                .await
-            {
-                Ok(signature) => Ok(Json(SignTypedDataResult { signature })),
-                Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
-            }
-        }
-        Ok(None) => Err(StatusCode::NOT_FOUND),
-        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
-    }
+    let signature = relayer_provider_context
+        .provider
+        .sign_typed_data(&relayer_provider_context.relayer.wallet_index, &typed_data)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(Json(SignTypedDataResult { signature }))
 }
+
 pub fn create_sign_routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/:relayer_id/sign/message", post(sign_text))
