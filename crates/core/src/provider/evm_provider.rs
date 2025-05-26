@@ -224,7 +224,7 @@ impl EvmProvider {
             .block_id(BlockId::Number(BlockNumberOrTag::Pending))
             .await
             .map_err(WalletOrProviderError::ProviderError)?;
-
+        
         Ok(TransactionNonce::new(nonce))
     }
 

@@ -232,7 +232,7 @@ impl TransactionsQueues {
                 value: transaction_to_send.value,
                 data: transaction_to_send.data.clone(),
                 // TODO: need to handle the edge case of this failing and keeping the nonce
-                nonce: transactions_queue.nonce_manager.next(),
+                nonce: transactions_queue.nonce_manager.current(),
                 gas_limit: None,
                 status: TransactionStatus::Pending,
                 blobs: transaction_to_send.blobs.clone(),

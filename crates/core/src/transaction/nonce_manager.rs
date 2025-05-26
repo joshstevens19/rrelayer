@@ -20,8 +20,4 @@ impl NonceManager {
     pub fn current(&self) -> TransactionNonce {
         self.nonce
     }
-
-    pub fn next(&self) -> TransactionNonce {
-        self.nonce + 1
-    }
 }

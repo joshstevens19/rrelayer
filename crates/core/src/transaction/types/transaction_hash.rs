@@ -5,11 +5,12 @@ use std::{
     str::FromStr,
 };
 
-use crate::postgres::PgType;
 use alloy::primitives::TxHash;
 use bytes::BytesMut;
 use serde::{Deserialize, Serialize};
 use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
+
+use crate::postgres::PgType;
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq)]
 pub struct TransactionHash(TxHash);

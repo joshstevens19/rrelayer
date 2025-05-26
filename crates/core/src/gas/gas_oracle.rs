@@ -38,7 +38,7 @@ impl GasOracleCache {
         speed: &TransactionSpeed,
     ) -> Option<GasPriceResult> {
         let gas_prices = self.get_gas_price(chain_id).await?;
-        
+
         match speed {
             TransactionSpeed::Super => Some(gas_prices.super_fast),
             TransactionSpeed::Fast => Some(gas_prices.fast),
