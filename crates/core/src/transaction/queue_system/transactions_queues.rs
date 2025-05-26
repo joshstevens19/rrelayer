@@ -231,7 +231,8 @@ impl TransactionsQueues {
                 from: transactions_queue.relay_address(),
                 value: transaction_to_send.value,
                 data: transaction_to_send.data.clone(),
-                nonce: transactions_queue.nonce_manager.current(),
+                // TODO: need to handle the edge case of this failing and keeping the nonce
+                nonce: transactions_queue.nonce_manager.next(),
                 gas_limit: None,
                 status: TransactionStatus::Pending,
                 blobs: transaction_to_send.blobs.clone(),
@@ -430,8 +431,8 @@ impl TransactionsQueues {
                             .move_pending_to_inmempool(&transaction_sent)
                             .await
                             .map_err(
-                            ProcessPendingTransactionError::MovePendingTransactionToInmempoolError,
-                        )?;
+                                ProcessPendingTransactionError::MovePendingTransactionToInmempoolError,
+                            )?;
                         self.invalidate_transaction_cache(&transaction.id).await;
                     }
                     Err(e) => {

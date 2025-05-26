@@ -60,9 +60,11 @@ impl Div<u32> for MaxPriorityFee {
 }
 
 impl<'a> FromSql<'a> for MaxPriorityFee {
-    fn from_sql(_ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
-        let s = str::from_utf8(raw)?;
-        let value = s.parse::<u128>()?;
+    fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
+        let decimal = rust_decimal::Decimal::from_sql(ty, raw)?;
+        let value_str = decimal.to_string();
+        let value = u128::from_str(&value_str)
+            .map_err(|e| format!("Failed to convert decimal to u128: {}", e))?;
         Ok(MaxPriorityFee(value))
     }
 
@@ -77,8 +79,10 @@ impl ToSql for MaxPriorityFee {
         ty: &Type,
         out: &mut BytesMut,
     ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
-        let value_str = self.0.to_string();
-        value_str.to_sql(ty, out)
+        match rust_decimal::Decimal::from_str(&self.0.to_string()) {
+            Ok(decimal) => decimal.to_sql(ty, out),
+            Err(e) => Err(format!("Failed to convert to decimal: {}", e).into()),
+        }
     }
 
     fn accepts(ty: &Type) -> bool {

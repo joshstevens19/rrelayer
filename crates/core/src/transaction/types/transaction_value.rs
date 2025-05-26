@@ -35,11 +35,13 @@ impl PartialEq for TransactionValue {
 }
 
 impl<'a> FromSql<'a> for TransactionValue {
-    fn from_sql(_ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
-        let mut bytes = [0u8; 32];
-        bytes.copy_from_slice(raw);
-        let transaction_value = U256::from_be_bytes(bytes);
-        Ok(TransactionValue(transaction_value))
+    fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
+        let decimal = rust_decimal::Decimal::from_sql(ty, raw)?;
+        let value_str = decimal.to_string();
+
+        let u256_value = U256::from_str(&value_str)
+            .map_err(|e| format!("Failed to convert decimal to U256: {}", e))?;
+        Ok(TransactionValue(u256_value))
     }
 
     fn accepts(ty: &Type) -> bool {
@@ -53,8 +55,10 @@ impl ToSql for TransactionValue {
         ty: &Type,
         out: &mut BytesMut,
     ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
-        let value_as_string = self.0.to_string();
-        value_as_string.to_sql(ty, out)
+        match rust_decimal::Decimal::from_str(&self.0.to_string()) {
+            Ok(decimal) => decimal.to_sql(ty, out),
+            Err(e) => Err(format!("Failed to convert to decimal: {}", e).into()),
+        }
     }
 
     fn accepts(ty: &Type) -> bool {

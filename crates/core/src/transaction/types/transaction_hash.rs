@@ -5,6 +5,7 @@ use std::{
     str::FromStr,
 };
 
+use crate::postgres::PgType;
 use alloy::primitives::TxHash;
 use bytes::BytesMut;
 use serde::{Deserialize, Serialize};
@@ -47,6 +48,10 @@ impl PartialEq for TransactionHash {
 
 impl<'a> FromSql<'a> for TransactionHash {
     fn from_sql(_ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
+        if raw.len() != 32 {
+            return Err("Invalid byte length for transaction hash".into());
+        }
+
         let tx_hash = TxHash::from_slice(raw);
 
         Ok(TransactionHash(tx_hash))
@@ -60,12 +65,10 @@ impl<'a> FromSql<'a> for TransactionHash {
 impl ToSql for TransactionHash {
     fn to_sql(
         &self,
-        _ty: &Type,
+        _ty: &PgType,
         out: &mut BytesMut,
     ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
-        let value_as_string = self.0.to_string();
-
-        out.extend_from_slice(value_as_string.as_bytes());
+        out.extend_from_slice(self.0.as_slice());
         Ok(IsNull::No)
     }
 

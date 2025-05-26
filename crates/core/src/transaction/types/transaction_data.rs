@@ -68,7 +68,7 @@ impl<'a> FromSql<'a> for TransactionData {
     }
 
     fn accepts(ty: &Type) -> bool {
-        *ty == Type::TEXT || *ty == Type::CHAR || *ty == Type::VARCHAR || *ty == Type::BPCHAR
+        *ty == Type::BYTEA
     }
 }
 

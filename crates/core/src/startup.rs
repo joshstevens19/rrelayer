@@ -44,14 +44,19 @@ use crate::{
     AdminIdentifier,
 };
 
-fn start_crons(
+async fn start_crons(
     gas_oracle_cache: Arc<Mutex<GasOracleCache>>,
     blob_gas_oracle_cache: Arc<Mutex<BlobGasOracleCache>>,
     providers: Arc<Vec<EvmProvider>>,
 ) {
     info!("Running cron task...");
-    tokio::spawn(gas_oracle(Arc::clone(&providers), gas_oracle_cache));
-    tokio::spawn(blob_gas_oracle(providers, blob_gas_oracle_cache));
+
+    let gas_oracle_task = gas_oracle(Arc::clone(&providers), gas_oracle_cache);
+    let blob_gas_oracle_task = blob_gas_oracle(providers, blob_gas_oracle_cache);
+
+    tokio::join!(gas_oracle_task, blob_gas_oracle_task);
+
+    info!("All oracle crons initialized and running");
 }
 
 #[derive(Error, Debug)]
@@ -317,6 +322,8 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
     let gas_oracle_cache = Arc::new(Mutex::new(GasOracleCache::new()));
     let blob_gas_oracle_cache = Arc::new(Mutex::new(BlobGasOracleCache::new()));
 
+    start_crons(gas_oracle_cache.clone(), blob_gas_oracle_cache.clone(), providers.clone()).await;
+
     let transaction_queue = startup_transactions_queues(
         gas_oracle_cache.clone(),
         blob_gas_oracle_cache.clone(),
@@ -324,8 +331,6 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
         cache.clone(),
     )
     .await?;
-
-    start_crons(gas_oracle_cache.clone(), blob_gas_oracle_cache.clone(), providers.clone());
 
     start_api(
         config.api_config,

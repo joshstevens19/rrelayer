@@ -37,7 +37,6 @@ impl PostgresClient {
                     &transaction.chain_id,
                     &transaction.data,
                     &transaction.value,
-                    // &0i64,
                     &transaction.speed,
                     &transaction.status,
                     &transaction.expires_at,

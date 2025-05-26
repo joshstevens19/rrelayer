@@ -7,7 +7,10 @@ use tokio::{
 };
 use tracing::info;
 
-use crate::{network::types::ChainId, provider::EvmProvider, transaction::types::TransactionSpeed};
+use crate::{
+    network::types::ChainId, provider::EvmProvider, rrelayerr_error,
+    transaction::types::TransactionSpeed,
+};
 
 /// Result structure for blob gas estimates
 #[derive(Clone, Debug)]
@@ -83,20 +86,54 @@ pub async fn blob_gas_oracle(
     providers: Arc<Vec<EvmProvider>>,
     blob_gas_oracle_cache: Arc<Mutex<BlobGasOracleCache>>,
 ) {
+    let mut initial_tasks = Vec::new();
+
     for provider in providers.iter() {
         if !provider.supports_blob_transactions() {
             continue;
         }
 
-        info!("Running blob_gas_oracle cron for provider: {}", provider.name);
+        info!("Getting initial blob gas price for provider: {}", provider.name);
+        let cache = Arc::clone(&blob_gas_oracle_cache);
+        let provider = provider.clone();
+
+        let task = tokio::spawn(async move {
+            let blob_gas_price_result = provider.calculate_ethereum_blob_gas_price().await;
+            if let Ok(blob_gas_price) = blob_gas_price_result {
+                cache.lock().await.update_blob_gas_price(provider.chain_id, blob_gas_price).await;
+            } else {
+                rrelayerr_error!(
+                    "Failed to get initial blob gas price for provider: {} - error {:?}",
+                    provider.name,
+                    blob_gas_price_result
+                );
+            }
+        });
+
+        initial_tasks.push(task);
+    }
+
+    for task in initial_tasks {
+        let _ = task.await;
+    }
+
+    info!("Initial blob gas price collection completed for all blob-supporting providers");
+
+    for provider in providers.iter() {
+        if !provider.supports_blob_transactions() {
+            continue;
+        }
+
+        info!("Starting blob_gas_oracle interval for provider: {}", provider.name);
         let cache = Arc::clone(&blob_gas_oracle_cache);
         let provider = Arc::new(provider.clone());
 
         tokio::spawn(async move {
             let mut interval = time::interval(Duration::from_secs(20));
             loop {
-                let blob_gas_price_result = provider.calculate_ethereum_blob_gas_price().await;
+                interval.tick().await;
 
+                let blob_gas_price_result = provider.calculate_ethereum_blob_gas_price().await;
                 if let Ok(blob_gas_price) = blob_gas_price_result {
                     cache
                         .lock()
@@ -104,8 +141,6 @@ pub async fn blob_gas_oracle(
                         .update_blob_gas_price(provider.chain_id, blob_gas_price)
                         .await;
                 }
-
-                interval.tick().await;
             }
         });
     }

@@ -221,6 +221,7 @@ impl EvmProvider {
         let nonce = self
             .rpc_client()
             .get_transaction_count(wallet.address())
+            .block_id(BlockId::Number(BlockNumberOrTag::Pending))
             .await
             .map_err(WalletOrProviderError::ProviderError)?;
 

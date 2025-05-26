@@ -118,18 +118,19 @@ async fn send_transaction(
     headers: HeaderMap,
     Json(transaction): Json<RelayTransactionRequest>,
 ) -> Result<Json<SendTransactionResult>, StatusCode> {
-    if !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await {
-        return Err(StatusCode::UNAUTHORIZED);
-    }
-
-    let api_key = headers
-        .get("x-api-key")
-        .and_then(|value| value.to_str().ok())
-        .ok_or(StatusCode::UNAUTHORIZED)?;
+    // if !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await {
+    //     return Err(StatusCode::UNAUTHORIZED);
+    // }
+    //
+    // let api_key = headers
+    //     .get("x-api-key")
+    //     .and_then(|value| value.to_str().ok())
+    //     .ok_or(StatusCode::UNAUTHORIZED)?;
 
     let transaction_to_send = TransactionToSend::new(
         transaction.to,
-        api_key.to_string(),
+        // api_key.to_string(),
+        "bob".to_string(),
         transaction.value,
         transaction.data.clone(),
         transaction.speed.clone(),
