@@ -46,10 +46,10 @@ impl<'a> FromSql<'a> for JwtRole {
                 "INTEGRATOR" => Ok(JwtRole::Integrator),
                 _ => Err(format!("Unknown JwtRole: {}", role).into()),
             }
-        } else if *ty == Type::TEXT ||
-            *ty == Type::CHAR ||
-            *ty == Type::VARCHAR ||
-            *ty == Type::BPCHAR
+        } else if *ty == Type::TEXT
+            || *ty == Type::CHAR
+            || *ty == Type::VARCHAR
+            || *ty == Type::BPCHAR
         {
             let role = from_utf8(raw).map_err(|err| format!("Invalid UTF-8 sequence: {}", err))?;
 
@@ -66,8 +66,8 @@ impl<'a> FromSql<'a> for JwtRole {
     }
 
     fn accepts(ty: &Type) -> bool {
-        (*ty == Type::TEXT || *ty == Type::CHAR || *ty == Type::VARCHAR || *ty == Type::BPCHAR) ||
-            (ty.name() == "user_role")
+        (*ty == Type::TEXT || *ty == Type::CHAR || *ty == Type::VARCHAR || *ty == Type::BPCHAR)
+            || (ty.name() == "user_role")
     }
 }
 
@@ -94,8 +94,8 @@ impl ToSql for JwtRole {
     }
 
     fn accepts(ty: &Type) -> bool {
-        (*ty == Type::TEXT || *ty == Type::CHAR || *ty == Type::VARCHAR || *ty == Type::BPCHAR) ||
-            (ty.name() == "user_role")
+        (*ty == Type::TEXT || *ty == Type::CHAR || *ty == Type::VARCHAR || *ty == Type::BPCHAR)
+            || (ty.name() == "user_role")
     }
 
     tokio_postgres::types::to_sql_checked!();

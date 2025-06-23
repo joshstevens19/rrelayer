@@ -49,7 +49,7 @@ impl TransactionApi {
 
     pub async fn replace_transaction(
         &self,
-        transaction_id: &RelayerId,
+        transaction_id: &TransactionId,
         replacement: &RelayTransactionRequest,
     ) -> ApiResult<bool> {
         self.client.post(&format!("transactions/replace/{}", transaction_id), replacement).await
@@ -57,7 +57,7 @@ impl TransactionApi {
 
     pub async fn get_transaction_status(
         &self,
-        transaction_id: &RelayerId,
+        transaction_id: &TransactionId,
     ) -> ApiResult<Option<RelayTransactionStatusResult>> {
         self.client.get(&format!("transactions/status/{}", transaction_id)).await
     }

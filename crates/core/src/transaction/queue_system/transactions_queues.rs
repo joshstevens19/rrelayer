@@ -212,8 +212,8 @@ impl TransactionsQueues {
                 return Err(AddTransactionError::RelayerIsPaused(*relayer_id));
             }
 
-            if transactions_queue.is_allowlisted_only() &&
-                !self
+            if transactions_queue.is_allowlisted_only()
+                && !self
                     .relayer_allowed_to_send_transaction_to(relayer_id, &transaction_to_send.to)
                     .await
                     .map_err(AddTransactionError::CouldNotReadAllowlistsFromDb)?
@@ -361,8 +361,8 @@ impl TransactionsQueues {
                 return Err(ReplaceTransactionError::RelayerIsPaused(transaction.relayer_id));
             }
 
-            if transactions_queue.is_allowlisted_only() &&
-                !self
+            if transactions_queue.is_allowlisted_only()
+                && !self
                     .relayer_allowed_to_send_transaction_to(
                         &transaction.relayer_id,
                         &transaction.to,
@@ -431,8 +431,8 @@ impl TransactionsQueues {
                             .move_pending_to_inmempool(&transaction_sent)
                             .await
                             .map_err(
-                                ProcessPendingTransactionError::MovePendingTransactionToInmempoolError,
-                            )?;
+                            ProcessPendingTransactionError::MovePendingTransactionToInmempoolError,
+                        )?;
                         self.invalidate_transaction_cache(&transaction.id).await;
                     }
                     Err(e) => {
@@ -502,7 +502,7 @@ impl TransactionsQueues {
                                     TransactionQueueSendTransactionError::SendTransactionGasPriceError(error),
                                 ))
                             }
-                        }
+                        };
                     }
                 }
 

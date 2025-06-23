@@ -2,6 +2,7 @@ use std::time::SystemTime;
 
 use alloy::primitives::U256;
 use clap::Subcommand;
+use rrelayerr_core::common_types::PagingContext;
 use rrelayerr_core::{
     common_types::EvmAddress,
     relayer::types::RelayerId,
@@ -37,7 +38,7 @@ pub enum TxCommand {
     List {
         /// Relayer ID
         #[clap(required = true)]
-        relayer_id: String,
+        relayer_id: RelayerId,
 
         /// Filter by status (pending, sent, failed, success)
         #[arg(long)]
@@ -119,8 +120,10 @@ pub async fn handle_tx(
         TxCommand::Withdraw { relayer_id, to, amount, token } => {
             handle_withdraw(relayer_id, to, amount, project_path, sdk).await
         }
-        // TxCommand::Status { tx_id } => handle_status(tx_id),
-        // TxCommand::List(args) => handle_list(&args.relayer_id, args.status.as_ref()),
+        TxCommand::Status { tx_id } => handle_status(tx_id, project_path, sdk).await,
+        TxCommand::List { relayer_id, status } => {
+            handle_list(relayer_id, status, project_path, sdk).await
+        }
         // TxCommand::Queue { relayer_id } => handle_queue(relayer_id),
         // TxCommand::Cancel { tx_id } => handle_cancel(tx_id),
         // TxCommand::Replace { tx_id } => handle_replace(tx_id),
@@ -177,21 +180,52 @@ async fn handle_withdraw(
     Ok(())
 }
 
-fn handle_status(tx_id: &TransactionId) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Getting transaction status for ID: {}", tx_id);
-    // TODO: Implement status checking logic
+async fn handle_status(
+    tx_id: &TransactionId,
+    project_path: &ProjectLocation,
+    sdk: &mut SDK,
+) -> Result<(), Box<dyn std::error::Error>> {
+    handle_authenticate(sdk, "account1", project_path).await?;
+
+    let status = sdk.transaction.get_transaction_status(tx_id).await?;
+    match status {
+        None => {
+            println!("Can not find transaction id {}", tx_id)
+        }
+        Some(result) => {
+            println!("Transaction status: {}", result.status);
+            if let Some(hash) = result.hash {
+                println!("Transaction hash: {}", hash);
+            }
+        }
+    }
+
     Ok(())
 }
 
-fn handle_list(
+async fn handle_list(
     relayer_id: &RelayerId,
-    status: Option<&TxStatus>,
+    // TODO: handle status filtering
+    _status: &Option<TxStatus>,
+    project_path: &ProjectLocation,
+    sdk: &mut SDK,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    match status {
-        Some(status) => println!("Listing transactions for relayer: {}", relayer_id),
-        None => println!("Listing all transactions for relayer: {}", relayer_id),
-    }
-    // TODO: Implement transaction listing logic
+    handle_authenticate(sdk, "account1", project_path).await?;
+
+    let transactions = sdk
+        .transaction
+        .get_transactions(
+            relayer_id,
+            &PagingContext {
+                // TODO: handle paging later
+                limit: 1000,
+                offset: 0,
+            },
+        )
+        .await?;
+
+    log_transactions(transactions.items)?;
+
     Ok(())
 }
 

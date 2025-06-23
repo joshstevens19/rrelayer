@@ -53,10 +53,10 @@ impl<'a> FromSql<'a> for TransactionStatus {
                 "EXPIRED" => Ok(TransactionStatus::Expired),
                 _ => Err(format!("Unknown TransactionStatus: {}", status).into()),
             }
-        } else if *ty == Type::TEXT ||
-            *ty == Type::CHAR ||
-            *ty == Type::VARCHAR ||
-            *ty == Type::BPCHAR
+        } else if *ty == Type::TEXT
+            || *ty == Type::CHAR
+            || *ty == Type::VARCHAR
+            || *ty == Type::BPCHAR
         {
             let status =
                 from_utf8(raw).map_err(|err| format!("Invalid UTF-8 sequence: {}", err))?;
@@ -76,8 +76,8 @@ impl<'a> FromSql<'a> for TransactionStatus {
     }
 
     fn accepts(ty: &Type) -> bool {
-        (*ty == Type::TEXT || *ty == Type::CHAR || *ty == Type::VARCHAR || *ty == Type::BPCHAR) ||
-            (ty.name() == "tx_status")
+        (*ty == Type::TEXT || *ty == Type::CHAR || *ty == Type::VARCHAR || *ty == Type::BPCHAR)
+            || (ty.name() == "tx_status")
     }
 }
 
@@ -106,8 +106,8 @@ impl ToSql for TransactionStatus {
     }
 
     fn accepts(ty: &Type) -> bool {
-        (*ty == Type::TEXT || *ty == Type::CHAR || *ty == Type::VARCHAR || *ty == Type::BPCHAR) ||
-            (ty.name() == "tx_status")
+        (*ty == Type::TEXT || *ty == Type::CHAR || *ty == Type::VARCHAR || *ty == Type::BPCHAR)
+            || (ty.name() == "tx_status")
     }
 
     tokio_postgres::types::to_sql_checked!();

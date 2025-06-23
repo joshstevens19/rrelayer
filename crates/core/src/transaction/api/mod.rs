@@ -213,8 +213,8 @@ async fn get_relayer_transactions(
     headers: HeaderMap,
     auth_guard: ReadOnlyOrAboveJwtTokenOrApiKeyGuard,
 ) -> Result<Json<PagingResult<Transaction>>, StatusCode> {
-    if auth_guard.is_api_key() &&
-        !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await
+    if auth_guard.is_api_key()
+        && !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await
     {
         return Err(StatusCode::UNAUTHORIZED);
     }

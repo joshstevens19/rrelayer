@@ -16,9 +16,9 @@ impl SdkContext {
     pub(crate) fn with_auth_token(&self, token: String) -> ApiBaseConfig {
         ApiBaseConfig::WithAuthToken {
             server_url: match &self.config {
-                ApiBaseConfig::Basic { server_url } |
-                ApiBaseConfig::WithAuthToken { server_url, .. } |
-                ApiBaseConfig::WithApiKey { server_url, .. } => server_url.clone(),
+                ApiBaseConfig::Basic { server_url }
+                | ApiBaseConfig::WithAuthToken { server_url, .. }
+                | ApiBaseConfig::WithApiKey { server_url, .. } => server_url.clone(),
             },
             auth_token: token,
         }

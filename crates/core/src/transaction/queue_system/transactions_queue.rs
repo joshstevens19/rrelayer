@@ -82,8 +82,8 @@ impl TransactionsQueue {
     }
 
     pub fn should_bump_gas(&self, ms_between_times: u64, speed: &TransactionSpeed) -> bool {
-        let should_bump = ms_between_times >
-            (self.evm_provider.blocks_every * self.blocks_to_wait_before_bump(speed));
+        let should_bump = ms_between_times
+            > (self.evm_provider.blocks_every * self.blocks_to_wait_before_bump(speed));
         if should_bump {
             rrelayerr_info!(
                 "Gas bump required for relayer: {} - elapsed: {}ms, threshold: {}ms, speed: {:?}",
@@ -747,8 +747,8 @@ impl TransactionsQueue {
             &transaction_sent.sent_with_gas,
             self.is_legacy_transactions(),
         )
-            .await
-            .map_err(TransactionQueueSendTransactionError::CouldNotUpdateTransactionDb)?;
+        .await
+        .map_err(TransactionQueueSendTransactionError::CouldNotUpdateTransactionDb)?;
 
         rrelayerr_info!(
             "Successfully processed transaction {} for relayer: {}",

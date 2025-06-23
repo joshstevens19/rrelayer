@@ -308,10 +308,10 @@ fn decrypt(path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
             }
             Err(e) => {
                 let error_str = e.to_string().to_lowercase();
-                let is_likely_password_error = error_str.contains("password") ||
-                    error_str.contains("mac mismatch") ||
-                    error_str.contains("invalid") ||
-                    error_str.contains("decrypt");
+                let is_likely_password_error = error_str.contains("password")
+                    || error_str.contains("mac mismatch")
+                    || error_str.contains("invalid")
+                    || error_str.contains("decrypt");
 
                 if is_likely_password_error && attempts < MAX_ATTEMPTS {
                     println!("Incorrect password. Try again...");

@@ -48,10 +48,10 @@ impl<'a> FromSql<'a> for TransactionSpeed {
                 "SUPER" => Ok(TransactionSpeed::Super),
                 _ => Err(format!("Unknown TransactionSpeed: {}", speed).into()),
             }
-        } else if *ty == Type::TEXT ||
-            *ty == Type::CHAR ||
-            *ty == Type::VARCHAR ||
-            *ty == Type::BPCHAR
+        } else if *ty == Type::TEXT
+            || *ty == Type::CHAR
+            || *ty == Type::VARCHAR
+            || *ty == Type::BPCHAR
         {
             // Handle text types for backward compatibility
             let speed = from_utf8(raw).map_err(|err| format!("Invalid UTF-8 sequence: {}", err))?;
@@ -69,8 +69,8 @@ impl<'a> FromSql<'a> for TransactionSpeed {
     }
 
     fn accepts(ty: &Type) -> bool {
-        (*ty == Type::TEXT || *ty == Type::CHAR || *ty == Type::VARCHAR || *ty == Type::BPCHAR) ||
-            (ty.name() == "speed")
+        (*ty == Type::TEXT || *ty == Type::CHAR || *ty == Type::VARCHAR || *ty == Type::BPCHAR)
+            || (ty.name() == "speed")
     }
 }
 
@@ -97,8 +97,8 @@ impl ToSql for TransactionSpeed {
     }
 
     fn accepts(ty: &Type) -> bool {
-        (*ty == Type::TEXT || *ty == Type::CHAR || *ty == Type::VARCHAR || *ty == Type::BPCHAR) ||
-            (ty.name() == "speed")
+        (*ty == Type::TEXT || *ty == Type::CHAR || *ty == Type::VARCHAR || *ty == Type::BPCHAR)
+            || (ty.name() == "speed")
     }
 
     tokio_postgres::types::to_sql_checked!();

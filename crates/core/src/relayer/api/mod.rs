@@ -135,8 +135,8 @@ async fn get_relayer_api(
     Path(relayer_id): Path<RelayerId>,
     headers: HeaderMap,
 ) -> Result<Json<GetRelayerResult>, StatusCode> {
-    if auth_guard.is_api_key() &&
-        !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await
+    if auth_guard.is_api_key()
+        && !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await
     {
         return Err(StatusCode::UNAUTHORIZED);
     }
@@ -172,8 +172,8 @@ async fn pause_relayer(
     Path(relayer_id): Path<RelayerId>,
     headers: HeaderMap,
 ) -> StatusCode {
-    if auth_guard.is_api_key() &&
-        !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await
+    if auth_guard.is_api_key()
+        && !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await
     {
         return StatusCode::UNAUTHORIZED;
     }
@@ -202,8 +202,8 @@ async fn unpause_relayer(
     Path(relayer_id): Path<RelayerId>,
     headers: HeaderMap,
 ) -> StatusCode {
-    if auth_guard.is_api_key() &&
-        !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await
+    if auth_guard.is_api_key()
+        && !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await
     {
         return StatusCode::UNAUTHORIZED;
     }
@@ -232,8 +232,8 @@ async fn update_relay_max_gas_price(
     Path((relayer_id, cap)): Path<(RelayerId, Option<GasPrice>)>,
     headers: HeaderMap,
 ) -> StatusCode {
-    if auth_guard.is_api_key() &&
-        !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await
+    if auth_guard.is_api_key()
+        && !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await
     {
         return StatusCode::UNAUTHORIZED;
     }
@@ -349,8 +349,8 @@ async fn get_allowlist_addresses(
     Query(query): Query<GetAllowlistAddressesQuery>,
     headers: HeaderMap,
 ) -> Result<Json<PagingResult<EvmAddress>>, StatusCode> {
-    if auth_guard.is_api_key() &&
-        !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await
+    if auth_guard.is_api_key()
+        && !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await
     {
         return Err(StatusCode::UNAUTHORIZED);
     }
@@ -377,8 +377,8 @@ async fn add_allowlist_address(
     Path((relayer_id, address)): Path<(RelayerId, EvmAddress)>,
     headers: HeaderMap,
 ) -> StatusCode {
-    if auth_guard.is_api_key() &&
-        !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await
+    if auth_guard.is_api_key()
+        && !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await
     {
         return StatusCode::UNAUTHORIZED;
     }
@@ -410,8 +410,8 @@ async fn delete_allowlist_address(
     Path((relayer_id, address)): Path<(RelayerId, EvmAddress)>,
     headers: HeaderMap,
 ) -> StatusCode {
-    if auth_guard.is_api_key() &&
-        !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await
+    if auth_guard.is_api_key()
+        && !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await
     {
         return StatusCode::UNAUTHORIZED;
     }
@@ -444,8 +444,8 @@ async fn update_relay_eip1559_status(
     Path((relayer_id, enabled)): Path<(RelayerId, bool)>,
     headers: HeaderMap,
 ) -> StatusCode {
-    if auth_guard.is_api_key() &&
-        !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await
+    if auth_guard.is_api_key()
+        && !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await
     {
         return StatusCode::UNAUTHORIZED;
     }
