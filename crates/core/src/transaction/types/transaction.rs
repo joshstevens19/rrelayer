@@ -27,7 +27,7 @@ use crate::{
     relayer::types::RelayerId,
     shared::{
         common_types::{ApiKey, EvmAddress},
-        serializers::{serialize_system_time, serialize_system_time_option},
+        serializers::{deserialize_system_time, deserialize_system_time_option, serialize_system_time, serialize_system_time_option},
     },
 };
 
@@ -56,22 +56,44 @@ pub struct Transaction {
 
     pub blobs: Option<Vec<Blob>>,
 
-    #[serde(rename = "txHash", skip_serializing_if = "Option::is_none", default)]
+    #[serde(
+        rename = "txHash",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     pub known_transaction_hash: Option<TransactionHash>,
 
-    #[serde(rename = "queuedAt", serialize_with = "serialize_system_time")]
+    #[serde(
+        rename = "queuedAt",
+        serialize_with = "serialize_system_time",
+        deserialize_with = "deserialize_system_time"
+    )]
     pub queued_at: SystemTime,
 
-    #[serde(rename = "expiresAt", serialize_with = "serialize_system_time")]
+    #[serde(
+        rename = "expiresAt",
+        serialize_with = "serialize_system_time",
+        deserialize_with = "deserialize_system_time"
+    )]
     pub expires_at: SystemTime,
 
     #[serde(
         rename = "sentAt",
         skip_serializing_if = "Option::is_none",
         serialize_with = "serialize_system_time_option",
+        deserialize_with = "deserialize_system_time_option",
         default
     )]
     pub sent_at: Option<SystemTime>,
+
+    #[serde(
+        rename = "confirmedAt",
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "serialize_system_time_option",
+        deserialize_with = "deserialize_system_time_option",
+        default
+    )]
+    pub confirmed_at: Option<SystemTime>,
 
     #[serde(rename = "sentWithGas", skip_serializing_if = "Option::is_none", default)]
     pub sent_with_gas: Option<GasPriceResult>,
@@ -83,6 +105,7 @@ pub struct Transaction {
         rename = "minedAt",
         skip_serializing_if = "Option::is_none",
         serialize_with = "serialize_system_time_option",
+        deserialize_with = "deserialize_system_time_option",
         default
     )]
     pub mined_at: Option<SystemTime>,
@@ -95,10 +118,10 @@ pub struct Transaction {
     #[serde(rename = "maxFee", skip_serializing_if = "Option::is_none", default)]
     pub sent_with_max_fee_per_gas: Option<MaxFee>,
 
-    #[serde(skip_serializing)]
+    #[serde(skip_serializing, skip_deserializing, default)]
     pub is_noop: bool,
 
-    #[serde(skip_serializing)]
+    #[serde(skip_serializing, skip_deserializing, default)]
     pub from_api_key: ApiKey,
 }
 
@@ -192,7 +215,9 @@ impl Transaction {
             nonce: self.nonce.into(),
             max_priority_fee_per_gas: gas_price_result.max_priority_fee.into(),
             max_fee_per_gas: gas_price_result.max_fee.into(),
-            gas_limit: self.gas_limit.unwrap().into(),
+            // TODO: fix
+            // gas_limit: self.gas_limit.unwrap().into(),
+            gas_limit: 210000,
             to: self.to.into(),
             value: self.value.clone().into(),
             access_list: Default::default(),

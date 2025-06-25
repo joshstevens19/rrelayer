@@ -1,3 +1,4 @@
+use std::str::FromStr;
 use std::sync::Arc;
 
 use alloy::rpc::types::TransactionReceipt;
@@ -11,22 +12,15 @@ use axum::{
 use serde::{Deserialize, Serialize};
 
 use super::types::TransactionSpeed;
-use crate::{
-    app_state::AppState,
-    authentication::guards::ReadOnlyOrAboveJwtTokenOrApiKeyGuard,
-    provider::find_provider_for_chain_id,
-    relayer::{get_relayer, is_relayer_api_key, types::RelayerId},
-    rrelayerr_error,
-    shared::common_types::{EvmAddress, PagingContext, PagingQuery, PagingResult},
-    transaction::{
-        get_transaction_by_id,
-        queue_system::TransactionToSend,
-        types::{
-            Transaction, TransactionData, TransactionHash, TransactionId, TransactionStatus,
-            TransactionValue,
-        },
+use crate::shared::utils::convert_blob_strings_to_blobs;
+use crate::{app_state::AppState, authentication::guards::ReadOnlyOrAboveJwtTokenOrApiKeyGuard, provider::find_provider_for_chain_id, relayer::{get_relayer, is_relayer_api_key, types::RelayerId}, rrelayerr_error, rrelayerr_info, shared::common_types::{EvmAddress, PagingContext, PagingQuery, PagingResult}, transaction::{
+    get_transaction_by_id,
+    queue_system::TransactionToSend,
+    types::{
+        Transaction, TransactionData, TransactionHash, TransactionId, TransactionStatus,
+        TransactionValue,
     },
-};
+}};
 
 // TODO! GUARDS
 async fn get_transaction_by_id_api(
@@ -94,7 +88,7 @@ async fn get_transaction_status(
     Ok(Json(RelayTransactionStatusResult { hash: Some(hash), status: transaction.status, receipt }))
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct RelayTransactionRequest {
     pub to: EvmAddress,
     #[serde(default)]
@@ -103,7 +97,15 @@ pub struct RelayTransactionRequest {
     pub data: TransactionData,
     pub speed: Option<TransactionSpeed>,
     #[serde(default)]
-    pub blobs: Option<Vec<Blob>>,
+    pub blobs: Option<Vec<String>>, // will overflow the stack if you use the Blob type directly
+}
+
+impl FromStr for RelayTransactionRequest {
+    type Err = serde_json::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        serde_json::from_str(s)
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -118,7 +120,8 @@ async fn send_transaction(
     headers: HeaderMap,
     Json(transaction): Json<RelayTransactionRequest>,
 ) -> Result<Json<SendTransactionResult>, StatusCode> {
-    // if !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await {
+    // TODO: validate API key
+    // if !is_reayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await {
     //     return Err(StatusCode::UNAUTHORIZED);
     // }
     //
@@ -134,7 +137,7 @@ async fn send_transaction(
         transaction.value,
         transaction.data.clone(),
         transaction.speed.clone(),
-        transaction.blobs.clone(),
+        convert_blob_strings_to_blobs(transaction.blobs)?,
     );
 
     let transaction = state
@@ -154,6 +157,7 @@ async fn send_transaction(
     }))
 }
 
+// TODO: should return a new tx hash
 async fn replace_transaction(
     State(state): State<Arc<AppState>>,
     Path(transaction_id): Path<TransactionId>,
@@ -165,9 +169,10 @@ async fn replace_transaction(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
 
-    if !is_relayer_api_key(&state.db, &state.cache, &transaction.relayer_id, &headers).await {
-        return Err(StatusCode::UNAUTHORIZED);
-    }
+    // TODO: validate API key
+    // if !is_relayer_api_key(&state.db, &state.cache, &transaction.relayer_id, &headers).await {
+    //     return Err(StatusCode::UNAUTHORIZED);
+    // }
 
     let status = state
         .transactions_queues
@@ -180,6 +185,7 @@ async fn replace_transaction(
     Ok(Json(status))
 }
 
+// TODO: should return a new tx hash
 async fn cancel_transaction(
     State(state): State<Arc<AppState>>,
     Path(transaction_id): Path<TransactionId>,
@@ -190,9 +196,11 @@ async fn cancel_transaction(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
 
-    if !is_relayer_api_key(&state.db, &state.cache, &transaction.relayer_id, &headers).await {
-        return Err(StatusCode::UNAUTHORIZED);
-    }
+
+    // TODO: validate API key
+    // if !is_relayer_api_key(&state.db, &state.cache, &transaction.relayer_id, &headers).await {
+    //     return Err(StatusCode::UNAUTHORIZED);
+    // }
 
     let status = state
         .transactions_queues
@@ -213,11 +221,12 @@ async fn get_relayer_transactions(
     headers: HeaderMap,
     auth_guard: ReadOnlyOrAboveJwtTokenOrApiKeyGuard,
 ) -> Result<Json<PagingResult<Transaction>>, StatusCode> {
-    if auth_guard.is_api_key()
-        && !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await
-    {
-        return Err(StatusCode::UNAUTHORIZED);
-    }
+    // TODO: validate API key
+    // if auth_guard.is_api_key()
+    //     && !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await
+    // {
+    //     return Err(StatusCode::UNAUTHORIZED);
+    // }
 
     let paging_context = PagingContext::new(paging.limit, paging.offset);
 
@@ -234,9 +243,10 @@ async fn get_transactions_pending_count(
     Path(relayer_id): Path<RelayerId>,
     headers: HeaderMap,
 ) -> Result<Json<usize>, StatusCode> {
-    if !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await {
-        return Err(StatusCode::UNAUTHORIZED);
-    }
+    // TODO: validate API key
+    // if !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await {
+    //     return Err(StatusCode::UNAUTHORIZED);
+    // }
 
     let count =
         state.transactions_queues.lock().await.pending_transactions_count(&relayer_id).await;
@@ -249,9 +259,10 @@ async fn get_transactions_inmempool_count(
     Path(relayer_id): Path<RelayerId>,
     headers: HeaderMap,
 ) -> Result<Json<usize>, StatusCode> {
-    if !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await {
-        return Err(StatusCode::UNAUTHORIZED);
-    }
+    // TODO: validate API key
+    // if !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await {
+    //     return Err(StatusCode::UNAUTHORIZED);
+    // }
 
     let count =
         state.transactions_queues.lock().await.inmempool_transactions_count(&relayer_id).await;

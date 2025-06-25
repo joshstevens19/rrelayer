@@ -49,6 +49,8 @@ impl PostgresClient {
         let results: Vec<Transaction> =
             rows.iter().map(build_transaction_from_transaction_view).collect();
 
+        println!("{:?}", results);
+
         let result_count = results.len();
 
         Ok(PagingResult::new(results, paging_context.next(result_count), paging_context.previous()))

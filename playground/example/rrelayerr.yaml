@@ -4,12 +4,12 @@ signing_key:
     path: ./keystores/rrelayerr_signing_key
     name: rrelayerr_signing_key
 admins:
-- account1
+  - account1
 networks:
-- name: sepolia_ethereum
-  provider_urls:
-  - https://sepolia.gateway.tenderly.co
-  block_explorer_url: https://sepolia.etherscan.io
+  - name: sepolia_ethereum
+    provider_urls:
+      - https://eth-sepolia.g.alchemy.com/v2/ru5F_pouvf-UWiO4GeznT
+    block_explorer_url: https://sepolia.etherscan.io
 gas_providers:
   tenderly:
     enabled: true

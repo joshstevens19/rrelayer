@@ -214,9 +214,9 @@ impl TransactionsQueues {
 
             if transactions_queue.is_allowlisted_only()
                 && !self
-                    .relayer_allowed_to_send_transaction_to(relayer_id, &transaction_to_send.to)
-                    .await
-                    .map_err(AddTransactionError::CouldNotReadAllowlistsFromDb)?
+                .relayer_allowed_to_send_transaction_to(relayer_id, &transaction_to_send.to)
+                .await
+                .map_err(AddTransactionError::CouldNotReadAllowlistsFromDb)?
             {
                 return Err(AddTransactionError::RelayerNotAllowedToSendTransactionTo(
                     *relayer_id,
@@ -242,6 +242,7 @@ impl TransactionsQueues {
                 expires_at,
                 sent_at: None,
                 mined_at: None,
+                confirmed_at: None,
                 speed: transaction_to_send.speed.clone(),
                 sent_with_max_priority_fee_per_gas: None,
                 sent_with_max_fee_per_gas: None,
@@ -326,6 +327,7 @@ impl TransactionsQueues {
                     EditableTransactionType::Pending => {
                         self.transaction_to_noop(&mut transactions_queue, &mut result.transaction);
                         self.invalidate_transaction_cache(&transaction.id).await;
+
                         Ok(true)
                     }
                     EditableTransactionType::Inmempool => {
@@ -363,12 +365,12 @@ impl TransactionsQueues {
 
             if transactions_queue.is_allowlisted_only()
                 && !self
-                    .relayer_allowed_to_send_transaction_to(
-                        &transaction.relayer_id,
-                        &transaction.to,
-                    )
-                    .await
-                    .map_err(ReplaceTransactionError::CouldNotReadAllowlistsFromDb)?
+                .relayer_allowed_to_send_transaction_to(
+                    &transaction.relayer_id,
+                    &transaction.to,
+                )
+                .await
+                .map_err(ReplaceTransactionError::CouldNotReadAllowlistsFromDb)?
             {
                 return Err(ReplaceTransactionError::RelayerNotAllowedToSendTransactionTo(
                     transaction.relayer_id,
@@ -431,8 +433,8 @@ impl TransactionsQueues {
                             .move_pending_to_inmempool(&transaction_sent)
                             .await
                             .map_err(
-                            ProcessPendingTransactionError::MovePendingTransactionToInmempoolError,
-                        )?;
+                                ProcessPendingTransactionError::MovePendingTransactionToInmempoolError,
+                            )?;
                         self.invalidate_transaction_cache(&transaction.id).await;
                     }
                     Err(e) => {
