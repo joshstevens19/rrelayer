@@ -1,11 +1,13 @@
-use std::{env, fs::File, io::Read, path::PathBuf};
-
+use alloy::providers::Provider;
 use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
+use std::{env, fs::File, io::Read, path::PathBuf};
 use thiserror::Error;
 use tracing::{error, info};
 
+use crate::network::types::ChainId;
 use crate::{
+    create_retry_client,
     gas::{
         fee_estimator::{
             custom::CustomGasFeeEstimator, infura::InfuraGasProviderSetupConfig,
@@ -93,6 +95,21 @@ pub struct NetworkSetupConfig {
         default
     )]
     pub gas_provider: Option<GasProvider>,
+}
+
+impl NetworkSetupConfig {
+    pub async fn get_chain_id(&self) -> Result<ChainId, String> {
+        let provider_url = self.provider_urls[0].clone();
+
+        let provider = create_retry_client(&provider_url)
+            .map_err(|e| format!("RPC provider is not valid as cannot get chain ID: {}", e))?;
+        let chain_id = provider
+            .get_chain_id()
+            .await
+            .map_err(|e| format!("RPC provider is not valid as cannot get chain ID: {}", e))?;
+
+        Ok(ChainId::new(chain_id))
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

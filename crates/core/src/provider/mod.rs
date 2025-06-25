@@ -30,6 +30,9 @@ pub enum LoadProvidersError {
 
     #[error("{0}")]
     EvmProviderNewError(#[from] EvmProviderNewError),
+
+    #[error("Gas estimator error {0}")]
+    GasEstimatorError(String),
 }
 
 pub async fn load_providers(
@@ -63,9 +66,11 @@ pub async fn load_providers(
                         &config.provider_urls,
                         &config.name,
                         &mnemonic,
-                        get_gas_estimator(setup_config, config),
+                        get_gas_estimator(&config.provider_urls, setup_config, config)
+                            .await
+                            .map_err(|e| LoadProvidersError::GasEstimatorError(e.to_string()))?,
                     )
-                    .await?,
+                        .await?,
                 );
             }
             Err(e) => return Err(LoadProvidersError::SigningKeyError(e.to_string())),

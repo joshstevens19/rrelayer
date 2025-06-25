@@ -9,7 +9,9 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::infura::InfuraGasFeeEstimator;
+use crate::gas::fee_estimator::fallback::FallbackGasFeeEstimator;
 use crate::{
+    create_retry_client,
     gas::{
         fee_estimator::tenderly::TenderlyGasFeeEstimator,
         types::{GasPrice, GasProvider, MaxFee, MaxPriorityFee},
@@ -96,35 +98,43 @@ pub trait BaseGasFeeEstimator {
     fn is_chain_supported(&self, chain_id: &ChainId) -> bool;
 }
 
-pub fn get_gas_estimator(
+pub async fn get_gas_estimator(
+    provider_urls: &[String],
     setup_config: &SetupConfig,
     network: &NetworkSetupConfig,
-) -> Option<Arc<dyn BaseGasFeeEstimator + Send + Sync>> {
-    match &setup_config.gas_providers {
-        Some(setup_gas_providers) => {
-            if let Some(network_gas_provider) = &network.gas_provider {
-                return match network_gas_provider {
-                    GasProvider::Tenderly => match &setup_gas_providers.tenderly {
-                        Some(setup) => Some(Arc::new(TenderlyGasFeeEstimator::new(&setup.api_key))),
-                        None => None,
-                    },
-                    GasProvider::Infura => match &setup_gas_providers.infura {
-                        Some(setup) => Some(Arc::new(InfuraGasFeeEstimator::new(
+) -> Result<Arc<dyn BaseGasFeeEstimator + Send + Sync>, Box<dyn std::error::Error>> {
+    if let Some(setup_gas_providers) = &setup_config.gas_providers {
+        if let Some(network_gas_provider) = &network.gas_provider {
+            match network_gas_provider {
+                GasProvider::Tenderly => {
+                    if let Some(setup) = &setup_gas_providers.tenderly {
+                        return Ok(Arc::new(TenderlyGasFeeEstimator::new(&setup.api_key)));
+                    }
+                }
+                GasProvider::Infura => {
+                    if let Some(setup) = &setup_gas_providers.infura {
+                        return Ok(Arc::new(InfuraGasFeeEstimator::new(
                             &setup.api_key,
                             &setup.secret,
-                        ))),
-                        None => None,
-                    },
-                    GasProvider::Custom => match &setup_gas_providers.custom {
-                        Some(setup) => Some(Arc::new(setup.to_owned())),
-                        None => None,
-                    },
-                };
+                        )));
+                    }
+                }
+                GasProvider::Custom => {
+                    if let Some(setup) = &setup_gas_providers.custom {
+                        return Ok(Arc::new(setup.to_owned()));
+                    }
+                }
             }
         }
-        // fallback to tenderly as they have a free plan
-        None => return Some(Arc::new(TenderlyGasFeeEstimator::new(&None))),
     }
 
-    None
+    let chain_id = network.get_chain_id().await?;
+
+    let tenderly = TenderlyGasFeeEstimator::new(&None);
+    if tenderly.is_chain_supported(&chain_id) {
+        return Ok(Arc::new(tenderly));
+    }
+
+    let provider = create_retry_client(&provider_urls[0])?;
+    Ok(Arc::new(FallbackGasFeeEstimator::new(provider.clone())))
 }

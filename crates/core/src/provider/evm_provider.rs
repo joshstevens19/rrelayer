@@ -153,7 +153,7 @@ impl EvmProvider {
         provider_urls: &[String],
         name: &str,
         mnemonic: &str,
-        gas_estimator: Option<Arc<dyn BaseGasFeeEstimator + Send + Sync>>,
+        gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
     ) -> Result<Self, EvmProviderNewError> {
         // get the first one to avoid calling chainId a lot
         let provider = create_retry_client(&provider_urls[0]).map_err(|e| {
@@ -178,8 +178,7 @@ impl EvmProvider {
                 .map_err(EvmProviderNewError::ProviderError)?,
             rpc_clients: providers,
             wallet_manager: Arc::new(WalletManager::new(mnemonic)),
-            gas_estimator: gas_estimator
-                .unwrap_or_else(|| Arc::new(FallbackGasFeeEstimator::new(provider.clone()))),
+            gas_estimator,
             chain_id,
             name: name.to_string(),
             provider_urls: provider_urls.to_owned(),

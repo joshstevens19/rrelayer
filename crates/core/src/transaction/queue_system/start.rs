@@ -2,7 +2,7 @@ use std::{collections::VecDeque, sync::Arc};
 
 use thiserror::Error;
 use tokio::sync::Mutex;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use super::{transactions_queues::TransactionsQueues, types::TransactionRelayerSetup};
 use crate::{
@@ -180,9 +180,6 @@ pub enum StartTransactionsQueuesError {
     #[error("Failed to load relayers from database: {0}")]
     CouldNotLoadRelayersFromDatabase(PostgresError),
 
-    #[error("Could not find provider for chai {0}")]
-    CouldNotFindProviderForChainId(ChainId),
-
     #[error("Failed to repopulate transactions queue: {0}")]
     RepopulateTransactionsQueueError(RepopulateTransactionsQueueError),
 
@@ -212,7 +209,8 @@ pub async fn startup_transactions_queues(
 
         match provider {
             None => {
-                Err(StartTransactionsQueuesError::CouldNotFindProviderForChainId(relayer.chain_id))?
+                warn!("Could not find network provider on chain {} this means relayer name {} - id {} has not been started up make sure the network is enabled in your yaml.. skipping", relayer.chain_id, relayer.name, relayer.id);
+                continue;
             }
             Some(provider) => {
                 let evm_provider = provider.clone();

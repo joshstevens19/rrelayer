@@ -432,6 +432,7 @@ impl TenderlyGasFeeEstimator {
         chain_id: &ChainId,
     ) -> Result<TenderlyGasEstimatePriceResult, reqwest::Error> {
         let url = self.build_suggested_gas_price_endpoint(chain_id);
+        println!("Tenderly gas estimate url: {}", url);
         let client = reqwest::Client::new();
 
         let body = serde_json::json!({
@@ -439,6 +440,7 @@ impl TenderlyGasFeeEstimator {
             "method": "tenderly_gasPrice",
             "params": []
         });
+        println!("Tenderly gas estimate body: {:?}", body);
 
         let gas_estimate_result: TenderlyGasEstimateJsonRpcResult =
             client.post(url).json(&body).send().await?.json().await?;

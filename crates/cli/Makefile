@@ -3,7 +3,7 @@ help:
 init:
 	cargo run -- init --path $(CURDIR)/../../playground
 start:
-	cargo run -- start --path $(CURDIR)/../../playground/example
+	RUST_BACKTRACE=1 cargo run -- start --path $(CURDIR)/../../playground/example
 
 auth_new_account:
 	cargo run -- auth --path $(CURDIR)/../../playground/example new-account account2

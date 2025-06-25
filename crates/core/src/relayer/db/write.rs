@@ -104,10 +104,10 @@ impl PostgresClient {
             "UPDATE relayer.record SET address = $1 WHERE chain_id = $2 AND wallet_index = $3",
             &[&address, chain_id, &wallet_index],
         )
-            .await
-            .map_err(|e| {
-                CreateRelayerError::CouldNotUpdateRelayerInfoDb(name.to_string(), *chain_id, e)
-            })?;
+        .await
+        .map_err(|e| {
+            CreateRelayerError::CouldNotUpdateRelayerInfoDb(name.to_string(), *chain_id, e)
+        })?;
 
         let relayer = self.get_relayer(&relayer_id).await.map_err(|e| {
             CreateRelayerError::CouldNotSaveRelayerDb(name.to_string(), *chain_id, e)
