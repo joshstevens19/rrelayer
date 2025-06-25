@@ -23,6 +23,7 @@ pub fn build_transaction_from_transaction_view(row: &Row) -> Transaction {
         queued_at: row.get("queued_at"),
         expires_at: row.get("expires_at"),
         sent_at: row.get("sent_at"),
+        confirmed_at: row.get("confirmed_at"),
         // TODO! load from db
         sent_with_gas: None,
         // TODO! load from db
