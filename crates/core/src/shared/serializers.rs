@@ -33,20 +33,20 @@ where
     D: Deserializer<'de>,
 {
     let s = String::deserialize(deserializer)?;
-    let datetime = DateTime::parse_from_rfc3339(&s)
-        .map_err(serde::de::Error::custom)?;
+    let datetime = DateTime::parse_from_rfc3339(&s).map_err(serde::de::Error::custom)?;
     Ok(datetime.with_timezone(&Utc).into())
 }
 
-pub fn deserialize_system_time_option<'de, D>(deserializer: D) -> Result<Option<SystemTime>, D::Error>
+pub fn deserialize_system_time_option<'de, D>(
+    deserializer: D,
+) -> Result<Option<SystemTime>, D::Error>
 where
     D: Deserializer<'de>,
 {
     let opt = Option::<String>::deserialize(deserializer)?;
     match opt {
         Some(s) => {
-            let datetime = DateTime::parse_from_rfc3339(&s)
-                .map_err(serde::de::Error::custom)?;
+            let datetime = DateTime::parse_from_rfc3339(&s).map_err(serde::de::Error::custom)?;
             Ok(Some(datetime.with_timezone(&Utc).into()))
         }
         None => Ok(None),

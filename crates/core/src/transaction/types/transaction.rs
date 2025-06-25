@@ -27,7 +27,10 @@ use crate::{
     relayer::types::RelayerId,
     shared::{
         common_types::{ApiKey, EvmAddress},
-        serializers::{deserialize_system_time, deserialize_system_time_option, serialize_system_time, serialize_system_time_option},
+        serializers::{
+            deserialize_system_time, deserialize_system_time_option, serialize_system_time,
+            serialize_system_time_option,
+        },
     },
 };
 
@@ -56,11 +59,7 @@ pub struct Transaction {
 
     pub blobs: Option<Vec<Blob>>,
 
-    #[serde(
-        rename = "txHash",
-        skip_serializing_if = "Option::is_none",
-        default
-    )]
+    #[serde(rename = "txHash", skip_serializing_if = "Option::is_none", default)]
     pub known_transaction_hash: Option<TransactionHash>,
 
     #[serde(

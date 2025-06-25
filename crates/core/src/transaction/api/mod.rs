@@ -13,14 +13,22 @@ use serde::{Deserialize, Serialize};
 
 use super::types::TransactionSpeed;
 use crate::shared::utils::convert_blob_strings_to_blobs;
-use crate::{app_state::AppState, authentication::guards::ReadOnlyOrAboveJwtTokenOrApiKeyGuard, provider::find_provider_for_chain_id, relayer::{get_relayer, is_relayer_api_key, types::RelayerId}, rrelayerr_error, rrelayerr_info, shared::common_types::{EvmAddress, PagingContext, PagingQuery, PagingResult}, transaction::{
-    get_transaction_by_id,
-    queue_system::TransactionToSend,
-    types::{
-        Transaction, TransactionData, TransactionHash, TransactionId, TransactionStatus,
-        TransactionValue,
+use crate::{
+    app_state::AppState,
+    authentication::guards::ReadOnlyOrAboveJwtTokenOrApiKeyGuard,
+    provider::find_provider_for_chain_id,
+    relayer::{get_relayer, is_relayer_api_key, types::RelayerId},
+    rrelayerr_error, rrelayerr_info,
+    shared::common_types::{EvmAddress, PagingContext, PagingQuery, PagingResult},
+    transaction::{
+        get_transaction_by_id,
+        queue_system::TransactionToSend,
+        types::{
+            Transaction, TransactionData, TransactionHash, TransactionId, TransactionStatus,
+            TransactionValue,
+        },
     },
-}};
+};
 
 // TODO! GUARDS
 async fn get_transaction_by_id_api(
@@ -195,7 +203,6 @@ async fn cancel_transaction(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
-
 
     // TODO: validate API key
     // if !is_relayer_api_key(&state.db, &state.cache, &transaction.relayer_id, &headers).await {

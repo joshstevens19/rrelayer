@@ -46,6 +46,9 @@ list:
 create:
 	cargo run -- create --path $(CURDIR)/../../playground/example relayer1 sepolia_ethereum
 
+clone:
+	cargo run -- clone --path $(CURDIR)/../../playground/example 3c24e942-3109-4516-bd3b-6e2a904ef473 relayer_base2 base
+
 config_get:
 	cargo run -- config --path $(CURDIR)/../../playground/example get 3c24e942-3109-4516-bd3b-6e2a904ef473
 config_pause:

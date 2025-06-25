@@ -10,6 +10,9 @@ networks:
     provider_urls:
       - https://eth-sepolia.g.alchemy.com/v2/ru5F_pouvf-UWiO4GeznT
     block_explorer_url: https://sepolia.etherscan.io
+  - name: base
+    provider_urls:
+      - https://base.gateway.tenderly.co
 gas_providers:
   tenderly:
     enabled: true

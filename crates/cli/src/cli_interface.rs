@@ -22,6 +22,24 @@ pub enum Commands {
         #[clap(long, short)]
         path: Option<String>,
     },
+    /// Clone an existing relayer private key to another network
+    Clone {
+        #[clap(long, short)]
+        path: Option<String>,
+
+        /// The unique identifier of the relayer
+        #[clap(required = true)]
+        relayer: RelayerId,
+
+        /// The new relayer name
+        #[clap(required = true)]
+        name: String,
+
+        /// Network to assign it to
+        #[arg(required = true)]
+        network: String,
+    },
+    /// Authenticate with rrelayerr
     Auth {
         #[clap(long, short)]
         path: Option<String>,
@@ -101,8 +119,8 @@ pub enum Commands {
         #[clap(required = true)]
         name: String,
 
-        /// Networks to assign it to
-        #[arg(required = true, long)]
+        /// Network to assign it to
+        #[arg(required = true)]
         network: String,
     },
     /// Sign messages and transactions

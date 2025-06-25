@@ -15,22 +15,22 @@ pub async fn sleep_ms(ms: &u64) {
     sleep(Duration::from_millis(*ms)).await
 }
 
-pub fn convert_blob_strings_to_blobs(blob_strings: Option<Vec<String>>) -> Result<Option<Vec<Blob>>, StatusCode> {
+pub fn convert_blob_strings_to_blobs(
+    blob_strings: Option<Vec<String>>,
+) -> Result<Option<Vec<Blob>>, StatusCode> {
     match blob_strings {
         Some(strings) => {
             let mut blobs = Vec::new();
             for blob_str in strings {
-                let blob = blob_str.parse::<Blob>()
-                    .map_err(|e| {
-                        tracing::error!("Failed to parse blob hex string '{}': {:?}",
-                            blob_str, e);
-                        StatusCode::BAD_REQUEST
-                    })?;
+                let blob = blob_str.parse::<Blob>().map_err(|e| {
+                    tracing::error!("Failed to parse blob hex string '{}': {:?}", blob_str, e);
+                    StatusCode::BAD_REQUEST
+                })?;
 
                 blobs.push(blob);
             }
             Ok(Some(blobs))
         }
-        None => Ok(None)
+        None => Ok(None),
     }
 }

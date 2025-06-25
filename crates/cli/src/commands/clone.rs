@@ -1,11 +1,11 @@
+use rrelayerr_core::relayer::types::RelayerId;
 use rrelayerr_sdk::SDK;
 
-use crate::{
-    authentication::handle_authenticate,
-    commands::{keystore::ProjectLocation, network::get_chain_id_for_network},
-};
+use crate::commands::network::get_chain_id_for_network;
+use crate::{authentication::handle_authenticate, commands::keystore::ProjectLocation};
 
-pub async fn handle_create(
+pub async fn handle_clone(
+    relayer_id: &RelayerId,
     name: &str,
     network: &str,
     project_path: &ProjectLocation,
@@ -21,9 +21,9 @@ pub async fn handle_create(
 
     let chain_id = get_chain_id_for_network(&network, project_path).await?;
 
-    let result = sdk.relayer.create(chain_id, name).await?;
+    let result = sdk.relayer.clone(relayer_id, chain_id, name).await?;
 
-    println!("\n✅  Relayer created successfully!");
+    println!("\n✅  Relayer cloned successfully!");
     println!("┌─────────────────────────────────────────────────");
     println!("│ Name:      {}", name);
     println!("│ ID:        {}", result.id);

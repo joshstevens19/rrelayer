@@ -8,17 +8,12 @@ use rrelayerr_core::{
     relayer::types::RelayerId,
     transaction::{
         api::RelayTransactionRequest,
-        types::{
-            Transaction, TransactionData, TransactionId, TransactionSpeed,
-            TransactionValue,
-        },
+        types::{Transaction, TransactionData, TransactionId, TransactionSpeed, TransactionValue},
     },
 };
 use rrelayerr_sdk::SDK;
 
-use crate::{
-    authentication::handle_authenticate, commands::keystore::ProjectLocation,
-};
+use crate::{authentication::handle_authenticate, commands::keystore::ProjectLocation};
 
 #[derive(Subcommand)]
 pub enum TxCommand {
@@ -134,7 +129,9 @@ pub async fn handle_tx(
         }
         TxCommand::Queue { relayer_id } => handle_queue(relayer_id, project_path, sdk).await,
         TxCommand::Cancel { tx_id } => handle_cancel(tx_id, project_path, sdk).await,
-        TxCommand::Replace { tx_id, transaction } => handle_replace(tx_id, transaction, project_path, sdk).await,
+        TxCommand::Replace { tx_id, transaction } => {
+            handle_replace(tx_id, transaction, project_path, sdk).await
+        }
         TxCommand::Send { relayer_id, transaction } => {
             handle_send(relayer_id, transaction, project_path, sdk).await
         }
@@ -239,9 +236,13 @@ async fn handle_list(
     Ok(())
 }
 
-async fn handle_queue(relayer_id: &RelayerId, project_path: &ProjectLocation, sdk: &mut SDK) -> Result<(), Box<dyn std::error::Error>> {
+async fn handle_queue(
+    relayer_id: &RelayerId,
+    project_path: &ProjectLocation,
+    sdk: &mut SDK,
+) -> Result<(), Box<dyn std::error::Error>> {
     handle_authenticate(sdk, "account1", project_path).await?;
-    
+
     let (pending_result, mempool_result) = tokio::join!(
         sdk.transaction.get_transactions_pending_count(relayer_id),
         sdk.transaction.get_transactions_inmempool_count(relayer_id)
@@ -284,7 +285,9 @@ async fn handle_cancel(
         return Ok(());
     }
 
-    println!("Transaction could not be cancelled this can be due to the other transaction has already been mined..");
+    println!(
+        "Transaction could not be cancelled this can be due to the other transaction has already been mined.."
+    );
 
     Ok(())
 }
@@ -305,7 +308,9 @@ async fn handle_replace(
         return Ok(());
     }
 
-    println!("Transaction could not be cancelled this can be due to the other transaction has already been mined..");
+    println!(
+        "Transaction could not be cancelled this can be due to the other transaction has already been mined.."
+    );
     Ok(())
 }
 
@@ -403,21 +408,12 @@ fn log_transactions(transactions: Vec<Transaction>) -> Result<(), Box<dyn std::e
     Ok(())
 }
 
-
 fn format_tx_hash(tx: &Transaction) -> String {
-    if let Some(hash) = &tx.known_transaction_hash {
-        hash.to_string()
-    } else {
-        "-".to_string()
-    }
+    if let Some(hash) = &tx.known_transaction_hash { hash.to_string() } else { "-".to_string() }
 }
 
 fn format_sent_at(tx: &Transaction) -> String {
-    if let Some(sent_at) = &tx.sent_at {
-        format_time(sent_at)
-    } else {
-        "-".to_string()
-    }
+    if let Some(sent_at) = &tx.sent_at { format_time(sent_at) } else { "-".to_string() }
 }
 
 fn format_time(time: &SystemTime) -> String {
@@ -427,7 +423,7 @@ fn format_time(time: &SystemTime) -> String {
                 duration.as_secs() as i64,
                 duration.subsec_nanos(),
             )
-                .unwrap_or_default();
+            .unwrap_or_default();
             dt.format("%Y-%m-%d %H:%M:%S UTC").to_string()
         }
         Err(_) => "Invalid time".to_string(),

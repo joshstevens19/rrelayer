@@ -4,6 +4,7 @@ use clap::Parser;
 use rrelayerr_core::{load_env_from_project_path, setup_info_logger};
 use rrelayerr_sdk::SDK;
 
+use crate::commands::clone;
 use crate::{
     cli_interface::{Cli, Commands},
     commands::{
@@ -116,6 +117,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut sdk = SDK::new(project_location.get_api_url()?);
 
             create::handle_create(name, network, &project_location, &mut sdk).await?;
+        }
+        Commands::Clone { path, relayer, name, network } => {
+            let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;
+            load_env_from_project_path(&resolved_path);
+
+            let project_location = ProjectLocation::new(resolved_path);
+            let mut sdk = SDK::new(project_location.get_api_url()?);
+
+            clone::handle_clone(relayer, name, network, &project_location, &mut sdk).await?;
         }
         Commands::Sign { path, command } => {
             let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;

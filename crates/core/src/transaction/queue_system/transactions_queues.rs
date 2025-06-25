@@ -214,9 +214,9 @@ impl TransactionsQueues {
 
             if transactions_queue.is_allowlisted_only()
                 && !self
-                .relayer_allowed_to_send_transaction_to(relayer_id, &transaction_to_send.to)
-                .await
-                .map_err(AddTransactionError::CouldNotReadAllowlistsFromDb)?
+                    .relayer_allowed_to_send_transaction_to(relayer_id, &transaction_to_send.to)
+                    .await
+                    .map_err(AddTransactionError::CouldNotReadAllowlistsFromDb)?
             {
                 return Err(AddTransactionError::RelayerNotAllowedToSendTransactionTo(
                     *relayer_id,
@@ -365,12 +365,12 @@ impl TransactionsQueues {
 
             if transactions_queue.is_allowlisted_only()
                 && !self
-                .relayer_allowed_to_send_transaction_to(
-                    &transaction.relayer_id,
-                    &transaction.to,
-                )
-                .await
-                .map_err(ReplaceTransactionError::CouldNotReadAllowlistsFromDb)?
+                    .relayer_allowed_to_send_transaction_to(
+                        &transaction.relayer_id,
+                        &transaction.to,
+                    )
+                    .await
+                    .map_err(ReplaceTransactionError::CouldNotReadAllowlistsFromDb)?
             {
                 return Err(ReplaceTransactionError::RelayerNotAllowedToSendTransactionTo(
                     transaction.relayer_id,
@@ -433,8 +433,8 @@ impl TransactionsQueues {
                             .move_pending_to_inmempool(&transaction_sent)
                             .await
                             .map_err(
-                                ProcessPendingTransactionError::MovePendingTransactionToInmempoolError,
-                            )?;
+                            ProcessPendingTransactionError::MovePendingTransactionToInmempoolError,
+                        )?;
                         self.invalidate_transaction_cache(&transaction.id).await;
                     }
                     Err(e) => {

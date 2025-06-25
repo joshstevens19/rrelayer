@@ -70,6 +70,20 @@ impl RelayerApi {
             .await
     }
 
+    pub async fn clone(
+        &self,
+        id: &RelayerId,
+        chain_id: u64,
+        name: &str,
+    ) -> ApiResult<CreateRelayerResult> {
+        self.client
+            .post(
+                &format!("relayers/{}/clone", id),
+                &serde_json::json!({ "new_relayer_name": name, "chain_id": chain_id }),
+            )
+            .await
+    }
+
     pub async fn delete(&self, id: &RelayerId) -> ApiResult<()> {
         self.client.delete_status(&format!("relayers/{}", id)).await
     }

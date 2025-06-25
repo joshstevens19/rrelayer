@@ -8,6 +8,7 @@ use axum::{
     routing::{delete, get, post, put},
     Json, Router,
 };
+use futures::TryFutureExt;
 use rand::{distributions::Alphanumeric, Rng};
 use serde::{Deserialize, Serialize};
 
@@ -57,7 +58,58 @@ async fn create_relayer(
         .ok_or(StatusCode::NOT_FOUND)?;
 
     let relayer =
-        state.db.create_relayer(&relayer.name, &chain_id, provider).await.map_err(|e| {
+        state.db.create_relayer(&relayer.name, &chain_id, provider, None).await.map_err(|e| {
+            rrelayerr_error!("{}", e);
+            StatusCode::BAD_REQUEST
+        })?;
+
+    let current_nonce = provider
+        .get_nonce(&relayer.wallet_index)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let id = relayer.id;
+    let address = relayer.address;
+
+    state
+        .transactions_queues
+        .lock()
+        .await
+        .add_new_relayer(TransactionsQueueSetup::new(
+            relayer,
+            provider.clone(),
+            NonceManager::new(current_nonce),
+            Default::default(),
+            Default::default(),
+            Default::default(),
+        ))
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    invalidate_relayer_cache(&state.cache, &id).await;
+    Ok(Json(CreateRelayerResult { id, address }))
+}
+
+#[derive(Debug, Deserialize)]
+struct CloneRelayerRequest {
+    pub new_relayer_name: String,
+    pub chain_id: ChainId,
+}
+
+async fn clone_relayer(
+    State(state): State<Arc<AppState>>,
+    Path(relayer_id): Path<RelayerId>,
+    Json(relayer): Json<CloneRelayerRequest>,
+) -> Result<Json<CreateRelayerResult>, StatusCode> {
+    let provider = find_provider_for_chain_id(&state.evm_providers, &relayer.chain_id)
+        .await
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    let relayer = state
+        .db
+        .create_relayer(&relayer.new_relayer_name, &relayer.chain_id, provider, Some(relayer_id))
+        .await
+        .map_err(|e| {
             rrelayerr_error!("{}", e);
             StatusCode::BAD_REQUEST
         })?;
@@ -476,6 +528,7 @@ pub fn create_relayer_routes() -> Router<Arc<AppState>> {
         .route("/:relayer_id/pause", put(pause_relayer))
         .route("/:relayer_id/unpause", put(unpause_relayer))
         .route("/:relayer_id/gas/max/:cap", put(update_relay_max_gas_price))
+        .route("/:relayer_id/clone", post(clone_relayer).route_layer(from_fn(admin_jwt_guard)))
         .route(
             "/:relayer_id/api-keys",
             post(create_relayer_api_key).route_layer(from_fn(integrator_or_above_jwt_guard)),
