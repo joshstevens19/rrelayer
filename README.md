@@ -12,6 +12,8 @@ RUSTFLAGS="-C target-cpu=native" cargo run --profile maxperf --features jemalloc
     - aws signer
     - gcp signer
     - keystore signer
+    - turn key
+    - privy 
 - review whole codebase and tidy up
 - look at the vercel server API example
 
