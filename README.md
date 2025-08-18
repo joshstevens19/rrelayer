@@ -2,20 +2,9 @@
 
 // copy from docs
 
-# PROD RUN!!!
+# PROD RUN
 
 RUSTFLAGS="-C target-cpu=native" cargo run --profile maxperf --features jemalloc
-
-## Server MVP
-
-- support more signing options
-    - aws signer
-    - gcp signer
-    - keystore signer
-    - turn key
-    - privy 
-- review whole codebase and tidy up
-- look at the vercel server API example
 
 # AWS env
 
