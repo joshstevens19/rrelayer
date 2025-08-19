@@ -1,4 +1,4 @@
-use std::fmt::{Debug};
+use std::fmt::Debug;
 
 use clap::{Subcommand, ValueEnum};
 use rrelayer_core::{

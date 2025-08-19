@@ -1,9 +1,8 @@
 use std::{env, path::PathBuf, process::Command, thread, time::Duration};
 
-use clap::Args;
 use rrelayer_core::{PostgresClient, rrelayer_error, rrelayer_info, start};
 
-use crate::console::{print_error_message, print_success_message};
+use crate::console::print_error_message;
 
 pub async fn handle_start(project_path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     rrelayer_info!("Loading from path {:?}", project_path);
@@ -39,31 +38,6 @@ pub async fn handle_start(project_path: &PathBuf) -> Result<(), Box<dyn std::err
     Ok(())
 }
 
-fn check_postgres_connection(conn_str: &str, max_retries: u32) -> Result<(), String> {
-    let mut retries = 0;
-
-    while retries < max_retries {
-        let status = Command::new("pg_isready").args(["-d", conn_str]).output().map_err(|e| {
-            let error = format!("Failed to check Postgres status: {}", e);
-            rrelayer_error!(error);
-            error
-        })?;
-
-        if status.status.success() {
-            return Ok(());
-        }
-
-        retries += 1;
-        thread::sleep(Duration::from_millis(500));
-        rrelayer_info!(
-            "Waiting for Postgres to become available this may take a few attempts... attempt: {}",
-            retries
-        );
-    }
-
-    Err("Postgres did not become available within the given retries.".into())
-}
-
 fn check_docker_compose_status(project_path: &PathBuf, max_retries: u32) -> Result<(), String> {
     let mut retries = 0;
 
@@ -83,12 +57,8 @@ fn check_docker_compose_status(project_path: &PathBuf, max_retries: u32) -> Resu
             if !output.contains("Exit") && output.contains("Up") {
                 rrelayer_info!("All containers are up and running.");
 
-                return if let Ok(conn_str) = env::var("DATABASE_URL") {
-                    check_postgres_connection(&conn_str, max_retries).map_err(|e| {
-                        let error = format!("Failed to connect to PostgresSQL: {}", e);
-                        rrelayer_error!(error);
-                        error
-                    })
+                return if let Ok(_) = env::var("DATABASE_URL") {
+                    Ok(())
                 } else {
                     let error = "DATABASE_URL not set.".to_string();
                     rrelayer_error!(error);

@@ -19,6 +19,15 @@ use crate::{
 };
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct GcpSigningKey {
+    pub secret_name: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub version: Option<String>,
+    pub service_account_key_path: String,
+    pub secret_key: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AwsSigningKey {
     pub secret_name: String,
     pub access_key_id: String,
@@ -26,6 +35,7 @@ pub struct AwsSigningKey {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub session_token: Option<String>,
     pub region: String,
+    pub secret_key: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -51,33 +61,39 @@ pub struct SigningKey {
 
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub aws_secret_manager: Option<AwsSigningKey>,
+
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub gcp_secret_manager: Option<GcpSigningKey>,
 }
 
 impl SigningKey {
     pub fn from_keystore(keystore: KeystoreSigningKey) -> Self {
-        Self { keystore: Some(keystore), raw: None, aws_secret_manager: None }
+        Self {
+            keystore: Some(keystore),
+            raw: None,
+            aws_secret_manager: None,
+            gcp_secret_manager: None,
+        }
     }
 }
 
 impl SigningKey {
     pub fn validate(&self) -> Result<(), String> {
-        if self.raw.is_none() && self.aws_secret_manager.is_none() && self.keystore.is_none() {
-            return Err("Signing key is not set".to_string());
-        }
+        let configured_methods = [
+            self.raw.is_some(),
+            self.aws_secret_manager.is_some(),
+            self.gcp_secret_manager.is_some(),
+            self.keystore.is_some(),
+        ]
+        .iter()
+        .filter(|&&x| x)
+        .count();
 
-        if self.raw.is_some() && self.aws_secret_manager.is_some() {
-            return Err("Signing key can not be both raw and aws secret manager".to_string());
+        match configured_methods {
+            0 => Err("Signing key is not set".to_string()),
+            1 => Ok(()),
+            _ => Err("Only one signing key method can be configured at a time".to_string()),
         }
-
-        if self.raw.is_some() && self.keystore.is_some() {
-            return Err("Signing key can not be both raw and keystore".to_string());
-        }
-
-        if self.aws_secret_manager.is_some() && self.keystore.is_some() {
-            return Err("Signing key can not be both aws secret manager and keystore".to_string());
-        }
-
-        Ok(())
     }
 }
 

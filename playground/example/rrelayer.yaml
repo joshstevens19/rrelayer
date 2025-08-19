@@ -3,7 +3,19 @@ signing_key:
   keystore:
     path: ./keystores/rrelayer_signing_key
     name: rrelayer_signing_key
+#  gcp_secret_manager:
+#    secret_name: "Testing-Josh-Relayer"
+#    service_account_key_path: "./gcp-service-account.json"
+#    secret_key: "seed"
+#   aws_secret_manager:
+#     secret_key: "seed"
+#     access_key_id: ""
+#     secret_access_key: ""
+#     region: "us-east-1"  # or your preferred region
+#     secret_name: "testing-josh-relayer"
+#     session_token: ""
 admins:
+  - "0xa4635F69E5A64CD48da3FbC999aCed87B00756F6"
   - account1
 networks:
   #  - name: sepolia_ethereum

@@ -24,8 +24,15 @@ pub async fn get_aws_secret(
 
     let resp = client.get_secret_value().secret_id(config.secret_name.clone()).send().await?;
 
-    match resp.secret_string() {
-        Some(secret_string) => Ok(secret_string.to_string()),
-        None => Err("failed to get secret string".into()),
-    }
+    let secret_string = resp.secret_string().ok_or("failed to get secret string")?;
+
+    let secret_json: serde_json::Value = serde_json::from_str(secret_string)
+        .map_err(|e| format!("Failed to parse secret as JSON: {}", e))?;
+
+    let key_value = secret_json
+        .get(&config.secret_key)
+        .and_then(|v| v.as_str())
+        .ok_or(format!("Key '{}' not found in secret or is not a string", config.secret_key))?;
+
+    Ok(key_value.to_string())
 }
