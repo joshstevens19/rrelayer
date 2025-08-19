@@ -37,9 +37,9 @@ import {
   PagingResult,
   defaultPagingContext,
 } from '../api/types';
-import { RRelayerrEthereumProvider } from '../rrelayer-ethereum-provider';
+import { RrelayerEthereumProvider } from '../rrelayer-ethereum-provider';
 import { invariant } from '../utils';
-import { RRelayerrConfig } from './core-client';
+import { RRelayerConfig } from './core-client';
 
 export interface RelayerClientConfig {
   providerUrl: string;
@@ -62,12 +62,12 @@ export enum TransactionCountType {
  * The relayer client to interact with the relayer
  */
 export class RelayerClient {
-  private _apiBaseConfig: ApiBaseConfig;
-  private _relayerId: string;
-  private _ethereumProvider: RRelayerrEthereumProvider;
-  constructor(relayerConfig: RelayerClientConfig, coreConfig: RRelayerrConfig) {
+  private readonly _apiBaseConfig: ApiBaseConfig;
+  private readonly _relayerId: string;
+  private readonly _ethereumProvider: RrelayerEthereumProvider;
+  constructor(relayerConfig: RelayerClientConfig, coreConfig: RRelayerConfig) {
     this._relayerId = relayerConfig.relayerId;
-    this._ethereumProvider = new RRelayerrEthereumProvider(
+    this._ethereumProvider = new RrelayerEthereumProvider(
       relayerConfig.providerUrl,
       this
     );
@@ -273,7 +273,7 @@ export class RelayerClient {
     return {
       /**
        * Get a transaction
-       * @param id The transaction id
+       * @param transactionId The transaction id
        * @returns Transaction | null
        */
       getTransaction: (transactionId: string): Promise<Transaction | null> => {
@@ -281,7 +281,7 @@ export class RelayerClient {
       },
       /**
        * Get a transaction status
-       * @param id The transaction id
+       * @param transactionId The transaction id
        * @returns TransactionStatusResult | null
        */
       getTransactionStatus: (
@@ -392,7 +392,7 @@ export class RelayerClient {
     };
   }
 
-  public ethereumProvider(): RRelayerrEthereumProvider {
+  public ethereumProvider(): RrelayerEthereumProvider {
     return this._ethereumProvider;
   }
 }

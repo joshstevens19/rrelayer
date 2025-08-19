@@ -146,7 +146,8 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
             failed_at TIMESTAMPTZ NULL,
             failed_reason TEXT NULL,
             sent_at TIMESTAMPTZ NULL,
-            confirmed_at TIMESTAMPTZ NULL
+            confirmed_at TIMESTAMPTZ NULL,
+            external_id VARCHAR(255) NULL
         );
         DO $$
         BEGIN
@@ -186,7 +187,8 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
             failed_at TIMESTAMPTZ NULL,
             failed_reason TEXT NULL,
             sent_at TIMESTAMPTZ NULL,
-            confirmed_at TIMESTAMPTZ NULL
+            confirmed_at TIMESTAMPTZ NULL,
+            external_id VARCHAR(255) NULL
         );
         DO $$
         BEGIN

@@ -14,6 +14,7 @@ pub struct TransactionToSend {
     pub value: TransactionValue,
     pub data: TransactionData,
     pub blobs: Option<Vec<Blob>>,
+    pub external_id: Option<String>,
 }
 
 impl TransactionToSend {
@@ -24,6 +25,7 @@ impl TransactionToSend {
         data: TransactionData,
         speed: Option<TransactionSpeed>,
         blobs: Option<Vec<Blob>>,
+        external_id: Option<String>,
     ) -> Self {
         Self {
             id: TransactionId::new(),
@@ -34,6 +36,7 @@ impl TransactionToSend {
             value,
             data,
             blobs,
+            external_id,
         }
     }
 }

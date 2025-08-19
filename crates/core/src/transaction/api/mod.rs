@@ -104,6 +104,8 @@ pub struct RelayTransactionRequest {
     #[serde(default)]
     pub data: TransactionData,
     pub speed: Option<TransactionSpeed>,
+    /// This allows an app to pass their own custom external id in perfect for webhooks
+    pub external_id: Option<String>,
     #[serde(default)]
     pub blobs: Option<Vec<String>>, // will overflow the stack if you use the Blob type directly
 }
@@ -146,6 +148,7 @@ async fn send_transaction(
         transaction.data.clone(),
         transaction.speed.clone(),
         convert_blob_strings_to_blobs(transaction.blobs)?,
+        transaction.external_id,
     );
 
     let transaction = state

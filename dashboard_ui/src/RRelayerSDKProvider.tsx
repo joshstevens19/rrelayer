@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { createRRelayerrClient } from 'rrelayer-sdk/dist/clients/core-client';
+import { createRRelayerClient } from 'rrelayer-sdk/dist/clients/core-client';
 import { useAccount } from 'wagmi';
 import { getWalletClient } from 'wagmi/actions';
 import { config } from './Web3Provider';
@@ -9,7 +9,7 @@ import {
 } from './contexts/RRelayerrSDKContext';
 import LoadingComponent from './shared/components/Loading';
 
-export const RRelayerrSDKProvider = ({
+export const RRelayerSDKProvider = ({
   children,
 }: {
   children: React.ReactNode;
@@ -38,7 +38,7 @@ export const RRelayerrSDKProvider = ({
         return;
       }
 
-      const core = createRRelayerrClient({
+      const core = createRRelayerClient({
         // serverUrl: process.env.NEXT_PUBLIC_RELAYER_SERVER_URL!,
         serverUrl: 'http://127.0.0.1:8000',
       });

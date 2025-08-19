@@ -25,7 +25,7 @@ impl PostgresClient {
         for table_name in TRANSACTION_TABLES.iter() {
             trans.execute(
                 format!("
-                INSERT INTO {}(id, relayer_id, api_key, \"to\", \"from\", nonce, chain_id, data, value, speed, status, expires_at, queued_at)
+                INSERT INTO {}(id, relayer_id, api_key, \"to\", \"from\", nonce, chain_id, data, value, speed, status, expires_at, queued_at, external_id)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13);
             ", table_name).as_str(),
                 &[&transaction.id,
@@ -40,7 +40,9 @@ impl PostgresClient {
                     &transaction.speed,
                     &transaction.status,
                     &transaction.expires_at,
-                    &transaction.queued_at],
+                    &transaction.queued_at,
+                    &transaction.external_id
+                ],
             )
                 .await?;
         }
@@ -111,7 +113,7 @@ impl PostgresClient {
         for table_name in TRANSACTION_TABLES.iter() {
             trans.execute(
                 format!("
-                INSERT INTO {}(id, relayer_id, api_key, \"to\", nonce, chain_id, data, value, speed, status, expires_at, queued_at, failed_at, failed_reason)
+                INSERT INTO {}(id, relayer_id, api_key, \"to\", nonce, chain_id, data, value, speed, status, expires_at, queued_at, failed_at, failed_reason, external_id)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), $13);
                 ", table_name).as_str(),
                 &[
@@ -128,6 +130,7 @@ impl PostgresClient {
                     &transaction.expires_at,
                     &transaction.queued_at,
                     &failed_reason.chars().take(2000).collect::<String>(),
+                    &transaction.external_id,
                 ],
             )
                 .await

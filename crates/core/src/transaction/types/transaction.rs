@@ -122,6 +122,8 @@ pub struct Transaction {
 
     #[serde(skip_serializing, skip_deserializing, default)]
     pub from_api_key: ApiKey,
+
+    pub external_id: Option<String>,
 }
 
 impl Display for Transaction {

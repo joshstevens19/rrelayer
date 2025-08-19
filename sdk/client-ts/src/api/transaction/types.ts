@@ -42,6 +42,7 @@ export interface TransactionToSend {
   value?: string | null;
   data?: string | null;
   speed?: TransactionSpeed;
+  external_id?: string;
 }
 
 export interface TransactionSent {

@@ -1,8 +1,8 @@
 import { createWalletClient, custom } from 'viem';
-import { createRRelayerrClient } from '../clients';
+import { createRRelayerClient } from '../clients';
 
 export const integration = async () => {
-  const client = createRRelayerrClient({
+  const client = createRRelayerClient({
     serverUrl: 'http://127.0.0.1:8000',
   });
 

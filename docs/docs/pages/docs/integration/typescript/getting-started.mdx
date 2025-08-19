@@ -25,12 +25,12 @@ bun i rrelayer-ts
 
 ## Creating a rrelayer client
 
-The rrelayer client is the main entry point for interacting with the rrelayer server. You can create a client by calling the `createRRelayerrClient` function and passing in the server url and the api secret access key.
+The rrelayer client is the main entry point for interacting with the rrelayer server. You can create a client by calling the `createRRelayerClient` function and passing in the server url and the api secret access key.
 
 ```ts
-import { createRRelayerrClient } from 'rrelayer-ts';
+import { createRRelayerClient } from 'rrelayer-ts';
 
-const client = createRRelayerrClient({
+const client = createRRelayerClient({
   // This is where the rrelayer server is hosted
   serverUrl: 'http://127.0.0.1:8000',
   // This is your API secret access key you can have many
@@ -44,9 +44,9 @@ const client = createRRelayerrClient({
 The rrelayer client exposes ways for you to create an relayer client which exposes a ethereum provider you can use with `viem` or `ethers`.
 
 ```ts
-import { createRRelayerrClient } from 'rrelayer-ts';
+import { createRRelayerClient } from 'rrelayer-ts';
 
-const client = createRRelayerrClient({
+const client = createRRelayerClient({
   // This is where the rrelayer server is hosted
   serverUrl: 'http://127.0.0.1:8000',
   // This is your API secret access key you can have many

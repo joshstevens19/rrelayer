@@ -250,6 +250,7 @@ impl TransactionsQueues {
                 from_api_key: transaction_to_send.from_api_key.clone(),
                 sent_with_gas: None,
                 sent_with_blob_gas: None,
+                external_id: transaction_to_send.external_id.clone(),
             };
 
             let gas_price = transactions_queue

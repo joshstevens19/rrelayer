@@ -36,7 +36,7 @@ import {
   defaultPagingContext,
 } from '../api/types';
 import { invariant } from '../utils';
-import { RRelayerrClient } from './core-client';
+import { RRelayerClient } from './core-client';
 import { RelayerClient } from './relayer-client';
 import { NetworkStatus } from './types';
 
@@ -53,7 +53,7 @@ export type AdminSetup =
 export class AdminClient {
   private _currentTokenPair: TokenPair | null = null;
   private _walletClient: WalletClient;
-  constructor(private _rrelayerClient: RRelayerrClient, config: AdminSetup) {
+  constructor(private _rrelayerClient: RRelayerClient, config: AdminSetup) {
     if ('accessPrivateKey' in config) {
       this._walletClient = createWalletClient({
         account: privateKeyToAccount(config.accessPrivateKey),

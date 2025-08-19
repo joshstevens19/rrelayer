@@ -11,9 +11,9 @@ export {
 export {
   CreateRelayerClientConfig,
   CreateRelayerWithApiKeyResult,
-  RRelayerrClient,
-  RRelayerrConfig,
-  createRRelayerrClient,
+  RRelayerClient,
+  RRelayerConfig,
+  createRRelayerClient,
 } from './core-client';
 export { RelayerClientConfig, TransactionCountType } from './relayer-client';
 export { NetworkStatus } from './types';

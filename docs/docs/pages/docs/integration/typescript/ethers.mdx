@@ -35,9 +35,9 @@ The rrelayer client exposes ways for you to create an relayer client which expos
 
 ```ts [ethers@v6]
 import { BrowserProvider } from 'ethers';
-import { createRRelayerrClient } from 'rrelayer-ts';
+import { createRRelayerClient } from 'rrelayer-ts';
 
-const client = createRRelayerrClient({
+const client = createRRelayerClient({
   // This is where the rrelayer server is hosted
   serverUrl: 'http://127.0.0.1:8000',
   // This is your API secret access key you can have many
@@ -57,9 +57,9 @@ export provider = new BrowserProvider(relayer.ethereumProvider());
 
 ```ts [ethers@v5]
 import { ethers } from 'ethers';
-import { createRRelayerrClient } from 'rrelayer-ts';
+import { createRRelayerClient } from 'rrelayer-ts';
 
-const client = createRRelayerrClient({
+const client = createRRelayerClient({
   // This is where the rrelayer server is hosted
   serverUrl: 'http://127.0.0.1:8000',
   // This is your API secret access key you can have many
@@ -97,9 +97,9 @@ const message = await signer.signMessage('sign me!');
 
 ```ts [config]
 import { BrowserProvider } from 'ethers';
-import { createRRelayerrClient } from 'rrelayer-ts';
+import { createRRelayerClient } from 'rrelayer-ts';
 
-const client = createRRelayerrClient({
+const client = createRRelayerClient({
   // This is where the rrelayer server is hosted
   serverUrl: 'http://127.0.0.1:8000',
   // This is your API secret access key you can have many
@@ -163,9 +163,9 @@ const signature = await signer._signTypedData({
 
 ```ts [config]
 import { BrowserProvider } from 'ethers';
-import { createRRelayerrClient } from 'rrelayer-ts';
+import { createRRelayerClient } from 'rrelayer-ts';
 
-const client = createRRelayerrClient({
+const client = createRRelayerClient({
   // This is where the rrelayer server is hosted
   serverUrl: 'http://127.0.0.1:8000',
   // This is your API secret access key you can have many
@@ -204,9 +204,9 @@ const hash = await signer.sendTransaction({
 
 ```ts [config]
 import { BrowserProvider } from 'ethers';
-import { createRRelayerrClient } from 'rrelayer-ts';
+import { createRRelayerClient } from 'rrelayer-ts';
 
-const client = createRRelayerrClient({
+const client = createRRelayerClient({
   // This is where the rrelayer server is hosted
   serverUrl: 'http://127.0.0.1:8000',
   // This is your API secret access key you can have many
@@ -262,9 +262,9 @@ export const wagmiAbi = [
 
 ```ts [config]
 import { BrowserProvider } from 'ethers';
-import { createRRelayerrClient } from 'rrelayer-ts';
+import { createRRelayerClient } from 'rrelayer-ts';
 
-const client = createRRelayerrClient({
+const client = createRRelayerClient({
   // This is where the rrelayer server is hosted
   serverUrl: 'http://127.0.0.1:8000',
   // This is your API secret access key you can have many

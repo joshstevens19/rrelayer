@@ -176,6 +176,7 @@ async fn handle_withdraw(
                 data: TransactionData::empty(),
                 speed: Some(TransactionSpeed::Fast),
                 blobs: None,
+                external_id: None
             },
         )
         .await?;

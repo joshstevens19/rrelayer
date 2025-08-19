@@ -2,7 +2,7 @@ import { CreateRelayerResult, GetRelayerResult, getRelayer } from '../api';
 import { AdminClient, AdminSetup } from './admin-client';
 import { RelayerClient } from './relayer-client';
 
-export interface RRelayerrConfig {
+export interface RRelayerConfig {
   serverUrl: string;
 }
 
@@ -20,8 +20,8 @@ export interface CreateRelayerClientConfig {
   apiKey: string;
 }
 
-export class RRelayerrClient {
-  constructor(public config: RRelayerrConfig) {}
+export class RRelayerClient {
+  constructor(public config: RRelayerConfig) {}
 
   /**
    * Create admin client
@@ -85,8 +85,8 @@ export class RRelayerrClient {
   }
 }
 
-export const createRRelayerrClient = (
-  config: RRelayerrConfig
-): RRelayerrClient => {
-  return new RRelayerrClient(config);
+export const createRRelayerClient = (
+  config: RRelayerConfig
+): RRelayerClient => {
+  return new RRelayerClient(config);
 };

@@ -15,9 +15,9 @@ await rrelayerClient.networks.disable(1);
 ```
 
 ```ts [config]
-import { createRRelayerrClient } from 'rrelayer-ts';
+import { createRRelayerClient } from 'rrelayer-ts';
 
-export const rrelayerClient = createRRelayerrClient({
+export const rrelayerClient = createRRelayerClient({
   // This is where the rrelayer server is hosted
   serverUrl: 'http://127.0.0.1:8000',
   // This is your API secret access key you can have many
@@ -42,9 +42,9 @@ await rrelayerClient.networks.enable(1);
 ```
 
 ```ts [config]
-import { createRRelayerrClient } from 'rrelayer-ts';
+import { createRRelayerClient } from 'rrelayer-ts';
 
-export const rrelayerClient = createRRelayerrClient({
+export const rrelayerClient = createRRelayerClient({
   // This is where the rrelayer server is hosted
   serverUrl: 'http://127.0.0.1:8000',
   // This is your API secret access key you can have many
@@ -83,9 +83,9 @@ const networks = await rrelayerClient.network.get(NetworkStatus.DISABLED);
 ```
 
 ```ts [config]
-import { createRRelayerrClient } from 'rrelayer-ts';
+import { createRRelayerClient } from 'rrelayer-ts';
 
-export const rrelayerClient = createRRelayerrClient({
+export const rrelayerClient = createRRelayerClient({
   // This is where the rrelayer server is hosted
   serverUrl: 'http://127.0.0.1:8000',
   // This is your API secret access key you can have many

@@ -31,9 +31,9 @@ The rrelayer client exposes ways for you to create an relayer client which expos
 
 ```ts
 import { createWalletClient, custom } from 'viem';
-import { createRRelayerrClient } from 'rrelayer-ts';
+import { createRRelayerClient } from 'rrelayer-ts';
 
-const client = createRRelayerrClient({
+const client = createRRelayerClient({
   // This is where the rrelayer server is hosted
   serverUrl: 'http://127.0.0.1:8000',
   // This is your API secret access key you can have many
@@ -74,9 +74,9 @@ const message = await walletClient.signMessage({
 
 ```ts [config]
 import { createWalletClient, custom } from 'viem';
-import { createRRelayerrClient } from 'rrelayer-ts';
+import { createRRelayerClient } from 'rrelayer-ts';
 
-const client = createRRelayerrClient({
+const client = createRRelayerClient({
   // This is where the rrelayer server is hosted
   serverUrl: 'http://127.0.0.1:8000',
   // This is your API secret access key you can have many
@@ -145,9 +145,9 @@ const signature = await walletClient.signTypedData({
 
 ```ts [config]
 import { createWalletClient, custom } from 'viem';
-import { createRRelayerrClient } from 'rrelayer-ts';
+import { createRRelayerClient } from 'rrelayer-ts';
 
-const client = createRRelayerrClient({
+const client = createRRelayerClient({
   // This is where the rrelayer server is hosted
   serverUrl: 'http://127.0.0.1:8000',
   // This is your API secret access key you can have many
@@ -189,9 +189,9 @@ const hash = await walletClient.sendTransaction({
 
 ```ts [config]
 import { createWalletClient, custom } from 'viem';
-import { createRRelayerrClient } from 'rrelayer-ts';
+import { createRRelayerClient } from 'rrelayer-ts';
 
-const client = createRRelayerrClient({
+const client = createRRelayerClient({
   // This is where the rrelayer server is hosted
   serverUrl: 'http://127.0.0.1:8000',
   // This is your API secret access key you can have many
@@ -250,9 +250,9 @@ export const wagmiAbi = [
 
 ```ts [config]
 import { createWalletClient, createPublicClient, custom } from 'viem';
-import { createRRelayerrClient } from 'rrelayer-ts';
+import { createRRelayerClient } from 'rrelayer-ts';
 
-const client = createRRelayerrClient({
+const client = createRRelayerClient({
   // This is where the rrelayer server is hosted
   serverUrl: 'http://127.0.0.1:8000',
   // This is your API secret access key you can have many
