@@ -4,9 +4,9 @@ import { useAccount } from 'wagmi';
 import { getWalletClient } from 'wagmi/actions';
 import { config } from './Web3Provider';
 import {
-  RRelayerrSDKContext,
-  RRelayerrSDKContextType,
-} from './contexts/RRelayerrSDKContext';
+  RRelayerSDKContext,
+  RRelayerSDKContextType,
+} from './contexts/RRelayerSDKContext';
 import LoadingComponent from './shared/components/Loading';
 
 export const RRelayerSDKProvider = ({
@@ -14,7 +14,7 @@ export const RRelayerSDKProvider = ({
 }: {
   children: React.ReactNode;
 }) => {
-  const [sdk, setSDK] = useState<RRelayerrSDKContextType | null>(null);
+  const [sdk, setSDK] = useState<RRelayerSDKContextType | null>(null);
   const [loading, setLoading] = useState(true);
   const { isConnected, connector } = useAccount();
 
@@ -68,8 +68,8 @@ export const RRelayerSDKProvider = ({
   }
 
   return (
-    <RRelayerrSDKContext.Provider value={sdk}>
+    <RRelayerSDKContext.Provider value={sdk}>
       {children}
-    </RRelayerrSDKContext.Provider>
+    </RRelayerSDKContext.Provider>
   );
 };

@@ -1,4 +1,4 @@
-import { RRelayerrSDKContext } from '@/contexts/RRelayerrSDKContext';
+import { RRelayerSDKContext } from '@/contexts/RRelayerSDKContext';
 import { useCallback, useContext } from 'react';
 import { JwtRole } from 'rrelayer-sdk/dist/api/authentication/types';
 import { Address } from 'viem';
@@ -9,12 +9,12 @@ export interface UseAddUserOptions {
 }
 
 export const useAddUser = ({ onSuccess, onError }: UseAddUserOptions = {}) => {
-  const sdk = useContext(RRelayerrSDKContext);
+  const sdk = useContext(RRelayerSDKContext);
 
   const addUser = useCallback(
     async (user: Address, role: JwtRole) => {
       if (!sdk) {
-        throw new Error('RRelayerrSDKContext is undefined');
+        throw new Error('RRelayerSDKContext is undefined');
       }
 
       try {

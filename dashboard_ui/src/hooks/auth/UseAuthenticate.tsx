@@ -1,4 +1,4 @@
-import { RRelayerrSDKContext } from '@/contexts/RRelayerrSDKContext';
+import { RRelayerSDKContext } from '@/contexts/RRelayerSDKContext';
 import { useCallback, useContext } from 'react';
 import { TokenPair } from 'rrelayer-sdk/dist/api/authentication/types';
 
@@ -11,11 +11,11 @@ export const useAuthenticate = ({
   onSuccess,
   onError,
 }: UseAuthenticateOptions) => {
-  const sdk = useContext(RRelayerrSDKContext);
+  const sdk = useContext(RRelayerSDKContext);
 
   const authenticate = useCallback(async () => {
     if (!sdk) {
-      throw new Error('RRelayerrSDKContext is undefined');
+      throw new Error('RRelayerSDKContext is undefined');
     }
 
     try {

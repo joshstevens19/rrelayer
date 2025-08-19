@@ -1,4 +1,4 @@
-import { RRelayerrSDKContext } from '@/contexts/RRelayerrSDKContext';
+import { RRelayerSDKContext } from '@/contexts/RRelayerSDKContext';
 import { useCallback, useContext } from 'react';
 
 export interface UseUpdateEIP1559RelayerStatusOptions {
@@ -10,12 +10,12 @@ export const useUpdateEIP1559RelayerStatus = ({
   onSuccess,
   onError,
 }: UseUpdateEIP1559RelayerStatusOptions = {}) => {
-  const sdk = useContext(RRelayerrSDKContext);
+  const sdk = useContext(RRelayerSDKContext);
 
   const updateEIP1559RelayerStatus = useCallback(
     async (relayerId: string, status: boolean) => {
       if (!sdk) {
-        throw new Error('RRelayerrSDKContext is undefined');
+        throw new Error('RRelayerSDKContext is undefined');
       }
 
       try {

@@ -1,4 +1,4 @@
-import { RRelayerrSDKContext } from '@/contexts/RRelayerrSDKContext';
+import { RRelayerSDKContext } from '@/contexts/RRelayerSDKContext';
 import { useCallback, useContext } from 'react';
 
 export interface UseDeleteRelayerApiOptions {
@@ -10,12 +10,12 @@ export const useDeleteRelayerApiKey = ({
   onSuccess,
   onError,
 }: UseDeleteRelayerApiOptions = {}) => {
-  const sdk = useContext(RRelayerrSDKContext);
+  const sdk = useContext(RRelayerSDKContext);
 
   const deleteRelayerApiKey = useCallback(
     async (relayerId: string, apiKey: string) => {
       if (!sdk) {
-        throw new Error('RRelayerrSDKContext is undefined');
+        throw new Error('RRelayerSDKContext is undefined');
       }
 
       try {

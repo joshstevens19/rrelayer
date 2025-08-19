@@ -1,4 +1,4 @@
-import { RRelayerrSDKContext } from '@/contexts/RRelayerrSDKContext';
+import { RRelayerSDKContext } from '@/contexts/RRelayerSDKContext';
 import { ConnectKitButton } from 'connectkit';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/router';
@@ -10,7 +10,7 @@ import Authenticate from './components/authenticate';
 const Login: React.FC = () => {
   const router = useRouter();
   const { isConnected } = useAccount();
-  const sdk = useContext(RRelayerrSDKContext);
+  const sdk = useContext(RRelayerSDKContext);
 
   useEffect(() => {
     if (!sdk) {

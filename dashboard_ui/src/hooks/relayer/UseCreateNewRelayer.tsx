@@ -1,4 +1,4 @@
-import { RRelayerrSDKContext } from '@/contexts/RRelayerrSDKContext';
+import { RRelayerSDKContext } from '@/contexts/RRelayerSDKContext';
 import { useCallback, useContext } from 'react';
 import { CreateRelayerResult } from 'rrelayer-sdk';
 
@@ -11,12 +11,12 @@ export const useCreateNewRelayer = ({
   onSuccess,
   onError,
 }: UseCreateRelayerOptions) => {
-  const sdk = useContext(RRelayerrSDKContext);
+  const sdk = useContext(RRelayerSDKContext);
 
   const createNewRelayer = useCallback(
     async (name: string, chainId: number) => {
       if (!sdk) {
-        throw new Error('RRelayerrSDKContext is undefined');
+        throw new Error('RRelayerSDKContext is undefined');
       }
 
       try {

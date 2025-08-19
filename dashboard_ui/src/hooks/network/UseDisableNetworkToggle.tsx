@@ -1,4 +1,4 @@
-import { RRelayerrSDKContext } from '@/contexts/RRelayerrSDKContext';
+import { RRelayerSDKContext } from '@/contexts/RRelayerSDKContext';
 import { useCallback, useContext } from 'react';
 
 export interface UsePauseRelayerToggleOptions {
@@ -15,12 +15,12 @@ export const useDisableNetworkToggle = ({
   onSuccess,
   onError,
 }: UsePauseRelayerToggleOptions = {}) => {
-  const sdk = useContext(RRelayerrSDKContext);
+  const sdk = useContext(RRelayerSDKContext);
 
   const pauseRelayerToggle = useCallback(
     async (chainId: string, toggleType: DisableNetworkToggleType) => {
       if (!sdk) {
-        throw new Error('RRelayerrSDKContext is undefined');
+        throw new Error('RRelayerSDKContext is undefined');
       }
 
       try {

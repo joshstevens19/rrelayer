@@ -1,4 +1,4 @@
-import { RRelayerrSDKContext } from '@/contexts/RRelayerrSDKContext';
+import { RRelayerSDKContext } from '@/contexts/RRelayerSDKContext';
 import { useCallback, useContext } from 'react';
 
 export interface UseCreateNewRelayerApiKeyOptions {
@@ -10,12 +10,12 @@ export const useCreateNewRelayerApiKey = ({
   onSuccess,
   onError,
 }: UseCreateNewRelayerApiKeyOptions) => {
-  const sdk = useContext(RRelayerrSDKContext);
+  const sdk = useContext(RRelayerSDKContext);
 
   const createNewRelayerApiKey = useCallback(
     async (relayerId: string) => {
       if (!sdk) {
-        throw new Error('RRelayerrSDKContext is undefined');
+        throw new Error('RRelayerSDKContext is undefined');
       }
 
       try {

@@ -1,4 +1,4 @@
-import { RRelayerrSDKContext } from '@/contexts/RRelayerrSDKContext';
+import { RRelayerSDKContext } from '@/contexts/RRelayerSDKContext';
 import { useCallback, useContext } from 'react';
 import { Address } from 'viem';
 
@@ -11,12 +11,12 @@ export const useAddAllowlistedAddressForRelayer = ({
   onSuccess,
   onError,
 }: UseAddAllowlistedAddressForRelayerOptions = {}) => {
-  const sdk = useContext(RRelayerrSDKContext);
+  const sdk = useContext(RRelayerSDKContext);
 
   const addAllowlistedAddress = useCallback(
     async (relayerId: string, address: Address) => {
       if (!sdk) {
-        throw new Error('RRelayerrSDKContext is undefined');
+        throw new Error('RRelayerSDKContext is undefined');
       }
 
       try {

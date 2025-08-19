@@ -274,7 +274,7 @@ export const sidebar = {
               text: 'SDK',
               items: [
                 {
-                  text: 'RRelayerrClient',
+                  text: 'RRelayerClient',
                   items: [
                     {
                       text: 'Setup',
@@ -299,7 +299,7 @@ export const sidebar = {
                   ],
                 },
                 {
-                  text: 'RRelayerrRelayerClient',
+                  text: 'RRelayerRelayerClient',
                   items: [
                     {
                       text: 'Setup',

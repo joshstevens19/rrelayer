@@ -1,9 +1,9 @@
-import { RRelayerrSDKContext } from '@/contexts/RRelayerrSDKContext';
+import { RRelayerSDKContext } from '@/contexts/RRelayerSDKContext';
 import { useCallback, useContext, useState } from 'react';
 import { Relayer } from 'rrelayer-sdk';
 
 export const useGetRelayer = () => {
-  const sdk = useContext(RRelayerrSDKContext);
+  const sdk = useContext(RRelayerSDKContext);
   const [loading, setLoading] = useState(false);
   const [relayer, setRelayer] = useState<Relayer | null>(null);
 
@@ -12,7 +12,7 @@ export const useGetRelayer = () => {
       setLoading(true);
 
       if (!sdk) {
-        const error = new Error('RRelayerrSDKContext is undefined');
+        const error = new Error('RRelayerSDKContext is undefined');
         setLoading(false);
         throw error;
       }

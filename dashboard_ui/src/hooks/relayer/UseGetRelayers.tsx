@@ -1,9 +1,9 @@
-import { RRelayerrSDKContext } from '@/contexts/RRelayerrSDKContext';
+import { RRelayerSDKContext } from '@/contexts/RRelayerSDKContext';
 import { useCallback, useContext, useEffect, useState } from 'react';
 import { PagingContext, Relayer } from 'rrelayer-sdk';
 
 export const useGetRelayers = () => {
-  const sdk = useContext(RRelayerrSDKContext);
+  const sdk = useContext(RRelayerSDKContext);
   const [items, setItems] = useState<Relayer[]>([]);
   const [loading, setLoading] = useState(false);
   const [pagingContext, setPagingContext] = useState<
@@ -17,7 +17,7 @@ export const useGetRelayers = () => {
   const getRelayers = useCallback(
     async (context?: PagingContext) => {
       if (!sdk) {
-        throw new Error('RRelayerrSDKContext is undefined');
+        throw new Error('RRelayerSDKContext is undefined');
       }
 
       setLoading(true);

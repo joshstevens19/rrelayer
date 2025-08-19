@@ -1,9 +1,9 @@
-import { RRelayerrSDKContext } from '@/contexts/RRelayerrSDKContext';
+import { RRelayerSDKContext } from '@/contexts/RRelayerSDKContext';
 import { useCallback, useContext, useState } from 'react';
 import { PagingContext, User } from 'rrelayer-sdk';
 
 export const useGetUsers = () => {
-  const sdk = useContext(RRelayerrSDKContext);
+  const sdk = useContext(RRelayerSDKContext);
   const [items, setItems] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [relayerId, setRelayerId] = useState<string | null>(null);
@@ -18,7 +18,7 @@ export const useGetUsers = () => {
   const getUsers = useCallback(
     async (context?: PagingContext) => {
       if (!sdk) {
-        throw new Error('RRelayerrSDKContext is undefined');
+        throw new Error('RRelayerSDKContext is undefined');
       }
 
       setLoading(true);
