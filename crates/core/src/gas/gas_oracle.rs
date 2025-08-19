@@ -8,7 +8,7 @@ use tracing::info;
 
 use super::fee_estimator::base::{GasEstimatorError, GasEstimatorResult, GasPriceResult};
 use crate::{
-    network::types::ChainId, provider::EvmProvider, rrelayerr_error, rrelayerr_info,
+    network::types::ChainId, provider::EvmProvider, rrelayer_error, rrelayer_info,
     transaction::types::TransactionSpeed,
 };
 
@@ -66,7 +66,7 @@ pub async fn gas_oracle(
                     cache.lock().await.update_gas_price(provider.chain_id, gas_price).await;
                 }
                 Err(err) => {
-                    rrelayerr_error!(
+                    rrelayer_error!(
                         "Failed to get initial gas price for provider: {} - error {}",
                         provider.name,
                         err
@@ -100,7 +100,7 @@ pub async fn gas_oracle(
                         cache.lock().await.update_gas_price(provider.chain_id, gas_price).await;
                     }
                     Err(err) => {
-                        rrelayerr_error!("Failed to get gas price for provider: {} - error {} - try again in 10s", provider.name, err);
+                        rrelayer_error!("Failed to get gas price for provider: {} - error {} - try again in 10s", provider.name, err);
                     }
                 }
             }

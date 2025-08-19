@@ -70,7 +70,7 @@ pub async fn load_providers(
                             .await
                             .map_err(|e| LoadProvidersError::GasEstimatorError(e.to_string()))?,
                     )
-                        .await?,
+                    .await?,
                 );
             }
             Err(e) => return Err(LoadProvidersError::SigningKeyError(e.to_string())),

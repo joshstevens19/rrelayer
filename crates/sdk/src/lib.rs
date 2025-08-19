@@ -3,7 +3,7 @@ mod types;
 
 use alloy::{primitives::Address, signers};
 pub use api::{Authentication, GasApi, NetworkApi, RelayerApi, SignApi, TransactionApi, UserApi};
-use rrelayerr_core::authentication::{
+use rrelayer_core::authentication::{
     api::{AuthenticateRequest, GenerateSecretResult},
     types::TokenPair,
 };

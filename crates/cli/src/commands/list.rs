@@ -1,5 +1,5 @@
-use rrelayerr_core::common_types::PagingContext;
-use rrelayerr_sdk::SDK;
+use rrelayer_core::common_types::PagingContext;
+use rrelayer_sdk::SDK;
 
 use crate::{
     authentication::handle_authenticate,

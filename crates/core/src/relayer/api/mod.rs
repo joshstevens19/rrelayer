@@ -28,7 +28,7 @@ use crate::{
         get_relayer, is_relayer_api_key,
         types::{Relayer, RelayerId},
     },
-    rrelayerr_error,
+    rrelayer_error,
     shared::common_types::{EvmAddress, PagingContext, PagingResult},
     transaction::{queue_system::TransactionsQueueSetup, NonceManager},
 };
@@ -59,7 +59,7 @@ async fn create_relayer(
 
     let relayer =
         state.db.create_relayer(&relayer.name, &chain_id, provider, None).await.map_err(|e| {
-            rrelayerr_error!("{}", e);
+            rrelayer_error!("{}", e);
             StatusCode::BAD_REQUEST
         })?;
 
@@ -110,7 +110,7 @@ async fn clone_relayer(
         .create_relayer(&relayer.new_relayer_name, &relayer.chain_id, provider, Some(relayer_id))
         .await
         .map_err(|e| {
-            rrelayerr_error!("{}", e);
+            rrelayer_error!("{}", e);
             StatusCode::BAD_REQUEST
         })?;
 
@@ -306,13 +306,13 @@ async fn update_relay_max_gas_price(
                 StatusCode::NO_CONTENT
             }
             Err(e) => {
-                rrelayerr_error!("{}", e);
+                rrelayer_error!("{}", e);
                 StatusCode::INTERNAL_SERVER_ERROR
             }
         },
         Ok(None) => StatusCode::NOT_FOUND,
         Err(e) => {
-            rrelayerr_error!("{}", e);
+            rrelayer_error!("{}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         }
     }

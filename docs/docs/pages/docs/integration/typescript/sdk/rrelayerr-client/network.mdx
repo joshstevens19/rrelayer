@@ -1,6 +1,6 @@
 ## Network
 
-All the network related rrelayerr calls
+All the network related rrelayer calls
 
 ### Disable
 
@@ -9,16 +9,16 @@ Disable a network
 :::code-group
 
 ```ts [example]
-import { rrelayerrClient } from './config';
+import { rrelayerClient } from './config';
 
-await rrelayerrClient.networks.disable(1);
+await rrelayerClient.networks.disable(1);
 ```
 
 ```ts [config]
-import { createRRelayerrClient } from 'rrelayerr-ts';
+import { createRRelayerrClient } from 'rrelayer-ts';
 
-export const rrelayerrClient = createRRelayerrClient({
-  // This is where the rrelayerr server is hosted
+export const rrelayerClient = createRRelayerrClient({
+  // This is where the rrelayer server is hosted
   serverUrl: 'http://127.0.0.1:8000',
   // This is your API secret access key you can have many
   // of these but you generate them within the server itself
@@ -36,16 +36,16 @@ Enable a network
 :::code-group
 
 ```ts [example]
-import { rrelayerrClient } from './config';
+import { rrelayerClient } from './config';
 
-await rrelayerrClient.networks.enable(1);
+await rrelayerClient.networks.enable(1);
 ```
 
 ```ts [config]
-import { createRRelayerrClient } from 'rrelayerr-ts';
+import { createRRelayerrClient } from 'rrelayer-ts';
 
-export const rrelayerrClient = createRRelayerrClient({
-  // This is where the rrelayerr server is hosted
+export const rrelayerClient = createRRelayerrClient({
+  // This is where the rrelayer server is hosted
   serverUrl: 'http://127.0.0.1:8000',
   // This is your API secret access key you can have many
   // of these but you generate them within the server itself
@@ -63,30 +63,30 @@ Get the networks
 :::code-group
 
 ```ts [get all]
-import { rrelayerrClient } from './config';
+import { rrelayerClient } from './config';
 
-const networks = await rrelayerrClient.network.get();
+const networks = await rrelayerClient.network.get();
 ```
 
 ```ts [get enabled]
-import { NetworkStatus } from 'rrelayerr-ts';
-import { rrelayerrClient } from './config';
+import { NetworkStatus } from 'rrelayer-ts';
+import { rrelayerClient } from './config';
 
-const networks = await rrelayerrClient.network.get(NetworkStatus.ENABLED);
+const networks = await rrelayerClient.network.get(NetworkStatus.ENABLED);
 ```
 
 ```ts [get disabled]
-import { NetworkStatus } from 'rrelayerr-ts';
-import { rrelayerrClient } from './config';
+import { NetworkStatus } from 'rrelayer-ts';
+import { rrelayerClient } from './config';
 
-const networks = await rrelayerrClient.network.get(NetworkStatus.DISABLED);
+const networks = await rrelayerClient.network.get(NetworkStatus.DISABLED);
 ```
 
 ```ts [config]
-import { createRRelayerrClient } from 'rrelayerr-ts';
+import { createRRelayerrClient } from 'rrelayer-ts';
 
-export const rrelayerrClient = createRRelayerrClient({
-  // This is where the rrelayerr server is hosted
+export const rrelayerClient = createRRelayerrClient({
+  // This is where the rrelayer server is hosted
   serverUrl: 'http://127.0.0.1:8000',
   // This is your API secret access key you can have many
   // of these but you generate them within the server itself

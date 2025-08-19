@@ -3,7 +3,7 @@ use std::{fs, path::PathBuf, str::FromStr};
 use alloy::signers::local::{LocalSigner, MnemonicBuilder, coins_bip39::English};
 use clap::Subcommand;
 use dialoguer::Password;
-use rrelayerr_core::{
+use rrelayer_core::{
     SetupConfig,
     keystore::{
         KeyStorePasswordManager, KeystoreDecryptResult, create_new_mnemonic_in_keystore,
@@ -107,7 +107,7 @@ impl ProjectLocation {
     }
 
     pub fn setup_config(&self, raw_yaml: bool) -> Result<SetupConfig, Box<dyn std::error::Error>> {
-        let yaml = read(&self.output_dir.join("rrelayerr.yaml"), raw_yaml)?;
+        let yaml = read(&self.output_dir.join("rrelayer.yaml"), raw_yaml)?;
         Ok(yaml)
     }
 
@@ -116,7 +116,7 @@ impl ProjectLocation {
         config: SetupConfig,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let yaml = serde_yaml::to_string(&config)?;
-        fs::write(&self.output_dir.join("rrelayerr.yaml"), yaml)?;
+        fs::write(&self.output_dir.join("rrelayer.yaml"), yaml)?;
         Ok(())
     }
 

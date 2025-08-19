@@ -1,5 +1,5 @@
-use rrelayerr_core::relayer::types::RelayerId;
-use rrelayerr_sdk::SDK;
+use rrelayer_core::relayer::types::RelayerId;
+use rrelayer_sdk::SDK;
 
 use crate::commands::network::get_chain_id_for_network;
 use crate::{authentication::handle_authenticate, commands::keystore::ProjectLocation};

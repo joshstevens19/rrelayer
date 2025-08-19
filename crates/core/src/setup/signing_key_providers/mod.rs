@@ -29,7 +29,7 @@ pub async fn get_mnemonic_from_signing_key(
             .unwrap_or_else(|| {
                 KeyStorePasswordManager::new(project_name)
                     .load(&keystore.name)
-                    .expect("Server is not authenticated to use the keystores rrelayerr_signing_key please login on the server")
+                    .expect("Server is not authenticated to use the keystores rrelayer_signing_key please login on the server")
             });
         let keystore_path = project_path.join(&keystore.path);
         let result = recover_mnemonic_from_keystore(&keystore_path, &password)?;

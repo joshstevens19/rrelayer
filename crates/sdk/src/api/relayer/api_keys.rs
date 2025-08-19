@@ -1,4 +1,4 @@
-use rrelayerr_core::{
+use rrelayer_core::{
     common_types::{ApiKey, PagingContext, PagingResult},
     relayer::{api::CreateRelayerApiResult, types::RelayerId},
 };

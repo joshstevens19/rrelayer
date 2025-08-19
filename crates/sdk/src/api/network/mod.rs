@@ -1,4 +1,4 @@
-use rrelayerr_core::network::types::Network;
+use rrelayer_core::network::types::Network;
 
 use crate::api::{http::HttpClient, types::ApiResult};
 

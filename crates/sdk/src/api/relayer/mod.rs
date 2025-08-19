@@ -3,7 +3,7 @@ mod api_keys;
 
 pub use allowlist::RelayerAllowlist;
 pub use api_keys::RelayerApiKeys;
-use rrelayerr_core::{
+use rrelayer_core::{
     common_types::{PagingContext, PagingResult},
     relayer::{
         api::{CreateRelayerResult, GetRelayerResult},

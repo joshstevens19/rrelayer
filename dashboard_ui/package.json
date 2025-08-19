@@ -1,5 +1,5 @@
 {
-  "name": "rrelayerr_dashboard_ui",
+  "name": "rrelayer_dashboard_ui",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -14,7 +14,7 @@
     "next": "14.1.0",
     "react": "^18",
     "react-dom": "^18",
-    "rrelayerr-sdk": "file:rrelayerr-sdk-1.0.19.tgz",
+    "rrelayer-sdk": "file:rrelayer-sdk-1.0.19.tgz",
     "viem": "^2.8.10",
     "wagmi": "^2.5.7"
   },

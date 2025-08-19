@@ -1,6 +1,6 @@
 import { RRelayerrSDKContext } from '@/contexts/RRelayerrSDKContext';
 import { useCallback, useContext, useEffect, useState } from 'react';
-import { PagingContext, Relayer } from 'rrelayerr-sdk';
+import { PagingContext, Relayer } from 'rrelayer-sdk';
 
 export const useGetRelayers = () => {
   const sdk = useContext(RRelayerrSDKContext);

@@ -1,11 +1,11 @@
 use std::fmt::{Debug, Display};
 
 use clap::{Subcommand, ValueEnum};
-use rrelayerr_core::{
+use rrelayer_core::{
     authentication::types::JwtRole,
     common_types::{EvmAddress, PagingQuery},
 };
-use rrelayerr_sdk::SDK;
+use rrelayer_sdk::SDK;
 
 use crate::{
     authentication::handle_authenticate, commands::keystore::ProjectLocation, console::print_table,

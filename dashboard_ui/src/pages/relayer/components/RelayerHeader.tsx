@@ -6,7 +6,7 @@ import {
 import ChainIdPrettyComponent from '@/shared/components/ChainIdPretty';
 import LoadingComponent from '@/shared/components/Loading';
 import React, { useState } from 'react';
-import { Relayer } from 'rrelayerr-sdk';
+import { Relayer } from 'rrelayer-sdk';
 
 interface RelayerHeaderProps {
   relayer: Relayer;

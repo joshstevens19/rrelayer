@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { createRRelayerrClient } from 'rrelayerr-sdk/dist/clients/core-client';
+import { createRRelayerrClient } from 'rrelayer-sdk/dist/clients/core-client';
 import { useAccount } from 'wagmi';
 import { getWalletClient } from 'wagmi/actions';
 import { config } from './Web3Provider';
@@ -47,7 +47,7 @@ export const RRelayerrSDKProvider = ({
         connector,
       });
 
-      const knownAuth = localStorage.getItem('rrelayerr__authentication');
+      const knownAuth = localStorage.getItem('rrelayer__authentication');
 
       setSDK({
         core,

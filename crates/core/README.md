@@ -1,10 +1,10 @@
-# reelayerr_server
+# reelayer_server
 
 ## Docker
 
 ### Server
 
-docker build -f docker/server/Dockerfile -t rrelayerr_server .
+docker build -f docker/server/Dockerfile -t rrelayer_server .
 
 ## Unit tests
 

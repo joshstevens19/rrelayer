@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use clap::Subcommand;
 use dialoguer::Password;
-use rrelayerr_core::keystore::{
+use rrelayer_core::keystore::{
     KeyStorePasswordManager, KeystoreDecryptResult, PasswordError, decrypt_keystore,
 };
 

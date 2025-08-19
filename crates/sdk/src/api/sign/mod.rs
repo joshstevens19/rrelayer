@@ -1,4 +1,4 @@
-use rrelayerr_core::relayer::{
+use rrelayer_core::relayer::{
     api::sign::{SignTextResult, SignTypedDataResult},
     types::RelayerId,
 };

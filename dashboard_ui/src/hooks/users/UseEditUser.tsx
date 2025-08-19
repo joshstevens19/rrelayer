@@ -1,6 +1,6 @@
 import { RRelayerrSDKContext } from '@/contexts/RRelayerrSDKContext';
 import { useCallback, useContext } from 'react';
-import { JwtRole } from 'rrelayerr-sdk/dist/api/authentication/types';
+import { JwtRole } from 'rrelayer-sdk/dist/api/authentication/types';
 import { Address } from 'viem';
 
 export interface UseEditUserOptions {

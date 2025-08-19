@@ -1,8 +1,8 @@
 use std::{path::PathBuf, str::FromStr};
 
 use clap::Parser;
-use rrelayerr_core::{load_env_from_project_path, setup_info_logger};
-use rrelayerr_sdk::SDK;
+use rrelayer_core::{load_env_from_project_path, setup_info_logger};
+use rrelayer_sdk::SDK;
 
 use crate::commands::clone;
 use crate::{

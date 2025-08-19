@@ -1,6 +1,6 @@
 import { RRelayerrSDKContext } from '@/contexts/RRelayerrSDKContext';
 import { useCallback, useContext, useState } from 'react';
-import { PagingContext, User } from 'rrelayerr-sdk';
+import { PagingContext, User } from 'rrelayer-sdk';
 
 export const useGetUsers = () => {
   const sdk = useContext(RRelayerrSDKContext);

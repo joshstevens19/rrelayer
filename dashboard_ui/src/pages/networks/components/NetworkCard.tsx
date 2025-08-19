@@ -1,5 +1,5 @@
 import React from 'react';
-import { Network } from 'rrelayerr-sdk';
+import { Network } from 'rrelayer-sdk';
 import ChainIdPrettyComponent from '../../../shared/components/ChainIdPretty';
 
 const NetworkCard: React.FC<Network> = ({

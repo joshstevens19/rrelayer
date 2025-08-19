@@ -13,7 +13,7 @@ use super::types::User;
 use crate::{
     app_state::AppState,
     authentication::{guards::admin_jwt_guard, types::JwtRole},
-    rrelayerr_error,
+    rrelayer_error,
     shared::common_types::{EvmAddress, PagingContext, PagingQuery, PagingResult},
 };
 
@@ -24,7 +24,7 @@ async fn get_users(
 ) -> Result<Json<PagingResult<User>>, StatusCode> {
     state.db.get_users(&PagingContext::new(paging.limit, paging.offset)).await.map(Json).map_err(
         |e| {
-            rrelayerr_error!("{}", e);
+            rrelayer_error!("{}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         },
     )
@@ -70,7 +70,7 @@ async fn delete_user(
     match state.db.delete_user(&user).await {
         Ok(_) => StatusCode::NO_CONTENT,
         Err(e) => {
-            rrelayerr_error!("{}", e);
+            rrelayer_error!("{}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         }
     }

@@ -1,5 +1,5 @@
 use alloy::primitives::Address;
-use rrelayerr_core::authentication::{
+use rrelayer_core::authentication::{
     api::{AuthenticateRequest, GenerateSecretResult},
     types::TokenPair,
 };

@@ -9,36 +9,36 @@ We will explore both ethersv5 and ethersv6 and some interfaces have changed betw
 
 ## Installation
 
-Lets install both `ethers` and `rrelayerr-ts`
+Lets install both `ethers` and `rrelayer-ts`
 
 :::code-group
 
 ```bash [npm]
-npm i rrelayerr-ts ethers
+npm i rrelayer-ts ethers
 ```
 
 ```bash [pnpm]
-pnpm i rrelayerr-ts ethers
+pnpm i rrelayer-ts ethers
 ```
 
 ```bash [bun]
-bun i rrelayerr-ts ethers
+bun i rrelayer-ts ethers
 ```
 
 :::
 
 ## Creating wallet client
 
-The rrelayerr client exposes ways for you to create an relayer client which exposes a ethereum provider you can use with `ethers`.
+The rrelayer client exposes ways for you to create an relayer client which exposes a ethereum provider you can use with `ethers`.
 
 :::code-group
 
 ```ts [ethers@v6]
 import { BrowserProvider } from 'ethers';
-import { createRRelayerrClient } from 'rrelayerr-ts';
+import { createRRelayerrClient } from 'rrelayer-ts';
 
 const client = createRRelayerrClient({
-  // This is where the rrelayerr server is hosted
+  // This is where the rrelayer server is hosted
   serverUrl: 'http://127.0.0.1:8000',
   // This is your API secret access key you can have many
   // of these but you generate them within the server itself
@@ -57,10 +57,10 @@ export provider = new BrowserProvider(relayer.ethereumProvider());
 
 ```ts [ethers@v5]
 import { ethers } from 'ethers';
-import { createRRelayerrClient } from 'rrelayerr-ts';
+import { createRRelayerrClient } from 'rrelayer-ts';
 
 const client = createRRelayerrClient({
-  // This is where the rrelayerr server is hosted
+  // This is where the rrelayer server is hosted
   serverUrl: 'http://127.0.0.1:8000',
   // This is your API secret access key you can have many
   // of these but you generate them within the server itself
@@ -97,10 +97,10 @@ const message = await signer.signMessage('sign me!');
 
 ```ts [config]
 import { BrowserProvider } from 'ethers';
-import { createRRelayerrClient } from 'rrelayerr-ts';
+import { createRRelayerrClient } from 'rrelayer-ts';
 
 const client = createRRelayerrClient({
-  // This is where the rrelayerr server is hosted
+  // This is where the rrelayer server is hosted
   serverUrl: 'http://127.0.0.1:8000',
   // This is your API secret access key you can have many
   // of these but you generate them within the server itself
@@ -163,10 +163,10 @@ const signature = await signer._signTypedData({
 
 ```ts [config]
 import { BrowserProvider } from 'ethers';
-import { createRRelayerrClient } from 'rrelayerr-ts';
+import { createRRelayerrClient } from 'rrelayer-ts';
 
 const client = createRRelayerrClient({
-  // This is where the rrelayerr server is hosted
+  // This is where the rrelayer server is hosted
   serverUrl: 'http://127.0.0.1:8000',
   // This is your API secret access key you can have many
   // of these but you generate them within the server itself
@@ -204,10 +204,10 @@ const hash = await signer.sendTransaction({
 
 ```ts [config]
 import { BrowserProvider } from 'ethers';
-import { createRRelayerrClient } from 'rrelayerr-ts';
+import { createRRelayerrClient } from 'rrelayer-ts';
 
 const client = createRRelayerrClient({
-  // This is where the rrelayerr server is hosted
+  // This is where the rrelayer server is hosted
   serverUrl: 'http://127.0.0.1:8000',
   // This is your API secret access key you can have many
   // of these but you generate them within the server itself
@@ -262,10 +262,10 @@ export const wagmiAbi = [
 
 ```ts [config]
 import { BrowserProvider } from 'ethers';
-import { createRRelayerrClient } from 'rrelayerr-ts';
+import { createRRelayerrClient } from 'rrelayer-ts';
 
 const client = createRRelayerrClient({
-  // This is where the rrelayerr server is hosted
+  // This is where the rrelayer server is hosted
   serverUrl: 'http://127.0.0.1:8000',
   // This is your API secret access key you can have many
   // of these but you generate them within the server itself

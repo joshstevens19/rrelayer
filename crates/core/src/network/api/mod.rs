@@ -19,7 +19,7 @@ use super::{
 use crate::{
     app_state::AppState,
     authentication::guards::{admin_jwt_guard, read_only_or_above_jwt_guard},
-    rrelayerr_error, rrelayerr_info,
+    rrelayer_error, rrelayer_info,
 };
 
 async fn networks(State(state): State<Arc<AppState>>) -> Result<Json<Vec<Network>>, StatusCode> {
@@ -81,7 +81,7 @@ async fn disable_network(
             StatusCode::CREATED
         }
         Err(e) => {
-            rrelayerr_error!("Failed to disable network: {}", e);
+            rrelayer_error!("Failed to disable network: {}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         }
     }

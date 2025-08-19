@@ -3,7 +3,7 @@ import { ConnectKitButton } from 'connectkit';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/router';
 import React, { useContext, useEffect } from 'react';
-import { TokenPair } from 'rrelayerr-sdk/dist/api/authentication/types';
+import { TokenPair } from 'rrelayer-sdk/dist/api/authentication/types';
 import { useAccount } from 'wagmi';
 import Authenticate from './components/authenticate';
 
@@ -45,7 +45,7 @@ const Login: React.FC = () => {
             transition={{ duration: 0.5 }}
             className="text-3xl font-bold mb-4"
           >
-            Welcome to the Dashboard for rrelayerr
+            Welcome to the Dashboard for rrelayer
           </motion.h1>
           <motion.div
             initial={{ opacity: 0 }}

@@ -2,10 +2,10 @@ use std::{fs, path::Path};
 
 use dialoguer::{Confirm, Input};
 use rand::{Rng, distributions::Alphanumeric};
-use rrelayerr_core::{
+use rrelayer_core::{
     AdminIdentifier, ApiConfig, GasProviders, KeystoreSigningKey, NetworkSetupConfig, SetupConfig,
     SigningKey, WriteFileError, gas::fee_estimator::tenderly::TenderlyGasProviderSetupConfig,
-    generate_docker_file, keystore::recover_wallet_from_keystore, rrelayerr_info, write_file,
+    generate_docker_file, keystore::recover_wallet_from_keystore, rrelayer_info, write_file,
 };
 use serde_yaml;
 
@@ -49,7 +49,7 @@ pub async fn handle_init(path: &Path) -> Result<(), Box<dyn std::error::Error>> 
     let mut project_location = ProjectLocation::new(project_path.clone());
     project_location.override_project_name(&project_name);
 
-    let mnemonic_name = "rrelayerr_signing_key";
+    let mnemonic_name = "rrelayer_signing_key";
     let created_path = create_from_mnemonic(
         &None,
         true,
@@ -108,11 +108,11 @@ pub async fn handle_init(path: &Path) -> Result<(), Box<dyn std::error::Error>> 
         }),
         api_config: ApiConfig { port: 8000, allowed_origins: None },
     };
-    fs::write(project_path.join("rrelayerr.yaml"), serde_yaml::to_string(&yaml_content)?)?;
+    fs::write(project_path.join("rrelayer.yaml"), serde_yaml::to_string(&yaml_content)?)?;
 
     if docker_support {
-        let env = r#"DATABASE_URL=postgresql://postgres:rrelayerr@localhost:5441/postgres
-POSTGRES_PASSWORD=rrelayerr"#;
+        let env = r#"DATABASE_URL=postgresql://postgres:rrelayer@localhost:5441/postgres
+POSTGRES_PASSWORD=rrelayer"#;
 
         write_docker_compose(&project_path).map_err(|e| {
             print_error_message(&format!("Failed to write docker compose file: {}", e));
@@ -134,12 +134,12 @@ POSTGRES_PASSWORD=rrelayerr"#;
 
     write_gitignore(&project_path)?;
 
-    rrelayerr_info!("\nProject '{}' initialized successfully!", project_name);
-    rrelayerr_info!(
+    rrelayer_info!("\nProject '{}' initialized successfully!", project_name);
+    rrelayer_info!(
         "Secured with the signing key with the password: {} please write it down it has auto logged you in on this system",
         mnemonic_password
     );
-    rrelayerr_info!(
+    rrelayer_info!(
         "Created you `account1` secured with password: {} please write it down it has auto logged you in on this system",
         account_password
     );

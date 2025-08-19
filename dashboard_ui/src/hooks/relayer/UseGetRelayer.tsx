@@ -1,6 +1,6 @@
 import { RRelayerrSDKContext } from '@/contexts/RRelayerrSDKContext';
 import { useCallback, useContext, useState } from 'react';
-import { Relayer } from 'rrelayerr-sdk';
+import { Relayer } from 'rrelayer-sdk';
 
 export const useGetRelayer = () => {
   const sdk = useContext(RRelayerrSDKContext);

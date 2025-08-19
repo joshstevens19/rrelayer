@@ -1,4 +1,4 @@
-# Ideas for rrelayerr which can be picked up when we have time
+# Ideas for rrelayer which can be picked up when we have time
 
 ## Server
 

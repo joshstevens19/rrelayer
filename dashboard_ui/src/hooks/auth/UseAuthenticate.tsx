@@ -1,6 +1,6 @@
 import { RRelayerrSDKContext } from '@/contexts/RRelayerrSDKContext';
 import { useCallback, useContext } from 'react';
-import { TokenPair } from 'rrelayerr-sdk/dist/api/authentication/types';
+import { TokenPair } from 'rrelayer-sdk/dist/api/authentication/types';
 
 export interface UseAuthenticateOptions {
   onSuccess?: (tokenPair: TokenPair) => void;
@@ -21,7 +21,7 @@ export const useAuthenticate = ({
     try {
       const response = await sdk.admin.authentication.authenticate();
       localStorage.setItem(
-        'rrelayerr__authentication',
+        'rrelayer__authentication',
         JSON.stringify(response)
       );
 

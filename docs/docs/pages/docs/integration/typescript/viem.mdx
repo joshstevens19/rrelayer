@@ -7,34 +7,34 @@ To integrate the relayer within your application with just a few code changes yo
 
 ## Installation
 
-Lets install both `viem` and `rrelayerr-ts`
+Lets install both `viem` and `rrelayer-ts`
 
 :::code-group
 
 ```bash [npm]
-npm i rrelayerr-ts viem
+npm i rrelayer-ts viem
 ```
 
 ```bash [pnpm]
-pnpm i rrelayerr-ts viem
+pnpm i rrelayer-ts viem
 ```
 
 ```bash [bun]
-bun i rrelayerr-ts viem
+bun i rrelayer-ts viem
 ```
 
 :::
 
 ## Creating wallet client
 
-The rrelayerr client exposes ways for you to create an relayer client which exposes a ethereum provider you can use with `viem`.
+The rrelayer client exposes ways for you to create an relayer client which exposes a ethereum provider you can use with `viem`.
 
 ```ts
 import { createWalletClient, custom } from 'viem';
-import { createRRelayerrClient } from 'rrelayerr-ts';
+import { createRRelayerrClient } from 'rrelayer-ts';
 
 const client = createRRelayerrClient({
-  // This is where the rrelayerr server is hosted
+  // This is where the rrelayer server is hosted
   serverUrl: 'http://127.0.0.1:8000',
   // This is your API secret access key you can have many
   // of these but you generate them within the server itself
@@ -48,7 +48,7 @@ const relayer = await client.createRelayerClient({
   apiKey: 'API_KEY',
 });
 
-// viem wallet client to now allow signing as we injected rrelayerr provider
+// viem wallet client to now allow signing as we injected rrelayer provider
 const walletClient = createWalletClient({
   transport: custom(relayer.ethereumProvider()),
 });
@@ -74,10 +74,10 @@ const message = await walletClient.signMessage({
 
 ```ts [config]
 import { createWalletClient, custom } from 'viem';
-import { createRRelayerrClient } from 'rrelayerr-ts';
+import { createRRelayerrClient } from 'rrelayer-ts';
 
 const client = createRRelayerrClient({
-  // This is where the rrelayerr server is hosted
+  // This is where the rrelayer server is hosted
   serverUrl: 'http://127.0.0.1:8000',
   // This is your API secret access key you can have many
   // of these but you generate them within the server itself
@@ -145,10 +145,10 @@ const signature = await walletClient.signTypedData({
 
 ```ts [config]
 import { createWalletClient, custom } from 'viem';
-import { createRRelayerrClient } from 'rrelayerr-ts';
+import { createRRelayerrClient } from 'rrelayer-ts';
 
 const client = createRRelayerrClient({
-  // This is where the rrelayerr server is hosted
+  // This is where the rrelayer server is hosted
   serverUrl: 'http://127.0.0.1:8000',
   // This is your API secret access key you can have many
   // of these but you generate them within the server itself
@@ -189,10 +189,10 @@ const hash = await walletClient.sendTransaction({
 
 ```ts [config]
 import { createWalletClient, custom } from 'viem';
-import { createRRelayerrClient } from 'rrelayerr-ts';
+import { createRRelayerrClient } from 'rrelayer-ts';
 
 const client = createRRelayerrClient({
-  // This is where the rrelayerr server is hosted
+  // This is where the rrelayer server is hosted
   serverUrl: 'http://127.0.0.1:8000',
   // This is your API secret access key you can have many
   // of these but you generate them within the server itself
@@ -250,10 +250,10 @@ export const wagmiAbi = [
 
 ```ts [config]
 import { createWalletClient, createPublicClient, custom } from 'viem';
-import { createRRelayerrClient } from 'rrelayerr-ts';
+import { createRRelayerrClient } from 'rrelayer-ts';
 
 const client = createRRelayerrClient({
-  // This is where the rrelayerr server is hosted
+  // This is where the rrelayer server is hosted
   serverUrl: 'http://127.0.0.1:8000',
   // This is your API secret access key you can have many
   // of these but you generate them within the server itself

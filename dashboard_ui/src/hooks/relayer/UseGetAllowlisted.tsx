@@ -1,6 +1,6 @@
 import { RRelayerrSDKContext } from '@/contexts/RRelayerrSDKContext';
 import { useCallback, useContext, useState } from 'react';
-import { PagingContext } from 'rrelayerr-sdk';
+import { PagingContext } from 'rrelayer-sdk';
 
 export const useGetAllowlisted = () => {
   const sdk = useContext(RRelayerrSDKContext);

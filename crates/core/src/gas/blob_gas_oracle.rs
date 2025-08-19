@@ -8,7 +8,7 @@ use tokio::{
 use tracing::info;
 
 use crate::{
-    network::types::ChainId, provider::EvmProvider, rrelayerr_error,
+    network::types::ChainId, provider::EvmProvider, rrelayer_error,
     transaction::types::TransactionSpeed,
 };
 
@@ -102,7 +102,7 @@ pub async fn blob_gas_oracle(
             if let Ok(blob_gas_price) = blob_gas_price_result {
                 cache.lock().await.update_blob_gas_price(provider.chain_id, blob_gas_price).await;
             } else {
-                rrelayerr_error!(
+                rrelayer_error!(
                     "Failed to get initial blob gas price for provider: {} - error {:?}",
                     provider.name,
                     blob_gas_price_result

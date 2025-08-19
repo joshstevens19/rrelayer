@@ -1,21 +1,21 @@
 use std::{env, path::PathBuf, process::Command, thread, time::Duration};
 
 use clap::Args;
-use rrelayerr_core::{PostgresClient, rrelayerr_error, rrelayerr_info, start};
+use rrelayer_core::{PostgresClient, rrelayer_error, rrelayer_info, start};
 
 use crate::console::{print_error_message, print_success_message};
 
 pub async fn handle_start(project_path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
-    rrelayerr_info!("Loading from path {:?}", project_path);
-    let rrelayerr_yaml_path = project_path.join("rrelayerr.yaml");
-    if !rrelayerr_yaml_path.exists() {
+    rrelayer_info!("Loading from path {:?}", project_path);
+    let rrelayer_yaml_path = project_path.join("rrelayer.yaml");
+    if !rrelayer_yaml_path.exists() {
         return Err(
             "Not in a relayer project directory. Please run this command from your project root."
                 .into(),
         );
     }
 
-    rrelayerr_info!("Starting relayer...");
+    rrelayer_info!("Starting relayer...");
 
     let docker_compose_path = project_path.join("docker-compose.yml");
     if !docker_compose_path.exists() {
@@ -24,7 +24,7 @@ pub async fn handle_start(project_path: &PathBuf) -> Result<(), Box<dyn std::err
 
     match start_docker_compose(&project_path) {
         Ok(_) => {
-            rrelayerr_info!("Docker postgres containers started up successfully");
+            rrelayer_info!("Docker postgres containers started up successfully");
         }
         Err(e) => {
             return Err(e.into());
@@ -45,7 +45,7 @@ fn check_postgres_connection(conn_str: &str, max_retries: u32) -> Result<(), Str
     while retries < max_retries {
         let status = Command::new("pg_isready").args(["-d", conn_str]).output().map_err(|e| {
             let error = format!("Failed to check Postgres status: {}", e);
-            rrelayerr_error!(error);
+            rrelayer_error!(error);
             error
         })?;
 
@@ -55,7 +55,7 @@ fn check_postgres_connection(conn_str: &str, max_retries: u32) -> Result<(), Str
 
         retries += 1;
         thread::sleep(Duration::from_millis(500));
-        rrelayerr_info!(
+        rrelayer_info!(
             "Waiting for Postgres to become available this may take a few attempts... attempt: {}",
             retries
         );
@@ -81,28 +81,28 @@ fn check_docker_compose_status(project_path: &PathBuf, max_retries: u32) -> Resu
         if ps_status.status.success() {
             let output = String::from_utf8_lossy(&ps_status.stdout);
             if !output.contains("Exit") && output.contains("Up") {
-                rrelayerr_info!("All containers are up and running.");
+                rrelayer_info!("All containers are up and running.");
 
                 return if let Ok(conn_str) = env::var("DATABASE_URL") {
                     check_postgres_connection(&conn_str, max_retries).map_err(|e| {
                         let error = format!("Failed to connect to PostgresSQL: {}", e);
-                        rrelayerr_error!(error);
+                        rrelayer_error!(error);
                         error
                     })
                 } else {
                     let error = "DATABASE_URL not set.".to_string();
-                    rrelayerr_error!(error);
+                    rrelayer_error!(error);
                     Err(error)
                 };
             }
         } else {
             let error = format!("docker compose ps exited with status: {}", ps_status.status);
-            rrelayerr_error!(error);
+            rrelayer_error!(error);
         }
 
         retries += 1;
         thread::sleep(Duration::from_millis(200));
-        rrelayerr_info!("Waiting for docker compose containers to start...");
+        rrelayer_info!("Waiting for docker compose containers to start...");
     }
 
     Err("Docker containers did not start successfully within the given retries.".into())
@@ -127,11 +127,11 @@ fn start_docker_compose(project_path: &PathBuf) -> Result<(), String> {
 
     if !status.success() {
         let error = "Docker compose could not startup the postgres container, please make sure docker is running on the machine".to_string();
-        rrelayerr_error!(error);
+        rrelayer_error!(error);
         return Err(error);
     }
 
-    rrelayerr_info!("Docker starting up the postgres container..");
+    rrelayer_info!("Docker starting up the postgres container..");
 
     check_docker_compose_status(project_path, 200)
 }

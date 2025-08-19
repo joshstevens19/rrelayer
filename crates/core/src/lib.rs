@@ -32,4 +32,4 @@ pub mod user;
 pub use docker::generate_docker_file;
 pub use environment::load_env_from_project_path;
 pub use file::{write_file, WriteFileError};
-pub use tracing::{error as rrelayerr_error, info as rrelayerr_info};
+pub use tracing::{error as rrelayer_error, info as rrelayer_info};

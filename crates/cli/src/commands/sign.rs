@@ -1,6 +1,6 @@
 use clap::Subcommand;
-use rrelayerr_core::relayer::types::RelayerId;
-use rrelayerr_sdk::SDK;
+use rrelayer_core::relayer::types::RelayerId;
+use rrelayer_sdk::SDK;
 
 use crate::{authentication::handle_authenticate, commands::keystore::ProjectLocation};
 

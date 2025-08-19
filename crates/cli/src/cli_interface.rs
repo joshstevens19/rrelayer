@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use rrelayerr_core::{common_types::EvmAddress, relayer::types::RelayerId};
+use rrelayer_core::{common_types::EvmAddress, relayer::types::RelayerId};
 
 use crate::commands::{
     allowlist, api_key, auth::AuthCommand, config, keystore::KeystoreCommand,
@@ -39,7 +39,7 @@ pub enum Commands {
         #[arg(required = true)]
         network: String,
     },
-    /// Authenticate with rrelayerr
+    /// Authenticate with rrelayer
     Auth {
         #[clap(long, short)]
         path: Option<String>,

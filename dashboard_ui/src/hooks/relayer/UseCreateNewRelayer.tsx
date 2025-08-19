@@ -1,6 +1,6 @@
 import { RRelayerrSDKContext } from '@/contexts/RRelayerrSDKContext';
 import { useCallback, useContext } from 'react';
-import { CreateRelayerResult } from 'rrelayerr-sdk';
+import { CreateRelayerResult } from 'rrelayer-sdk';
 
 export interface UseCreateRelayerOptions {
   onSuccess?: (result: CreateRelayerResult) => void;

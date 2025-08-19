@@ -10,8 +10,8 @@ export const config = createConfig(
       [mainnet.id]: http('https://rpc.ankr.com/eth'),
     },
     walletConnectProjectId: 'cf3f224a7a594e8d73a2700148c199da',
-    appName: 'rrelayerr Dashboard',
-    appDescription: 'Dashboard to config the rrelayerr',
+    appName: 'rrelayer Dashboard',
+    appDescription: 'Dashboard to config the rrelayer',
     // appUrl: 'https://family.co',
     // appIcon: 'https://family.co/logo.png',
   })

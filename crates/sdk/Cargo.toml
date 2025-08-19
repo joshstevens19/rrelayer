@@ -1,5 +1,5 @@
 [package]
-name = "rrelayerr_sdk"
+name = "rrelayer_sdk"
 version = "0.1.0"
 edition = "2024"
 
@@ -13,5 +13,5 @@ chrono = { version = "0.4.38", features = ["serde"] }
 alloy = { workspace = true, features = ["full", "signer-mnemonic", "eips", "eip712"] }
 alloy-rlp = { workspace = true }
 alloy-eips = { workspace = true }
-rrelayerr_core = { path = "../core" }
+rrelayer_core = { path = "../core" }
 

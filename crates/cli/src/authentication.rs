@@ -11,11 +11,11 @@ use alloy::{
     signers::{Signer, local::PrivateKeySigner},
 };
 use dialoguer::Password;
-use rrelayerr_core::{
+use rrelayer_core::{
     authentication::types::TokenPair,
     keystore::{KeyStorePasswordManager, KeystoreDecryptResult, PasswordError, decrypt_keystore},
 };
-use rrelayerr_sdk::SDK;
+use rrelayer_sdk::SDK;
 use serde::{Deserialize, Serialize};
 
 use crate::commands::keystore::ProjectLocation;
@@ -30,7 +30,7 @@ struct StoredTokenData {
 fn get_secure_token_path(project_name: &str, account: &str) -> PathBuf {
     let base_dir = dirs::config_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join("rrelayerr")
+        .join("rrelayer")
         .join(project_name)
         .join("auth_tokens");
 

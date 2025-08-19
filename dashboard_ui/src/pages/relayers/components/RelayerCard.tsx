@@ -2,7 +2,7 @@ import { useRelayerBalance } from '@/hooks/relayer';
 import LoadingComponent from '@/shared/components/Loading';
 import { useRouter } from 'next/router';
 import React from 'react';
-import { Relayer } from 'rrelayerr-sdk';
+import { Relayer } from 'rrelayer-sdk';
 import AddressComponent from '../../../shared/components/Address';
 import ChainIdPrettyComponent from '../../../shared/components/ChainIdPretty';
 

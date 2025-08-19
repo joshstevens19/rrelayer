@@ -37,7 +37,7 @@ import {
   PagingResult,
   defaultPagingContext,
 } from '../api/types';
-import { RRelayerrEthereumProvider } from '../rrelayerr-ethereum-provider';
+import { RRelayerrEthereumProvider } from '../rrelayer-ethereum-provider';
 import { invariant } from '../utils';
 import { RRelayerrConfig } from './core-client';
 

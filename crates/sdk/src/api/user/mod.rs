@@ -1,4 +1,4 @@
-use rrelayerr_core::{
+use rrelayer_core::{
     authentication::types::JwtRole,
     common_types::{EvmAddress, PagingQuery, PagingResult},
     user::types::User,

@@ -41,7 +41,7 @@ export class RRelayerrEthereumProvider {
 
       if (args.method === 'eth_sendRawTransaction') {
         throw new Error(
-          'Sending raw transaction is not supported by rrelayerr. Use eth_sendTransaction instead.'
+          'Sending raw transaction is not supported by rrelayer. Use eth_sendTransaction instead.'
         );
       }
 
@@ -54,7 +54,7 @@ export class RRelayerrEthereumProvider {
         const transaction: SendTransactionParameters = args.params[0];
         if (!transaction.to) {
           throw new Error(
-            'To address is required to send transactions with a rrelayerr'
+            'To address is required to send transactions with a rrelayer'
           );
         }
 

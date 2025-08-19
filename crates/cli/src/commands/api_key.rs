@@ -1,9 +1,9 @@
 use clap::Subcommand;
-use rrelayerr_core::{
+use rrelayer_core::{
     common_types::{ApiKey, PagingContext},
     relayer::types::RelayerId,
 };
-use rrelayerr_sdk::SDK;
+use rrelayer_sdk::SDK;
 
 use crate::{
     authentication::handle_authenticate, commands::keystore::ProjectLocation, console::print_table,

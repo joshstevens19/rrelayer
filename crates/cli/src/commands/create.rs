@@ -1,4 +1,4 @@
-use rrelayerr_sdk::SDK;
+use rrelayer_sdk::SDK;
 
 use crate::{
     authentication::handle_authenticate,

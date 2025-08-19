@@ -1,6 +1,6 @@
 use alloy::{primitives::U256, providers::Provider, sol};
-use rrelayerr_core::{common_types::EvmAddress, create_retry_client, relayer::types::RelayerId};
-use rrelayerr_sdk::SDK;
+use rrelayer_core::{common_types::EvmAddress, create_retry_client, relayer::types::RelayerId};
+use rrelayer_sdk::SDK;
 
 use crate::{authentication::handle_authenticate, commands::keystore::ProjectLocation};
 

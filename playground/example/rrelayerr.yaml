@@ -1,8 +1,8 @@
 name: example
 signing_key:
   keystore:
-    path: ./keystores/rrelayerr_signing_key
-    name: rrelayerr_signing_key
+    path: ./keystores/rrelayer_signing_key
+    name: rrelayer_signing_key
 admins:
   - account1
 networks:

@@ -5,8 +5,8 @@ export const sidebar = {
     {
       text: 'Introduction',
       items: [
-        { text: 'What is rrelayer?', link: '/docs/what-is-rrelayerr' },
-        { text: 'Why rrelayerr?', link: '/docs/why-rrelayerr' },
+        { text: 'What is rrelayer?', link: '/docs/what-is-rrelayer' },
+        { text: 'Why rrelayer?', link: '/docs/why-rrelayer' },
       ],
     },
     {
@@ -278,23 +278,23 @@ export const sidebar = {
                   items: [
                     {
                       text: 'Setup',
-                      link: '/docs/integration/typescript/sdk/rrelayerr-client/setup',
+                      link: '/docs/integration/typescript/sdk/rrelayer-client/setup',
                     },
                     {
                       text: 'Gas',
-                      link: '/docs/integration/typescript/sdk/rrelayerr-client/gas',
+                      link: '/docs/integration/typescript/sdk/rrelayer-client/gas',
                     },
                     {
                       text: 'Network',
-                      link: '/docs/integration/typescript/sdk/rrelayerr-client/network',
+                      link: '/docs/integration/typescript/sdk/rrelayer-client/network',
                     },
                     {
                       text: 'Relayer',
-                      link: '/docs/integration/typescript/sdk/rrelayerr-client/relayer',
+                      link: '/docs/integration/typescript/sdk/rrelayer-client/relayer',
                     },
                     {
                       text: 'Relayer client',
-                      link: '/docs/integration/typescript/sdk/rrelayerr-client/relayer-client',
+                      link: '/docs/integration/typescript/sdk/rrelayer-client/relayer-client',
                     },
                   ],
                 },
@@ -303,23 +303,23 @@ export const sidebar = {
                   items: [
                     {
                       text: 'Setup',
-                      link: '/docs/integration/typescript/sdk/rrelayerr-relayer-client/setup',
+                      link: '/docs/integration/typescript/sdk/rrelayer-relayer-client/setup',
                     },
                     {
                       text: 'Base methods',
-                      link: '/docs/integration/typescript/sdk/rrelayerr-relayer-client/base',
+                      link: '/docs/integration/typescript/sdk/rrelayer-relayer-client/base',
                     },
                     {
                       text: 'API keys',
-                      link: '/docs/integration/typescript/sdk/rrelayerr-relayer-client/api-keys',
+                      link: '/docs/integration/typescript/sdk/rrelayer-relayer-client/api-keys',
                     },
                     {
                       text: 'Sign',
-                      link: '/docs/integration/typescript/sdk/rrelayerr-relayer-client/sign',
+                      link: '/docs/integration/typescript/sdk/rrelayer-relayer-client/sign',
                     },
                     {
                       text: 'Transactions',
-                      link: '/docs/integration/typescript/sdk/rrelayerr-relayer-client/transactions',
+                      link: '/docs/integration/typescript/sdk/rrelayer-relayer-client/transactions',
                     },
                   ],
                 },

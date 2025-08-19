@@ -129,9 +129,9 @@ pub struct KeyStorePasswordManager {
 
 impl KeyStorePasswordManager {
     pub fn new(app_name: &str) -> Self {
-        // Create .rrelayerr/accounts directory in user's home directory
+        // Create .rrelayer/accounts directory in user's home directory
         let home_dir = dirs::home_dir().expect("Could not find home directory");
-        let storage_dir = home_dir.join(".rrelayerr").join("accounts");
+        let storage_dir = home_dir.join(".rrelayer").join("accounts");
 
         fs::create_dir_all(&storage_dir).expect("Failed to create account storage directory");
 

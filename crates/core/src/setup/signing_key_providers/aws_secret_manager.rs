@@ -11,7 +11,7 @@ pub async fn get_aws_secret(
         config.secret_access_key.clone(),
         config.session_token.clone(),
         None,
-        "rrelayerr-server",
+        "rrelayer-server",
     );
 
     let shared_config = aws_config::defaults(BehaviorVersion::latest())

@@ -28,7 +28,7 @@ use crate::{
     postgres::{PostgresClient, PostgresConnectionError, PostgresError},
     provider::{load_providers, EvmProvider, LoadProvidersError},
     relayer::api::create_relayer_routes,
-    rrelayerr_error, rrelayerr_info,
+    rrelayer_error, rrelayer_info,
     schema::apply_schema,
     setup::yaml::{read, ApiConfig, ReadYamlError},
     setup_info_logger,
@@ -93,7 +93,7 @@ async fn activity_logger(req: Request<Body>, next: Next) -> Result<Response, Sta
             Ok(bytes) => bytes,
             Err(_) => {
                 if status.is_client_error() {
-                    rrelayerr_error!(
+                    rrelayer_error!(
                         "{} {} responded with {} after {:?}",
                         method,
                         uri,
@@ -101,7 +101,7 @@ async fn activity_logger(req: Request<Body>, next: Next) -> Result<Response, Sta
                         duration
                     );
                 } else {
-                    rrelayerr_error!(
+                    rrelayer_error!(
                         "{} {} responded with {} after {:?}",
                         method,
                         uri,
@@ -149,26 +149,26 @@ async fn activity_logger(req: Request<Body>, next: Next) -> Result<Response, Sta
         let response = Response::from_parts(parts, Body::from(bytes));
 
         if status.is_client_error() {
-            rrelayerr_error!("{} {} responded with {} after {:?}", method, uri, status, duration);
+            rrelayer_error!("{} {} responded with {} after {:?}", method, uri, status, duration);
 
             if !error_details.is_empty() {
-                rrelayerr_error!("Error details: {}", error_details);
+                rrelayer_error!("Error details: {}", error_details);
             }
 
             if status == StatusCode::BAD_REQUEST {
-                rrelayerr_error!("Bad request error: URI={}, method={}", uri, method);
+                rrelayer_error!("Bad request error: URI={}, method={}", uri, method);
             }
         } else if status.is_server_error() {
-            rrelayerr_error!("{} {} responded with {} after {:?}", method, uri, status, duration);
+            rrelayer_error!("{} {} responded with {} after {:?}", method, uri, status, duration);
 
             if !error_details.is_empty() {
-                rrelayerr_error!("Error details: {}", error_details);
+                rrelayer_error!("Error details: {}", error_details);
             }
         }
 
         Ok(response)
     } else {
-        rrelayerr_info!("{} {} responded with {} after {:?}", method, uri, status, duration);
+        rrelayer_info!("{} {} responded with {} after {:?}", method, uri, status, duration);
         Ok(response)
     }
 }
@@ -272,9 +272,9 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
 
     info!("Starting up the server");
 
-    let yaml_path = project_path.join("rrelayerr.yaml");
+    let yaml_path = project_path.join("rrelayer.yaml");
     if !yaml_path.exists() {
-        error!("Found rrelayerr.yaml in the current directory");
+        error!("Found rrelayer.yaml in the current directory");
         return Err(StartError::NoYamlFileFound);
     }
 

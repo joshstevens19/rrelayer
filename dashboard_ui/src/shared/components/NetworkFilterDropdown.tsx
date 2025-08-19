@@ -1,7 +1,7 @@
 import { useNetworks } from '@/hooks/network/UseNetworks';
 import LoadingComponent from '@/shared/components/Loading';
 import React, { useEffect, useState } from 'react';
-import { Network } from 'rrelayerr-sdk';
+import { Network } from 'rrelayer-sdk';
 
 export interface NetworkFilterDropdownProps {
   onSelect?: (network: Network) => void;

@@ -43,7 +43,7 @@ async fn generate_auth_secret(
 
     let id = Uuid::new_v4();
     let challenge = format!(
-        "Welcome to rrelayerr!\n\nClick to sign in with your wallet address to continue.\n\nThis request will not trigger a blockchain transaction or cost any gas fees.\n\nWallet address:\n{}\n\nNonce:\n{}",
+        "Welcome to rrelayer!\n\nClick to sign in with your wallet address to continue.\n\nThis request will not trigger a blockchain transaction or cost any gas fees.\n\nWallet address:\n{}\n\nNonce:\n{}",
         secret_request.address.hex(),
         id
     );

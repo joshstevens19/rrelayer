@@ -1,5 +1,5 @@
 {
-  "name": "rrelayerr-sdk",
+  "name": "rrelayer-sdk",
   "version": "1.0.19",
   "description": "The rrelayer sdk",
   "main": "dist/index.js",

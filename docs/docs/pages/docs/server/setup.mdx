@@ -7,27 +7,27 @@ It is best to install the repo from source, the main reason is this is really ea
 :::code-group
 
 ```bash [http]
-git clone https://github.com/joshstevens19/rrelayerr.git
+git clone https://github.com/joshstevens19/rrelayer.git
 ```
 
 ```bash [ssh]
-git clone git@github.com:joshstevens19/rrelayerr.git
+git clone git@github.com:joshstevens19/rrelayer.git
 ```
 
 :::
 
-Once installed you can cd into the folder `rrelayerr_server`
+Once installed you can cd into the folder `rrelayer_server`
 
 :::code-group
 
 ```bash [http]
-git clone https://github.com/joshstevens19/rrelayerr.git
-cd ./rrelayerr_server
+git clone https://github.com/joshstevens19/rrelayer.git
+cd ./rrelayer_server
 ```
 
 ```bash [ssh]
-git clone git@github.com:joshstevens19/rrelayerr.git
-cd ./rrelayerr_server
+git clone git@github.com:joshstevens19/rrelayer.git
+cd ./rrelayer_server
 ```
 
 :::
@@ -55,7 +55,7 @@ gas_providers:
     secret: ${INFURA_API_KEY_SECRET}
 ```
 
-You will need to replace the `${}` with the correct environment variables names. rrelayerr will see anything with ${} and replace it with the environment variable.
+You will need to replace the `${}` with the correct environment variables names. rrelayer will see anything with ${} and replace it with the environment variable.
 We highly advise you use environment variables for these properties, you can create an `.env` within the project and it will be ignored from git.
 
 ```bash

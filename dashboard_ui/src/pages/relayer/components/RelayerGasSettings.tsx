@@ -3,7 +3,7 @@ import {
   useUpdateMaxGasPriceRelayer,
 } from '@/hooks/relayer';
 import React, { useState } from 'react';
-import { Relayer } from 'rrelayerr-sdk';
+import { Relayer } from 'rrelayer-sdk';
 
 export interface RelayerGasSettingsProps {
   relayer: Relayer;

@@ -1,4 +1,4 @@
-use rrelayerr_core::authentication::types::TokenPair;
+use rrelayer_core::authentication::types::TokenPair;
 
 use crate::api::ApiBaseConfig;
 

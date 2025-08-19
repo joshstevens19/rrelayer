@@ -1,6 +1,6 @@
 import { RRelayerrSDKContext } from '@/contexts/RRelayerrSDKContext';
 import { useCallback, useContext, useState } from 'react';
-import { Network } from 'rrelayerr-sdk';
+import { Network } from 'rrelayer-sdk';
 
 export const useNetworks = () => {
   const sdk = useContext(RRelayerrSDKContext);

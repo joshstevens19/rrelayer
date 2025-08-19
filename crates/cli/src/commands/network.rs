@@ -2,10 +2,10 @@ use alloy::providers::Provider;
 use clap::{Args, Subcommand};
 use dialoguer::{Confirm, Input};
 use prettytable::{Cell, Row, Table, format};
-use rrelayerr_core::{
+use rrelayer_core::{
     NetworkSetupConfig, create_retry_client, gas::fee_estimator::base::GasPriceResult,
 };
-use rrelayerr_sdk::SDK;
+use rrelayer_sdk::SDK;
 
 use crate::{
     authentication::handle_authenticate, commands::keystore::ProjectLocation, console::print_table,
@@ -132,7 +132,7 @@ async fn handle_add(project_path: &ProjectLocation) -> Result<(), Box<dyn std::e
     project_path.overwrite_setup_config(setup_config)?;
 
     println!(
-        "Network '{}' added successfully - for networks to be added to rrelayerr you have to restart the server",
+        "Network '{}' added successfully - for networks to be added to rrelayer you have to restart the server",
         network_name
     );
 

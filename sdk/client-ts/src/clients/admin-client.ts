@@ -53,7 +53,7 @@ export type AdminSetup =
 export class AdminClient {
   private _currentTokenPair: TokenPair | null = null;
   private _walletClient: WalletClient;
-  constructor(private _rrelayerrClient: RRelayerrClient, config: AdminSetup) {
+  constructor(private _rrelayerClient: RRelayerrClient, config: AdminSetup) {
     if ('accessPrivateKey' in config) {
       this._walletClient = createWalletClient({
         account: privateKeyToAccount(config.accessPrivateKey),
@@ -71,7 +71,7 @@ export class AdminClient {
   private _apiBaseConfig = (): ApiBaseConfig => {
     invariant(this._currentTokenPair, 'No access token');
     return {
-      serverUrl: this._rrelayerrClient.config.serverUrl,
+      serverUrl: this._rrelayerClient.config.serverUrl,
       authToken: this._currentTokenPair.accessToken,
     };
   };
@@ -157,7 +157,7 @@ export class AdminClient {
             await this._walletClient.getAddresses()
           )[0],
           {
-            serverUrl: this._rrelayerrClient.config.serverUrl,
+            serverUrl: this._rrelayerClient.config.serverUrl,
           }
         );
 
@@ -173,7 +173,7 @@ export class AdminClient {
             signature,
           },
           {
-            serverUrl: this._rrelayerrClient.config.serverUrl,
+            serverUrl: this._rrelayerClient.config.serverUrl,
           }
         );
 
@@ -330,7 +330,7 @@ export class AdminClient {
 
         return {
           relayer: result,
-          client: await this._rrelayerrClient.createRelayerClient({
+          client: await this._rrelayerClient.createRelayerClient({
             relayerId: result.id,
             apiKey,
           }),
@@ -408,7 +408,7 @@ export class AdminClient {
               authToken: this._currentTokenPair!.accessToken,
             },
           },
-          this._rrelayerrClient.config
+          this._rrelayerClient.config
         );
       },
     };

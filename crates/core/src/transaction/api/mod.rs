@@ -18,7 +18,7 @@ use crate::{
     authentication::guards::ReadOnlyOrAboveJwtTokenOrApiKeyGuard,
     provider::find_provider_for_chain_id,
     relayer::{get_relayer, is_relayer_api_key, types::RelayerId},
-    rrelayerr_error, rrelayerr_info,
+    rrelayer_error, rrelayer_info,
     shared::common_types::{EvmAddress, PagingContext, PagingQuery, PagingResult},
     transaction::{
         get_transaction_by_id,
@@ -155,7 +155,7 @@ async fn send_transaction(
         .add_transaction(&relayer_id, &transaction_to_send)
         .await
         .map_err(|e| {
-            rrelayerr_error!("{}", e);
+            rrelayer_error!("{}", e);
             StatusCode::BAD_REQUEST
         })?;
 
