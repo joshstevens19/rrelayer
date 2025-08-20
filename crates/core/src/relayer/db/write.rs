@@ -1,4 +1,4 @@
-use alloy::signers::local::LocalSignerError;
+use std::error::Error;
 use thiserror::Error;
 
 use crate::{
@@ -22,7 +22,7 @@ pub enum CreateRelayerError {
     NoSaveRelayerInitInfoReturnedDb(String, ChainId),
 
     #[error("Wallet error - name: {0}, chainId: {1}: {0}")]
-    WalletError(String, ChainId, LocalSignerError),
+    WalletError(String, ChainId, Box<dyn Error + Send + Sync>),
 
     #[error("Relayer {0} not found for cloning")]
     RelayerNotFound(RelayerId),
@@ -96,7 +96,7 @@ impl PostgresClient {
         };
 
         let address = evm_provider
-            .get_address(wallet_index as u32)
+            .create_wallet(wallet_index as u32)
             .await
             .map_err(|e| CreateRelayerError::WalletError(name.to_string(), *chain_id, e))?;
 

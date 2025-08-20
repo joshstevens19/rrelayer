@@ -17,7 +17,7 @@ use crate::{
         types::{GasPrice, GasProvider, MaxFee, MaxPriorityFee},
     },
     network::types::ChainId,
-    setup::yaml::{NetworkSetupConfig, SetupConfig},
+    NetworkSetupConfig, SetupConfig,
 };
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

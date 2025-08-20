@@ -1,20 +1,20 @@
 use std::sync::Arc;
 
+use alloy::consensus::{SignableTransaction, TxEnvelope};
 use alloy::{
     consensus::TypedTransaction,
     dyn_abi::eip712::TypedData,
     eips::{BlockId, BlockNumberOrTag},
-    network::{
-        primitives::BlockTransactionsKind, Ethereum, EthereumWallet, TransactionBuilder,
-        TransactionBuilderError, TxSigner,
-    },
+    network::primitives::BlockTransactionsKind,
+    network::Ethereum,
+    network::TransactionBuilderError,
     primitives::PrimitiveSignature,
     providers::{Provider, ProviderBuilder, RootProvider},
     rpc::{
         client::ClientBuilder,
         types::{TransactionReceipt, TransactionRequest},
     },
-    signers::{local::LocalSignerError, Signer},
+    signers::local::LocalSignerError,
     transports::{
         http::{Client, Http},
         layers::{RetryBackoffLayer, RetryBackoffService},
@@ -26,14 +26,11 @@ use reqwest::Url;
 use thiserror::Error;
 use tracing::info;
 
-use super::wallet_manager::WalletManager;
+use crate::wallet::{MnemonicWalletManager, PrivyWalletManager, WalletManagerTrait};
 use crate::{
     gas::{
         blob_gas_oracle::{BlobGasEstimatorResult, BlobGasPriceResult},
-        fee_estimator::{
-            base::{BaseGasFeeEstimator, GasEstimatorError, GasEstimatorResult},
-            fallback::FallbackGasFeeEstimator,
-        },
+        fee_estimator::base::{BaseGasFeeEstimator, GasEstimatorError, GasEstimatorResult},
         types::GasLimit,
     },
     network::types::ChainId,
@@ -46,7 +43,7 @@ pub type RelayerProvider = RootProvider<RetryBackoffService<Http<Client>>>;
 #[derive(Clone)]
 pub struct EvmProvider {
     rpc_clients: Vec<Arc<RelayerProvider>>,
-    wallet_manager: Arc<WalletManager>,
+    wallet_manager: Arc<dyn WalletManagerTrait>,
     gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
     pub chain_id: ChainId,
     pub name: String,
@@ -144,18 +141,44 @@ pub enum EvmProviderNewError {
     #[error("http provider cant be created for {0}: {1}")]
     HttpProviderCantBeCreated(String, String),
 
+    #[error("wallet manager error: {0}")]
+    WalletManagerError(String),
+
     #[error("{0}")]
     ProviderError(RpcError<TransportErrorKind>),
 }
 
 impl EvmProvider {
-    pub async fn new(
+    pub async fn new_with_mnemonic(
         provider_urls: &[String],
         name: &str,
         mnemonic: &str,
         gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
     ) -> Result<Self, EvmProviderNewError> {
-        // get the first one to avoid calling chainId a lot
+        let wallet_manager = Arc::new(MnemonicWalletManager::new(mnemonic));
+        Self::new_internal(provider_urls, name, wallet_manager, gas_estimator).await
+    }
+
+    pub async fn new_with_privy(
+        provider_urls: &[String],
+        name: &str,
+        app_id: String,
+        app_secret: String,
+        gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
+    ) -> Result<Self, EvmProviderNewError> {
+        let privy_manager = PrivyWalletManager::new(app_id, app_secret)
+            .await
+            .map_err(|e| EvmProviderNewError::WalletManagerError(e.to_string()))?;
+        let wallet_manager = Arc::new(privy_manager);
+        Self::new_internal(provider_urls, name, wallet_manager, gas_estimator).await
+    }
+
+    async fn new_internal(
+        provider_urls: &[String],
+        name: &str,
+        wallet_manager: Arc<dyn WalletManagerTrait>,
+        gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
+    ) -> Result<Self, EvmProviderNewError> {
         let provider = create_retry_client(&provider_urls[0]).map_err(|e| {
             EvmProviderNewError::HttpProviderCantBeCreated(provider_urls[0].clone(), e.to_string())
         })?;
@@ -164,8 +187,7 @@ impl EvmProvider {
             provider.get_chain_id().await.map_err(EvmProviderNewError::ProviderError)?,
         );
 
-        let mut providers: Vec<Arc<RelayerProvider>> = vec![];
-        providers.push(provider.clone());
+        let mut providers: Vec<Arc<RelayerProvider>> = vec![provider.clone()];
         for url in provider_urls.iter().skip(1) {
             providers.push(create_retry_client(url).map_err(|e| {
                 EvmProviderNewError::HttpProviderCantBeCreated(url.clone(), e.to_string())
@@ -177,7 +199,7 @@ impl EvmProvider {
                 .await
                 .map_err(EvmProviderNewError::ProviderError)?,
             rpc_clients: providers,
-            wallet_manager: Arc::new(WalletManager::new(mnemonic)),
+            wallet_manager,
             gas_estimator,
             chain_id,
             name: name.to_string(),
@@ -191,10 +213,18 @@ impl EvmProvider {
         self.rpc_clients[index].clone()
     }
 
-    pub async fn get_address(&self, wallet_index: u32) -> Result<EvmAddress, LocalSignerError> {
-        let wallet = self.wallet_manager.get_wallet(wallet_index, &self.chain_id).await?;
+    pub async fn create_wallet(
+        &self,
+        wallet_index: u32,
+    ) -> Result<EvmAddress, Box<dyn std::error::Error + Send + Sync>> {
+        self.wallet_manager.create_wallet(wallet_index, &self.chain_id).await
+    }
 
-        Ok(EvmAddress::new(wallet.address()))
+    pub async fn get_address(
+        &self,
+        wallet_index: u32,
+    ) -> Result<EvmAddress, Box<dyn std::error::Error + Send + Sync>> {
+        self.wallet_manager.get_address(wallet_index, &self.chain_id).await
     }
 
     pub async fn get_receipt(
@@ -211,15 +241,11 @@ impl EvmProvider {
         &self,
         wallet_index: &u32,
     ) -> Result<TransactionNonce, WalletOrProviderError> {
-        let wallet = self
-            .wallet_manager
-            .get_wallet(*wallet_index, &self.chain_id)
-            .await
-            .map_err(WalletOrProviderError::WalletError)?;
+        let address = self.wallet_manager.get_address(*wallet_index, &self.chain_id).await.unwrap(); // TODO: fix this upwrap
 
         let nonce = self
             .rpc_client()
-            .get_transaction_count(wallet.address())
+            .get_transaction_count(address.into())
             .block_id(BlockId::Number(BlockNumberOrTag::Pending))
             .await
             .map_err(WalletOrProviderError::ProviderError)?;
@@ -232,15 +258,21 @@ impl EvmProvider {
         wallet_index: &u32,
         transaction: TypedTransaction,
     ) -> Result<TransactionHash, SendTransactionError> {
-        let local_signer = self.wallet_manager.get_wallet(*wallet_index, &self.chain_id).await?;
+        let signature = self
+            .wallet_manager
+            .sign_transaction(*wallet_index, &transaction, &self.chain_id)
+            .await
+            .unwrap(); // TODO: fix
 
-        let wallet = EthereumWallet::new(local_signer);
-
-        let tx_request: TransactionRequest = transaction.into();
-        let tx_envelope = tx_request.build(&wallet).await?;
+        let tx_envelope = match transaction {
+            TypedTransaction::Legacy(tx) => TxEnvelope::Legacy(tx.into_signed(signature)),
+            TypedTransaction::Eip2930(tx) => TxEnvelope::Eip2930(tx.into_signed(signature)),
+            TypedTransaction::Eip1559(tx) => TxEnvelope::Eip1559(tx.into_signed(signature)),
+            TypedTransaction::Eip4844(tx) => TxEnvelope::Eip4844(tx.into_signed(signature)),
+            TypedTransaction::Eip7702(tx) => TxEnvelope::Eip7702(tx.into_signed(signature)),
+        };
 
         let provider = self.rpc_client();
-
         let receipt = provider.send_tx_envelope(tx_envelope).await?;
 
         Ok(TransactionHash::from_alloy_hash(receipt.tx_hash()))
@@ -250,62 +282,24 @@ impl EvmProvider {
         &self,
         wallet_index: &u32,
         transaction: &TypedTransaction,
-    ) -> Result<PrimitiveSignature, LocalSignerError> {
-        let wallet = self.wallet_manager.get_wallet(*wallet_index, &self.chain_id).await?;
-
-        let signature = match transaction {
-            TypedTransaction::Legacy(tx) => {
-                let mut tx = tx.clone();
-                // TODO: fix this
-                wallet.sign_transaction(&mut tx).await.unwrap()
-            }
-            TypedTransaction::Eip2930(tx) => {
-                let mut tx = tx.clone();
-                // TODO: fix this
-                wallet.sign_transaction(&mut tx).await.unwrap()
-            }
-            TypedTransaction::Eip1559(tx) => {
-                let mut tx = tx.clone();
-                // TODO: fix this
-                wallet.sign_transaction(&mut tx).await.unwrap()
-            }
-            TypedTransaction::Eip4844(tx) => {
-                let mut tx = tx.clone();
-                // TODO: fix this
-                wallet.sign_transaction(&mut tx).await.unwrap()
-            }
-            TypedTransaction::Eip7702(tx) => {
-                let mut tx = tx.clone();
-                // TODO: fix this
-                wallet.sign_transaction(&mut tx).await.unwrap()
-            }
-        };
-
-        Ok(signature)
+    ) -> Result<PrimitiveSignature, Box<dyn std::error::Error + Send + Sync>> {
+        self.wallet_manager.sign_transaction(*wallet_index, transaction, &self.chain_id).await
     }
 
     pub async fn sign_text(
         &self,
         wallet_index: &u32,
         text: &String,
-    ) -> Result<PrimitiveSignature, SignTextError> {
-        let wallet = self.wallet_manager.get_wallet(*wallet_index, &self.chain_id).await?;
-
-        let signature = wallet.sign_message(text.as_bytes()).await?;
-
-        Ok(signature)
+    ) -> Result<PrimitiveSignature, Box<dyn std::error::Error + Send + Sync>> {
+        self.wallet_manager.sign_text(*wallet_index, text).await
     }
 
     pub async fn sign_typed_data(
         &self,
         wallet_index: &u32,
         typed_data: &TypedData,
-    ) -> Result<PrimitiveSignature, SignTypedDataError> {
-        let wallet = self.wallet_manager.get_wallet(*wallet_index, &self.chain_id).await?;
-
-        let signature = wallet.sign_dynamic_typed_data(typed_data).await?;
-
-        Ok(signature)
+    ) -> Result<PrimitiveSignature, Box<dyn std::error::Error + Send + Sync>> {
+        self.wallet_manager.sign_typed_data(*wallet_index, typed_data).await
     }
 
     pub async fn estimate_gas(

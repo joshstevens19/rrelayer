@@ -3,19 +3,14 @@ use std::path::PathBuf;
 use thiserror::Error;
 
 use crate::{
-    gas::fee_estimator::base::get_gas_estimator,
-    network::types::ChainId,
-    setup::yaml::{SetupConfig, SigningKey},
+    gas::fee_estimator::base::get_gas_estimator, network::types::ChainId, SetupConfig, SigningKey,
 };
 
-mod wallet_manager;
-pub use wallet_manager::generate_seed_phrase;
-
 mod evm_provider;
-pub use evm_provider::{create_retry_client, EvmProvider, RelayerProvider, SendTransactionError};
 
 use self::evm_provider::EvmProviderNewError;
-use crate::setup::signing_key_providers::get_mnemonic_from_signing_key;
+use crate::wallet::get_mnemonic_from_signing_key;
+pub use evm_provider::{create_retry_client, EvmProvider, RelayerProvider, SendTransactionError};
 
 #[derive(Error, Debug)]
 pub enum LoadProvidersError {
@@ -56,25 +51,37 @@ pub async fn load_providers(
             setup_config.signing_key.as_ref().unwrap()
         };
 
-        let result =
-            get_mnemonic_from_signing_key(project_path, &setup_config.name, signing_key).await;
+        // Create the appropriate provider based on signing key type
+        let provider = if let Some(privy) = &signing_key.privy {
+            // Use Privy wallet manager
+            EvmProvider::new_with_privy(
+                &config.provider_urls,
+                &config.name,
+                privy.app_id.clone(),
+                privy.app_secret.clone(),
+                get_gas_estimator(&config.provider_urls, setup_config, config)
+                    .await
+                    .map_err(|e| LoadProvidersError::GasEstimatorError(e.to_string()))?,
+            )
+            .await?
+        } else {
+            let mnemonic =
+                get_mnemonic_from_signing_key(project_path, &setup_config.name, signing_key)
+                    .await
+                    .map_err(|e| LoadProvidersError::SigningKeyError(e.to_string()))?;
 
-        match result {
-            Ok(mnemonic) => {
-                providers.push(
-                    EvmProvider::new(
-                        &config.provider_urls,
-                        &config.name,
-                        &mnemonic,
-                        get_gas_estimator(&config.provider_urls, setup_config, config)
-                            .await
-                            .map_err(|e| LoadProvidersError::GasEstimatorError(e.to_string()))?,
-                    )
-                    .await?,
-                );
-            }
-            Err(e) => return Err(LoadProvidersError::SigningKeyError(e.to_string())),
-        }
+            EvmProvider::new_with_mnemonic(
+                &config.provider_urls,
+                &config.name,
+                &mnemonic,
+                get_gas_estimator(&config.provider_urls, setup_config, config)
+                    .await
+                    .map_err(|e| LoadProvidersError::GasEstimatorError(e.to_string()))?,
+            )
+            .await?
+        };
+
+        providers.push(provider);
     }
 
     Ok(providers)

@@ -12,6 +12,12 @@ use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 #[derive(Debug, Copy, Clone, Serialize, Eq)]
 pub struct ChainId(u64);
 
+impl Default for ChainId {
+    fn default() -> Self {
+        ChainId(1)
+    }
+}
+
 impl ChainId {
     pub fn new(id: u64) -> Self {
         ChainId(id)

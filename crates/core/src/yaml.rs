@@ -52,6 +52,12 @@ pub struct KeystoreSigningKey {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct PrivySigningKey {
+    pub app_id: String,
+    pub app_secret: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct SigningKey {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub keystore: Option<KeystoreSigningKey>,
@@ -64,6 +70,9 @@ pub struct SigningKey {
 
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub gcp_secret_manager: Option<GcpSigningKey>,
+
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub privy: Option<PrivySigningKey>,
 }
 
 impl SigningKey {
@@ -73,6 +82,7 @@ impl SigningKey {
             raw: None,
             aws_secret_manager: None,
             gcp_secret_manager: None,
+            privy: None,
         }
     }
 }
@@ -84,6 +94,7 @@ impl SigningKey {
             self.aws_secret_manager.is_some(),
             self.gcp_secret_manager.is_some(),
             self.keystore.is_some(),
+            self.privy.is_some(),
         ]
         .iter()
         .filter(|&&x| x)

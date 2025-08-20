@@ -9,7 +9,7 @@ use eth_keystore::{decrypt_key, encrypt_key};
 use rand::thread_rng;
 use thiserror::Error;
 
-use crate::generate_seed_phrase;
+use crate::wallet::generate_seed_phrase;
 
 pub fn create_new_mnemonic_in_keystore(
     password: &str,

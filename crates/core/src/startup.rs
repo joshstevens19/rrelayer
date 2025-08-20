@@ -15,6 +15,8 @@ use tokio::sync::Mutex;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 use tracing::{error, info};
 
+use crate::keystore::{recover_wallet_from_keystore, KeyStorePasswordManager};
+use crate::yaml::ReadYamlError;
 use crate::{
     app_state::AppState,
     authentication::{api::create_authentication_routes, types::JwtRole},
@@ -23,14 +25,13 @@ use crate::{
         blob_gas_oracle::{blob_gas_oracle, BlobGasOracleCache},
         gas_oracle::{gas_oracle, GasOracleCache},
     },
-    keystore::{recover_wallet_from_keystore, KeyStorePasswordManager, PasswordError},
     network::api::create_network_routes,
     postgres::{PostgresClient, PostgresConnectionError, PostgresError},
     provider::{load_providers, EvmProvider, LoadProvidersError},
+    read,
     relayer::api::create_relayer_routes,
     rrelayer_error, rrelayer_info,
     schema::apply_schema,
-    setup::yaml::{read, ApiConfig, ReadYamlError},
     setup_info_logger,
     shared::{cache::Cache, common_types::EvmAddress},
     transaction::{
@@ -41,7 +42,7 @@ use crate::{
         },
     },
     user::api::create_user_routes,
-    AdminIdentifier,
+    AdminIdentifier, ApiConfig,
 };
 
 async fn start_crons(

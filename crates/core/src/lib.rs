@@ -8,15 +8,11 @@ pub mod network;
 mod postgres;
 pub use postgres::PostgresClient;
 mod provider;
-pub use provider::{create_retry_client, generate_seed_phrase};
+pub use provider::create_retry_client;
 pub mod relayer;
-mod setup;
-pub use setup::{
-    signing_key_providers::keystore,
-    yaml::{
-        read, AdminIdentifier, ApiConfig, GasProviders, KeystoreSigningKey, NetworkSetupConfig,
-        SetupConfig, SigningKey,
-    },
+pub use yaml::{
+    read, AdminIdentifier, ApiConfig, GasProviders, KeystoreSigningKey, NetworkSetupConfig,
+    SetupConfig, SigningKey,
 };
 mod shared;
 pub use shared::common_types;
@@ -28,6 +24,9 @@ mod file;
 mod schema;
 pub mod transaction;
 pub mod user;
+mod wallet;
+pub use wallet::{generate_seed_phrase, keystore};
+mod yaml;
 
 pub use docker::generate_docker_file;
 pub use environment::load_env_from_project_path;

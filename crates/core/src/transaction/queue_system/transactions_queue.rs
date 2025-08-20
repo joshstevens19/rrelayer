@@ -55,7 +55,8 @@ impl TransactionsQueue {
         blob_oracle_cache: Arc<Mutex<BlobGasOracleCache>>,
     ) -> Self {
         rrelayer_info!(
-            "Creating new TransactionsQueue for relayer: {} on chain: {}",
+            "Creating new TransactionsQueue for relayer: {} (name: {}) on chain: {}",
+            setup.relayer.id,
             setup.relayer.name,
             setup.relayer.chain_id
         );
@@ -580,8 +581,11 @@ impl TransactionsQueue {
     ) -> Result<TransactionHash, LocalSignerError> {
         rrelayer_info!("Computing transaction hash for relayer: {}", self.relayer.name);
 
-        let signature =
-            self.evm_provider.sign_transaction(&self.relayer.wallet_index, transaction).await?;
+        let signature = self
+            .evm_provider
+            .sign_transaction(&self.relayer.wallet_index, transaction)
+            .await
+            .unwrap(); // TODO: fix error
 
         let hash = match transaction {
             TypedTransaction::Legacy(tx) => {

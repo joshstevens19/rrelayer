@@ -1,7 +1,7 @@
 use aws_config::{BehaviorVersion, Region};
 use aws_sdk_secretsmanager::{config::Credentials, Client};
 
-use crate::setup::yaml::AwsSigningKey;
+use crate::yaml::AwsSigningKey;
 
 pub async fn get_aws_secret(
     config: &AwsSigningKey,

@@ -1,14 +1,12 @@
+use crate::SigningKey;
 use std::path::PathBuf;
 
-use crate::setup::signing_key_providers::gcp_secret_manager::get_gcp_secret;
-use crate::{
-    keystore::{recover_mnemonic_from_keystore, KeyStorePasswordManager},
-    setup::signing_key_providers::aws_secret_manager::get_aws_secret,
-    SigningKey,
-};
+mod aws_secret_manager;
+use aws_secret_manager::get_aws_secret;
+mod gcp_secret_manager;
+use crate::keystore::{recover_mnemonic_from_keystore, KeyStorePasswordManager};
+use gcp_secret_manager::get_gcp_secret;
 
-pub mod aws_secret_manager;
-pub mod gcp_secret_manager;
 pub mod keystore;
 
 pub async fn get_mnemonic_from_signing_key(

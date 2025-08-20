@@ -1,4 +1,4 @@
-use crate::setup::yaml::GcpSigningKey;
+use crate::yaml::GcpSigningKey;
 use google_secretmanager1::{hyper, hyper_rustls, oauth2, SecretManager};
 use std::path::PathBuf;
 
