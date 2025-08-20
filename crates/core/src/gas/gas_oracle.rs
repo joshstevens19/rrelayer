@@ -6,9 +6,9 @@ use tokio::{
 };
 use tracing::info;
 
-use super::fee_estimator::base::{GasEstimatorError, GasEstimatorResult, GasPriceResult};
+use super::fee_estimator::base::{GasEstimatorResult, GasPriceResult};
 use crate::{
-    network::types::ChainId, provider::EvmProvider, rrelayer_error, rrelayer_info,
+    network::types::ChainId, provider::EvmProvider, rrelayer_error,
     transaction::types::TransactionSpeed,
 };
 
