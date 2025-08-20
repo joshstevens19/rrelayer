@@ -101,11 +101,7 @@ pub async fn handle_init(path: &Path) -> Result<(), Box<dyn std::error::Error>> 
             block_explorer_url: Some("https://sepolia.etherscan.io".to_string()),
             gas_provider: None,
         }],
-        gas_providers: Some(GasProviders {
-            infura: None,
-            tenderly: Some(TenderlyGasProviderSetupConfig { enabled: true, api_key: None }),
-            custom: None,
-        }),
+        gas_providers: None,
         api_config: ApiConfig { port: 8000, allowed_origins: None },
     };
     fs::write(project_path.join("rrelayer.yaml"), serde_yaml::to_string(&yaml_content)?)?;

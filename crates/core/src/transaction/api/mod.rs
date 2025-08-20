@@ -1,6 +1,4 @@
-use std::str::FromStr;
-use std::sync::Arc;
-
+use alloy::network::AnyTransactionReceipt;
 use alloy::rpc::types::TransactionReceipt;
 use alloy_eips::eip4844::Blob;
 use axum::{
@@ -10,6 +8,8 @@ use axum::{
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
+use std::sync::Arc;
 
 use super::types::TransactionSpeed;
 use crate::shared::utils::convert_blob_strings_to_blobs;
@@ -45,7 +45,7 @@ async fn get_transaction_by_id_api(
 pub struct RelayTransactionStatusResult {
     pub hash: Option<TransactionHash>,
     pub status: TransactionStatus,
-    pub receipt: Option<TransactionReceipt>,
+    pub receipt: Option<AnyTransactionReceipt>,
 }
 
 // TODO! GUARDS

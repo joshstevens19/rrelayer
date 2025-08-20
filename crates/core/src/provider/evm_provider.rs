@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
 use alloy::consensus::{SignableTransaction, TxEnvelope};
+use alloy::network::{AnyNetwork, AnyTransactionReceipt, AnyTxEnvelope};
+use alloy::rpc::types::serde_helpers::WithOtherFields;
 use alloy::{
     consensus::TypedTransaction,
     dyn_abi::eip712::TypedData,
@@ -10,10 +12,7 @@ use alloy::{
     network::TransactionBuilderError,
     primitives::PrimitiveSignature,
     providers::{Provider, ProviderBuilder, RootProvider},
-    rpc::{
-        client::ClientBuilder,
-        types::{TransactionReceipt, TransactionRequest},
-    },
+    rpc::{client::ClientBuilder, types::TransactionRequest},
     signers::local::LocalSignerError,
     transports::{
         http::{Client, Http},
@@ -21,6 +20,7 @@ use alloy::{
         RpcError, TransportErrorKind,
     },
 };
+use alloy_eips::eip2718::Encodable2718;
 use rand::{thread_rng, Rng};
 use reqwest::Url;
 use thiserror::Error;
@@ -38,7 +38,7 @@ use crate::{
     transaction::types::{TransactionHash, TransactionNonce},
 };
 
-pub type RelayerProvider = RootProvider<RetryBackoffService<Http<Client>>>;
+pub type RelayerProvider = RootProvider<RetryBackoffService<Http<Client>>, AnyNetwork>;
 
 #[derive(Clone)]
 pub struct EvmProvider {
@@ -101,7 +101,7 @@ pub fn create_retry_client(rpc_url: &str) -> Result<Arc<RelayerProvider>, RetryC
     let retry_layer = RetryBackoffLayer::new(5000, 500, 660);
     let client = ClientBuilder::default().layer(retry_layer).http(url.clone());
 
-    let provider = ProviderBuilder::new().on_client(client);
+    let provider = ProviderBuilder::new().network::<AnyNetwork>().on_client(client);
 
     Ok(Arc::new(provider))
 }
@@ -230,7 +230,7 @@ impl EvmProvider {
     pub async fn get_receipt(
         &self,
         transaction_hash: &TransactionHash,
-    ) -> Result<Option<TransactionReceipt>, RpcError<TransportErrorKind>> {
+    ) -> Result<Option<AnyTransactionReceipt>, RpcError<TransportErrorKind>> {
         let receipt =
             self.rpc_client().get_transaction_receipt(transaction_hash.into_alloy_hash()).await?;
 
@@ -273,7 +273,8 @@ impl EvmProvider {
         };
 
         let provider = self.rpc_client();
-        let receipt = provider.send_tx_envelope(tx_envelope).await?;
+        let tx_bytes = tx_envelope.encoded_2718();
+        let receipt = provider.send_raw_transaction(&tx_bytes).await?;
 
         Ok(TransactionHash::from_alloy_hash(receipt.tx_hash()))
     }
@@ -308,7 +309,9 @@ impl EvmProvider {
     ) -> Result<GasLimit, RpcError<TransportErrorKind>> {
         let request: TransactionRequest = transaction.clone().into();
 
-        let result = self.rpc_client().estimate_gas(&request).await?;
+        let request_with_other = WithOtherFields::new(request);
+
+        let result = self.rpc_client().estimate_gas(&request_with_other).await?;
 
         Ok(GasLimit::new(result as u128))
     }

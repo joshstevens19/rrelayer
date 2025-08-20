@@ -1,3 +1,4 @@
+use alloy::network::AnyTransactionReceipt;
 use alloy::rpc::types::TransactionReceipt;
 
 use crate::{
@@ -181,7 +182,7 @@ impl PostgresClient {
     pub async fn transaction_mined(
         &mut self,
         transaction_id: &TransactionId,
-        transaction_receipt: &TransactionReceipt,
+        transaction_receipt: &AnyTransactionReceipt,
     ) -> Result<(), PostgresError> {
         let mut conn = self.pool.get().await?;
         let trans = conn.transaction().await.map_err(PostgresError::PgError)?;

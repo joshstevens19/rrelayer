@@ -128,12 +128,12 @@ pub async fn get_gas_estimator(
         }
     }
 
-    let chain_id = network.get_chain_id().await?;
-
-    let tenderly = TenderlyGasFeeEstimator::new(&None);
-    if tenderly.is_chain_supported(&chain_id) {
-        return Ok(Arc::new(tenderly));
-    }
+    // let chain_id = network.get_chain_id().await?;
+    //
+    // let tenderly = TenderlyGasFeeEstimator::new(&None);
+    // if tenderly.is_chain_supported(&chain_id) {
+    //     return Ok(Arc::new(tenderly));
+    // }
 
     let provider = create_retry_client(&provider_urls[0])?;
     Ok(Arc::new(FallbackGasFeeEstimator::new(provider.clone())))

@@ -4,9 +4,9 @@ use std::{
     time::{Duration, SystemTime},
 };
 
+use alloy::network::{AnyTransactionReceipt, ReceiptResponse};
 use alloy::{
     consensus::{SignableTransaction, TypedTransaction},
-    rpc::types::TransactionReceipt,
     signers::local::LocalSignerError,
     transports::{RpcError, TransportErrorKind},
 };
@@ -265,7 +265,7 @@ impl TransactionsQueue {
     pub async fn move_inmempool_to_mining(
         &mut self,
         id: &TransactionId,
-        receipt: &TransactionReceipt,
+        receipt: &AnyTransactionReceipt,
     ) -> Result<TransactionStatus, MoveInmempoolTransactionToMinedError> {
         rrelayer_info!(
             "Moving transaction {} from inmempool to mined for relayer: {} with receipt status: {}",
@@ -765,7 +765,7 @@ impl TransactionsQueue {
     pub async fn get_receipt(
         &mut self,
         transaction_hash: &TransactionHash,
-    ) -> Result<Option<TransactionReceipt>, RpcError<TransportErrorKind>> {
+    ) -> Result<Option<AnyTransactionReceipt>, RpcError<TransportErrorKind>> {
         rrelayer_info!(
             "Getting receipt for transaction hash {} on relayer: {}",
             transaction_hash,

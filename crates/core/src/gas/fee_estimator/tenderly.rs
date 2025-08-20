@@ -14,8 +14,7 @@ use crate::{
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TenderlyGasProviderSetupConfig {
     pub enabled: bool,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub api_key: Option<String>,
+    pub api_key: String,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -87,8 +86,7 @@ pub struct TenderlyGasFeeChainConfig {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct TenderlyGasFeeEstimator {
     supported_chains: Vec<TenderlyGasFeeChainConfig>,
-    // It does not require an API key - it will be 3 RPS on the free tier
-    api_key: Option<String>,
+    api_key: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -104,7 +102,7 @@ struct TenderlyGasEstimateResult {
 }
 
 impl TenderlyGasFeeEstimator {
-    pub fn new(api_key: &Option<String>) -> Self {
+    pub fn new(api_key: &String) -> Self {
         let supported_chains = vec![
             TenderlyGasFeeChainConfig {
                 rpc_url: "https://mainnet.gateway.tenderly.co".to_string(),
@@ -424,7 +422,7 @@ impl TenderlyGasFeeEstimator {
             .expect("Chain not found")
             .rpc_url
             .clone();
-        format!("{}/{}", rpc_url, self.api_key.as_deref().unwrap_or(""))
+        format!("{}/{}", rpc_url, self.api_key)
     }
 
     async fn request_gas_estimate(
