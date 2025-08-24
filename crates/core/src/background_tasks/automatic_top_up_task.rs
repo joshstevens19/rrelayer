@@ -18,7 +18,6 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::time::{interval, Interval};
 use tracing::{error, info, warn};
 
-// ERC-20 interface definition
 sol! {
     #[sol(rpc)]
     interface IERC20 {
@@ -226,7 +225,7 @@ impl AutomaticTopUpTask {
             info!("No target addresses found for top-up on chain {}", chain_id);
             return;
         }
-        
+
         if let Some(native_config) = &config.native {
             if native_config.enabled {
                 info!("Processing native token top-ups for {} addresses", target_addresses.len());
@@ -242,7 +241,7 @@ impl AutomaticTopUpTask {
                 info!("Native token top-ups disabled for chain {}", chain_id);
             }
         }
-        
+
         if let Some(erc20_tokens) = &config.erc20_tokens {
             for (index, token_config) in erc20_tokens.iter().enumerate() {
                 info!(
@@ -288,7 +287,7 @@ impl AutomaticTopUpTask {
         native_config: &NativeTokenConfig,
     ) {
         let mut addresses_needing_top_up = Vec::new();
-        
+
         for address in target_addresses {
             match provider.rpc_client().get_balance((*address).into()).await {
                 Ok(balance) => {
@@ -323,7 +322,7 @@ impl AutomaticTopUpTask {
             target_addresses.len(),
             chain_id
         );
-        
+
         match self.check_native_from_address_balance(provider, from_address, native_config).await {
             Ok(sufficient) => {
                 if !sufficient {
@@ -341,7 +340,7 @@ impl AutomaticTopUpTask {
                 );
             }
         }
-        
+
         for address in addresses_needing_top_up {
             match self
                 .send_native_top_up_transaction(chain_id, provider, from_address, &address, native_config)
@@ -418,7 +417,7 @@ impl AutomaticTopUpTask {
             token_config.address,
             chain_id
         );
-        
+
         match self.check_erc20_from_address_balance(provider, from_address, token_config).await {
             Ok(sufficient) => {
                 if !sufficient {
@@ -492,7 +491,7 @@ impl AutomaticTopUpTask {
             target_address,
             format_wei_to_eth(&native_config.top_up_amount)
         );
-        
+
         let tx = TypedTransaction::Legacy(TxLegacy {
             chain_id: Some(provider.chain_id.u64()),
             nonce: 0,                  // This will be updated by the provider
@@ -502,7 +501,7 @@ impl AutomaticTopUpTask {
             value: native_config.top_up_amount,
             input: alloy::primitives::Bytes::new(),
         });
-        
+
         let wallet_index = match self.find_wallet_index_for_address(chain_id, from_address) {
             Some(index) => index,
             None => {
