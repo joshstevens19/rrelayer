@@ -1,7 +1,10 @@
+use alloy::primitives::utils::{parse_units, ParseUnits};
+use alloy::primitives::U256;
 use alloy::providers::Provider;
 use regex::{Captures, Regex};
-use serde::{Deserialize, Serialize};
-use std::{env, fs::File, io::Read, path::PathBuf};
+use serde::de::Visitor;
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use std::{env, fmt, fs::File, io::Read, path::PathBuf};
 use thiserror::Error;
 use tracing::{error, info};
 
@@ -18,7 +21,7 @@ use crate::{
     shared::common_types::EvmAddress,
 };
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GcpSigningKey {
     pub secret_name: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -27,7 +30,7 @@ pub struct GcpSigningKey {
     pub secret_key: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AwsSigningKey {
     pub secret_name: String,
     pub access_key_id: String,
@@ -38,12 +41,12 @@ pub struct AwsSigningKey {
     pub secret_key: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RawSigningKey {
     pub mnemonic: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct KeystoreSigningKey {
     pub path: String,
     pub name: String,
@@ -51,13 +54,13 @@ pub struct KeystoreSigningKey {
     pub dangerous_define_raw_password: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PrivySigningKey {
     pub app_id: String,
     pub app_secret: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SigningKey {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub keystore: Option<KeystoreSigningKey>,
@@ -108,7 +111,7 @@ impl SigningKey {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NetworkSetupConfig {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -122,6 +125,8 @@ pub struct NetworkSetupConfig {
         default
     )]
     pub gas_provider: Option<GasProvider>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub automatic_top_up: Option<AutomaticTopUpConfig>,
 }
 
 impl NetworkSetupConfig {
@@ -139,7 +144,7 @@ impl NetworkSetupConfig {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GasProviders {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub infura: Option<InfuraGasProviderSetupConfig>,
@@ -149,21 +154,158 @@ pub struct GasProviders {
     pub custom: Option<CustomGasFeeEstimator>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum AdminIdentifier {
     EvmAddress(EvmAddress),
     Name(String),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ApiConfig {
     pub port: u32,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub allowed_origins: Option<Vec<String>>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
+pub enum TopUpTargetAddresses {
+    All,
+    List(Vec<EvmAddress>),
+}
+
+impl Serialize for TopUpTargetAddresses {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            TopUpTargetAddresses::All => serializer.serialize_str("*"),
+            TopUpTargetAddresses::List(addresses) => addresses.serialize(serializer),
+        }
+    }
+}
+
+struct ForAddressesTypeVisitor;
+
+impl<'de> Visitor<'de> for ForAddressesTypeVisitor {
+    type Value = TopUpTargetAddresses;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("either '*' for all addresses or a list of addresses")
+    }
+
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        if value == "*" {
+            Ok(TopUpTargetAddresses::All)
+        } else {
+            Err(de::Error::invalid_value(de::Unexpected::Str(value), &"'*' for all addresses"))
+        }
+    }
+
+    fn visit_seq<A>(self, seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: de::SeqAccess<'de>,
+    {
+        let addresses = Vec::<EvmAddress>::deserialize(de::value::SeqAccessDeserializer::new(seq))?;
+        Ok(TopUpTargetAddresses::List(addresses))
+    }
+}
+
+impl<'de> Deserialize<'de> for TopUpTargetAddresses {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_any(ForAddressesTypeVisitor)
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct NativeTokenConfig {
+    pub enabled: bool,
+    #[serde(deserialize_with = "deserialize_eth_amount", serialize_with = "serialize_eth_amount")]
+    pub min_balance: U256,
+    #[serde(deserialize_with = "deserialize_eth_amount", serialize_with = "serialize_eth_amount")]
+    pub top_up_amount: U256,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Erc20TokenConfig {
+    pub address: EvmAddress,
+    #[serde(deserialize_with = "deserialize_token_amount", serialize_with = "serialize_token_amount")]
+    pub min_balance: U256,
+    #[serde(deserialize_with = "deserialize_token_amount", serialize_with = "serialize_token_amount")]
+    pub top_up_amount: U256,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AutomaticTopUpConfig {
+    pub from_address: EvmAddress,
+    pub targets: TopUpTargetAddresses,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub native: Option<NativeTokenConfig>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub erc20_tokens: Option<Vec<Erc20TokenConfig>>,
+}
+
+fn deserialize_eth_amount<'de, D>(deserializer: D) -> Result<U256, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    let result: U256 = parse_units(&s, 18).unwrap_or(ParseUnits::U256(U256::ZERO)).into();
+    Ok(result)
+}
+
+fn serialize_eth_amount<S>(amount: &U256, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    // Convert back to ETH string representation
+    let eth_divisor = U256::from(10u64.pow(18));
+    let whole_eth = amount / eth_divisor;
+    let remainder = amount % eth_divisor;
+
+    let eth_string = if remainder.is_zero() {
+        format!("{}", whole_eth)
+    } else {
+        let decimal_str = format!("{:018}", remainder);
+        let decimal_trimmed = decimal_str.trim_end_matches('0');
+        format!("{}.{}", whole_eth, decimal_trimmed)
+    };
+
+    serializer.serialize_str(&eth_string)
+}
+
+// For ERC-20 tokens, we'll use 18 decimals as default but this can be extended
+// to query the token contract for actual decimals in the future
+fn deserialize_token_amount<'de, D>(deserializer: D) -> Result<U256, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    // For now, assume 18 decimals for ERC-20 tokens (same as ETH)
+    // This can be enhanced to support different token decimals
+    let result: U256 = parse_units(&s, 18)
+        .unwrap_or(ParseUnits::U256(U256::ZERO))
+        .into();
+    Ok(result)
+}
+
+fn serialize_token_amount<S>(amount: &U256, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    // For now, use same logic as ETH (18 decimals)
+    // This can be enhanced to support different token decimals
+    serialize_eth_amount(amount, serializer)
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SetupConfig {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]

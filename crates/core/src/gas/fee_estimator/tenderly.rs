@@ -11,7 +11,7 @@ use crate::{
     network::types::ChainId,
 };
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TenderlyGasProviderSetupConfig {
     pub enabled: bool,
     pub api_key: String,

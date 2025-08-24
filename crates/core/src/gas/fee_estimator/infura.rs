@@ -12,7 +12,7 @@ use crate::{
     network::types::ChainId,
 };
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct InfuraGasProviderSetupConfig {
     pub enabled: bool,
     pub api_key: String,

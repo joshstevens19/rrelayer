@@ -26,6 +26,7 @@ pub mod transaction;
 pub mod user;
 mod wallet;
 pub use wallet::{generate_seed_phrase, keystore};
+mod background_tasks;
 mod yaml;
 
 pub use docker::generate_docker_file;

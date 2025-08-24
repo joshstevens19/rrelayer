@@ -127,6 +127,7 @@ async fn handle_add(project_path: &ProjectLocation) -> Result<(), Box<dyn std::e
         provider_urls,
         block_explorer_url: if block_explorer.is_empty() { None } else { Some(block_explorer) },
         gas_provider: None,
+        automatic_top_up: None,
     });
 
     project_path.overwrite_setup_config(setup_config)?;

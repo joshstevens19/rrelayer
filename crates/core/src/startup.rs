@@ -15,15 +15,14 @@ use tokio::sync::Mutex;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 use tracing::{error, info};
 
+use crate::background_tasks::run_background_tasks;
 use crate::keystore::{recover_wallet_from_keystore, KeyStorePasswordManager};
 use crate::yaml::ReadYamlError;
 use crate::{
     app_state::AppState,
     authentication::{api::create_authentication_routes, types::JwtRole},
     gas::{
-        api::create_gas_routes,
-        blob_gas_oracle::{blob_gas_oracle, BlobGasOracleCache},
-        gas_oracle::{gas_oracle, GasOracleCache},
+        api::create_gas_routes, blob_gas_oracle::BlobGasOracleCache, gas_oracle::GasOracleCache,
     },
     network::api::create_network_routes,
     postgres::{PostgresClient, PostgresConnectionError, PostgresError},
@@ -44,21 +43,6 @@ use crate::{
     user::api::create_user_routes,
     AdminIdentifier, ApiConfig,
 };
-
-async fn start_crons(
-    gas_oracle_cache: Arc<Mutex<GasOracleCache>>,
-    blob_gas_oracle_cache: Arc<Mutex<BlobGasOracleCache>>,
-    providers: Arc<Vec<EvmProvider>>,
-) {
-    info!("Running cron task...");
-
-    let gas_oracle_task = gas_oracle(Arc::clone(&providers), gas_oracle_cache);
-    let blob_gas_oracle_task = blob_gas_oracle(providers, blob_gas_oracle_cache);
-
-    tokio::join!(gas_oracle_task, blob_gas_oracle_task);
-
-    info!("All oracle crons initialized and running");
-}
 
 #[derive(Error, Debug)]
 #[allow(clippy::enum_variant_names)]
@@ -323,7 +307,14 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
     let gas_oracle_cache = Arc::new(Mutex::new(GasOracleCache::new()));
     let blob_gas_oracle_cache = Arc::new(Mutex::new(BlobGasOracleCache::new()));
 
-    start_crons(gas_oracle_cache.clone(), blob_gas_oracle_cache.clone(), providers.clone()).await;
+    run_background_tasks(
+        &config,
+        gas_oracle_cache.clone(),
+        blob_gas_oracle_cache.clone(),
+        providers.clone(),
+        Arc::new(postgres),
+    )
+    .await;
 
     let transaction_queue = startup_transactions_queues(
         gas_oracle_cache.clone(),
