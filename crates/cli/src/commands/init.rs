@@ -102,6 +102,7 @@ pub async fn handle_init(path: &Path) -> Result<(), InitError> {
             block_explorer_url: Some("https://sepolia.etherscan.io".to_string()),
             gas_provider: None,
             automatic_top_up: None,
+            confirmations: None,
         }],
         gas_providers: None,
         api_config: ApiConfig { port: 8000, allowed_origins: None },

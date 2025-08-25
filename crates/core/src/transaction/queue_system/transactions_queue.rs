@@ -60,6 +60,7 @@ impl TransactionsQueue {
             setup.relayer.name,
             setup.relayer.chain_id
         );
+        let confirmations = setup.evm_provider.confirmations;
         Self {
             pending_transactions: Mutex::new(setup.pending_transactions),
             inmempool_transactions: Mutex::new(setup.inmempool_transactions),
@@ -69,7 +70,7 @@ impl TransactionsQueue {
             nonce_manager: setup.nonce_manager,
             gas_oracle_cache,
             blob_oracle_cache,
-            confirmations: 12,
+            confirmations,
         }
     }
 

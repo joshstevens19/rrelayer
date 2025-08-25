@@ -36,6 +36,7 @@ use crate::{
     rrelayer_info,
     shared::common_types::{EvmAddress, WalletOrProviderError},
     transaction::types::{TransactionHash, TransactionNonce},
+    NetworkSetupConfig,
 };
 
 pub type RelayerProvider = RootProvider<RetryBackoffService<Http<Client>>, AnyNetwork>;
@@ -50,6 +51,7 @@ pub struct EvmProvider {
     pub provider_urls: Vec<String>,
     /// this is in seconds
     pub blocks_every: u64,
+    pub confirmations: u64,
 }
 
 pub async fn calculate_block_time_difference(
@@ -155,18 +157,16 @@ pub enum EvmProviderNewError {
 
 impl EvmProvider {
     pub async fn new_with_mnemonic(
-        provider_urls: &[String],
-        name: &str,
+        network_setup_config: &NetworkSetupConfig,
         mnemonic: &str,
         gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
     ) -> Result<Self, EvmProviderNewError> {
         let wallet_manager = Arc::new(MnemonicWalletManager::new(mnemonic));
-        Self::new_internal(provider_urls, name, wallet_manager, gas_estimator).await
+        Self::new_internal(network_setup_config, wallet_manager, gas_estimator).await
     }
 
     pub async fn new_with_privy(
-        provider_urls: &[String],
-        name: &str,
+        network_setup_config: &NetworkSetupConfig,
         app_id: String,
         app_secret: String,
         gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
@@ -175,25 +175,28 @@ impl EvmProvider {
             .await
             .map_err(|e| EvmProviderNewError::WalletManagerError(e.to_string()))?;
         let wallet_manager = Arc::new(privy_manager);
-        Self::new_internal(provider_urls, name, wallet_manager, gas_estimator).await
+        Self::new_internal(network_setup_config, wallet_manager, gas_estimator).await
     }
 
     async fn new_internal(
-        provider_urls: &[String],
-        name: &str,
+        network_setup_config: &NetworkSetupConfig,
         wallet_manager: Arc<dyn WalletManagerTrait>,
         gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
     ) -> Result<Self, EvmProviderNewError> {
-        let provider = create_retry_client(&provider_urls[0]).map_err(|e| {
-            EvmProviderNewError::HttpProviderCantBeCreated(provider_urls[0].clone(), e.to_string())
-        })?;
+        let provider =
+            create_retry_client(&network_setup_config.provider_urls[0]).map_err(|e| {
+                EvmProviderNewError::HttpProviderCantBeCreated(
+                    network_setup_config.provider_urls[0].clone(),
+                    e.to_string(),
+                )
+            })?;
 
         let chain_id = ChainId::new(
             provider.get_chain_id().await.map_err(EvmProviderNewError::ProviderError)?,
         );
 
         let mut providers: Vec<Arc<RelayerProvider>> = vec![provider.clone()];
-        for url in provider_urls.iter().skip(1) {
+        for url in network_setup_config.provider_urls.iter().skip(1) {
             providers.push(create_retry_client(url).map_err(|e| {
                 EvmProviderNewError::HttpProviderCantBeCreated(url.clone(), e.to_string())
             })?);
@@ -207,8 +210,9 @@ impl EvmProvider {
             wallet_manager,
             gas_estimator,
             chain_id,
-            name: name.to_string(),
-            provider_urls: provider_urls.to_owned(),
+            name: network_setup_config.name.to_string(),
+            provider_urls: network_setup_config.provider_urls.to_owned(),
+            confirmations: network_setup_config.confirmations.unwrap_or(12),
         })
     }
 
