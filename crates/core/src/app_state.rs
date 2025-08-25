@@ -8,6 +8,7 @@ use crate::{
     provider::EvmProvider,
     shared::cache::Cache,
     transaction::queue_system::transactions_queues::TransactionsQueues,
+    webhooks::WebhookManager,
 };
 
 pub struct AppState {
@@ -17,4 +18,5 @@ pub struct AppState {
     pub blob_gas_oracle_cache: Arc<Mutex<BlobGasOracleCache>>,
     pub transactions_queues: Arc<Mutex<TransactionsQueues>>,
     pub cache: Arc<Cache>,
+    pub webhook_manager: Arc<Mutex<WebhookManager>>,
 }

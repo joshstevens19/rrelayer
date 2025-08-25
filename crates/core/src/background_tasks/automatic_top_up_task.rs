@@ -1,4 +1,13 @@
-use crate::{network::types::ChainId, postgres::{PostgresClient, PostgresError}, provider::EvmProvider, relayer::types::Relayer, rrelayer_info, shared::common_types::{EvmAddress, PagingContext}, yaml::{AutomaticTopUpConfig, Erc20TokenConfig, NativeTokenConfig, TopUpTargetAddresses}, SetupConfig};
+use crate::{
+    network::types::ChainId,
+    postgres::{PostgresClient, PostgresError},
+    provider::EvmProvider,
+    relayer::types::Relayer,
+    rrelayer_error, rrelayer_info,
+    shared::common_types::{EvmAddress, PagingContext},
+    yaml::{AutomaticTopUpConfig, Erc20TokenConfig, NativeTokenConfig, TopUpTargetAddresses},
+    SetupConfig,
+};
 use alloy::consensus::TxLegacy;
 use alloy::consensus::TypedTransaction;
 use alloy::primitives::U256;
@@ -102,7 +111,11 @@ impl AutomaticTopUpTask {
                 let chain_id = match network_config.get_chain_id().await {
                     Ok(id) => id,
                     Err(e) => {
-                        error!("Failed to get chain ID for network {}: {}", network_config.name, e);
+                        rrelayer_error!(
+                            "Failed to get chain ID for network {}: {}",
+                            network_config.name,
+                            e
+                        );
                         continue;
                     }
                 };
@@ -113,7 +126,11 @@ impl AutomaticTopUpTask {
                         self.relayer_cache.insert(chain_id, relayers);
                     }
                     Err(e) => {
-                        error!("Failed to refresh relayer cache for chain {}: {}", chain_id, e);
+                        rrelayer_error!(
+                            "Failed to refresh relayer cache for chain {}: {}",
+                            chain_id,
+                            e
+                        );
                     }
                 }
             }
@@ -167,7 +184,11 @@ impl AutomaticTopUpTask {
                 let chain_id = match network_config.get_chain_id().await {
                     Ok(id) => id,
                     Err(e) => {
-                        error!("Failed to get chain ID for network {}: {}", network_config.name, e);
+                        rrelayer_error!(
+                            "Failed to get chain ID for network {}: {}",
+                            network_config.name,
+                            e
+                        );
                         continue;
                     }
                 };
@@ -200,7 +221,11 @@ impl AutomaticTopUpTask {
         provider: &EvmProvider,
         config: &AutomaticTopUpConfig,
     ) {
-        rrelayer_info!("Processing top-up config for chain {} from {}", chain_id, config.from_address);
+        rrelayer_info!(
+            "Processing top-up config for chain {} from {}",
+            chain_id,
+            config.from_address
+        );
 
         let target_addresses = match self
             .resolve_target_addresses(chain_id, &config.targets, &config.from_address)
@@ -208,7 +233,7 @@ impl AutomaticTopUpTask {
         {
             Ok(addresses) => addresses,
             Err(e) => {
-                error!("Failed to resolve target addresses for chain {}: {}", chain_id, e);
+                rrelayer_error!("Failed to resolve target addresses for chain {}: {}", chain_id, e);
                 return;
             }
         };
@@ -220,7 +245,10 @@ impl AutomaticTopUpTask {
 
         if let Some(native_config) = &config.native {
             if native_config.enabled {
-                rrelayer_info!("Processing native token top-ups for {} addresses", target_addresses.len());
+                rrelayer_info!(
+                    "Processing native token top-ups for {} addresses",
+                    target_addresses.len()
+                );
                 self.process_native_token_top_ups(
                     chain_id,
                     provider,
@@ -335,7 +363,13 @@ impl AutomaticTopUpTask {
 
         for address in addresses_needing_top_up {
             match self
-                .send_native_top_up_transaction(chain_id, provider, from_address, &address, native_config)
+                .send_native_top_up_transaction(
+                    chain_id,
+                    provider,
+                    from_address,
+                    &address,
+                    native_config,
+                )
                 .await
             {
                 Ok(tx_hash) => {
@@ -370,7 +404,7 @@ impl AutomaticTopUpTask {
         token_config: &Erc20TokenConfig,
     ) {
         let mut addresses_needing_top_up = Vec::new();
-        
+
         // Check ERC-20 token balances for all target addresses
         for address in target_addresses {
             match self.get_erc20_balance(provider, &token_config.address, address).await {
@@ -387,7 +421,10 @@ impl AutomaticTopUpTask {
                     }
                 }
                 Err(e) => {
-                    warn!("Failed to check ERC-20 balance for address {} and token {}: {}", address, token_config.address, e);
+                    warn!(
+                        "Failed to check ERC-20 balance for address {} and token {}: {}",
+                        address, token_config.address, e
+                    );
                 }
             }
         }
@@ -431,7 +468,13 @@ impl AutomaticTopUpTask {
         // Send ERC-20 token top-ups
         for address in addresses_needing_top_up {
             match self
-                .send_erc20_top_up_transaction(chain_id, provider, from_address, &address, token_config)
+                .send_erc20_top_up_transaction(
+                    chain_id,
+                    provider,
+                    from_address,
+                    &address,
+                    token_config,
+                )
                 .await
             {
                 Ok(tx_hash) => {
@@ -577,7 +620,7 @@ impl AutomaticTopUpTask {
         let _original_count = addresses.len();
         let contains_from_address = addresses.contains(from_address);
         addresses.retain(|addr| addr != from_address);
-        
+
         if contains_from_address {
             match targets {
                 TopUpTargetAddresses::All => {
@@ -595,7 +638,7 @@ impl AutomaticTopUpTask {
                 }
             }
         }
-        
+
         Ok(addresses)
     }
 
@@ -622,7 +665,11 @@ impl AutomaticTopUpTask {
             .await
             .map_err(|e| format!("Failed to get from_address balance: {}", e))?;
 
-        rrelayer_info!("From address {} has balance: {} ETH", from_address, format_wei_to_eth(&balance));
+        rrelayer_info!(
+            "From address {} has balance: {} ETH",
+            from_address,
+            format_wei_to_eth(&balance)
+        );
 
         let estimated_gas_cost =
             self.estimate_transaction_cost(provider).await.unwrap_or_else(|e| {
@@ -683,7 +730,6 @@ impl AutomaticTopUpTask {
         Ok(total_cost)
     }
 
-
     /// Finds the EVM provider for a specific chain ID.
     ///
     /// # Arguments
@@ -736,10 +782,10 @@ impl AutomaticTopUpTask {
         from_address: &EvmAddress,
         token_config: &Erc20TokenConfig,
     ) -> Result<bool, String> {
-        let balance = self
-            .get_erc20_balance(provider, &token_config.address, from_address)
-            .await
-            .map_err(|e| format!("Failed to get from_address ERC-20 token balance: {}", e))?;
+        let balance =
+            self.get_erc20_balance(provider, &token_config.address, from_address)
+                .await
+                .map_err(|e| format!("Failed to get from_address ERC-20 token balance: {}", e))?;
 
         rrelayer_info!(
             "From address {} has ERC-20 token balance: {} for token {}",
@@ -817,9 +863,9 @@ impl AutomaticTopUpTask {
 
         let tx = TypedTransaction::Legacy(TxLegacy {
             chain_id: Some(provider.chain_id.u64()),
-            nonce: 0, // This will be updated by the provider
+            nonce: 0,                  // This will be updated by the provider
             gas_price: 20_000_000_000, // 20 gwei, will be updated by gas estimation
-            gas_limit: 100000, // Higher gas limit for ERC-20 transfers
+            gas_limit: 100000,         // Higher gas limit for ERC-20 transfers
             to: alloy::primitives::TxKind::Call(token_config.address.into()),
             value: U256::ZERO, // No native token value for ERC-20 transfers
             input: transfer_call.abi_encode().into(),
@@ -867,9 +913,7 @@ impl AutomaticTopUpTask {
         token_address: &EvmAddress,
         wallet_address: &EvmAddress,
     ) -> Result<U256, String> {
-        let call_data = IERC20::balanceOfCall {
-            account: (*wallet_address).into(),
-        };
+        let call_data = IERC20::balanceOfCall { account: (*wallet_address).into() };
 
         let call_tx = WithOtherFields::new(alloy::rpc::types::TransactionRequest {
             to: Some(alloy::primitives::TxKind::Call((*token_address).into())),
@@ -878,12 +922,10 @@ impl AutomaticTopUpTask {
         });
 
         match provider.rpc_client().call(&call_tx).await {
-            Ok(result) => {
-                match IERC20::balanceOfCall::abi_decode_returns(&result, false) {
-                    Ok(balance) => Ok(balance._0),
-                    Err(e) => Err(format!("Failed to decode balanceOf response: {}", e)),
-                }
-            }
+            Ok(result) => match IERC20::balanceOfCall::abi_decode_returns(&result, false) {
+                Ok(balance) => Ok(balance._0),
+                Err(e) => Err(format!("Failed to decode balanceOf response: {}", e)),
+            },
             Err(e) => Err(format!("Failed to call balanceOf on token contract: {}", e)),
         }
     }
@@ -911,7 +953,7 @@ fn format_wei_to_eth(wei: &U256) -> String {
 }
 
 /// Formats a token amount to a human-readable string.
-/// 
+///
 /// Currently assumes 18 decimals for ERC-20 tokens (same as ETH).
 /// This can be enhanced in the future to query actual token decimals.
 ///

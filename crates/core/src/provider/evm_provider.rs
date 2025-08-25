@@ -24,7 +24,6 @@ use alloy_eips::eip2718::Encodable2718;
 use rand::{thread_rng, Rng};
 use reqwest::Url;
 use thiserror::Error;
-use tracing::info;
 
 use crate::wallet::{MnemonicWalletManager, PrivyWalletManager, WalletManagerTrait};
 use crate::{
@@ -34,6 +33,7 @@ use crate::{
         types::GasLimit,
     },
     network::types::ChainId,
+    rrelayer_info,
     shared::common_types::{EvmAddress, WalletOrProviderError},
     transaction::types::{TransactionHash, TransactionNonce},
 };
@@ -59,7 +59,9 @@ pub async fn calculate_block_time_difference(
 
     // Ensure there's no underflow if not enough blocks to check set to 2 seconds
     if latest_block_number <= 13 {
-        info!("Not enough blocks to calculate block time difference, setting to 2 seconds");
+        rrelayer_info!(
+            "Not enough blocks to calculate block time difference, setting to 2 seconds"
+        );
         return Ok(2);
     }
 

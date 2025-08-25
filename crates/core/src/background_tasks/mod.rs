@@ -4,7 +4,7 @@ use crate::background_tasks::automatic_top_up_task::run_automatic_top_up_task;
 use crate::gas::blob_gas_oracle::{blob_gas_oracle, BlobGasOracleCache};
 use crate::gas::gas_oracle::{gas_oracle, GasOracleCache};
 use crate::provider::EvmProvider;
-use crate::{PostgresClient, SetupConfig};
+use crate::{rrelayer_info, PostgresClient, SetupConfig};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::info;
@@ -16,7 +16,7 @@ pub async fn run_background_tasks(
     providers: Arc<Vec<EvmProvider>>,
     postgres_client: Arc<PostgresClient>,
 ) {
-    info!("Starting background tasks");
+    rrelayer_info!("Starting background tasks");
 
     let gas_oracle_task = gas_oracle(Arc::clone(&providers), gas_oracle_cache);
     let blob_gas_oracle_task = blob_gas_oracle(Arc::clone(&providers), blob_gas_oracle_cache);
@@ -24,5 +24,5 @@ pub async fn run_background_tasks(
 
     tokio::join!(gas_oracle_task, blob_gas_oracle_task, top_up_task);
 
-    info!("Background tasks spawned up");
+    rrelayer_info!("Background tasks spawned up");
 }

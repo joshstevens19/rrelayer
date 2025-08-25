@@ -1,5 +1,6 @@
 use std::{env, future::Future, time::Duration};
 
+use crate::rrelayer_error;
 use bb8::{Pool, RunError};
 use bb8_postgres::PostgresConnectionManager;
 use bytes::Buf;
@@ -115,11 +116,11 @@ impl PostgresClient {
                         {
                             return Box::pin(_new(true)).await;
                         }
-                        error!("Error connecting to database: {}", e);
+                        rrelayer_error!("Error connecting to database: {}", e);
                         return Err(PostgresConnectionError::CanNotConnectToDatabase);
                     }
                     Err(e) => {
-                        error!("Timeout connecting to database: {}", e);
+                        rrelayer_error!("Timeout connecting to database: {}", e);
                         return Err(PostgresConnectionError::CanNotConnectToDatabase);
                     }
                 };

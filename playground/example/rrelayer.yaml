@@ -1,12 +1,12 @@
 name: example
 signing_key:
-  keystore:
-    path: ./keystores/rrelayer_signing_key
-    name: rrelayer_signing_key
-#  gcp_secret_manager:
-#    secret_name: "Testing-Josh-Relayer"
-#    service_account_key_path: "./gcp-service-account.json"
-#    secret_key: "seed"
+#  keystore:
+#    path: ./keystores/rrelayer_signing_key
+#    name: rrelayer_signing_key
+  gcp_secret_manager:
+    secret_name: "Testing-Josh-Relayer"
+    service_account_key_path: "./gcp-service-account.json"
+    secret_key: "seed"
 #   aws_secret_manager:
 #     secret_key: "seed"
 #     access_key_id: ""
@@ -14,19 +14,85 @@ signing_key:
 #     region: "us-east-1"  # or your preferred region
 #     secret_name: "testing-josh-relayer"
 #     session_token: ""
+#  privy:
+#    app_id: "cmeim2cey01hal40bvtk2ji3z"
+#    app_secret: "2jwEdV9rURx2Fhy8qGHWYVoWFQTyHDjM3ZeEXhmRHZFsNvVX71DZPAvnWTeA6uFce93E8a7e16ybzYbXs9vB6SN4"
 admins:
   - "0xa4635F69E5A64CD48da3FbC999aCed87B00756F6"
-  - account1
+  # - account1
 networks:
-  #  - name: sepolia_ethereum
-  #    provider_urls:
-  #      - https://eth-sepolia.g.alchemy.com/v2/ru5F_pouvf-UWiO4GeznT
-  #    block_explorer_url: https://sepolia.etherscan.io
+#    - name: sepolia_ethereum
+#      provider_urls:
+#        - https://eth-sepolia.g.alchemy.com/v2/ru5F_pouvf-UWiO4GeznT
+#      block_explorer_url: https://sepolia.etherscan.io
   - name: base
     provider_urls:
       - https://base.gateway.tenderly.co
-gas_providers:
-  tenderly:
-    enabled: true
+    automatic_top_up:
+      from_address: '0x26988BA8250E009DCC5DF543D78E2277E2AA900B'
+      targets: '*'
+      native:
+        enabled: true
+        min_balance: "0.01"
+        top_up_amount: "0.1"
+#      erc20_tokens:
+#        - address: "0x..." # Token contract address
+#          min_balance: "100"
+#          top_up_amount: "500"
+#        - address: "0x..." # Another token
+#          min_balance: "50"
+#          top_up_amount: "200"
+safe_proxy: "0xxxxx"
+#gas_providers:
+#  tenderly:
+#    enabled: true
 api_config:
   port: 8000
+# SENT
+webhooks:
+  - endpoint: https://your-app.vercel.app/api/webhooks/relayer
+    shared_secret: ${RRELAYER_WEBHOOK_SHARED_SECRET}
+    networks:
+      - base
+  - endpoint: https://another-service.com/webhook
+    shared_secret: ${ANOTHER_WEBHOOK_SECRET}
+    networks:
+      - base
+      - ethereum
+
+  # 2jwEdV9rURx2Fhy8qGHWYVoWFQTyHDjM3ZeEXhmRHZFsNvVX71DZPAvnWTeA6uFce93E8a7e16ybzYbXs9vB6SN4
+  # app id - cmeim2cey01hal40bvtk2ji3z
+  # wallet id - mvb3oaxa3anotjplxe1xj3fp
+  # PK - wallet-auth:MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgzk6/AHf3N+wyH1hHVS7Opq0/v+F3+A/bJ9r/sCTZInehRANCAAR1yVR4dDFmSwAtu9X+XmS8ByvAawGGg975Q4Wg7ZbIeQpCihFIC3j0RVnBFbT/1Zyezv84an8RhgWKbwiw8jk2
+
+
+#  curl --request POST \
+#  --url https://api.privy.io/v1/wallets \
+#  --user "cmeim2cey01hal40bvtk2ji3z:2jwEdV9rURx2Fhy8qGHWYVoWFQTyHDjM3ZeEXhmRHZFsNvVX71DZPAvnWTeA6uFce93E8a7e16ybzYbXs9vB6SN4" \
+#--header 'Content-Type: application/json' \
+#--header 'privy-app-id: cmeim2cey01hal40bvtk2ji3z' \
+#  --data '{
+#"chain_type": "ethereum"
+#}'
+#
+#  {"id":"aia5gth4cbx8m78yh954iu5y","address":"0xF2D58a8DC5FE5E50a40330364D0BA28fC95741a4","chain_type":"ethereum","policy_ids":[],"additional_signers":[],"exported_at":null,"imported_at":null,"created_at":1755612536997,"owner_id":null}%
+#
+#
+#  curl --request POST \
+#    --url https://api.privy.io/v1/wallets/aia5gth4cbx8m78yh954iu5y/rpc \
+#    --user "cmeim2cey01hal40bvtk2ji3z:2jwEdV9rURx2Fhy8qGHWYVoWFQTyHDjM3ZeEXhmRHZFsNvVX71DZPAvnWTeA6uFce93E8a7e16ybzYbXs9vB6SN4" \
+#    --header 'Content-Type: application/json' \
+#                 --header 'privy-app-id: cmeim2cey01hal40bvtk2ji3z' \
+#                 --data '{
+#                 "method": "personal_sign",
+#                 "params": {
+#                   "message": "Hello from Privy!",
+#                   "encoding": "utf-8"
+#                 }
+#}'
+#
+#  curl -X GET "https://api.privy.io/v1/wallets" \
+#  --user "cmeim2cey01hal40bvtk2ji3z:2jwEdV9rURx2Fhy8qGHWYVoWFQTyHDjM3ZeEXhmRHZFsNvVX71DZPAvnWTeA6uFce93E8a7e16ybzYbXs9vB6SN4" \
+#-H "privy-app-id: cmeim2cey01hal40bvtk2ji3z" \
+#-H "Content-Type: application/json"
+

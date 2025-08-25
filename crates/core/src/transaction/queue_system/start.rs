@@ -2,15 +2,15 @@ use std::{collections::VecDeque, sync::Arc};
 
 use thiserror::Error;
 use tokio::sync::Mutex;
-use tracing::{error, info, warn};
+use tracing::warn;
 
 use super::{transactions_queues::TransactionsQueues, types::TransactionRelayerSetup};
 use crate::{
     gas::{blob_gas_oracle::BlobGasOracleCache, gas_oracle::GasOracleCache},
-    network::types::ChainId,
     postgres::{PostgresClient, PostgresConnectionError, PostgresError},
     provider::{find_provider_for_chain_id, EvmProvider},
     relayer::types::{Relayer, RelayerId},
+    rrelayer_error,
     shared::{
         cache::Cache,
         common_types::{PagingContext, WalletOrProviderError},
@@ -57,10 +57,10 @@ async fn continuously_process_pending_transactions(
 
         match result {
             Ok(result) => {
-                // info!("PENDING: {:?}", result);
+                // rrelayer_info!("PENDING: {:?}", result);
                 processes_next_break(&result.process_again_after).await;
             }
-            Err(e) => error!("PENDING ERROR: {}", e),
+            Err(e) => rrelayer_error!("PENDING ERROR: {}", e),
         }
     }
 }
@@ -77,10 +77,10 @@ async fn continuously_process_inmempool_transactions(
 
         match result {
             Ok(result) => {
-                // info!("INMEMPOOL: {:?}", result);
+                // rrelayer_info!("INMEMPOOL: {:?}", result);
                 processes_next_break(&result.process_again_after).await;
             }
-            Err(e) => error!("INMEMPOOL ERROR: {}", e),
+            Err(e) => rrelayer_error!("INMEMPOOL ERROR: {}", e),
         }
     }
 }
@@ -99,10 +99,10 @@ async fn continuously_process_mined_transactions(
 
         match result {
             Ok(result) => {
-                // info!("MINED: {:?}", result);
+                // rrelayer_info!("MINED: {:?}", result);
                 processes_next_break(&result.process_again_after).await;
             }
-            Err(e) => error!("MINED ERROR: {}", e),
+            Err(e) => rrelayer_error!("MINED ERROR: {}", e),
         }
     }
 }
@@ -192,6 +192,7 @@ pub async fn startup_transactions_queues(
     blob_gas_oracle_cache: Arc<Mutex<BlobGasOracleCache>>,
     providers: Arc<Vec<EvmProvider>>,
     cache: Arc<Cache>,
+    webhook_manager: Arc<Mutex<crate::webhooks::WebhookManager>>,
 ) -> Result<Arc<Mutex<TransactionsQueues>>, StartTransactionsQueuesError> {
     let postgres = PostgresClient::new()
         .await
@@ -254,6 +255,7 @@ pub async fn startup_transactions_queues(
             gas_oracle_cache,
             blob_gas_oracle_cache,
             cache,
+            webhook_manager,
         )
         .await?,
     ));

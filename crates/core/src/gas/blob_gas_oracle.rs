@@ -8,7 +8,7 @@ use tokio::{
 use tracing::info;
 
 use crate::{
-    network::types::ChainId, provider::EvmProvider, rrelayer_error,
+    network::types::ChainId, provider::EvmProvider, rrelayer_error, rrelayer_info,
     transaction::types::TransactionSpeed,
 };
 
@@ -93,7 +93,7 @@ pub async fn blob_gas_oracle(
             continue;
         }
 
-        info!("Getting initial blob gas price for provider: {}", provider.name);
+        rrelayer_info!("Getting initial blob gas price for provider: {}", provider.name);
         let cache = Arc::clone(&blob_gas_oracle_cache);
         let provider = provider.clone();
 
@@ -117,14 +117,14 @@ pub async fn blob_gas_oracle(
         let _ = task.await;
     }
 
-    info!("Initial blob gas price collection completed for all blob-supporting providers");
+    rrelayer_info!("Initial blob gas price collection completed for all blob-supporting providers");
 
     for provider in providers.iter() {
         if !provider.supports_blob_transactions() {
             continue;
         }
 
-        info!("Starting blob_gas_oracle interval for provider: {}", provider.name);
+        rrelayer_info!("Starting blob_gas_oracle interval for provider: {}", provider.name);
         let cache = Arc::clone(&blob_gas_oracle_cache);
         let provider = Arc::new(provider.clone());
 

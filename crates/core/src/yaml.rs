@@ -18,6 +18,7 @@ use crate::{
         },
         types::{deserialize_gas_provider, GasProvider},
     },
+    rrelayer_error,
     shared::common_types::EvmAddress,
 };
 
@@ -236,9 +237,15 @@ pub struct NativeTokenConfig {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Erc20TokenConfig {
     pub address: EvmAddress,
-    #[serde(deserialize_with = "deserialize_token_amount", serialize_with = "serialize_token_amount")]
+    #[serde(
+        deserialize_with = "deserialize_token_amount",
+        serialize_with = "serialize_token_amount"
+    )]
     pub min_balance: U256,
-    #[serde(deserialize_with = "deserialize_token_amount", serialize_with = "serialize_token_amount")]
+    #[serde(
+        deserialize_with = "deserialize_token_amount",
+        serialize_with = "serialize_token_amount"
+    )]
     pub top_up_amount: U256,
 }
 
@@ -290,9 +297,7 @@ where
     let s = String::deserialize(deserializer)?;
     // For now, assume 18 decimals for ERC-20 tokens (same as ETH)
     // This can be enhanced to support different token decimals
-    let result: U256 = parse_units(&s, 18)
-        .unwrap_or(ParseUnits::U256(U256::ZERO))
-        .into();
+    let result: U256 = parse_units(&s, 18).unwrap_or(ParseUnits::U256(U256::ZERO)).into();
     Ok(result)
 }
 
@@ -300,9 +305,27 @@ fn serialize_token_amount<S>(amount: &U256, serializer: S) -> Result<S::Ok, S::E
 where
     S: Serializer,
 {
-    // For now, use same logic as ETH (18 decimals)
-    // This can be enhanced to support different token decimals
     serialize_eth_amount(amount, serializer)
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct WebhookConfig {
+    pub endpoint: String,
+    pub shared_secret: String,
+    pub networks: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct WebhookConfigAdvanced {
+    pub endpoint: String,
+    pub shared_secret: String,
+    pub networks: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub timeout_seconds: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub retry_attempts: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub enabled: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -317,6 +340,8 @@ pub struct SetupConfig {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub gas_providers: Option<GasProviders>,
     pub api_config: ApiConfig,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub webhooks: Option<Vec<WebhookConfig>>,
 }
 
 fn substitute_env_variables(contents: &str) -> Result<String, regex::Error> {
@@ -326,7 +351,7 @@ fn substitute_env_variables(contents: &str) -> Result<String, regex::Error> {
         match env::var(var_name) {
             Ok(val) => val,
             Err(_) => {
-                error!("Environment variable {} not found", var_name);
+                rrelayer_error!("Environment variable {} not found", var_name);
                 panic!("Environment variable {} not found", var_name)
             }
         }

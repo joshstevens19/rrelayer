@@ -165,6 +165,7 @@ async fn start_api(
     transactions_queues: Arc<Mutex<TransactionsQueues>>,
     providers: Arc<Vec<EvmProvider>>,
     cache: Arc<Cache>,
+    webhook_manager: Arc<Mutex<crate::webhooks::WebhookManager>>,
 ) -> Result<(), StartApiError> {
     let mut db = PostgresClient::new().await.map_err(StartApiError::DatabaseConnectionError)?;
 
@@ -180,6 +181,7 @@ async fn start_api(
         blob_gas_oracle_cache,
         transactions_queues,
         cache,
+        webhook_manager,
     });
 
     let cors = CorsLayer::new()
@@ -217,7 +219,7 @@ async fn start_api(
     let address = format!("localhost:{}", api_config.port);
 
     let listener = tokio::net::TcpListener::bind(&address).await?;
-    info!("listening on http://{}", address);
+    rrelayer_info!("listening on http://{}", address);
     axum::serve(listener, app).await.map_err(StartApiError::ApiStartupError)?;
 
     Ok(())
@@ -255,18 +257,18 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
     setup_info_logger();
     dotenv().ok();
 
-    info!("Starting up the server");
+    rrelayer_info!("Starting up the server");
 
     let yaml_path = project_path.join("rrelayer.yaml");
     if !yaml_path.exists() {
-        error!("Found rrelayer.yaml in the current directory");
+        rrelayer_error!("Found rrelayer.yaml in the current directory");
         return Err(StartError::NoYamlFileFound);
     }
 
     let postgres = PostgresClient::new().await?;
 
     apply_schema(&postgres).await?;
-    info!("Applied database schema");
+    rrelayer_info!("Applied database schema");
 
     let config = read(&yaml_path, false)?;
 
@@ -298,7 +300,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
     }
 
     postgres.add_users(&admins).await?;
-    info!("Added admin users to database");
+    rrelayer_info!("Added admin users to database");
 
     let cache = Arc::new(Cache::new().await);
 
@@ -307,12 +309,17 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
     let gas_oracle_cache = Arc::new(Mutex::new(GasOracleCache::new()));
     let blob_gas_oracle_cache = Arc::new(Mutex::new(BlobGasOracleCache::new()));
 
+    let postgres_client = Arc::new(postgres);
+
+    // Initialize webhook manager first
+    let webhook_manager = Arc::new(Mutex::new(crate::webhooks::WebhookManager::new(&config, None)));
+
     run_background_tasks(
         &config,
         gas_oracle_cache.clone(),
         blob_gas_oracle_cache.clone(),
         providers.clone(),
-        Arc::new(postgres),
+        postgres_client.clone(),
     )
     .await;
 
@@ -321,8 +328,25 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
         blob_gas_oracle_cache.clone(),
         providers.clone(),
         cache.clone(),
+        webhook_manager.clone(),
     )
     .await?;
+
+    // Start webhook manager background tasks
+    {
+        let manager = webhook_manager.lock().await;
+        // Update network name mappings
+        let network_mappings: Vec<_> =
+            providers.iter().map(|p| (p.chain_id, p.name.clone())).collect();
+        manager.update_network_names(&network_mappings).await;
+
+        // Spawn background tasks
+        let manager_clone = webhook_manager.clone();
+        tokio::spawn(async move {
+            let mut manager = manager_clone.lock().await;
+            manager.run_background_tasks().await;
+        });
+    }
 
     start_api(
         config.api_config,
@@ -331,6 +355,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
         transaction_queue,
         providers,
         cache,
+        webhook_manager,
     )
     .await?;
 

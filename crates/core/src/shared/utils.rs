@@ -1,3 +1,4 @@
+use crate::rrelayer_error;
 use alloy_eips::eip4844::Blob;
 use axum::http::StatusCode;
 use std::time::Duration;
@@ -23,7 +24,7 @@ pub fn convert_blob_strings_to_blobs(
             let mut blobs = Vec::new();
             for blob_str in strings {
                 let blob = blob_str.parse::<Blob>().map_err(|e| {
-                    tracing::error!("Failed to parse blob hex string '{}': {:?}", blob_str, e);
+                    rrelayer_error!("Failed to parse blob hex string '{}': {:?}", blob_str, e);
                     StatusCode::BAD_REQUEST
                 })?;
 

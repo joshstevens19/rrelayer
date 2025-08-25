@@ -35,6 +35,7 @@ use crate::{
         queue_system::types::TransactionQueueSendTransactionError,
         types::{Transaction, TransactionData, TransactionId, TransactionStatus, TransactionValue},
     },
+    webhooks::WebhookManager,
 };
 
 pub struct TransactionsQueues {
@@ -44,6 +45,7 @@ pub struct TransactionsQueues {
     blob_gas_oracle_cache: Arc<Mutex<BlobGasOracleCache>>,
     db: PostgresClient,
     cache: Arc<Cache>,
+    webhook_manager: Arc<Mutex<WebhookManager>>,
 }
 
 impl TransactionsQueues {
@@ -52,6 +54,7 @@ impl TransactionsQueues {
         gas_oracle_cache: Arc<Mutex<GasOracleCache>>,
         blob_gas_oracle_cache: Arc<Mutex<BlobGasOracleCache>>,
         cache: Arc<Cache>,
+        webhook_manager: Arc<Mutex<WebhookManager>>,
     ) -> Result<Self, WalletOrProviderError> {
         let mut queues = HashMap::new();
         let mut relayer_block_times_ms = HashMap::new();
@@ -85,6 +88,7 @@ impl TransactionsQueues {
             blob_gas_oracle_cache,
             db: PostgresClient::new().await.expect("Failed to create PostgreSQL connection"),
             cache,
+            webhook_manager,
         })
     }
 
@@ -305,6 +309,11 @@ impl TransactionsQueues {
             transactions_queue.nonce_manager.increase().await;
             self.invalidate_transaction_cache(&transaction.id).await;
 
+            {
+                let webhook_manager = self.webhook_manager.lock().await;
+                webhook_manager.on_transaction_queued(&transaction).await;
+            }
+
             Ok(transaction)
         } else {
             Err(AddTransactionError::RelayerNotFound(*relayer_id))
@@ -334,12 +343,17 @@ impl TransactionsQueues {
                     EditableTransactionType::Inmempool => {
                         self.transaction_to_noop(&mut transactions_queue, &mut result.transaction);
 
-                        transactions_queue
+                        let transaction_sent = transactions_queue
                             .send_transaction(&mut self.db, &mut result.transaction)
                             .await
                             .map_err(CancelTransactionError::SendTransactionError)?;
 
                         self.invalidate_transaction_cache(&transaction.id).await;
+
+                        {
+                            let webhook_manager = self.webhook_manager.lock().await;
+                            webhook_manager.on_transaction_cancelled(&result.transaction).await;
+                        }
 
                         Ok(true)
                     }
@@ -389,14 +403,23 @@ impl TransactionsQueues {
                         Ok(true)
                     }
                     EditableTransactionType::Inmempool => {
+                        let original_transaction = result.transaction.clone();
                         self.transaction_replace(&mut result.transaction, replace_with);
 
-                        transactions_queue
+                        // TODO: look at this
+                        let transaction_sent = transactions_queue
                             .send_transaction(&mut self.db, &mut result.transaction)
                             .await
                             .map_err(ReplaceTransactionError::SendTransactionError)?;
 
                         self.invalidate_transaction_cache(&transaction.id).await;
+
+                        {
+                            let webhook_manager = self.webhook_manager.lock().await;
+                            webhook_manager
+                                .on_transaction_replaced(&result.transaction, &original_transaction)
+                                .await;
+                        }
 
                         Ok(true)
                     }
@@ -437,6 +460,17 @@ impl TransactionsQueues {
                             ProcessPendingTransactionError::MovePendingTransactionToInmempoolError,
                         )?;
                         self.invalidate_transaction_cache(&transaction.id).await;
+
+                        {
+                            let webhook_manager = self.webhook_manager.lock().await;
+                            let sent_transaction = Transaction {
+                                status: TransactionStatus::Inmempool,
+                                known_transaction_hash: Some(transaction_sent.hash),
+                                sent_at: Some(SystemTime::now()),
+                                ..transaction
+                            };
+                            webhook_manager.on_transaction_sent(&sent_transaction).await;
+                        }
                     }
                     Err(e) => {
                         return match e {
@@ -543,16 +577,50 @@ impl TransactionsQueues {
                                         .transaction_mined(&transaction.id, &receipt)
                                         .await.map_err(|e| ProcessInmempoolTransactionError::CouldNotUpdateTransactionStatusInTheDatabase(*relayer_id, transaction.clone(), TransactionStatus::Mined, e))?;
                                     self.invalidate_transaction_cache(&transaction.id).await;
+
+                                    {
+                                        let webhook_manager = self.webhook_manager.lock().await;
+                                        let mined_transaction = Transaction {
+                                            status: TransactionStatus::Mined,
+                                            mined_at: Some(SystemTime::now()),
+                                            ..transaction
+                                        };
+                                        webhook_manager
+                                            .on_transaction_mined(&mined_transaction, &receipt)
+                                            .await;
+                                    }
                                 }
                                 TransactionStatus::Expired => {
                                     self.db.transaction_expired(&transaction.id).await.map_err(|e| ProcessInmempoolTransactionError::CouldNotUpdateTransactionStatusInTheDatabase(*relayer_id, transaction.clone(), TransactionStatus::Expired, e))?;
                                     self.invalidate_transaction_cache(&transaction.id).await;
+
+                                    {
+                                        let webhook_manager = self.webhook_manager.lock().await;
+                                        let expired_transaction = Transaction {
+                                            status: TransactionStatus::Expired,
+                                            ..transaction
+                                        };
+                                        webhook_manager
+                                            .on_transaction_expired(&expired_transaction)
+                                            .await;
+                                    }
                                 }
                                 TransactionStatus::Failed => {
                                     self.db
                                         .update_transaction_failed(&transaction.id, "Failed onchain")
                                         .await.map_err(|e| ProcessInmempoolTransactionError::CouldNotUpdateTransactionStatusInTheDatabase(*relayer_id, transaction.clone(), TransactionStatus::Failed, e))?;
                                     self.invalidate_transaction_cache(&transaction.id).await;
+
+                                    {
+                                        let webhook_manager = self.webhook_manager.lock().await;
+                                        let failed_transaction = Transaction {
+                                            status: TransactionStatus::Failed,
+                                            ..transaction
+                                        };
+                                        webhook_manager
+                                            .on_transaction_failed(&failed_transaction)
+                                            .await;
+                                    }
                                 }
                                 _ => {}
                             }
@@ -630,8 +698,7 @@ impl TransactionsQueues {
                     match mined_at.elapsed() {
                         Ok(elapsed) => {
                             if transactions_queue.in_confirmed_range(elapsed) {
-                                // check receipt still exists
-                                transactions_queue
+                                let receipt = transactions_queue
                                     .get_receipt(&transaction.known_transaction_hash.unwrap())
                                     .await
                                     .map_err(|e| {
@@ -658,6 +725,18 @@ impl TransactionsQueues {
                                 transactions_queue.move_mining_to_confirmed(&transaction.id).await;
 
                                 self.invalidate_transaction_cache(&transaction.id).await;
+
+                                {
+                                    let webhook_manager = self.webhook_manager.lock().await;
+                                    let confirmed_transaction = Transaction {
+                                        status: TransactionStatus::Confirmed,
+                                        confirmed_at: Some(SystemTime::now()),
+                                        ..transaction
+                                    };
+                                    webhook_manager
+                                        .on_transaction_confirmed(&confirmed_transaction, &receipt)
+                                        .await;
+                                }
 
                                 return Ok(ProcessResult::<ProcessMinedStatus>::success());
                             }
