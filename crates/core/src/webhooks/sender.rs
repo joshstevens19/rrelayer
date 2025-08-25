@@ -12,14 +12,13 @@ pub struct WebhookSender {
 }
 
 impl WebhookSender {
-    pub fn new(config: WebhookDeliveryConfig) -> Self {
+    pub fn new(config: WebhookDeliveryConfig) -> Result<Self, reqwest::Error> {
         let client = Client::builder()
             .timeout(Duration::from_secs(config.timeout_seconds as u64))
             .user_agent("RRelayer-Webhooks/1.0")
-            .build()
-            .expect("Failed to create HTTP client for webhooks");
+            .build()?;
 
-        Self { client, config }
+        Ok(Self { client, config })
     }
 
     /// Send a webhook with retry logic

@@ -8,7 +8,8 @@ use rrelayer_core::{
 use rrelayer_sdk::SDK;
 
 use crate::{
-    authentication::handle_authenticate, commands::keystore::ProjectLocation, console::print_table,
+    authentication::handle_authenticate, commands::error::UserError,
+    commands::keystore::ProjectLocation, console::print_table,
 };
 
 #[derive(Subcommand)]
@@ -66,7 +67,7 @@ pub async fn handle_user(
     command: &UserCommand,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), UserError> {
     match command {
         UserCommand::List => handle_list(project_path, sdk).await,
         UserCommand::Edit { address, role } => handle_edit(address, role, project_path, sdk).await,
@@ -75,10 +76,7 @@ pub async fn handle_user(
     }
 }
 
-async fn handle_list(
-    project_path: &ProjectLocation,
-    sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn handle_list(project_path: &ProjectLocation, sdk: &mut SDK) -> Result<(), UserError> {
     handle_authenticate(sdk, "account1", project_path).await?;
 
     log_users(sdk).await?;
@@ -90,7 +88,7 @@ async fn handle_delete(
     address: &EvmAddress,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), UserError> {
     handle_authenticate(sdk, "account1", project_path).await?;
 
     sdk.user.delete(address).await?;
@@ -105,7 +103,7 @@ async fn handle_add(
     role: &CliJwtRole,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), UserError> {
     handle_authenticate(sdk, "account1", project_path).await?;
 
     let jwt_role: JwtRole = role.clone().into();
@@ -122,7 +120,7 @@ async fn handle_edit(
     role: &CliJwtRole,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), UserError> {
     handle_authenticate(sdk, "account1", project_path).await?;
 
     let jwt_role: JwtRole = role.clone().into();
@@ -133,7 +131,7 @@ async fn handle_edit(
     Ok(())
 }
 
-async fn log_users(sdk: &mut SDK) -> Result<(), Box<dyn std::error::Error>> {
+async fn log_users(sdk: &mut SDK) -> Result<(), UserError> {
     let users = sdk
         .user
         .get(&PagingQuery {

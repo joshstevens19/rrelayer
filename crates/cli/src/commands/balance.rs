@@ -2,14 +2,17 @@ use alloy::{primitives::U256, providers::Provider, sol};
 use rrelayer_core::{common_types::EvmAddress, create_retry_client, relayer::types::RelayerId};
 use rrelayer_sdk::SDK;
 
-use crate::{authentication::handle_authenticate, commands::keystore::ProjectLocation};
+use crate::{
+    authentication::handle_authenticate, commands::error::BalanceError,
+    commands::keystore::ProjectLocation,
+};
 
 pub async fn handle_balance(
     relayer_id: &RelayerId,
     token: &Option<EvmAddress>,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), BalanceError> {
     handle_authenticate(sdk, "account1", project_path).await?;
 
     let relayer_result = sdk.relayer.get(relayer_id).await?;
@@ -21,8 +24,12 @@ pub async fn handle_balance(
         Some(relayer_result) => {
             match &token {
                 Some(token_address) => {
-                    let provider =
-                        create_retry_client(relayer_result.provider_urls.get(0).unwrap())?;
+                    let provider = create_retry_client(
+                        relayer_result.provider_urls.get(0).ok_or_else(|| {
+                            BalanceError::Provider("No provider URLs found for relayer".to_string())
+                        })?,
+                    )
+                    .map_err(|e| BalanceError::CoreProvider(e.to_string()))?;
 
                     let relayer_address = relayer_result.relayer.address.into_address();
 
@@ -42,7 +49,10 @@ pub async fn handle_balance(
                         Ok(result) => result._0,
                         Err(e) => {
                             println!("Failed to get token balance: {}", e);
-                            return Err(e.into());
+                            return Err(BalanceError::QueryFailed(format!(
+                                "Failed to get token balance: {}",
+                                e
+                            )));
                         }
                     };
 
@@ -90,11 +100,19 @@ pub async fn handle_balance(
                 }
                 None => {
                     // Native token balance logic remains unchanged
-                    let provider =
-                        create_retry_client(relayer_result.provider_urls.get(0).unwrap())?;
+                    let provider = create_retry_client(
+                        relayer_result.provider_urls.get(0).ok_or_else(|| {
+                            BalanceError::Provider("No provider URLs found for relayer".to_string())
+                        })?,
+                    )
+                    .map_err(|e| BalanceError::CoreProvider(e.to_string()))?;
 
-                    let balance =
-                        provider.get_balance(relayer_result.relayer.address.into_address()).await?;
+                    let balance = provider
+                        .get_balance(relayer_result.relayer.address.into_address())
+                        .await
+                        .map_err(|e| {
+                            BalanceError::QueryFailed(format!("Failed to get balance: {}", e))
+                        })?;
 
                     let eth_value = if balance.is_zero() {
                         "0".to_string()

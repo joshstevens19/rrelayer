@@ -3,13 +3,14 @@ use std::{fs, path::Path};
 use dialoguer::{Confirm, Input};
 use rand::{Rng, distributions::Alphanumeric};
 use rrelayer_core::{
-    AdminIdentifier, ApiConfig, GasProviders, KeystoreSigningKey, NetworkSetupConfig, SetupConfig,
-    SigningKey, WriteFileError, gas::fee_estimator::tenderly::TenderlyGasProviderSetupConfig,
-    generate_docker_file, keystore::recover_wallet_from_keystore, rrelayer_info, write_file,
+    AdminIdentifier, ApiConfig, KeystoreSigningKey, NetworkSetupConfig, SetupConfig, SigningKey,
+    WriteFileError, generate_docker_file, keystore::recover_wallet_from_keystore, rrelayer_info,
+    write_file,
 };
 use serde_yaml;
 
 use crate::{
+    commands::error::InitError,
     commands::keystore::{ProjectLocation, create_from_mnemonic, create_from_private_key},
     console::print_error_message,
 };
@@ -26,7 +27,7 @@ fn write_gitignore(path: &Path) -> Result<(), WriteFileError> {
     )
 }
 
-pub async fn handle_init(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn handle_init(path: &Path) -> Result<(), InitError> {
     let project_name: String = Input::new().with_prompt("Enter project name").interact_text()?;
 
     let project_description: String = Input::new()
@@ -83,7 +84,7 @@ pub async fn handle_init(path: &Path) -> Result<(), Box<dyn std::error::Error>> 
 
     // make sure it works properly
     recover_wallet_from_keystore(&account_path, &account_password)
-        .expect("Failed to recover wallet");
+        .map_err(|e| InitError::Wallet(e))?;
 
     let yaml_content: SetupConfig = SetupConfig {
         name: project_name.clone(),
@@ -114,23 +115,23 @@ POSTGRES_PASSWORD=rrelayer"#;
 
         write_docker_compose(&project_path).map_err(|e| {
             print_error_message(&format!("Failed to write docker compose file: {}", e));
-            e
+            InitError::ConfigWrite(e)
         })?;
 
         write_file(&project_path.join(".env"), &env).map_err(|e| {
             print_error_message(&format!("Failed to write .env file: {}", e));
-            e
+            InitError::ConfigWrite(e)
         })?;
     } else {
         let env = r#"DATABASE_URL=postgresql://[user[:password]@][host][:port][/dbname]"#;
 
         write_file(&project_path.join(".env"), env).map_err(|e| {
             print_error_message(&format!("Failed to write .env file: {}", e));
-            e
+            InitError::ConfigWrite(e)
         })?;
     }
 
-    write_gitignore(&project_path)?;
+    write_gitignore(&project_path).map_err(InitError::ConfigWrite)?;
 
     rrelayer_info!("\nProject '{}' initialized successfully!", project_name);
     rrelayer_info!(

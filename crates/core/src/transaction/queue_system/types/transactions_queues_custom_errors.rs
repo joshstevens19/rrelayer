@@ -59,6 +59,9 @@ pub enum AddTransactionError {
 
     #[error("could not estimate gas limit - {0}")]
     TransactionEstimateGasError(RelayerId, RpcError<TransportErrorKind>),
+
+    #[error("Internal error: {0}")]
+    InternalError(String),
 }
 
 #[derive(Error, Debug)]

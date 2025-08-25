@@ -6,7 +6,10 @@ use rrelayer_core::keystore::{
     KeyStorePasswordManager, KeystoreDecryptResult, PasswordError, decrypt_keystore,
 };
 
-use crate::commands::keystore::{ProjectLocation, create_from_private_key};
+use crate::{
+    commands::error::AuthError,
+    commands::keystore::{ProjectLocation, create_from_private_key},
+};
 
 #[derive(Subcommand)]
 pub enum AuthCommand {
@@ -44,7 +47,7 @@ pub enum AuthCommand {
 pub async fn handle_auth_command(
     cmd: &AuthCommand,
     project_path: PathBuf,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), AuthError> {
     match cmd {
         AuthCommand::Login { account } => {
             login(account, ProjectLocation::new(project_path))?;
@@ -66,11 +69,8 @@ pub async fn handle_auth_command(
     Ok(())
 }
 
-fn login(
-    account: &str,
-    project_location: ProjectLocation,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let password_manager = KeyStorePasswordManager::new(&project_location.get_project_name());
+fn login(account: &str, project_location: ProjectLocation) -> Result<(), AuthError> {
+    let password_manager = KeyStorePasswordManager::new(&project_location.get_project_name())?;
 
     if password_manager.load(account).is_ok() {
         println!("Already logged in as '{}'", account);
@@ -87,15 +87,12 @@ fn login(
             println!("Successfully logged in as '{}'", account);
             Ok(())
         }
-        Err(_) => Err("Invalid password or keystore not found".into()),
+        Err(_) => Err(AuthError::InvalidCredentials),
     }
 }
 
-fn logout(
-    account: &str,
-    project_location: ProjectLocation,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let password_manager = KeyStorePasswordManager::new(&project_location.get_project_name());
+fn logout(account: &str, project_location: ProjectLocation) -> Result<(), AuthError> {
+    let password_manager = KeyStorePasswordManager::new(&project_location.get_project_name())?;
 
     match password_manager.delete(account) {
         Ok(_) => {
@@ -106,24 +103,18 @@ fn logout(
             println!("Not logged in as '{}'", account);
             Ok(())
         }
-        Err(e) => Err(format!("Error during logout: {}", e).into()),
+        Err(e) => Err(AuthError::PasswordManager(e)),
     }
 }
 
-fn new_account(
-    account: &str,
-    project_location: ProjectLocation,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn new_account(account: &str, project_location: ProjectLocation) -> Result<(), AuthError> {
     create_from_private_key(&None, true, account, project_location, None)?;
 
     Ok(())
 }
 
-fn show_account_info(
-    account: &str,
-    project_location: ProjectLocation,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let password_manager = KeyStorePasswordManager::new(&project_location.get_project_name());
+fn show_account_info(account: &str, project_location: ProjectLocation) -> Result<(), AuthError> {
+    let password_manager = KeyStorePasswordManager::new(&project_location.get_project_name())?;
 
     let password = match password_manager.load(account) {
         Ok(password) => password,
@@ -134,10 +125,10 @@ fn show_account_info(
 
             match decrypt_keystore(&project_location.get_account_keystore(account), &password) {
                 Ok(_) => password,
-                Err(_) => return Err("Invalid password or keystore not found".into()),
+                Err(_) => return Err(AuthError::InvalidCredentials),
             }
         }
-        Err(e) => return Err(format!("Error retrieving password: {}", e).into()),
+        Err(e) => return Err(AuthError::PasswordManager(e)),
     };
 
     let result = decrypt_keystore(&project_location.get_account_keystore(account), &password)?;
@@ -159,9 +150,9 @@ fn show_account_info(
     Ok(())
 }
 
-fn list_accounts(project_location: ProjectLocation) -> Result<(), Box<dyn std::error::Error>> {
+fn list_accounts(project_location: ProjectLocation) -> Result<(), AuthError> {
     let project_name = project_location.get_project_name();
-    let password_manager = KeyStorePasswordManager::new(&project_name);
+    let password_manager = KeyStorePasswordManager::new(&project_name)?;
 
     let logged_in_accounts = password_manager.list_accounts()?;
 

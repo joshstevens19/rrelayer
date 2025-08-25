@@ -5,6 +5,7 @@ pub mod balance;
 pub mod clone;
 pub mod config;
 pub mod create;
+pub mod error;
 pub mod init;
 pub mod keystore;
 pub mod list;

@@ -1,3 +1,4 @@
+use crate::wallet::WalletError;
 use crate::yaml::GcpSigningKey;
 use google_secretmanager1::{hyper, hyper_rustls, oauth2, SecretManager};
 use std::path::PathBuf;
@@ -5,26 +6,32 @@ use std::path::PathBuf;
 pub async fn get_gcp_secret(
     project_path: &PathBuf,
     config: &GcpSigningKey,
-) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<String, WalletError> {
     let key_path = project_path.join(&config.service_account_key_path);
 
-    let service_account_key = oauth2::read_service_account_key(&key_path)
-        .await
-        .map_err(|e| format!("Failed to read service account key: {}", e))?;
+    let service_account_key = oauth2::read_service_account_key(&key_path).await.map_err(|e| {
+        WalletError::ConfigurationError {
+            message: format!("Failed to read service account key: {}", e),
+        }
+    })?;
 
-    let project_id = service_account_key
-        .project_id
-        .clone()
-        .ok_or("No project_id found in service account key")?;
+    let project_id =
+        service_account_key.project_id.clone().ok_or(WalletError::ConfigurationError {
+            message: "No project_id found in service account key".to_string(),
+        })?;
 
     let auth = oauth2::ServiceAccountAuthenticator::builder(service_account_key)
         .build()
         .await
-        .map_err(|e| format!("Failed to create authenticator: {}", e))?;
+        .map_err(|e| WalletError::AuthenticationError {
+            message: format!("Failed to create authenticator: {}", e),
+        })?;
 
     let https = hyper_rustls::HttpsConnectorBuilder::new()
         .with_native_roots()
-        .map_err(|e| format!("Failed to create HTTPS connector: {}", e))?
+        .map_err(|e| WalletError::ConfigurationError {
+            message: format!("Failed to create HTTPS connector: {}", e),
+        })?
         .https_or_http()
         .enable_http1()
         .build();
@@ -35,27 +42,27 @@ pub async fn get_gcp_secret(
     let secret_path =
         format!("projects/{}/secrets/{}/versions/{}", project_id, config.secret_name, version);
 
-    let result = client
-        .projects()
-        .secrets_versions_access(&secret_path)
-        .doit()
-        .await
-        .map_err(|e| format!("Failed to access secret: {}", e))?;
+    let result =
+        client.projects().secrets_versions_access(&secret_path).doit().await.map_err(|e| {
+            WalletError::ApiError { message: format!("Failed to access secret: {}", e) }
+        })?;
 
-    let secret_data =
-        result.1.payload.and_then(|payload| payload.data).ok_or("No secret data found")?;
+    let secret_data = result
+        .1
+        .payload
+        .and_then(|payload| payload.data)
+        .ok_or(WalletError::ApiError { message: "No secret data found".to_string() })?;
 
-    let secret_string = String::from_utf8(secret_data)
-        .map_err(|e| format!("Failed to decode secret as UTF-8: {}", e))?;
+    let secret_string = String::from_utf8(secret_data)?;
 
     let secret_key = config.secret_key.clone();
-    let secret_json: serde_json::Value = serde_json::from_str(&secret_string)
-        .map_err(|e| format!("Failed to parse secret as JSON: {}", e))?;
+    let secret_json: serde_json::Value = serde_json::from_str(&secret_string)?;
 
-    let key_value = secret_json
-        .get(&secret_key)
-        .and_then(|v| v.as_str())
-        .ok_or(format!("Key '{}' not found in secret or is not a string", secret_key))?;
+    let key_value = secret_json.get(&secret_key).and_then(|v| v.as_str()).ok_or(
+        WalletError::ConfigurationError {
+            message: format!("Key '{}' not found in secret or is not a string", secret_key),
+        },
+    )?;
 
     Ok(key_value.to_string())
 }

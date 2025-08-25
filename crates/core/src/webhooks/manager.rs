@@ -40,10 +40,13 @@ pub struct WebhookManager {
 
 impl WebhookManager {
     /// Create a new webhook manager
-    pub fn new(config: &SetupConfig, delivery_config: Option<WebhookDeliveryConfig>) -> Self {
-        let webhook_configs = config.webhooks.as_ref().map(|w| w.clone()).unwrap_or_default();
+    pub fn new(
+        config: &SetupConfig,
+        delivery_config: Option<WebhookDeliveryConfig>,
+    ) -> Result<Self, reqwest::Error> {
+        let webhook_configs = config.webhooks.as_ref().cloned().unwrap_or_default();
         let delivery_config = delivery_config.unwrap_or_default();
-        let sender = WebhookSender::new(delivery_config);
+        let sender = WebhookSender::new(delivery_config)?;
 
         // Build network name mapping
         let mut network_names = HashMap::new();
@@ -56,14 +59,14 @@ impl WebhookManager {
             // For now, we'll handle this in a separate method
         }
 
-        Self {
+        Ok(Self {
             pending_deliveries: Arc::new(RwLock::new(HashMap::new())),
             sender,
             webhook_configs,
             network_names: Arc::new(RwLock::new(network_names)),
             cleanup_interval: interval(Duration::from_secs(300)), // 5 minutes
             retry_interval: interval(Duration::from_secs(30)),    // 30 seconds
-        }
+        })
     }
 
     /// Update network name mapping (call this after network initialization)

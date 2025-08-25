@@ -17,6 +17,7 @@ use crate::{
         types::{GasPrice, GasProvider, MaxFee, MaxPriorityFee},
     },
     network::types::ChainId,
+    provider::RetryClientError,
     NetworkSetupConfig, SetupConfig,
 };
 
@@ -81,6 +82,9 @@ pub enum GasEstimatorError {
 
     #[error("Could not work out gas")]
     CanNotWorkOutGasEstimation,
+
+    #[error("Client creation error: {0}")]
+    ClientCreationError(#[from] RetryClientError),
 }
 
 impl From<reqwest::Error> for GasEstimatorError {
@@ -102,7 +106,7 @@ pub async fn get_gas_estimator(
     provider_urls: &[String],
     setup_config: &SetupConfig,
     network: &NetworkSetupConfig,
-) -> Result<Arc<dyn BaseGasFeeEstimator + Send + Sync>, Box<dyn std::error::Error>> {
+) -> Result<Arc<dyn BaseGasFeeEstimator + Send + Sync>, GasEstimatorError> {
     if let Some(setup_gas_providers) = &setup_config.gas_providers {
         if let Some(network_gas_provider) = &network.gas_provider {
             match network_gas_provider {

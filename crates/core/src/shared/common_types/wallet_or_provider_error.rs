@@ -11,4 +11,7 @@ pub enum WalletOrProviderError {
 
     #[error("Provider error: {0}")]
     ProviderError(RpcError<TransportErrorKind>),
+
+    #[error("Internal error: {0}")]
+    InternalError(String),
 }

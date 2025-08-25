@@ -28,6 +28,7 @@ serde_yaml = "0.9.34+deprecated"
 hex = "0.4.3"
 rand = "0.8.5"
 dirs = "6.0.0"
+thiserror = "1.0"
 prettytable = "0.10.0"
 chrono = "0.4.41"
 

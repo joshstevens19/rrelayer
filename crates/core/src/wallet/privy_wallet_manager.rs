@@ -1,6 +1,6 @@
 use crate::common_types::EvmAddress;
 use crate::network::types::ChainId;
-use crate::wallet::WalletManagerTrait;
+use crate::wallet::{WalletError, WalletManagerTrait};
 use alloy::consensus::{TxEnvelope, TypedTransaction};
 use alloy::dyn_abi::TypedData;
 use alloy::primitives::PrimitiveSignature;
@@ -28,10 +28,7 @@ pub struct PrivyWalletManager {
 }
 
 impl PrivyWalletManager {
-    pub async fn new(
-        app_id: String,
-        app_secret: String,
-    ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn new(app_id: String, app_secret: String) -> Result<Self, WalletError> {
         let client = reqwest::Client::new();
         let manager = Self {
             app_id: app_id.clone(),
@@ -44,7 +41,7 @@ impl PrivyWalletManager {
         Ok(manager)
     }
 
-    async fn load_wallets(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    async fn load_wallets(&self) -> Result<(), WalletError> {
         let mut all_wallets = Vec::new();
         let mut cursor: Option<String> = None;
 
@@ -93,7 +90,7 @@ impl WalletManagerTrait for PrivyWalletManager {
         &self,
         wallet_index: u32,
         chain_id: &ChainId,
-    ) -> Result<EvmAddress, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<EvmAddress, WalletError> {
         self.load_wallets().await?;
 
         {
@@ -117,7 +114,9 @@ impl WalletManagerTrait for PrivyWalletManager {
 
         if !response.status().is_success() {
             let error_text = response.text().await?;
-            return Err(format!("Failed to create wallet: {}", error_text).into());
+            return Err(WalletError::ApiError {
+                message: format!("Failed to create wallet: {}", error_text),
+            });
         }
 
         let new_wallet: PrivyWallet = response.json().await?;
@@ -137,11 +136,11 @@ impl WalletManagerTrait for PrivyWalletManager {
         &self,
         wallet_index: u32,
         _chain_id: &ChainId,
-    ) -> Result<EvmAddress, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<EvmAddress, WalletError> {
         let wallets = self.wallets.lock().await;
         let wallet = wallets
             .get(&wallet_index)
-            .ok_or("Wallet not found - you may need to create it first")?;
+            .ok_or(WalletError::WalletNotFound { index: wallet_index })?;
         Ok(wallet.address)
     }
 
@@ -150,11 +149,11 @@ impl WalletManagerTrait for PrivyWalletManager {
         wallet_index: u32,
         transaction: &TypedTransaction,
         _chain_id: &ChainId,
-    ) -> Result<PrimitiveSignature, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<PrimitiveSignature, WalletError> {
         let wallets = self.wallets.lock().await;
         let wallet = wallets
             .get(&wallet_index)
-            .ok_or("Wallet not found - you may need to create it first")?;
+            .ok_or(WalletError::WalletNotFound { index: wallet_index })?;
 
         let response = self
             .client
@@ -173,18 +172,23 @@ impl WalletManagerTrait for PrivyWalletManager {
 
         if !response.status().is_success() {
             let error_text = response.text().await?;
-            return Err(format!("Privy API error: {}", error_text).into());
+            return Err(WalletError::ApiError {
+                message: format!("Privy API error: {}", error_text),
+            });
         }
 
         let result: serde_json::Value = response.json().await?;
 
         if let Some(error) = result.get("error") {
-            return Err(format!("Privy signing error: {}", error).into());
+            return Err(WalletError::ApiError {
+                message: format!("Privy signing error: {}", error),
+            });
         }
 
-        let signed_transaction_hex = result["data"]["signed_transaction"]
-            .as_str()
-            .ok_or("No signed transaction in response data")?;
+        let signed_transaction_hex =
+            result["data"]["signed_transaction"].as_str().ok_or(WalletError::ApiError {
+                message: "No signed transaction in response data".to_string(),
+            })?;
 
         let tx_bytes = hex::decode(signed_transaction_hex.trim_start_matches("0x"))?;
         let tx_envelope = TxEnvelope::decode(&mut tx_bytes.as_slice())?;
@@ -193,7 +197,11 @@ impl WalletManagerTrait for PrivyWalletManager {
             TxEnvelope::Eip1559(signed_tx) => signed_tx.signature().clone(),
             TxEnvelope::Legacy(signed_tx) => signed_tx.signature().clone(),
             TxEnvelope::Eip2930(signed_tx) => signed_tx.signature().clone(),
-            _ => return Err("Unsupported signed transaction type".into()),
+            _ => {
+                return Err(WalletError::UnsupportedTransactionType {
+                    tx_type: "Unknown transaction envelope type".to_string(),
+                })
+            }
         };
 
         println!("Signature: {:?}", signature);
@@ -205,11 +213,11 @@ impl WalletManagerTrait for PrivyWalletManager {
         &self,
         wallet_index: u32,
         text: &str,
-    ) -> Result<PrimitiveSignature, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<PrimitiveSignature, WalletError> {
         let wallets = self.wallets.lock().await;
         let wallet = wallets
             .get(&wallet_index)
-            .ok_or("Wallet not found - you may need to create it first")?;
+            .ok_or(WalletError::WalletNotFound { index: wallet_index })?;
 
         let response = self
             .client
@@ -229,17 +237,22 @@ impl WalletManagerTrait for PrivyWalletManager {
 
         if !response.status().is_success() {
             let error_text = response.text().await?;
-            return Err(format!("Privy API error: {}", error_text).into());
+            return Err(WalletError::ApiError {
+                message: format!("Privy API error: {}", error_text),
+            });
         }
 
         let result: serde_json::Value = response.json().await?;
 
         if let Some(error) = result.get("error") {
-            return Err(format!("Privy signing error: {}", error).into());
+            return Err(WalletError::ApiError {
+                message: format!("Privy signing error: {}", error),
+            });
         }
 
-        let signature_hex =
-            result["data"]["signature"].as_str().ok_or("No signature in response data")?;
+        let signature_hex = result["data"]["signature"].as_str().ok_or(WalletError::ApiError {
+            message: "No signature in response data".to_string(),
+        })?;
 
         let signature = PrimitiveSignature::from_str(signature_hex)?;
         Ok(signature)
@@ -249,11 +262,11 @@ impl WalletManagerTrait for PrivyWalletManager {
         &self,
         wallet_index: u32,
         typed_data: &TypedData,
-    ) -> Result<PrimitiveSignature, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<PrimitiveSignature, WalletError> {
         let wallets = self.wallets.lock().await;
         let wallet = wallets
             .get(&wallet_index)
-            .ok_or("Wallet not found - you may need to create it first")?;
+            .ok_or(WalletError::WalletNotFound { index: wallet_index })?;
 
         let privy_typed_data = serde_json::json!({
             "types": typed_data.resolver,
@@ -279,17 +292,22 @@ impl WalletManagerTrait for PrivyWalletManager {
 
         if !response.status().is_success() {
             let error_text = response.text().await?;
-            return Err(format!("Privy API error: {}", error_text).into());
+            return Err(WalletError::ApiError {
+                message: format!("Privy API error: {}", error_text),
+            });
         }
 
         let result: serde_json::Value = response.json().await?;
 
         if let Some(error) = result.get("error") {
-            return Err(format!("Privy signing error: {}", error).into());
+            return Err(WalletError::ApiError {
+                message: format!("Privy signing error: {}", error),
+            });
         }
 
-        let signature_hex =
-            result["data"]["signature"].as_str().ok_or("No signature in response data")?;
+        let signature_hex = result["data"]["signature"].as_str().ok_or(WalletError::ApiError {
+            message: "No signature in response data".to_string(),
+        })?;
 
         let signature = PrimitiveSignature::from_str(signature_hex)?;
         Ok(signature)

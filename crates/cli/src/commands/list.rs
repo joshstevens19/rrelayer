@@ -3,7 +3,9 @@ use rrelayer_sdk::SDK;
 
 use crate::{
     authentication::handle_authenticate,
-    commands::{keystore::ProjectLocation, network::get_chain_id_for_network},
+    commands::{
+        error::RelayerManagementError, keystore::ProjectLocation, network::get_chain_id_for_network,
+    },
     console::print_table,
 };
 
@@ -11,7 +13,7 @@ pub async fn handle_list(
     network: &Option<String>,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), RelayerManagementError> {
     handle_authenticate(sdk, "account1", project_path).await?;
 
     if let Some(network) = network {
@@ -25,10 +27,7 @@ pub async fn handle_list(
     Ok(())
 }
 
-async fn log_relayers(
-    sdk: &mut SDK,
-    chain_id: Option<u64>,
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn log_relayers(sdk: &mut SDK, chain_id: Option<u64>) -> Result<(), RelayerManagementError> {
     let relayers = sdk
         .relayer
         .get_all(

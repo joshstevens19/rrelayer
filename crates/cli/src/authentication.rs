@@ -18,7 +18,7 @@ use rrelayer_core::{
 use rrelayer_sdk::SDK;
 use serde::{Deserialize, Serialize};
 
-use crate::commands::keystore::ProjectLocation;
+use crate::{commands::keystore::ProjectLocation, error::CliError};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct StoredTokenData {
@@ -53,7 +53,7 @@ fn save_token_to_cache(
     project_name: &str,
     account: &str,
     address: String,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), CliError> {
     if let Some(token_pair) = &sdk.context.token_pair {
         let expires_at = SystemTime::now() + Duration::from_secs(300); // 5 mins
 
@@ -74,14 +74,14 @@ fn save_token_to_cache(
 
         Ok(())
     } else {
-        Err("No token available to save".into())
+        Err(CliError::Internal("No token available to save".to_string()))
     }
 }
 
 fn load_token_from_cache(
     project_name: &str,
     account: &str,
-) -> Result<Option<StoredTokenData>, Box<dyn std::error::Error>> {
+) -> Result<Option<StoredTokenData>, CliError> {
     let token_file = get_secure_token_path(project_name, account);
 
     if !token_file.exists() {
@@ -103,7 +103,7 @@ fn load_token_from_cache(
     Ok(Some(token_data))
 }
 
-pub async fn check_api_running(sdk: &SDK) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn check_api_running(sdk: &SDK) -> Result<(), CliError> {
     match sdk.health.check().await {
         Ok(_) => Ok(()),
         Err(e) => {
@@ -111,7 +111,9 @@ pub async fn check_api_running(sdk: &SDK) -> Result<(), Box<dyn std::error::Erro
             eprintln!("Please start the API server before continuing.");
             eprintln!("Details: {}", e);
 
-            Err("The API server is not running. Please start it before continuing.".into())
+            Err(CliError::Api(
+                "The API server is not running. Please start it before continuing.".to_string(),
+            ))
         }
     }
 }
@@ -120,7 +122,7 @@ pub async fn handle_authenticate(
     sdk: &mut SDK,
     account: &str,
     project_location: &ProjectLocation,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), CliError> {
     check_api_running(sdk).await?;
 
     let project_name = project_location.get_project_name();
@@ -145,7 +147,9 @@ pub async fn handle_authenticate(
         sdk.context.token_pair = None;
     }
 
-    let password_manager = KeyStorePasswordManager::new(&project_name);
+    let password_manager = KeyStorePasswordManager::new(&project_name).map_err(|e| {
+        CliError::Authentication(format!("Failed to create password manager: {}", e))
+    })?;
     let keystore_path = project_location.get_account_keystore(account);
 
     let password = match password_manager.load(account) {
@@ -157,34 +161,52 @@ pub async fn handle_authenticate(
 
             match decrypt_keystore(&keystore_path, &pwd) {
                 Ok(_) => {
-                    password_manager.save(account, &pwd)?;
+                    password_manager.save(account, &pwd).map_err(|e| {
+                        CliError::Authentication(format!("Failed to save password: {}", e))
+                    })?;
                     pwd
                 }
-                Err(_) => return Err("Invalid password or keystore not found".into()),
+                Err(_) => {
+                    return Err(CliError::Authentication(
+                        "Invalid password or keystore not found".to_string(),
+                    ));
+                }
             }
         }
-        Err(e) => return Err(format!("Error loading password: {}", e).into()),
+        Err(e) => return Err(CliError::Authentication(format!("Error loading password: {}", e))),
     };
 
     let keystore_result = decrypt_keystore(&keystore_path, &password)?;
 
     match keystore_result {
         KeystoreDecryptResult::PrivateKey { hex_key, address, .. } => {
-            let private_key = B256::from_str(&hex_key)?;
-            let signer = PrivateKeySigner::from_bytes(&private_key)?;
-            let challenge_result =
-                sdk.get_auth_challenge(&Address::parse_checksummed(&address, None)?).await?;
+            let private_key = B256::from_str(&hex_key)
+                .map_err(|e| CliError::Internal(format!("Invalid hex key: {}", e)))?;
+            let signer = PrivateKeySigner::from_bytes(&private_key)
+                .map_err(|e| CliError::Internal(format!("Failed to create signer: {}", e)))?;
+            let challenge_result = sdk
+                .get_auth_challenge(
+                    &Address::parse_checksummed(&address, None)
+                        .map_err(|e| CliError::AddressParse(format!("Invalid address: {}", e)))?,
+                )
+                .await
+                .map_err(|e| CliError::Api(format!("Failed to get auth challenge: {}", e)))?;
 
-            let signature = signer.sign_message(challenge_result.challenge.as_bytes()).await?;
+            let signature = signer
+                .sign_message(challenge_result.challenge.as_bytes())
+                .await
+                .map_err(|e| CliError::Internal(format!("Failed to sign message: {}", e)))?;
 
-            sdk.login(&challenge_result, signature).await?;
+            sdk.login(&challenge_result, signature)
+                .await
+                .map_err(|e| CliError::Api(format!("Login failed: {}", e)))?;
 
             save_token_to_cache(sdk, &project_name, account, address)?;
 
             Ok(())
         }
-        KeystoreDecryptResult::Mnemonic { .. } => {
-            Err("Mnemonic-based accounts are not supported for authentication".into())
-        }
+        KeystoreDecryptResult::Mnemonic { .. } => Err(CliError::Authentication(
+            "Mnemonic-based accounts are not supported for authentication".to_string(),
+        )),
     }
 }

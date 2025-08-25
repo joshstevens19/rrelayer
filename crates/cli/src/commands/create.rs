@@ -2,7 +2,9 @@ use rrelayer_sdk::SDK;
 
 use crate::{
     authentication::handle_authenticate,
-    commands::{keystore::ProjectLocation, network::get_chain_id_for_network},
+    commands::{
+        error::RelayerManagementError, keystore::ProjectLocation, network::get_chain_id_for_network,
+    },
 };
 
 pub async fn handle_create(
@@ -10,7 +12,7 @@ pub async fn handle_create(
     network: &str,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), RelayerManagementError> {
     handle_authenticate(sdk, "account1", project_path).await?;
 
     let setup_config = project_path.setup_config(false)?;

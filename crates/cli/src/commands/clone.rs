@@ -2,7 +2,10 @@ use rrelayer_core::relayer::types::RelayerId;
 use rrelayer_sdk::SDK;
 
 use crate::commands::network::get_chain_id_for_network;
-use crate::{authentication::handle_authenticate, commands::keystore::ProjectLocation};
+use crate::{
+    authentication::handle_authenticate,
+    commands::{error::RelayerManagementError, keystore::ProjectLocation},
+};
 
 pub async fn handle_clone(
     relayer_id: &RelayerId,
@@ -10,7 +13,7 @@ pub async fn handle_clone(
     network: &str,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), RelayerManagementError> {
     handle_authenticate(sdk, "account1", project_path).await?;
 
     let setup_config = project_path.setup_config(false)?;

@@ -413,23 +413,33 @@ impl TenderlyGasFeeEstimator {
         Self { supported_chains, api_key: api_key.clone() }
     }
 
-    fn build_suggested_gas_price_endpoint(&self, chain_id: &ChainId) -> String {
+    fn build_suggested_gas_price_endpoint(&self, chain_id: &ChainId) -> Result<String, String> {
         let rpc_url = self
             .supported_chains
             .iter()
             .find(|c| c.chain_id == *chain_id)
-            .as_ref()
-            .expect("Chain not found")
+            .ok_or_else(|| format!("Chain not found: {}", chain_id))?
             .rpc_url
             .clone();
-        format!("{}/{}", rpc_url, self.api_key)
+        Ok(format!("{}/{}", rpc_url, self.api_key))
     }
 
     async fn request_gas_estimate(
         &self,
         chain_id: &ChainId,
     ) -> Result<TenderlyGasEstimatePriceResult, reqwest::Error> {
-        let url = self.build_suggested_gas_price_endpoint(chain_id);
+        let url = match self.build_suggested_gas_price_endpoint(chain_id) {
+            Ok(url) => url,
+            Err(e) => {
+                // Create a request that will fail with a proper reqwest::Error
+                let client = reqwest::Client::new();
+                let result = client.get("http://").send().await;
+                match result {
+                    Err(error) => return Err(error),
+                    Ok(_) => unreachable!("This should always fail"),
+                }
+            }
+        };
         println!("Tenderly gas estimate url: {}", url);
         let client = reqwest::Client::new();
 

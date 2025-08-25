@@ -1,3 +1,4 @@
+use crate::wallet::WalletError;
 use crate::SigningKey;
 use std::path::PathBuf;
 
@@ -13,7 +14,7 @@ pub async fn get_mnemonic_from_signing_key(
     project_path: &PathBuf,
     project_name: &str,
     signing_key: &SigningKey,
-) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<String, WalletError> {
     if let Some(raw) = &signing_key.raw {
         return Ok(raw.mnemonic.clone());
     }
@@ -29,17 +30,18 @@ pub async fn get_mnemonic_from_signing_key(
     }
 
     if let Some(keystore) = &signing_key.keystore {
-        let password = keystore.dangerous_define_raw_password
-            .clone()
-            .unwrap_or_else(|| {
-                KeyStorePasswordManager::new(project_name)
-                    .load(&keystore.name)
-                    .expect("Server is not authenticated to use the keystores rrelayer_signing_key please login on the server")
-            });
+        let password = if let Some(pwd) = keystore.dangerous_define_raw_password.clone() {
+            pwd
+        } else {
+            KeyStorePasswordManager::new(project_name)
+                .map_err(|e| WalletError::ConfigurationError { message: format!("Failed to create password manager: {}", e) })?
+                .load(&keystore.name)
+                .map_err(|_| WalletError::AuthenticationError { message: "Server is not authenticated to use the keystores rrelayer_signing_key please login on the server".to_string() })?
+        };
         let keystore_path = project_path.join(&keystore.path);
         let result = recover_mnemonic_from_keystore(&keystore_path, &password)?;
         return Ok(result);
     }
 
-    Err("No signing key found".into())
+    Err(WalletError::NoSigningKey)
 }

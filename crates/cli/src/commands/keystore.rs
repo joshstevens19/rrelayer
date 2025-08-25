@@ -13,6 +13,8 @@ use rrelayer_core::{
     read,
 };
 
+use crate::commands::error::KeystoreError;
+
 #[derive(Subcommand)]
 pub enum KeystoreCommand {
     /// Create a new keystore from a mnemonic phrase
@@ -92,12 +94,12 @@ impl ProjectLocation {
         self.output_dir.join("keystores").join("accounts").join(account)
     }
 
-    fn create_keystore_dir(&self) -> Result<(), Box<dyn std::error::Error>> {
+    fn create_keystore_dir(&self) -> Result<(), KeystoreError> {
         fs::create_dir_all(&self.get_keystore_dir())?;
         Ok(())
     }
 
-    fn create_account_keystore_dir(&self) -> Result<(), Box<dyn std::error::Error>> {
+    fn create_account_keystore_dir(&self) -> Result<(), KeystoreError> {
         fs::create_dir_all(&self.get_account_keystore_dir())?;
         Ok(())
     }
@@ -106,35 +108,33 @@ impl ProjectLocation {
         self.get_account_keystore_dir().join(name).exists()
     }
 
-    pub fn setup_config(&self, raw_yaml: bool) -> Result<SetupConfig, Box<dyn std::error::Error>> {
-        let yaml = read(&self.output_dir.join("rrelayer.yaml"), raw_yaml)?;
+    pub fn setup_config(&self, raw_yaml: bool) -> Result<SetupConfig, KeystoreError> {
+        let yaml = read(&self.output_dir.join("rrelayer.yaml"), raw_yaml)
+            .map_err(|e| KeystoreError::ProjectConfig(format!("Failed to read config: {}", e)))?;
         Ok(yaml)
     }
 
-    pub fn overwrite_setup_config(
-        &self,
-        config: SetupConfig,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn overwrite_setup_config(&self, config: SetupConfig) -> Result<(), KeystoreError> {
         let yaml = serde_yaml::to_string(&config)?;
         fs::write(&self.output_dir.join("rrelayer.yaml"), yaml)?;
         Ok(())
     }
 
     pub fn get_project_name(&self) -> String {
-        self.override_project_name
-            .clone()
-            .unwrap_or_else(|| self.setup_config(false).unwrap().name.clone())
+        self.override_project_name.clone().unwrap_or_else(|| {
+            self.setup_config(false)
+                .map(|config| config.name)
+                .unwrap_or_else(|_| "unknown_project".to_string())
+        })
     }
 
-    pub fn get_api_url(&self) -> Result<String, Box<dyn std::error::Error>> {
+    pub fn get_api_url(&self) -> Result<String, KeystoreError> {
         let setup_config = self.setup_config(false)?;
         Ok(format!("http://localhost:{}", setup_config.api_config.port))
     }
 }
 
-pub async fn handle_keystore_command(
-    cmd: &KeystoreCommand,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn handle_keystore_command(cmd: &KeystoreCommand) -> Result<(), KeystoreError> {
     match cmd {
         KeystoreCommand::CreateFromMnemonic { mnemonic, generate, name, output_dir } => {
             let dir = match output_dir {
@@ -164,19 +164,22 @@ pub fn create_from_mnemonic(
     name: &str,
     project_location: ProjectLocation,
     password: Option<String>,
-) -> Result<PathBuf, Box<dyn std::error::Error>> {
+) -> Result<PathBuf, KeystoreError> {
     project_location.create_keystore_dir()?;
     if project_location.keystore_already_exists(name) {
-        return Err(format!("Keystore already exists: {}", name).into());
+        return Err(KeystoreError::AlreadyExists(name.to_string()));
     }
 
     if let Some(phrase) = mnemonic {
         // Throws if the seed phrase is invalid
-        let _ = MnemonicBuilder::<English>::default().phrase(phrase).build()?;
+        let _ = MnemonicBuilder::<English>::default()
+            .phrase(phrase)
+            .build()
+            .map_err(|_| KeystoreError::InvalidMnemonic)?;
     } else if generate {
         // do nothing
     } else {
-        return Err("Either --mnemonic or --generate must be specified".into());
+        return Err(KeystoreError::InvalidMnemonic);
     };
 
     let password = if password.is_some() {
@@ -194,7 +197,7 @@ pub fn create_from_mnemonic(
         create_new_mnemonic_in_keystore(&password, &project_location.get_keystore_dir(), name)?;
     };
 
-    let password_manager = KeyStorePasswordManager::new(&project_location.get_project_name());
+    let password_manager = KeyStorePasswordManager::new(&project_location.get_project_name())?;
     password_manager.save(name, &password)?;
 
     let file_location = project_location.get_keystore_dir().join(name);
@@ -211,11 +214,11 @@ pub fn create_from_private_key(
     name: &str,
     project_location: ProjectLocation,
     password: Option<String>,
-) -> Result<PathBuf, Box<dyn std::error::Error>> {
+) -> Result<PathBuf, KeystoreError> {
     project_location.create_account_keystore_dir()?;
 
     if project_location.account_already_exists(name) {
-        return Err(format!("Account already exists: {}", name).into());
+        return Err(KeystoreError::AlreadyExists(name.to_string()));
     }
 
     if let Some(pk) = private_key {
@@ -223,12 +226,12 @@ pub fn create_from_private_key(
         let bytes = hex::decode(pk_str)?;
 
         if bytes.len() != 32 {
-            return Err(format!("Invalid private key length: {}, expected 32", bytes.len()).into());
+            return Err(KeystoreError::InvalidPrivateKey);
         }
     } else if generate {
         // do nothing
     } else {
-        return Err("Either --private-key or --generate must be specified".into());
+        return Err(KeystoreError::InvalidPrivateKey);
     };
 
     let password = if password.is_some() {
@@ -241,7 +244,8 @@ pub fn create_from_private_key(
     };
 
     if let Some(pk) = private_key {
-        let private_key = LocalSigner::from_str(&pk)?;
+        let private_key =
+            LocalSigner::from_str(&pk).map_err(|_| KeystoreError::InvalidPrivateKey)?;
         store_private_key_in_keystore(
             private_key,
             &password,
@@ -256,7 +260,7 @@ pub fn create_from_private_key(
         )?;
     }
 
-    let password_manager = KeyStorePasswordManager::new(&project_location.get_project_name());
+    let password_manager = KeyStorePasswordManager::new(&project_location.get_project_name())?;
     password_manager.save(name, &password)?;
 
     let file_location = project_location.get_account_keystore_dir().join(name);
@@ -267,9 +271,9 @@ pub fn create_from_private_key(
     Ok(file_location)
 }
 
-fn decrypt(path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+fn decrypt(path: &PathBuf) -> Result<(), KeystoreError> {
     if !path.exists() || !path.is_file() {
-        return Err(format!("Keystore file not found: {:?}", path).into());
+        return Err(KeystoreError::NotFound(format!("{:?}", path)));
     }
 
     const MAX_ATTEMPTS: usize = 3;
@@ -318,13 +322,12 @@ fn decrypt(path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
                     continue;
                 } else {
                     return if is_likely_password_error {
-                        Err(format!(
+                        Err(KeystoreError::DecryptionFailed(format!(
                             "Failed to decrypt after {} attempts. Incorrect password.",
                             MAX_ATTEMPTS
-                        )
-                        .into())
+                        )))
                     } else {
-                        Err(e)
+                        Err(KeystoreError::DecryptionFailed(format!("Decryption failed: {}", e)))
                     };
                 }
             }

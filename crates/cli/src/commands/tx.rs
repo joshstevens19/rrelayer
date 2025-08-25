@@ -13,7 +13,10 @@ use rrelayer_core::{
 };
 use rrelayer_sdk::SDK;
 
-use crate::{authentication::handle_authenticate, commands::keystore::ProjectLocation};
+use crate::{
+    authentication::handle_authenticate, commands::error::TransactionError,
+    commands::keystore::ProjectLocation,
+};
 
 #[derive(Subcommand)]
 pub enum TxCommand {
@@ -117,10 +120,10 @@ pub async fn handle_tx(
     command: &TxCommand,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), TransactionError> {
     match command {
         TxCommand::Get { tx_id } => handle_get(tx_id, project_path, sdk).await,
-        TxCommand::Withdraw { relayer_id, to, amount, token } => {
+        TxCommand::Withdraw { relayer_id, to, amount, token: _ } => {
             handle_withdraw(relayer_id, to, amount, project_path, sdk).await
         }
         TxCommand::Status { tx_id } => handle_status(tx_id, project_path, sdk).await,
@@ -135,8 +138,9 @@ pub async fn handle_tx(
         TxCommand::Send { relayer_id, transaction } => {
             handle_send(relayer_id, transaction, project_path, sdk).await
         }
-        _ => {
-            panic!("Invalid command");
+        TxCommand::Fund { relayer_id: _, amount: _, token: _ } => {
+            // TODO: Implement Fund command
+            Err(TransactionError::CommandFailed("Fund command not yet implemented".to_string()))
         }
     }
 }
@@ -145,7 +149,7 @@ async fn handle_get(
     tx_id: &TransactionId,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), TransactionError> {
     handle_authenticate(sdk, "account1", project_path).await?;
 
     let tx = sdk.transaction.get_transaction(tx_id).await?;
@@ -163,7 +167,7 @@ async fn handle_withdraw(
     amount: &U256,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), TransactionError> {
     handle_authenticate(sdk, "account1", project_path).await?;
 
     let tx = sdk
@@ -192,7 +196,7 @@ async fn handle_status(
     tx_id: &TransactionId,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), TransactionError> {
     handle_authenticate(sdk, "account1", project_path).await?;
 
     let status = sdk.transaction.get_transaction_status(tx_id).await?;
@@ -217,7 +221,7 @@ async fn handle_list(
     _status: &Option<TxStatus>,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), TransactionError> {
     handle_authenticate(sdk, "account1", project_path).await?;
 
     let transactions = sdk
@@ -241,7 +245,7 @@ async fn handle_queue(
     relayer_id: &RelayerId,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), TransactionError> {
     handle_authenticate(sdk, "account1", project_path).await?;
 
     let (pending_result, mempool_result) = tokio::join!(
@@ -275,7 +279,7 @@ async fn handle_cancel(
     tx_id: &TransactionId,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), TransactionError> {
     handle_authenticate(sdk, "account1", project_path).await?;
     println!("Canceling transaction: {}", tx_id);
 
@@ -298,7 +302,7 @@ async fn handle_replace(
     transaction: &RelayTransactionRequest,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), TransactionError> {
     handle_authenticate(sdk, "account1", project_path).await?;
     println!("Replacing transaction: {}", tx_id);
 
@@ -320,7 +324,7 @@ async fn handle_send(
     transaction: &RelayTransactionRequest,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), TransactionError> {
     handle_authenticate(sdk, "account1", project_path).await?;
     println!("Sending transaction: {:?}", transaction);
 
@@ -333,7 +337,7 @@ async fn handle_send(
     Ok(())
 }
 
-fn log_transactions(transactions: Vec<Transaction>) -> Result<(), Box<dyn std::error::Error>> {
+fn log_transactions(transactions: Vec<Transaction>) -> Result<(), TransactionError> {
     if transactions.is_empty() {
         println!("No transactions found.");
         return Ok(());
@@ -407,14 +411,6 @@ fn log_transactions(transactions: Vec<Transaction>) -> Result<(), Box<dyn std::e
     println!("\nUse 'transaction get <id>' to see more details about a specific transaction.");
 
     Ok(())
-}
-
-fn format_tx_hash(tx: &Transaction) -> String {
-    if let Some(hash) = &tx.known_transaction_hash { hash.to_string() } else { "-".to_string() }
-}
-
-fn format_sent_at(tx: &Transaction) -> String {
-    if let Some(sent_at) = &tx.sent_at { format_time(sent_at) } else { "-".to_string() }
 }
 
 fn format_time(time: &SystemTime) -> String {

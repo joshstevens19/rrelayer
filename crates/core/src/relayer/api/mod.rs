@@ -233,14 +233,11 @@ async fn pause_relayer(
     match state.db.pause_relayer(&relayer_id).await {
         Ok(_) => {
             invalidate_relayer_cache(&state.cache, &relayer_id).await;
-            state
-                .transactions_queues
-                .lock()
-                .await
-                .get_transactions_queue_unsafe(&relayer_id)
-                .lock()
-                .await
-                .set_is_paused(true);
+            if let Ok(queue) =
+                state.transactions_queues.lock().await.get_transactions_queue_unsafe(&relayer_id)
+            {
+                queue.lock().await.set_is_paused(true);
+            }
 
             StatusCode::NO_CONTENT
         }
@@ -263,14 +260,11 @@ async fn unpause_relayer(
     match state.db.unpause_relayer(&relayer_id).await {
         Ok(_) => {
             invalidate_relayer_cache(&state.cache, &relayer_id).await;
-            state
-                .transactions_queues
-                .lock()
-                .await
-                .get_transactions_queue_unsafe(&relayer_id)
-                .lock()
-                .await
-                .set_is_paused(false);
+            if let Ok(queue) =
+                state.transactions_queues.lock().await.get_transactions_queue_unsafe(&relayer_id)
+            {
+                queue.lock().await.set_is_paused(false);
+            }
 
             StatusCode::NO_CONTENT
         }
@@ -294,14 +288,14 @@ async fn update_relay_max_gas_price(
         Ok(Some(_)) => match state.db.update_relayer_max_gas_price(&relayer_id, cap).await {
             Ok(_) => {
                 invalidate_relayer_cache(&state.cache, &relayer_id).await;
-                state
+                if let Ok(queue) = state
                     .transactions_queues
                     .lock()
                     .await
                     .get_transactions_queue_unsafe(&relayer_id)
-                    .lock()
-                    .await
-                    .set_max_gas_price(cap);
+                {
+                    queue.lock().await.set_max_gas_price(cap);
+                }
 
                 StatusCode::NO_CONTENT
             }
@@ -438,14 +432,14 @@ async fn add_allowlist_address(
     match get_relayer(&state.db, &state.cache, &relayer_id).await {
         Ok(Some(_)) => match state.db.relayer_add_allowlist_address(&relayer_id, &address).await {
             Ok(_) => {
-                state
+                if let Ok(queue) = state
                     .transactions_queues
                     .lock()
                     .await
                     .get_transactions_queue_unsafe(&relayer_id)
-                    .lock()
-                    .await
-                    .set_is_allowlisted_only(true);
+                {
+                    queue.lock().await.set_is_allowlisted_only(true);
+                }
 
                 StatusCode::NO_CONTENT
             }
@@ -472,14 +466,14 @@ async fn delete_allowlist_address(
         Ok(_) => match state.db.get_relayer(&relayer_id).await {
             Ok(Some(relayer)) => {
                 if !relayer.allowlisted_only {
-                    state
+                    if let Ok(queue) = state
                         .transactions_queues
                         .lock()
                         .await
                         .get_transactions_queue_unsafe(&relayer_id)
-                        .lock()
-                        .await
-                        .set_is_allowlisted_only(false);
+                    {
+                        queue.lock().await.set_is_allowlisted_only(false);
+                    }
                 }
                 StatusCode::NO_CONTENT
             }
@@ -504,14 +498,11 @@ async fn update_relay_eip1559_status(
 
     match state.db.update_relayer_eip_1559_status(&relayer_id, &enabled).await {
         Ok(_) => {
-            state
-                .transactions_queues
-                .lock()
-                .await
-                .get_transactions_queue_unsafe(&relayer_id)
-                .lock()
-                .await
-                .set_is_legacy_transactions(!enabled); // Fixed: EIP-1559 enabled = NOT legacy
+            if let Ok(queue) =
+                state.transactions_queues.lock().await.get_transactions_queue_unsafe(&relayer_id)
+            {
+                queue.lock().await.set_is_legacy_transactions(!enabled); // Fixed: EIP-1559 enabled = NOT legacy
+            }
 
             StatusCode::NO_CONTENT
         }

@@ -185,6 +185,11 @@ pub enum StartTransactionsQueuesError {
 
     #[error("Failed to init transactions queues: {0}")]
     CouldNotInitTransactionsQueues(#[from] WalletOrProviderError),
+
+    #[error("Transactions queues error: {0}")]
+    TransactionsQueuesError(
+        #[from] crate::transaction::queue_system::transactions_queues::TransactionsQueuesError,
+    ),
 }
 
 pub async fn startup_transactions_queues(

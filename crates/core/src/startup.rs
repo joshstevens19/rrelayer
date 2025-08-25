@@ -94,7 +94,10 @@ async fn activity_logger(req: Request<Body>, next: Next) -> Result<Response, Sta
                         duration
                     );
                 }
-                return Ok(Response::builder().status(status).body(Body::empty()).unwrap());
+                return match Response::builder().status(status).body(Body::empty()) {
+                    Ok(response) => Ok(response),
+                    Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+                };
             }
         };
 
@@ -251,6 +254,12 @@ pub enum StartError {
 
     #[error("Could not load keystore admin: {0} - make sure you have logged in with that account")]
     CouldNotLoadKeystoreAdmin(String),
+
+    #[error("Webhook manager creation error: {0}")]
+    WebhookManagerError(#[from] reqwest::Error),
+
+    #[error("IO error: {0}")]
+    IoError(#[from] std::io::Error),
 }
 
 pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
@@ -272,18 +281,27 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
 
     let config = read(&yaml_path, false)?;
 
-    let password_manager = KeyStorePasswordManager::new(&config.name);
+    let password_manager = KeyStorePasswordManager::new(&config.name)?;
     let mut admins: Vec<(EvmAddress, JwtRole)> = vec![];
     for admin in config.admins.iter() {
         match admin {
             AdminIdentifier::Name(account) => {
                 match password_manager.load(account) {
                     Ok(password) => {
-                        let signer = recover_wallet_from_keystore(
+                        let signer = match recover_wallet_from_keystore(
                             &project_path.join("keystores").join("accounts").join(account),
                             &password,
-                        )
-                        .expect("Failed to recover wallet");
+                        ) {
+                            Ok(signer) => signer,
+                            Err(e) => {
+                                rrelayer_error!(
+                                    "Failed to recover wallet for account {}: {}",
+                                    account,
+                                    e
+                                );
+                                continue;
+                            }
+                        };
                         let address: EvmAddress = signer.address().into();
                         admins.push((address, JwtRole::Admin))
                     }
@@ -291,7 +309,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
                         return Err(StartError::CouldNotLoadKeystoreAdmin(account.to_string()))
                     }
                 }
-                if !password_manager.load(account).is_ok() {
+                if password_manager.load(account).is_err() {
                     return Err(StartError::CouldNotLoadKeystoreAdmin(account.to_string()));
                 }
             }
@@ -312,7 +330,8 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
     let postgres_client = Arc::new(postgres);
 
     // Initialize webhook manager first
-    let webhook_manager = Arc::new(Mutex::new(crate::webhooks::WebhookManager::new(&config, None)));
+    let webhook_manager =
+        Arc::new(Mutex::new(crate::webhooks::WebhookManager::new(&config, None)?));
 
     run_background_tasks(
         &config,

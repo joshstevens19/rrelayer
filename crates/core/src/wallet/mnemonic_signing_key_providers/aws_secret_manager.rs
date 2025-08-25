@@ -1,11 +1,10 @@
 use aws_config::{BehaviorVersion, Region};
 use aws_sdk_secretsmanager::{config::Credentials, Client};
 
+use crate::wallet::WalletError;
 use crate::yaml::AwsSigningKey;
 
-pub async fn get_aws_secret(
-    config: &AwsSigningKey,
-) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+pub async fn get_aws_secret(config: &AwsSigningKey) -> Result<String, WalletError> {
     let credentials = Credentials::new(
         config.access_key_id.clone(),
         config.secret_access_key.clone(),
@@ -22,17 +21,22 @@ pub async fn get_aws_secret(
 
     let client = Client::new(&shared_config);
 
-    let resp = client.get_secret_value().secret_id(config.secret_name.clone()).send().await?;
+    let resp =
+        client.get_secret_value().secret_id(config.secret_name.clone()).send().await.map_err(
+            |e| WalletError::ApiError { message: format!("Failed to get AWS secret: {}", e) },
+        )?;
 
-    let secret_string = resp.secret_string().ok_or("failed to get secret string")?;
+    let secret_string = resp
+        .secret_string()
+        .ok_or(WalletError::ApiError { message: "failed to get secret string".to_string() })?;
 
-    let secret_json: serde_json::Value = serde_json::from_str(secret_string)
-        .map_err(|e| format!("Failed to parse secret as JSON: {}", e))?;
+    let secret_json: serde_json::Value = serde_json::from_str(secret_string)?;
 
-    let key_value = secret_json
-        .get(&config.secret_key)
-        .and_then(|v| v.as_str())
-        .ok_or(format!("Key '{}' not found in secret or is not a string", config.secret_key))?;
+    let key_value = secret_json.get(&config.secret_key).and_then(|v| v.as_str()).ok_or(
+        WalletError::ConfigurationError {
+            message: format!("Key '{}' not found in secret or is not a string", config.secret_key),
+        },
+    )?;
 
     Ok(key_value.to_string())
 }

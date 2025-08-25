@@ -1,6 +1,6 @@
 use crate::common_types::EvmAddress;
 use crate::network::types::ChainId;
-use crate::wallet::WalletManagerTrait;
+use crate::wallet::{WalletError, WalletManagerTrait};
 use alloy::consensus::TypedTransaction;
 use alloy::dyn_abi::TypedData;
 use alloy::network::TxSigner;
@@ -59,7 +59,7 @@ impl WalletManagerTrait for MnemonicWalletManager {
         &self,
         wallet_index: u32,
         chain_id: &ChainId,
-    ) -> Result<EvmAddress, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<EvmAddress, WalletError> {
         // For mnemonic wallets, we can always derive any index
         // So creation is the same as getting the address
         let wallet = self.get_wallet(wallet_index, chain_id).await?;
@@ -70,7 +70,7 @@ impl WalletManagerTrait for MnemonicWalletManager {
         &self,
         wallet_index: u32,
         chain_id: &ChainId,
-    ) -> Result<EvmAddress, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<EvmAddress, WalletError> {
         let wallet = self.get_wallet(wallet_index, chain_id).await?;
         Ok(EvmAddress::new(wallet.address()))
     }
@@ -80,7 +80,7 @@ impl WalletManagerTrait for MnemonicWalletManager {
         wallet_index: u32,
         transaction: &TypedTransaction,
         chain_id: &ChainId,
-    ) -> Result<PrimitiveSignature, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<PrimitiveSignature, WalletError> {
         let wallet = self.get_wallet(wallet_index, chain_id).await?;
 
         let signature = match transaction {
@@ -113,7 +113,7 @@ impl WalletManagerTrait for MnemonicWalletManager {
         &self,
         wallet_index: u32,
         text: &str,
-    ) -> Result<PrimitiveSignature, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<PrimitiveSignature, WalletError> {
         let wallet = self.get_wallet(wallet_index, &ChainId::default()).await?;
         let signature = wallet.sign_message(text.as_bytes()).await?;
         Ok(signature)
@@ -123,16 +123,17 @@ impl WalletManagerTrait for MnemonicWalletManager {
         &self,
         wallet_index: u32,
         typed_data: &TypedData,
-    ) -> Result<PrimitiveSignature, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<PrimitiveSignature, WalletError> {
         let wallet = self.get_wallet(wallet_index, &ChainId::default()).await?;
         let signature = wallet.sign_dynamic_typed_data(typed_data).await?;
         Ok(signature)
     }
 }
 
-pub fn generate_seed_phrase() -> Result<String, Box<dyn std::error::Error>> {
+pub fn generate_seed_phrase() -> Result<String, WalletError> {
     let mut rng = thread_rng();
-    let mnemonic = Mnemonic::<English>::new_with_count(&mut rng, 24)?;
+    let mnemonic = Mnemonic::<English>::new_with_count(&mut rng, 24)
+        .map_err(|e| WalletError::MnemonicError(format!("Failed to generate mnemonic: {}", e)))?;
     let phrase = mnemonic.to_phrase();
     Ok(phrase)
 }

@@ -164,7 +164,7 @@ async fn send_transaction(
 
     Ok(Json(SendTransactionResult {
         id: transaction.id,
-        hash: transaction.known_transaction_hash.expect("Transaction hash should be set"),
+        hash: transaction.known_transaction_hash.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?,
     }))
 }
 

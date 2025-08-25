@@ -694,13 +694,19 @@ impl TransactionsQueue {
                     &transaction.sent_with_blob_gas,
                 )
                 .await?;
-            transaction.to_blob_typed_transaction(Some(&gas_price), Some(&blob_gas_price))
+            transaction.to_blob_typed_transaction(Some(&gas_price), Some(&blob_gas_price)).map_err(
+                |e| TransactionQueueSendTransactionError::TransactionConversionError(e.to_string()),
+            )?
         } else if self.is_legacy_transactions() {
             rrelayer_info!("Creating legacy transaction for relayer: {}", self.relayer.name);
-            transaction.to_legacy_typed_transaction(Some(&gas_price))
+            transaction.to_legacy_typed_transaction(Some(&gas_price)).map_err(|e| {
+                TransactionQueueSendTransactionError::TransactionConversionError(e.to_string())
+            })?
         } else {
             rrelayer_info!("Creating EIP-1559 transaction for relayer: {}", self.relayer.name);
-            transaction.to_eip1559_typed_transaction(Some(&gas_price))
+            transaction.to_eip1559_typed_transaction(Some(&gas_price)).map_err(|e| {
+                TransactionQueueSendTransactionError::TransactionConversionError(e.to_string())
+            })?
         };
 
         let estimated_gas_limit = self

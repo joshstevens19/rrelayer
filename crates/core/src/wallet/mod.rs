@@ -8,10 +8,77 @@ use alloy::primitives::PrimitiveSignature;
 use async_trait::async_trait;
 pub use mnemonic_wallet_manager::{generate_seed_phrase, MnemonicWalletManager};
 pub use privy_wallet_manager::PrivyWalletManager;
+use thiserror::Error;
 
 mod mnemonic_signing_key_providers;
 pub use mnemonic_signing_key_providers::{get_mnemonic_from_signing_key, keystore};
 mod privy_wallet_manager;
+
+#[derive(Error, Debug)]
+pub enum WalletError {
+    #[error("Signing key error: {0}")]
+    SigningKeyError(#[from] alloy::signers::local::LocalSignerError),
+
+    #[error("Generic signer error: {0}")]
+    GenericSignerError(String),
+
+    #[error("Network request failed: {0}")]
+    NetworkError(#[from] reqwest::Error),
+
+    #[error("JSON serialization error: {0}")]
+    JsonError(#[from] serde_json::Error),
+
+    #[error("Hex decoding error: {0}")]
+    HexError(#[from] hex::FromHexError),
+
+    #[error("String encoding error: {0}")]
+    StringEncodingError(#[from] std::string::FromUtf8Error),
+
+    #[error("RLP decoding error: {0}")]
+    RlpError(#[from] alloy_rlp::Error),
+
+    #[error("Signature parsing error: {0}")]
+    SignatureError(#[from] alloy::primitives::SignatureError),
+
+    #[error("Keystore error: {0}")]
+    KeystoreError(#[from] eth_keystore::KeystoreError),
+
+    #[error("Password management error: {0}")]
+    PasswordError(#[from] keystore::PasswordError),
+
+    #[error("Wallet not found at index {index}")]
+    WalletNotFound { index: u32 },
+
+    #[error("API error: {message}")]
+    ApiError { message: String },
+
+    #[error("Authentication failed: {message}")]
+    AuthenticationError { message: String },
+
+    #[error("Invalid wallet configuration: {message}")]
+    ConfigurationError { message: String },
+
+    #[error("No signing key configured")]
+    NoSigningKey,
+
+    #[error("Unsupported transaction type: {tx_type}")]
+    UnsupportedTransactionType { tx_type: String },
+
+    #[error("IO error: {0}")]
+    IoError(#[from] std::io::Error),
+
+    #[error("Mnemonic generation error: {0}")]
+    MnemonicError(String),
+
+    #[error("Key derivation error: {0}")]
+    KeyDerivationError(String),
+}
+
+impl From<alloy::signers::Error> for WalletError {
+    fn from(error: alloy::signers::Error) -> Self {
+        WalletError::GenericSignerError(format!("Alloy signer error: {}", error))
+    }
+}
 
 #[derive(Debug)]
 pub enum WalletSource {
@@ -26,14 +93,14 @@ pub trait WalletManagerTrait: Send + Sync {
         &self,
         wallet_index: u32,
         chain_id: &ChainId,
-    ) -> Result<EvmAddress, Box<dyn std::error::Error + Send + Sync>>;
+    ) -> Result<EvmAddress, WalletError>;
 
     /// Get the address of an existing wallet
     async fn get_address(
         &self,
         wallet_index: u32,
         chain_id: &ChainId,
-    ) -> Result<EvmAddress, Box<dyn std::error::Error + Send + Sync>>;
+    ) -> Result<EvmAddress, WalletError>;
 
     /// Sign a transaction with the specified wallet
     async fn sign_transaction(
@@ -41,19 +108,19 @@ pub trait WalletManagerTrait: Send + Sync {
         wallet_index: u32,
         transaction: &TypedTransaction,
         chain_id: &ChainId,
-    ) -> Result<PrimitiveSignature, Box<dyn std::error::Error + Send + Sync>>;
+    ) -> Result<PrimitiveSignature, WalletError>;
 
     /// Sign text with the specified wallet
     async fn sign_text(
         &self,
         wallet_index: u32,
         text: &str,
-    ) -> Result<PrimitiveSignature, Box<dyn std::error::Error + Send + Sync>>;
+    ) -> Result<PrimitiveSignature, WalletError>;
 
     /// Sign typed data with the specified wallet
     async fn sign_typed_data(
         &self,
         wallet_index: u32,
         typed_data: &TypedData,
-    ) -> Result<PrimitiveSignature, Box<dyn std::error::Error + Send + Sync>>;
+    ) -> Result<PrimitiveSignature, WalletError>;
 }

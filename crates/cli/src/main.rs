@@ -12,12 +12,14 @@ use crate::{
         keystore::ProjectLocation, list, network, sign, start, tx, user,
     },
     console::print_error_message,
+    error::CliError,
 };
 
 mod authentication;
 mod cli_interface;
 mod commands;
 mod console;
+mod error;
 
 fn resolve_path(override_path: &Option<String>) -> Result<PathBuf, String> {
     let path = match override_path {
@@ -33,7 +35,7 @@ fn resolve_path(override_path: &Option<String>) -> Result<PathBuf, String> {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<(), CliError> {
     let cli = Cli::parse();
     setup_info_logger();
 

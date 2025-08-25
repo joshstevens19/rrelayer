@@ -8,7 +8,8 @@ use rrelayer_core::{
 use rrelayer_sdk::SDK;
 
 use crate::{
-    authentication::handle_authenticate, commands::keystore::ProjectLocation, console::print_table,
+    authentication::handle_authenticate, commands::error::NetworkError,
+    commands::keystore::ProjectLocation, console::print_table,
 };
 
 #[derive(Subcommand)]
@@ -37,10 +38,10 @@ pub enum NetworkCommands {
 }
 
 #[derive(Args)]
-struct AddArgs {}
+pub struct AddArgs {}
 
 #[derive(Args, Copy, Clone)]
-struct ListArgs {
+pub struct ListArgs {
     #[arg(long, value_enum)]
     filter: Option<NetworkFilter>,
 }
@@ -55,7 +56,7 @@ pub async fn handle_network(
     command: &NetworkCommands,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), NetworkError> {
     match &command {
         NetworkCommands::Add(_) => handle_add(project_path).await,
         NetworkCommands::List(list_args) => handle_list(list_args, project_path, sdk).await,
@@ -71,7 +72,7 @@ pub async fn handle_network(
     }
 }
 
-async fn handle_add(project_path: &ProjectLocation) -> Result<(), Box<dyn std::error::Error>> {
+async fn handle_add(project_path: &ProjectLocation) -> Result<(), NetworkError> {
     let mut setup_config = project_path.setup_config(true)?;
 
     let network_name: String = Input::new()
@@ -94,12 +95,18 @@ async fn handle_add(project_path: &ProjectLocation) -> Result<(), Box<dyn std::e
             .allow_empty(true)
             .interact_text()?;
 
-        let provider = create_retry_client(&url)
-            .map_err(|e| format!("RPC provider is not valid as cannot get chain ID: {}", e))?;
-        provider
-            .get_chain_id()
-            .await
-            .map_err(|e| format!("RPC provider is not valid as cannot get chain ID: {}", e))?;
+        let provider = create_retry_client(&url).map_err(|e| {
+            NetworkError::InvalidConfig(format!(
+                "RPC provider is not valid as cannot get chain ID: {}",
+                e
+            ))
+        })?;
+        provider.get_chain_id().await.map_err(|e| {
+            NetworkError::ConnectionFailed(format!(
+                "RPC provider is not valid as cannot get chain ID: {}",
+                e
+            ))
+        })?;
 
         if url.trim().is_empty() {
             if provider_urls.is_empty() {
@@ -144,7 +151,7 @@ async fn handle_list(
     args: &ListArgs,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), NetworkError> {
     handle_authenticate(sdk, "account1", project_path).await?;
 
     let networks = if let Some(filter) = args.filter {
@@ -204,7 +211,7 @@ async fn handle_gas(
     network_name: &str,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), NetworkError> {
     handle_authenticate(sdk, "account1", project_path).await?;
 
     let chain_id = get_chain_id_for_network(network_name, project_path).await?;
@@ -272,7 +279,7 @@ async fn handle_network_toggle(
     project_path: &ProjectLocation,
     sdk: &mut SDK,
     enable: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), NetworkError> {
     handle_authenticate(sdk, "account1", project_path).await?;
 
     let chain_id = get_chain_id_for_network(network_name, project_path).await?;

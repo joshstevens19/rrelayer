@@ -12,6 +12,21 @@ use alloy_eips::eip4844::{
     Blob,
 };
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum TransactionConversionError {
+    #[error("No gas price found in transaction")]
+    NoGasPrice,
+    #[error("No blob gas price found in transaction")]
+    NoBlobGasPrice,
+    #[error("No blobs found in transaction")]
+    NoBlobs,
+    #[error("Failed to build blob sidecar: {0}")]
+    BlobSidecarBuild(String),
+    #[error("Gas limit not set")]
+    NoGasLimit,
+}
 
 use super::{
     TransactionData, TransactionHash, TransactionId, TransactionNonce, TransactionSpeed,
@@ -146,13 +161,13 @@ impl Transaction {
     pub fn to_eip1559_typed_transaction(
         &self,
         override_gas_price: Option<&GasPriceResult>,
-    ) -> TypedTransaction {
+    ) -> Result<TypedTransaction, TransactionConversionError> {
         let gas_price_result = match override_gas_price {
             Some(gas_price) => gas_price,
-            None => self.sent_with_gas.as_ref().unwrap(),
+            None => self.sent_with_gas.as_ref().ok_or(TransactionConversionError::NoGasPrice)?,
         };
 
-        TypedTransaction::Eip1559(TxEip1559 {
+        Ok(TypedTransaction::Eip1559(TxEip1559 {
             to: TxKind::Call(self.to.into()),
             value: self.value.clone().into(),
             input: self.data.clone().into(),
@@ -164,51 +179,62 @@ impl Transaction {
             max_fee_per_gas: gas_price_result.max_fee.into(),
             chain_id: self.chain_id.into(),
             access_list: AccessList::default(),
-        })
+        }))
     }
 
     pub fn to_legacy_typed_transaction(
         &self,
         override_gas_price: Option<&GasPriceResult>,
-    ) -> TypedTransaction {
+    ) -> Result<TypedTransaction, TransactionConversionError> {
         let gas_price_result = match override_gas_price {
             Some(gas_price) => gas_price.legacy_gas_price(),
-            None => self.sent_with_gas.as_ref().unwrap().legacy_gas_price(),
+            None => self
+                .sent_with_gas
+                .as_ref()
+                .ok_or(TransactionConversionError::NoGasPrice)?
+                .legacy_gas_price(),
         };
 
-        TypedTransaction::Legacy(TxLegacy {
+        let gas_limit = self.gas_limit.ok_or(TransactionConversionError::NoGasLimit)?;
+
+        Ok(TypedTransaction::Legacy(TxLegacy {
             to: TxKind::Call(self.to.into()),
             value: self.value.clone().into(),
             input: self.data.clone().into(),
-            gas_limit: self.gas_limit.unwrap().into(),
+            gas_limit: gas_limit.into(),
             nonce: self.nonce.into(),
             gas_price: gas_price_result.into(),
             chain_id: Some(self.chain_id.into()),
-        })
+        }))
     }
 
     pub fn to_blob_typed_transaction(
         &self,
         override_gas_price: Option<&GasPriceResult>,
         override_blob_gas_price: Option<&BlobGasPriceResult>,
-    ) -> TypedTransaction {
+    ) -> Result<TypedTransaction, TransactionConversionError> {
         let gas_price_result = match override_gas_price {
             Some(gas_price) => gas_price,
-            None => self.sent_with_gas.as_ref().expect("No gas price found"),
+            None => self.sent_with_gas.as_ref().ok_or(TransactionConversionError::NoGasPrice)?,
         };
 
         let blob_gas_price = match override_blob_gas_price {
             Some(blob_price) => blob_price.blob_gas_price,
             None => {
-                self.sent_with_blob_gas.as_ref().expect("No blob gas price found").blob_gas_price
+                self.sent_with_blob_gas
+                    .as_ref()
+                    .ok_or(TransactionConversionError::NoBlobGasPrice)?
+                    .blob_gas_price
             }
         };
 
-        let blobs = self.blobs.clone().expect("No blobs found - should not be possible");
+        let blobs = self.blobs.clone().ok_or(TransactionConversionError::NoBlobs)?;
 
         let builder: SidecarBuilder<SimpleCoder> =
             blobs.iter().map(|blob| blob.as_slice()).collect();
-        let sidecar = builder.build().expect("Failed to build blobs");
+        let sidecar = builder
+            .build()
+            .map_err(|e| TransactionConversionError::BlobSidecarBuild(e.to_string()))?;
 
         let blob_versioned_hashes = sidecar.versioned_hashes().collect::<Vec<_>>();
 
@@ -228,10 +254,9 @@ impl Transaction {
             input: self.data.clone().into(),
         };
 
-        TypedTransaction::Eip4844(TxEip4844Variant::TxEip4844WithSidecar(TxEip4844WithSidecar {
-            tx,
-            sidecar,
-        }))
+        Ok(TypedTransaction::Eip4844(TxEip4844Variant::TxEip4844WithSidecar(
+            TxEip4844WithSidecar { tx, sidecar },
+        )))
     }
 
     pub fn is_blob_transaction(&self) -> bool {

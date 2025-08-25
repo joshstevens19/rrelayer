@@ -2,7 +2,10 @@ use clap::Subcommand;
 use rrelayer_core::relayer::types::RelayerId;
 use rrelayer_sdk::SDK;
 
-use crate::{authentication::handle_authenticate, commands::keystore::ProjectLocation};
+use crate::{
+    authentication::handle_authenticate, commands::error::SigningError,
+    commands::keystore::ProjectLocation,
+};
 
 #[derive(Subcommand)]
 pub enum SignCommand {
@@ -36,7 +39,7 @@ pub async fn handle_sign(
     command: &SignCommand,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), SigningError> {
     match command {
         SignCommand::Text { relayer_id, message } => {
             handle_sign_text(relayer_id, message, project_path, sdk).await
@@ -52,7 +55,7 @@ async fn handle_sign_text(
     message: &str,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), SigningError> {
     handle_authenticate(sdk, "account1", project_path).await?;
 
     println!("Signing message with relayer {}...", relayer_id);
@@ -77,7 +80,7 @@ async fn handle_sign_typed_data(
     file: bool,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), SigningError> {
     handle_authenticate(sdk, "account1", project_path).await?;
 
     let typed_data_str =
@@ -87,14 +90,14 @@ async fn handle_sign_typed_data(
         Ok(data) => data,
         Err(e) => {
             println!("Error parsing typed data: {}", e);
-            return Err(e.into());
+            return Err(SigningError::Json(e));
         }
     };
 
     let result = sdk.sign.sign_typed_data(relayer_id, &typed_data).await?;
 
-    let pretty_json = serde_json::to_string_pretty(&typed_data)
-        .unwrap_or_else(|_| "Could not format typed data".to_string());
+    let pretty_json =
+        serde_json::to_string_pretty(&typed_data).map_err(SigningError::Json)?.to_string();
 
     println!("\n┌─────────────────────────────────────────────────────────────────────");
     println!("│ TYPED DATA");

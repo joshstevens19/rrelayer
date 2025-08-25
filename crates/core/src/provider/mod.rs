@@ -10,7 +10,9 @@ mod evm_provider;
 
 use self::evm_provider::EvmProviderNewError;
 use crate::wallet::get_mnemonic_from_signing_key;
-pub use evm_provider::{create_retry_client, EvmProvider, RelayerProvider, SendTransactionError};
+pub use evm_provider::{
+    create_retry_client, EvmProvider, RelayerProvider, RetryClientError, SendTransactionError,
+};
 
 #[derive(Error, Debug)]
 pub enum LoadProvidersError {
@@ -45,10 +47,12 @@ pub async fn load_providers(
             return Err(LoadProvidersError::ProvidersRequired);
         }
 
-        let signing_key: &SigningKey = if config.signing_key.is_some() {
-            config.signing_key.as_ref().unwrap()
+        let signing_key: &SigningKey = if let Some(ref signing_key) = config.signing_key {
+            signing_key
+        } else if let Some(ref signing_key) = setup_config.signing_key {
+            signing_key
         } else {
-            setup_config.signing_key.as_ref().unwrap()
+            return Err(LoadProvidersError::NoSigningKey);
         };
 
         // Create the appropriate provider based on signing key type

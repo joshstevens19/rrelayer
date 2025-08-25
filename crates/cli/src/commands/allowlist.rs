@@ -6,7 +6,8 @@ use rrelayer_core::{
 use rrelayer_sdk::SDK;
 
 use crate::{
-    authentication::handle_authenticate, commands::keystore::ProjectLocation, console::print_table,
+    authentication::handle_authenticate, commands::error::AllowlistError,
+    commands::keystore::ProjectLocation, console::print_table,
 };
 
 #[derive(Subcommand)]
@@ -43,7 +44,7 @@ pub async fn handle_allowlist(
     command: &AllowlistCommand,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), AllowlistError> {
     match command {
         AllowlistCommand::Add { relayer_id, address } => {
             handle_allowlist_add(relayer_id, address, project_path, sdk).await
@@ -62,7 +63,7 @@ async fn handle_allowlist_add(
     address: &EvmAddress,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), AllowlistError> {
     handle_authenticate(sdk, "account1", project_path).await?;
 
     sdk.relayer.allowlist.add(&relayer_id, address).await?;
@@ -76,7 +77,7 @@ async fn handle_allowlist_list(
     relayer_id: &RelayerId,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), AllowlistError> {
     handle_authenticate(sdk, "account1", project_path).await?;
 
     let addresses = sdk
@@ -119,7 +120,7 @@ async fn handle_allowlist_delete(
     address: &EvmAddress,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), AllowlistError> {
     handle_authenticate(sdk, "account1", project_path).await?;
 
     sdk.relayer.allowlist.delete(&relayer_id, address).await?;

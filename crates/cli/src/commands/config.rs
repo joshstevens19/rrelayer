@@ -2,10 +2,13 @@ use clap::Subcommand;
 use rrelayer_core::relayer::types::RelayerId;
 use rrelayer_sdk::SDK;
 
-use crate::{authentication::handle_authenticate, commands::keystore::ProjectLocation};
+use crate::{
+    authentication::handle_authenticate, commands::error::ConfigError,
+    commands::keystore::ProjectLocation,
+};
 
 #[derive(Subcommand)]
-enum GasCommand {
+pub enum GasCommand {
     /// Add an address to allowlist
     MaxPrice {
         /// Maximum gas price in wei
@@ -52,7 +55,7 @@ pub async fn handle_config(
     command: &ConfigCommand,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), ConfigError> {
     match command {
         ConfigCommand::Get { relayer_id } => handle_get(relayer_id, project_path, sdk).await,
         ConfigCommand::Pause { relayer_id } => handle_pause(relayer_id, project_path, sdk).await,
@@ -77,7 +80,7 @@ pub async fn handle_get(
     relayer_id: &RelayerId,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), ConfigError> {
     handle_authenticate(sdk, "account1", project_path).await?;
 
     let result = sdk.relayer.get(&relayer_id).await?;
@@ -135,7 +138,7 @@ async fn handle_pause(
     relayer_id: &RelayerId,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), ConfigError> {
     handle_authenticate(sdk, "account1", project_path).await?;
 
     sdk.relayer.pause(&relayer_id).await?;
@@ -149,7 +152,7 @@ async fn handle_unpause(
     relayer_id: &RelayerId,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), ConfigError> {
     handle_authenticate(sdk, "account1", project_path).await?;
 
     sdk.relayer.unpause(&relayer_id).await?;
@@ -164,7 +167,7 @@ async fn handle_update_eip1559_status(
     status: bool,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), ConfigError> {
     handle_authenticate(sdk, "account1", project_path).await?;
 
     sdk.relayer.update_eip1559_status(&relayer_id, status).await?;
@@ -179,7 +182,7 @@ async fn handle_update_max_gas_price(
     cap: u128,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), ConfigError> {
     handle_authenticate(sdk, "account1", project_path).await?;
 
     sdk.relayer.update_max_gas_price(&relayer_id, cap).await?;

@@ -95,10 +95,9 @@ impl PostgresClient {
             }
         };
 
-        let address = evm_provider
-            .create_wallet(wallet_index as u32)
-            .await
-            .map_err(|e| CreateRelayerError::WalletError(name.to_string(), *chain_id, e))?;
+        let address = evm_provider.create_wallet(wallet_index as u32).await.map_err(|e| {
+            CreateRelayerError::WalletError(name.to_string(), *chain_id, Box::new(e))
+        })?;
 
         self.execute(
             "UPDATE relayer.record SET address = $1 WHERE chain_id = $2 AND wallet_index = $3",

@@ -25,7 +25,7 @@ use rand::{thread_rng, Rng};
 use reqwest::Url;
 use thiserror::Error;
 
-use crate::wallet::{MnemonicWalletManager, PrivyWalletManager, WalletManagerTrait};
+use crate::wallet::{MnemonicWalletManager, PrivyWalletManager, WalletError, WalletManagerTrait};
 use crate::{
     gas::{
         blob_gas_oracle::{BlobGasEstimatorResult, BlobGasPriceResult},
@@ -118,6 +118,9 @@ pub enum SendTransactionError {
 
     #[error("Provider error: {0}")]
     RpcError(#[from] RpcError<TransportErrorKind>),
+
+    #[error("Internal error: {0}")]
+    InternalError(String),
 }
 
 #[derive(Error, Debug)]
@@ -215,17 +218,11 @@ impl EvmProvider {
         self.rpc_clients[index].clone()
     }
 
-    pub async fn create_wallet(
-        &self,
-        wallet_index: u32,
-    ) -> Result<EvmAddress, Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn create_wallet(&self, wallet_index: u32) -> Result<EvmAddress, WalletError> {
         self.wallet_manager.create_wallet(wallet_index, &self.chain_id).await
     }
 
-    pub async fn get_address(
-        &self,
-        wallet_index: u32,
-    ) -> Result<EvmAddress, Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn get_address(&self, wallet_index: u32) -> Result<EvmAddress, WalletError> {
         self.wallet_manager.get_address(wallet_index, &self.chain_id).await
     }
 
@@ -243,7 +240,10 @@ impl EvmProvider {
         &self,
         wallet_index: &u32,
     ) -> Result<TransactionNonce, WalletOrProviderError> {
-        let address = self.wallet_manager.get_address(*wallet_index, &self.chain_id).await.unwrap(); // TODO: fix this upwrap
+        let address =
+            self.wallet_manager.get_address(*wallet_index, &self.chain_id).await.map_err(|e| {
+                WalletOrProviderError::InternalError(format!("Failed to get address: {}", e))
+            })?;
 
         let nonce = self
             .rpc_client()
@@ -264,7 +264,7 @@ impl EvmProvider {
             .wallet_manager
             .sign_transaction(*wallet_index, &transaction, &self.chain_id)
             .await
-            .unwrap(); // TODO: fix
+            .map_err(|e| SendTransactionError::InternalError(e.to_string()))?;
 
         let tx_envelope = match transaction {
             TypedTransaction::Legacy(tx) => TxEnvelope::Legacy(tx.into_signed(signature)),
@@ -285,7 +285,7 @@ impl EvmProvider {
         &self,
         wallet_index: &u32,
         transaction: &TypedTransaction,
-    ) -> Result<PrimitiveSignature, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<PrimitiveSignature, WalletError> {
         self.wallet_manager.sign_transaction(*wallet_index, transaction, &self.chain_id).await
     }
 
@@ -293,7 +293,7 @@ impl EvmProvider {
         &self,
         wallet_index: &u32,
         text: &String,
-    ) -> Result<PrimitiveSignature, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<PrimitiveSignature, WalletError> {
         self.wallet_manager.sign_text(*wallet_index, text).await
     }
 
@@ -301,7 +301,7 @@ impl EvmProvider {
         &self,
         wallet_index: &u32,
         typed_data: &TypedData,
-    ) -> Result<PrimitiveSignature, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<PrimitiveSignature, WalletError> {
         self.wallet_manager.sign_typed_data(*wallet_index, typed_data).await
     }
 

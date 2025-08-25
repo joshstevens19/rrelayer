@@ -34,4 +34,7 @@ pub enum TransactionQueueSendTransactionError {
 
     #[error("Transaction estimate gas error: {0}")]
     TransactionEstimateGasError(RpcError<TransportErrorKind>),
+
+    #[error("Transaction conversion error: {0}")]
+    TransactionConversionError(String),
 }

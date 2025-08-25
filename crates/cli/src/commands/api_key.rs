@@ -6,7 +6,8 @@ use rrelayer_core::{
 use rrelayer_sdk::SDK;
 
 use crate::{
-    authentication::handle_authenticate, commands::keystore::ProjectLocation, console::print_table,
+    authentication::handle_authenticate, commands::error::ApiKeyError,
+    commands::keystore::ProjectLocation, console::print_table,
 };
 
 #[derive(Subcommand)]
@@ -39,7 +40,7 @@ pub async fn handle_api_key(
     command: &ApiKeyCommand,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), ApiKeyError> {
     match command {
         ApiKeyCommand::Add { relayer_id } => {
             handle_api_key_add(relayer_id, project_path, sdk).await
@@ -57,7 +58,7 @@ async fn handle_api_key_add(
     relayer_id: &RelayerId,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), ApiKeyError> {
     handle_authenticate(sdk, "account1", project_path).await?;
 
     let result = sdk.relayer.api_keys.create(&relayer_id).await?;
@@ -71,7 +72,7 @@ async fn handle_api_key_list(
     relayer_id: &RelayerId,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), ApiKeyError> {
     handle_authenticate(sdk, "account1", project_path).await?;
 
     let api_keys = sdk
@@ -111,7 +112,7 @@ async fn handle_api_key_delete(
     api_key: &ApiKey,
     project_path: &ProjectLocation,
     sdk: &mut SDK,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), ApiKeyError> {
     handle_authenticate(sdk, "account1", project_path).await?;
 
     sdk.relayer.api_keys.delete(&relayer_id, api_key).await?;

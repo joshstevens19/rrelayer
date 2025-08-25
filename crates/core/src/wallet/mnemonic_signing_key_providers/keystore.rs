@@ -9,13 +9,13 @@ use eth_keystore::{decrypt_key, encrypt_key};
 use rand::thread_rng;
 use thiserror::Error;
 
-use crate::wallet::generate_seed_phrase;
+use crate::wallet::{generate_seed_phrase, WalletError};
 
 pub fn create_new_mnemonic_in_keystore(
     password: &str,
     output_path: &PathBuf,
     filename: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), WalletError> {
     let phrase = generate_seed_phrase()?;
 
     store_mnemonic_in_keystore(&phrase, password, output_path, filename)
@@ -26,7 +26,7 @@ pub fn store_mnemonic_in_keystore(
     password: &str,
     output_path: &PathBuf,
     filename: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), WalletError> {
     let mut rng = thread_rng();
     encrypt_key(output_path, &mut rng, phrase.as_bytes(), password, Some(filename))?;
 
@@ -36,7 +36,7 @@ pub fn store_mnemonic_in_keystore(
 pub fn recover_mnemonic_from_keystore(
     keystore_path: &PathBuf,
     password: &str,
-) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<String, WalletError> {
     let mnemonic_bytes = decrypt_key(keystore_path, password)?;
 
     Ok(String::from_utf8(mnemonic_bytes)?)
@@ -46,7 +46,7 @@ pub fn create_new_private_key_in_keystore(
     password: &str,
     output_path: &PathBuf,
     filename: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), WalletError> {
     let private_key = PrivateKeySigner::random();
 
     store_private_key_in_keystore(private_key, password, output_path, Some(filename))
@@ -57,7 +57,7 @@ pub fn store_private_key_in_keystore(
     password: &str,
     output_path: &PathBuf,
     filename: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), WalletError> {
     let mut rng = thread_rng();
     encrypt_key(output_path, &mut rng, private_key.to_bytes(), password, filename)?;
 
@@ -67,10 +67,12 @@ pub fn store_private_key_in_keystore(
 pub fn recover_wallet_from_keystore(
     keystore_path: &PathBuf,
     password: &str,
-) -> Result<LocalSigner<SigningKey>, Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<LocalSigner<SigningKey>, WalletError> {
     let private_key = decrypt_key(keystore_path, password)?;
 
-    let wallet = LocalSigner::from_slice(&private_key)?;
+    let wallet = LocalSigner::from_slice(&private_key).map_err(|e| {
+        WalletError::KeyDerivationError(format!("Failed to create wallet from private key: {}", e))
+    })?;
 
     Ok(wallet)
 }
@@ -83,7 +85,7 @@ pub enum KeystoreDecryptResult {
 pub fn decrypt_keystore(
     keystore_path: &PathBuf,
     password: &str,
-) -> Result<KeystoreDecryptResult, Box<dyn std::error::Error>> {
+) -> Result<KeystoreDecryptResult, WalletError> {
     let bytes = decrypt_key(keystore_path, password)?;
 
     if let Ok(phrase) = String::from_utf8(bytes.clone()) {
@@ -104,9 +106,10 @@ pub fn decrypt_keystore(
                 address: wallet.address().to_string(),
             })
         }
-        Err(_) => {
-            Err("Could not determine keystore type - not a valid mnemonic or private key".into())
-        }
+        Err(_) => Err(WalletError::ConfigurationError {
+            message: "Could not determine keystore type - not a valid mnemonic or private key"
+                .to_string(),
+        }),
     }
 }
 
@@ -128,14 +131,16 @@ pub struct KeyStorePasswordManager {
 }
 
 impl KeyStorePasswordManager {
-    pub fn new(app_name: &str) -> Self {
+    pub fn new(app_name: &str) -> Result<Self, std::io::Error> {
         // Create .rrelayer/accounts directory in user's home directory
-        let home_dir = dirs::home_dir().expect("Could not find home directory");
+        let home_dir = dirs::home_dir().ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::NotFound, "Could not find home directory")
+        })?;
         let storage_dir = home_dir.join(".rrelayer").join("accounts");
 
-        fs::create_dir_all(&storage_dir).expect("Failed to create account storage directory");
+        fs::create_dir_all(&storage_dir)?;
 
-        Self { app_name: app_name.to_string(), storage_dir }
+        Ok(Self { app_name: app_name.to_string(), storage_dir })
     }
 
     fn get_password_path(&self, key: &str) -> PathBuf {
@@ -199,14 +204,12 @@ impl KeyStorePasswordManager {
 
             if let Some(filename) = entry.file_name().to_str() {
                 if filename.starts_with(&prefix) && filename.ends_with(suffix) {
-                    let account_name = filename
-                        .strip_prefix(&prefix)
-                        .unwrap()
-                        .strip_suffix(suffix)
-                        .unwrap()
-                        .to_string();
-
-                    accounts.push(account_name);
+                    if let (Some(without_prefix), Some(without_suffix)) =
+                        (filename.strip_prefix(&prefix), filename.strip_suffix(suffix))
+                    {
+                        let account_name = without_prefix.to_string();
+                        accounts.push(account_name);
+                    }
                 }
             }
         }
