@@ -7,7 +7,6 @@
 - Write terraform for AWS + GCP
 - Ability to config rate limits
 - Roles for API keys (manager, transactions only, etc)
-- autotop ups
 - autotasks
 - support logs endpoints to see audit logs of activity with breakdown of transaction
 
