@@ -1,9 +1,11 @@
+use crate::shared::utils::{format_token_amount, format_wei_to_eth};
 use crate::{
     network::types::ChainId,
     postgres::{PostgresClient, PostgresError},
     provider::EvmProvider,
     relayer::types::Relayer,
     rrelayer_error, rrelayer_info,
+    safe_proxy::SafeProxyManager,
     shared::common_types::{EvmAddress, PagingContext},
     yaml::{AutomaticTopUpConfig, Erc20TokenConfig, NativeTokenConfig, TopUpTargetAddresses},
     SetupConfig,
@@ -51,6 +53,7 @@ pub struct AutomaticTopUpTask {
     postgres_client: Arc<PostgresClient>,
     providers: Arc<Vec<EvmProvider>>,
     config: SetupConfig,
+    safe_proxy_manager: Option<SafeProxyManager>,
     relayer_cache: HashMap<ChainId, Vec<Relayer>>,
     relayer_refresh_interval: Interval,
     top_up_check_interval: Interval,
@@ -68,10 +71,15 @@ impl AutomaticTopUpTask {
         providers: Arc<Vec<EvmProvider>>,
         config: SetupConfig,
     ) -> Self {
+        // Initialize safe proxy manager if any safe proxy configs exist
+        let safe_proxy_manager =
+            config.safe_proxy.as_ref().map(|configs| SafeProxyManager::new(configs.clone()));
+
         Self {
             postgres_client,
             providers,
             config,
+            safe_proxy_manager,
             relayer_cache: HashMap::new(),
             relayer_refresh_interval: interval(Duration::from_secs(60)),
             top_up_check_interval: interval(Duration::from_secs(30)),
@@ -255,6 +263,7 @@ impl AutomaticTopUpTask {
                     &config.from_address,
                     &target_addresses,
                     native_config,
+                    config,
                 )
                 .await;
             } else {
@@ -277,6 +286,7 @@ impl AutomaticTopUpTask {
                     &config.from_address,
                     &target_addresses,
                     token_config,
+                    config,
                 )
                 .await;
             }
@@ -298,6 +308,7 @@ impl AutomaticTopUpTask {
     /// * `from_address` - Source address for funds
     /// * `target_addresses` - List of addresses to check and potentially top-up
     /// * `native_config` - Native token configuration settings
+    /// * `config` - Automatic top-up configuration containing safe address if applicable
     async fn process_native_token_top_ups(
         &self,
         chain_id: &ChainId,
@@ -305,6 +316,7 @@ impl AutomaticTopUpTask {
         from_address: &EvmAddress,
         target_addresses: &[EvmAddress],
         native_config: &NativeTokenConfig,
+        config: &AutomaticTopUpConfig,
     ) {
         let mut addresses_needing_top_up = Vec::new();
 
@@ -369,6 +381,7 @@ impl AutomaticTopUpTask {
                     from_address,
                     &address,
                     native_config,
+                    config,
                 )
                 .await
             {
@@ -395,6 +408,7 @@ impl AutomaticTopUpTask {
     /// * `from_address` - Source address for funds
     /// * `target_addresses` - List of addresses to check and potentially top-up
     /// * `token_config` - ERC-20 token configuration settings
+    /// * `config` - Automatic top-up configuration containing safe address if applicable
     async fn process_erc20_token_top_ups(
         &self,
         chain_id: &ChainId,
@@ -402,6 +416,7 @@ impl AutomaticTopUpTask {
         from_address: &EvmAddress,
         target_addresses: &[EvmAddress],
         token_config: &Erc20TokenConfig,
+        config: &AutomaticTopUpConfig,
     ) {
         let mut addresses_needing_top_up = Vec::new();
 
@@ -474,6 +489,7 @@ impl AutomaticTopUpTask {
                     from_address,
                     &address,
                     token_config,
+                    config,
                 )
                 .await
             {
@@ -501,6 +517,7 @@ impl AutomaticTopUpTask {
     /// * `from_address` - Source address for the funds
     /// * `target_address` - Destination address to receive funds
     /// * `native_config` - Native token configuration containing amount and settings
+    /// * `config` - Automatic top-up configuration containing safe address if applicable
     ///
     /// # Returns
     /// * `Ok(String)` - Transaction hash if successful
@@ -512,6 +529,7 @@ impl AutomaticTopUpTask {
         from_address: &EvmAddress,
         target_address: &EvmAddress,
         native_config: &NativeTokenConfig,
+        config: &AutomaticTopUpConfig,
     ) -> Result<String, String> {
         if from_address == target_address {
             return Err(format!(
@@ -521,29 +539,87 @@ impl AutomaticTopUpTask {
         }
 
         rrelayer_info!(
-            "Sending top-up transaction: {} -> {} ({} ETH)",
+            "Sending top-up transaction: {} -> {} ({} ETH){}",
             from_address,
             target_address,
-            format_wei_to_eth(&native_config.top_up_amount)
+            format_wei_to_eth(&native_config.top_up_amount),
+            if config.safe.is_some() { " via Safe proxy" } else { "" }
         );
+
+        let (final_to, final_value, final_data) = if let Some(safe_address) = &config.safe {
+            if let Some(ref safe_manager) = self.safe_proxy_manager {
+                rrelayer_info!(
+                    "Using Safe proxy {} for top-up transaction from {} to {}",
+                    safe_address,
+                    from_address,
+                    target_address
+                );
+
+                let wallet_index = match self.find_wallet_index_for_address(chain_id, from_address)
+                {
+                    Some(index) => index,
+                    None => {
+                        return Err(format!(
+                            "Cannot find wallet index for from_address {} on chain {}",
+                            from_address, chain_id
+                        ));
+                    }
+                };
+
+                let (_safe_tx, encoded_data) = safe_manager
+                    .create_safe_transaction_with_signature(
+                        provider,
+                        wallet_index,
+                        safe_address,
+                        *target_address,
+                        native_config.top_up_amount,
+                        alloy::primitives::Bytes::new(), // Empty data for native transfers
+                    )
+                    .await
+                    .map_err(|e| format!("Failed to create Safe transaction: {}", e))?;
+
+                (*safe_address, U256::ZERO, encoded_data)
+            } else {
+                return Err("Safe proxy address configured but SafeProxyManager not initialized"
+                    .to_string());
+            }
+        } else {
+            // Direct transaction
+            (*target_address, native_config.top_up_amount, alloy::primitives::Bytes::new())
+        };
 
         let tx = TypedTransaction::Legacy(TxLegacy {
             chain_id: Some(provider.chain_id.u64()),
             nonce: 0,                  // This will be updated by the provider
             gas_price: 20_000_000_000, // 20 gwei, will be updated by gas estimation
-            gas_limit: 21000,          // Standard transfer gas limit
-            to: alloy::primitives::TxKind::Call((*target_address).into()),
-            value: native_config.top_up_amount,
-            input: alloy::primitives::Bytes::new(),
+            gas_limit: if config.safe.is_some() { 300000 } else { 21000 }, // Higher gas limit for Safe transactions
+            to: alloy::primitives::TxKind::Call(final_to.into()),
+            value: final_value,
+            input: final_data,
         });
 
-        let wallet_index = match self.find_wallet_index_for_address(chain_id, from_address) {
-            Some(index) => index,
-            None => {
-                return Err(format!(
-                    "Cannot find wallet index for from_address {} on chain {}",
-                    from_address, chain_id
-                ));
+        let wallet_index = if config.safe.is_none() {
+            // For direct transactions, we need to find the wallet index
+            match self.find_wallet_index_for_address(chain_id, from_address) {
+                Some(index) => index,
+                None => {
+                    return Err(format!(
+                        "Cannot find wallet index for from_address {} on chain {}",
+                        from_address, chain_id
+                    ));
+                }
+            }
+        } else {
+            // For Safe transactions, we use the signer's wallet (from_address)
+            // This is already determined inside the Safe logic above
+            match self.find_wallet_index_for_address(chain_id, from_address) {
+                Some(index) => index,
+                None => {
+                    return Err(format!(
+                        "Cannot find wallet index for Safe signer {} on chain {}",
+                        from_address, chain_id
+                    ));
+                }
             }
         };
 
@@ -565,16 +641,20 @@ impl AutomaticTopUpTask {
                             .get_gas_price()
                             .await
                             .unwrap_or(20_000_000_000u128);
-                        let estimated_gas = U256::from(21000u64) * U256::from(gas_price);
-                        let required_balance = native_config.top_up_amount + estimated_gas;
+                        let estimated_gas =
+                            U256::from(if config.safe.is_some() { 300000 } else { 21000 })
+                                * U256::from(gas_price);
+                        let required_balance = if config.safe.is_some() {
+                            estimated_gas
+                        } else {
+                            native_config.top_up_amount + estimated_gas
+                        };
 
                         if from_balance < required_balance {
                             warn!(
-                                "Transaction failure likely due to insufficient from_address balance. Available: {} ETH, Required: {} ETH (top-up: {} ETH + gas: {} ETH)",
+                                "Transaction failure likely due to insufficient from_address balance. Available: {} ETH, Required: {} ETH",
                                 format_wei_to_eth(&from_balance),
-                                format_wei_to_eth(&required_balance),
-                                format_wei_to_eth(&native_config.top_up_amount),
-                                format_wei_to_eth(&estimated_gas)
+                                format_wei_to_eth(&required_balance)
                             );
                         }
                     }
@@ -827,6 +907,7 @@ impl AutomaticTopUpTask {
     /// * `from_address` - Source address for the tokens
     /// * `target_address` - Destination address to receive tokens
     /// * `token_config` - ERC-20 token configuration containing amount and settings
+    /// * `config` - Automatic top-up configuration containing safe address if applicable
     ///
     /// # Returns
     /// * `Ok(String)` - Transaction hash if successful
@@ -838,8 +919,8 @@ impl AutomaticTopUpTask {
         from_address: &EvmAddress,
         target_address: &EvmAddress,
         token_config: &Erc20TokenConfig,
+        config: &AutomaticTopUpConfig,
     ) -> Result<String, String> {
-        // Additional safety check to prevent self-funding
         if from_address == target_address {
             return Err(format!(
                 "Cannot send ERC-20 top-up transaction to self: from_address {} equals target_address {}",
@@ -848,37 +929,97 @@ impl AutomaticTopUpTask {
         }
 
         rrelayer_info!(
-            "Sending ERC-20 top-up transaction: {} -> {} ({} tokens of {})",
+            "Sending ERC-20 top-up transaction: {} -> {} ({} tokens of {}){}",
             from_address,
             target_address,
             format_token_amount(&token_config.top_up_amount),
-            token_config.address
+            token_config.address,
+            if config.safe.is_some() { " via Safe proxy" } else { "" }
         );
 
-        // Create ERC-20 transfer transaction using sol! interface
         let transfer_call = IERC20::transferCall {
             to: (*target_address).into(),
             amount: token_config.top_up_amount,
+        };
+
+        // Check if we need to use Safe proxy
+        let (final_to, final_value, final_data) = if let Some(safe_address) = &config.safe {
+            // Use Safe proxy for ERC-20 transfer
+            if let Some(ref safe_manager) = self.safe_proxy_manager {
+                rrelayer_info!(
+                    "Using Safe proxy {} for ERC-20 top-up transaction from {} to {}",
+                    safe_address,
+                    from_address,
+                    target_address
+                );
+
+                // Get wallet index for signing
+                let wallet_index = match self.find_wallet_index_for_address(chain_id, from_address)
+                {
+                    Some(index) => index,
+                    None => {
+                        return Err(format!(
+                            "Cannot find wallet index for from_address {} on chain {}",
+                            from_address, chain_id
+                        ));
+                    }
+                };
+
+                // Use SafeProxyManager to create the complete Safe transaction with signature
+                let (_safe_tx, encoded_data) = safe_manager
+                    .create_safe_transaction_with_signature(
+                        provider,
+                        wallet_index,
+                        safe_address,
+                        token_config.address, // The to address is the token contract
+                        U256::ZERO,           // No ETH value for ERC-20 transfers
+                        transfer_call.abi_encode().into(), // The transfer call data
+                    )
+                    .await
+                    .map_err(|e| format!("Failed to create Safe transaction: {}", e))?;
+
+                (*safe_address, U256::ZERO, encoded_data)
+            } else {
+                return Err("Safe proxy address configured but SafeProxyManager not initialized"
+                    .to_string());
+            }
+        } else {
+            // Direct ERC-20 transfer
+            (token_config.address.into(), U256::ZERO, transfer_call.abi_encode().into())
         };
 
         let tx = TypedTransaction::Legacy(TxLegacy {
             chain_id: Some(provider.chain_id.u64()),
             nonce: 0,                  // This will be updated by the provider
             gas_price: 20_000_000_000, // 20 gwei, will be updated by gas estimation
-            gas_limit: 100000,         // Higher gas limit for ERC-20 transfers
-            to: alloy::primitives::TxKind::Call(token_config.address.into()),
-            value: U256::ZERO, // No native token value for ERC-20 transfers
-            input: transfer_call.abi_encode().into(),
+            gas_limit: if config.safe.is_some() { 400000 } else { 100000 }, // Higher gas limit for Safe transactions
+            to: alloy::primitives::TxKind::Call(final_to.into()),
+            value: final_value,
+            input: final_data,
         });
 
         // Find the wallet index for the from_address
-        let wallet_index = match self.find_wallet_index_for_address(chain_id, from_address) {
-            Some(index) => index,
-            None => {
-                return Err(format!(
-                    "Cannot find wallet index for from_address {} on chain {}",
-                    from_address, chain_id
-                ));
+        let wallet_index = if config.safe.is_none() {
+            // For direct ERC-20 transactions
+            match self.find_wallet_index_for_address(chain_id, from_address) {
+                Some(index) => index,
+                None => {
+                    return Err(format!(
+                        "Cannot find wallet index for from_address {} on chain {}",
+                        from_address, chain_id
+                    ));
+                }
+            }
+        } else {
+            // For Safe ERC-20 transactions, we use the signer's wallet (from_address)
+            match self.find_wallet_index_for_address(chain_id, from_address) {
+                Some(index) => index,
+                None => {
+                    return Err(format!(
+                        "Cannot find wallet index for Safe signer {} on chain {}",
+                        from_address, chain_id
+                    ));
+                }
             }
         };
 
@@ -929,43 +1070,6 @@ impl AutomaticTopUpTask {
             Err(e) => Err(format!("Failed to call balanceOf on token contract: {}", e)),
         }
     }
-}
-
-/// Formats a Wei amount to a human-readable ETH string.
-///
-/// # Arguments
-/// * `wei` - Amount in Wei to format
-///
-/// # Returns
-/// * `String` - Formatted ETH amount (e.g., "1.5" for 1.5 ETH)
-fn format_wei_to_eth(wei: &U256) -> String {
-    let eth_divisor = U256::from(10u64.pow(18));
-    let whole_eth = wei / eth_divisor;
-    let remainder = wei % eth_divisor;
-
-    if remainder.is_zero() {
-        format!("{}", whole_eth)
-    } else {
-        let decimal_str = format!("{:018}", remainder);
-        let decimal_trimmed = decimal_str.trim_end_matches('0');
-        format!("{}.{}", whole_eth, decimal_trimmed)
-    }
-}
-
-/// Formats a token amount to a human-readable string.
-///
-/// Currently assumes 18 decimals for ERC-20 tokens (same as ETH).
-/// This can be enhanced in the future to query actual token decimals.
-///
-/// # Arguments
-/// * `amount` - Token amount to format (in smallest unit)
-///
-/// # Returns
-/// * `String` - Formatted token amount (e.g., "1.5" for 1.5 tokens)
-fn format_token_amount(amount: &U256) -> String {
-    // For now, use the same formatting as ETH (18 decimals)
-    // This can be enhanced to support different token decimals
-    format_wei_to_eth(amount)
 }
 
 /// Runs the automatic top-up task as a background service.

@@ -11,6 +11,7 @@ use crate::{
     provider::{find_provider_for_chain_id, EvmProvider},
     relayer::types::{Relayer, RelayerId},
     rrelayer_error,
+    safe_proxy::SafeProxyManager,
     shared::{
         cache::Cache,
         common_types::{PagingContext, WalletOrProviderError},
@@ -198,6 +199,7 @@ pub async fn startup_transactions_queues(
     providers: Arc<Vec<EvmProvider>>,
     cache: Arc<Cache>,
     webhook_manager: Arc<Mutex<crate::webhooks::WebhookManager>>,
+    safe_proxy_manager: Option<SafeProxyManager>,
 ) -> Result<Arc<Mutex<TransactionsQueues>>, StartTransactionsQueuesError> {
     let postgres = PostgresClient::new()
         .await
@@ -261,6 +263,7 @@ pub async fn startup_transactions_queues(
             blob_gas_oracle_cache,
             cache,
             webhook_manager,
+            safe_proxy_manager,
         )
         .await?,
     ));

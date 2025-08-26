@@ -28,6 +28,7 @@ networks:
   - name: base
     provider_urls:
       - https://base.gateway.tenderly.co
+    confirmations: 5
     automatic_top_up:
       from_address: '0x26988BA8250E009DCC5DF543D78E2277E2AA900B'
       targets: '*'
@@ -42,7 +43,12 @@ networks:
 #        - address: "0x..." # Another token
 #          min_balance: "50"
 #          top_up_amount: "200"
-safe_proxy: "0xxxxx"
+safe_proxy:
+  - address: "SAFE_ADDRESS"
+    relayers:
+     - "0x26988BA8250E009DCC5DF543D78E2277E2AA900B"
+     - "0x26988BA8250E009DCC5DF543D78E2277E2AA900B"
+     - "0x26988BA8250E009DCC5DF543D78E2277E2AA900B"
 #gas_providers:
 #  tenderly:
 #    enabled: true

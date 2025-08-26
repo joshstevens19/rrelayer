@@ -254,6 +254,8 @@ pub struct Erc20TokenConfig {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AutomaticTopUpConfig {
     pub from_address: EvmAddress,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub safe: Option<EvmAddress>,
     pub targets: TopUpTargetAddresses,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub native: Option<NativeTokenConfig>,
@@ -331,6 +333,12 @@ pub struct WebhookConfigAdvanced {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SafeProxyConfig {
+    pub address: EvmAddress,
+    pub relayers: Vec<EvmAddress>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SetupConfig {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -344,6 +352,8 @@ pub struct SetupConfig {
     pub api_config: ApiConfig,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub webhooks: Option<Vec<WebhookConfig>>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub safe_proxy: Option<Vec<SafeProxyConfig>>,
 }
 
 fn substitute_env_variables(contents: &str) -> Result<String, regex::Error> {

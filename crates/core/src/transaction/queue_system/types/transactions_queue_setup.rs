@@ -3,6 +3,7 @@ use std::collections::{HashMap, VecDeque};
 use crate::{
     provider::EvmProvider,
     relayer::types::Relayer,
+    safe_proxy::SafeProxyManager,
     transaction::{
         nonce_manager::NonceManager,
         types::{Transaction, TransactionId},
@@ -16,6 +17,7 @@ pub struct TransactionsQueueSetup {
     pub pending_transactions: VecDeque<Transaction>,
     pub inmempool_transactions: VecDeque<Transaction>,
     pub mined_transactions: HashMap<TransactionId, Transaction>,
+    pub safe_proxy_manager: Option<SafeProxyManager>,
 }
 
 impl TransactionsQueueSetup {
@@ -26,6 +28,7 @@ impl TransactionsQueueSetup {
         pending_transactions: VecDeque<Transaction>,
         inmempool_transactions: VecDeque<Transaction>,
         mined_transactions: HashMap<TransactionId, Transaction>,
+        safe_proxy_manager: Option<SafeProxyManager>,
     ) -> Self {
         TransactionsQueueSetup {
             relayer,
@@ -34,6 +37,7 @@ impl TransactionsQueueSetup {
             pending_transactions,
             inmempool_transactions,
             mined_transactions,
+            safe_proxy_manager,
         }
     }
 }

@@ -82,6 +82,7 @@ async fn create_relayer(
             Default::default(),
             Default::default(),
             Default::default(),
+            None, // Safe proxy manager not available for dynamically added relayers
         ))
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -133,6 +134,7 @@ async fn clone_relayer(
             Default::default(),
             Default::default(),
             Default::default(),
+            None, // Safe proxy manager not available for dynamically added relayers
         ))
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;

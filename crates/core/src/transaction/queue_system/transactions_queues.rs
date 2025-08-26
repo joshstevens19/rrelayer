@@ -33,6 +33,7 @@ use crate::{
     gas::{blob_gas_oracle::BlobGasOracleCache, gas_oracle::GasOracleCache},
     postgres::{PostgresClient, PostgresConnectionError, PostgresError},
     relayer::types::RelayerId,
+    safe_proxy::SafeProxyManager,
     shared::{
         cache::Cache,
         common_types::{EvmAddress, WalletOrProviderError},
@@ -55,6 +56,7 @@ pub struct TransactionsQueues {
     db: PostgresClient,
     cache: Arc<Cache>,
     webhook_manager: Arc<Mutex<WebhookManager>>,
+    safe_proxy_manager: Option<SafeProxyManager>,
 }
 
 impl TransactionsQueues {
@@ -64,6 +66,7 @@ impl TransactionsQueues {
         blob_gas_oracle_cache: Arc<Mutex<BlobGasOracleCache>>,
         cache: Arc<Cache>,
         webhook_manager: Arc<Mutex<WebhookManager>>,
+        safe_proxy_manager: Option<SafeProxyManager>,
     ) -> Result<Self, TransactionsQueuesError> {
         let mut queues = HashMap::new();
         let mut relayer_block_times_ms = HashMap::new();
@@ -83,6 +86,7 @@ impl TransactionsQueues {
                         setup.pending_transactions,
                         setup.inmempool_transactions,
                         setup.mined_transactions,
+                        safe_proxy_manager.clone(),
                     ),
                     gas_oracle_cache.clone(),
                     blob_gas_oracle_cache.clone(),
@@ -98,6 +102,7 @@ impl TransactionsQueues {
             db: PostgresClient::new().await?,
             cache,
             webhook_manager,
+            safe_proxy_manager,
         })
     }
 
@@ -160,6 +165,7 @@ impl TransactionsQueues {
                     VecDeque::new(),
                     VecDeque::new(),
                     HashMap::new(),
+                    self.safe_proxy_manager.clone(),
                 ),
                 self.gas_oracle_cache.clone(),
                 self.blob_gas_oracle_cache.clone(),

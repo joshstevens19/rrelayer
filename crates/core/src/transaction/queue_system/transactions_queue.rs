@@ -7,6 +7,7 @@ use std::{
 use alloy::network::{AnyTransactionReceipt, ReceiptResponse};
 use alloy::{
     consensus::{SignableTransaction, TypedTransaction},
+    hex,
     signers::local::LocalSignerError,
     transports::{RpcError, TransportErrorKind},
 };
@@ -29,7 +30,9 @@ use crate::{
     provider::EvmProvider,
     relayer::types::Relayer,
     rrelayer_info,
+    safe_proxy::SafeProxyManager,
     shared::common_types::EvmAddress,
+    transaction::types::TransactionData,
     transaction::{
         nonce_manager::NonceManager,
         types::{Transaction, TransactionHash, TransactionId, TransactionSpeed, TransactionStatus},
@@ -46,6 +49,7 @@ pub struct TransactionsQueue {
     gas_oracle_cache: Arc<Mutex<GasOracleCache>>,
     blob_oracle_cache: Arc<Mutex<BlobGasOracleCache>>,
     confirmations: u64,
+    safe_proxy_manager: Option<SafeProxyManager>,
 }
 
 impl TransactionsQueue {
@@ -71,6 +75,7 @@ impl TransactionsQueue {
             gas_oracle_cache,
             blob_oracle_cache,
             confirmations,
+            safe_proxy_manager: setup.safe_proxy_manager,
         }
     }
 
@@ -687,34 +692,129 @@ impl TransactionsQueue {
             return Err(TransactionQueueSendTransactionError::GasPriceTooHigh);
         }
 
-        let transaction_request: TypedTransaction = if transaction.is_blob_transaction() {
+        // Check if this relayer should use safe proxy
+        let (final_to, final_data) = if let Some(ref safe_proxy_manager) = self.safe_proxy_manager {
+            if let Some(safe_address) =
+                safe_proxy_manager.get_safe_proxy_for_relayer(&self.relayer.address)
+            {
+                rrelayer_info!(
+                    "Routing transaction {} through safe proxy {} for relayer: {}",
+                    transaction.id,
+                    safe_address,
+                    self.relayer.name
+                );
+
+                // Get the safe's current nonce (this would need to be implemented)
+                // For now, using a placeholder - this should get the actual safe nonce
+                let safe_nonce = alloy::primitives::U256::ZERO;
+
+                let (safe_addr, safe_tx) = safe_proxy_manager
+                    .wrap_transaction_for_safe(
+                        &self.relayer.address,
+                        transaction.to,
+                        transaction.value.clone(),
+                        transaction.data.clone(),
+                        safe_nonce,
+                    )
+                    .map_err(|e| {
+                        TransactionQueueSendTransactionError::TransactionConversionError(
+                            e.to_string(),
+                        )
+                    })?;
+
+                // Get the safe transaction hash that needs to be signed
+                let safe_tx_hash = safe_proxy_manager
+                    .get_safe_transaction_hash(
+                        &safe_addr,
+                        &safe_tx,
+                        self.evm_provider.chain_id.u64(),
+                    )
+                    .map_err(|e| {
+                        TransactionQueueSendTransactionError::TransactionConversionError(
+                            e.to_string(),
+                        )
+                    })?;
+
+                // Convert hash to hex string for signing
+                let hash_hex = format!("0x{}", hex::encode(safe_tx_hash));
+
+                // Sign the safe transaction hash with the relayer's wallet
+                let signature =
+                    self.evm_provider
+                        .sign_text(&self.relayer.wallet_index, &hash_hex)
+                        .await
+                        .map_err(|e| {
+                            TransactionQueueSendTransactionError::TransactionConversionError(
+                                format!("Failed to sign safe transaction hash: {}", e),
+                            )
+                        })?;
+
+                // Encode the signature into bytes according to Safe's requirements
+                // Safe signature format: r + s + v where v = recovery_id + 4
+                let mut sig_bytes = Vec::with_capacity(65);
+                sig_bytes.extend_from_slice(&signature.r().to_be_bytes::<32>());
+                sig_bytes.extend_from_slice(&signature.s().to_be_bytes::<32>());
+                // Safe requires v = recovery_id + 4 for ECDSA signatures
+                let recovery_id = if signature.v() { 1u8 } else { 0u8 };
+                sig_bytes.push(recovery_id + 4);
+                let signatures = alloy::primitives::Bytes::from(sig_bytes);
+
+                let safe_call_data = safe_proxy_manager
+                    .encode_safe_transaction(&safe_tx, signatures)
+                    .map_err(|e| {
+                        TransactionQueueSendTransactionError::TransactionConversionError(
+                            e.to_string(),
+                        )
+                    })?;
+
+                // Update transaction to point to safe with encoded data
+                (safe_addr, TransactionData::new(safe_call_data))
+            } else {
+                // No safe proxy for this relayer, use original transaction
+                (transaction.to, transaction.data.clone())
+            }
+        } else {
+            // No safe proxy configuration, use original transaction
+            (transaction.to, transaction.data.clone())
+        };
+
+        // Create a modified transaction for safe proxy if needed
+        let mut working_transaction = transaction.clone();
+        working_transaction.to = final_to;
+        working_transaction.data = final_data;
+
+        let transaction_request: TypedTransaction = if working_transaction.is_blob_transaction() {
             rrelayer_info!("Creating blob transaction for relayer: {}", self.relayer.name);
             let blob_gas_price = self
                 .compute_blob_gas_price_for_transaction(
-                    &transaction.speed,
-                    &transaction.sent_with_blob_gas,
+                    &working_transaction.speed,
+                    &working_transaction.sent_with_blob_gas,
                 )
                 .await?;
-            transaction.to_blob_typed_transaction(Some(&gas_price), Some(&blob_gas_price)).map_err(
-                |e| TransactionQueueSendTransactionError::TransactionConversionError(e.to_string()),
-            )?
+            working_transaction
+                .to_blob_typed_transaction(Some(&gas_price), Some(&blob_gas_price))
+                .map_err(|e| {
+                TransactionQueueSendTransactionError::TransactionConversionError(e.to_string())
+            })?
         } else if self.is_legacy_transactions() {
             rrelayer_info!("Creating legacy transaction for relayer: {}", self.relayer.name);
-            transaction.to_legacy_typed_transaction(Some(&gas_price)).map_err(|e| {
+            working_transaction.to_legacy_typed_transaction(Some(&gas_price)).map_err(|e| {
                 TransactionQueueSendTransactionError::TransactionConversionError(e.to_string())
             })?
         } else {
             rrelayer_info!("Creating EIP-1559 transaction for relayer: {}", self.relayer.name);
-            transaction.to_eip1559_typed_transaction(Some(&gas_price)).map_err(|e| {
+            working_transaction.to_eip1559_typed_transaction(Some(&gas_price)).map_err(|e| {
                 TransactionQueueSendTransactionError::TransactionConversionError(e.to_string())
             })?
         };
 
         let estimated_gas_limit = self
-            .estimate_gas(&transaction_request, transaction.is_noop)
+            .estimate_gas(&transaction_request, working_transaction.is_noop)
             .await
             .map_err(TransactionQueueSendTransactionError::TransactionEstimateGasError)?;
 
+        working_transaction.gas_limit = Some(estimated_gas_limit);
+        // Also update the original transaction for database storage
         transaction.gas_limit = Some(estimated_gas_limit);
         rrelayer_info!(
             "Set gas limit {} for transaction {} on relayer: {}",

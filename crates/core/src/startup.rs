@@ -30,6 +30,7 @@ use crate::{
     read,
     relayer::api::create_relayer_routes,
     rrelayer_error, rrelayer_info,
+    safe_proxy::SafeProxyManager,
     schema::apply_schema,
     setup_info_logger,
     shared::{cache::Cache, common_types::EvmAddress},
@@ -281,6 +282,21 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
 
     let config = read(&yaml_path, false)?;
 
+    // Create safe proxy manager from configuration
+    let safe_proxy_manager = if let Some(ref safe_proxy_configs) = config.safe_proxy {
+        if !safe_proxy_configs.is_empty() {
+            rrelayer_info!(
+                "Initializing safe proxy with {} configurations",
+                safe_proxy_configs.len()
+            );
+            Some(SafeProxyManager::new(safe_proxy_configs.clone()))
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
     let password_manager = KeyStorePasswordManager::new(&config.name)?;
     let mut admins: Vec<(EvmAddress, JwtRole)> = vec![];
     for admin in config.admins.iter() {
@@ -348,6 +364,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
         providers.clone(),
         cache.clone(),
         webhook_manager.clone(),
+        safe_proxy_manager,
     )
     .await?;
 

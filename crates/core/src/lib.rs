@@ -10,9 +10,11 @@ pub use postgres::{PostgresClient, PostgresConnectionError};
 mod provider;
 pub use provider::create_retry_client;
 pub mod relayer;
+pub mod safe_proxy;
+pub use safe_proxy::{SafeProxyError, SafeProxyManager, SafeTransaction};
 pub use yaml::{
     read, AdminIdentifier, ApiConfig, GasProviders, KeystoreSigningKey, NetworkSetupConfig,
-    SetupConfig, SigningKey,
+    SafeProxyConfig, SetupConfig, SigningKey,
 };
 mod shared;
 pub use shared::common_types;
