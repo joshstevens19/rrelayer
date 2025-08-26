@@ -1,3 +1,31 @@
+//! RRelayer Core Library
+//!
+//! This is the core library for RRelayer, a blockchain transaction relaying service
+//! that provides secure, scalable, and efficient transaction relaying capabilities.
+//!
+//! The library provides modules for:
+//! - Authentication and user management
+//! - Gas fee estimation and management
+//! - Network configuration and provider management
+//! - PostgreSQL database integration
+//! - Transaction queuing and processing
+//! - Wallet management and signing
+//! - Background task processing
+//! - Webhook integration
+//!
+//! # Example Usage
+//!
+//! ```rust,no_run
+//! use std::path::PathBuf;
+//! use rrelayer_core::{start, StartError};
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), StartError> {
+//!     let project_path = PathBuf::from(".");
+//!     start(&project_path).await
+//! }
+//! ```
+
 mod app_state;
 pub mod authentication;
 pub mod gas;

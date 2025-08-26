@@ -7,6 +7,15 @@ use crate::{
 };
 
 impl PostgresClient {
+    /// Retrieves a single transaction by its ID from the database.
+    ///
+    /// # Arguments
+    /// * `id` - The transaction ID to look up
+    ///
+    /// # Returns
+    /// * `Ok(Some(Transaction))` - The transaction if found
+    /// * `Ok(None)` - If no transaction exists with the given ID
+    /// * `Err(PostgresError)` - If a database error occurs
     pub async fn get_transaction(
         &self,
         id: &TransactionId,
@@ -28,6 +37,15 @@ impl PostgresClient {
         }
     }
 
+    /// Retrieves all transactions for a specific relayer with pagination.
+    ///
+    /// # Arguments
+    /// * `id` - The relayer ID to get transactions for
+    /// * `paging_context` - Pagination parameters (limit, offset)
+    ///
+    /// # Returns
+    /// * `Ok(PagingResult<Transaction>)` - Paginated list of transactions
+    /// * `Err(PostgresError)` - If a database error occurs
     pub async fn get_transactions_for_relayer(
         &self,
         id: &RelayerId,
@@ -56,6 +74,18 @@ impl PostgresClient {
         Ok(PagingResult::new(results, paging_context.next(result_count), paging_context.previous()))
     }
 
+    /// Retrieves transactions for a relayer filtered by status with pagination.
+    ///
+    /// Results are ordered by nonce in ascending order.
+    ///
+    /// # Arguments
+    /// * `id` - The relayer ID to get transactions for
+    /// * `status` - The transaction status to filter by
+    /// * `paging_context` - Pagination parameters (limit, offset)
+    ///
+    /// # Returns
+    /// * `Ok(PagingResult<Transaction>)` - Paginated list of transactions with the specified status
+    /// * `Err(PostgresError)` - If a database error occurs
     pub async fn get_transactions_by_status_for_relayer(
         &self,
         id: &RelayerId,

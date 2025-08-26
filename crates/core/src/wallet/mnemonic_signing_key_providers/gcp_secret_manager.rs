@@ -3,6 +3,26 @@ use crate::yaml::GcpSigningKey;
 use google_secretmanager1::{hyper, hyper_rustls, oauth2, SecretManager};
 use std::path::PathBuf;
 
+/// Retrieves a secret value from Google Cloud Secret Manager.
+///
+/// This function authenticates with Google Cloud using a service account key file
+/// and retrieves a secret from Google Cloud Secret Manager. The secret is expected
+/// to be stored as JSON, and this function extracts a specific key from that JSON.
+///
+/// # Arguments
+/// * `project_path` - Path to the project directory for resolving the service account key file
+/// * `config` - GCP configuration containing service account key path, secret name, and key
+///
+/// # Returns
+/// * `Ok(String)` - The secret value for the specified key
+/// * `Err(WalletError)` - If authentication fails, API call fails, or key extraction fails
+///
+/// # Errors
+/// - `WalletError::ConfigurationError` - If service account key file cannot be read or HTTPS connector fails
+/// - `WalletError::AuthenticationError` - If service account authentication fails
+/// - `WalletError::ApiError` - If GCP API call fails or secret data is missing
+/// - `WalletError::JsonError` - If secret JSON parsing fails
+/// - `WalletError::StringEncodingError` - If secret data is not valid UTF-8
 pub async fn get_gcp_secret(
     project_path: &PathBuf,
     config: &GcpSigningKey,

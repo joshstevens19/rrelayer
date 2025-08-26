@@ -30,6 +30,15 @@ use crate::{
     },
 };
 
+/// API endpoint to retrieve a transaction by its ID.
+///
+/// # Arguments
+/// * `state` - The application state containing cache and database connections
+/// * `id` - The transaction ID path parameter
+///
+/// # Returns
+/// * `Ok(Json<Option<Transaction>>)` - The transaction if found, None if not found
+/// * `Err(StatusCode)` - INTERNAL_SERVER_ERROR if database query fails
 // TODO! GUARDS
 async fn get_transaction_by_id_api(
     State(state): State<Arc<AppState>>,
@@ -41,6 +50,9 @@ async fn get_transaction_by_id_api(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
 }
 
+/// Response structure for transaction status requests.
+///
+/// Contains the transaction hash, current status, and receipt if available.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RelayTransactionStatusResult {
     pub hash: Option<TransactionHash>,
@@ -48,6 +60,18 @@ pub struct RelayTransactionStatusResult {
     pub receipt: Option<AnyTransactionReceipt>,
 }
 
+/// API endpoint to retrieve transaction status and receipt information.
+///
+/// Fetches transaction status and optionally retrieves the transaction receipt
+/// from the blockchain provider for completed transactions.
+///
+/// # Arguments
+/// * `state` - The application state containing cache, database, and provider connections
+/// * `id` - The transaction ID path parameter
+///
+/// # Returns
+/// * `Ok(Json<RelayTransactionStatusResult>)` - Transaction status with hash and receipt
+/// * `Err(StatusCode)` - NOT_FOUND if transaction doesn't exist, INTERNAL_SERVER_ERROR on other failures
 // TODO! GUARDS
 async fn get_transaction_status(
     State(state): State<Arc<AppState>>,
@@ -96,6 +120,9 @@ async fn get_transaction_status(
     Ok(Json(RelayTransactionStatusResult { hash: Some(hash), status: transaction.status, receipt }))
 }
 
+/// Request structure for relaying transactions.
+///
+/// Contains all necessary information to create and relay a blockchain transaction.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct RelayTransactionRequest {
     pub to: EvmAddress,
@@ -113,17 +140,42 @@ pub struct RelayTransactionRequest {
 impl FromStr for RelayTransactionRequest {
     type Err = serde_json::Error;
 
+    /// Parses a RelayTransactionRequest from a JSON string.
+    ///
+    /// # Arguments
+    /// * `s` - The JSON string to parse
+    ///
+    /// # Returns
+    /// * `Ok(RelayTransactionRequest)` - The parsed request
+    /// * `Err(serde_json::Error)` - If JSON parsing fails
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         serde_json::from_str(s)
     }
 }
 
+/// Response structure for send transaction requests.
+///
+/// Contains the assigned transaction ID and the blockchain transaction hash.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SendTransactionResult {
     pub id: TransactionId,
     pub hash: TransactionHash,
 }
 
+/// API endpoint to send a new transaction through a relayer.
+///
+/// Creates a new transaction and adds it to the transaction queue for processing.
+/// Currently API key validation is disabled (TODO).
+///
+/// # Arguments
+/// * `state` - The application state containing transaction queues and other services
+/// * `relayer_id` - The relayer ID path parameter
+/// * `headers` - HTTP headers (for future API key validation)
+/// * `transaction` - The transaction request payload
+///
+/// # Returns
+/// * `Ok(Json<SendTransactionResult>)` - The transaction ID and hash if successful
+/// * `Err(StatusCode)` - BAD_REQUEST for invalid transactions, INTERNAL_SERVER_ERROR for other failures
 async fn send_transaction(
     State(state): State<Arc<AppState>>,
     Path(relayer_id): Path<RelayerId>,
@@ -168,6 +220,20 @@ async fn send_transaction(
     }))
 }
 
+/// API endpoint to replace an existing pending transaction.
+///
+/// Replaces a pending transaction with new transaction parameters.
+/// Currently API key validation is disabled (TODO).
+///
+/// # Arguments
+/// * `state` - The application state containing transaction queues and database
+/// * `transaction_id` - The transaction ID to replace
+/// * `headers` - HTTP headers (for future API key validation)
+/// * `replace_with` - The new transaction parameters
+///
+/// # Returns
+/// * `Ok(Json<bool>)` - True if replacement was successful
+/// * `Err(StatusCode)` - NOT_FOUND if transaction doesn't exist, BAD_REQUEST for invalid replacement
 // TODO: should return a new tx hash
 async fn replace_transaction(
     State(state): State<Arc<AppState>>,
@@ -196,6 +262,19 @@ async fn replace_transaction(
     Ok(Json(status))
 }
 
+/// API endpoint to cancel a pending transaction.
+///
+/// Cancels a pending transaction by sending a replacement with higher gas price.
+/// Currently API key validation is disabled (TODO).
+///
+/// # Arguments
+/// * `state` - The application state containing transaction queues and database
+/// * `transaction_id` - The transaction ID to cancel
+/// * `headers` - HTTP headers (for future API key validation)
+///
+/// # Returns
+/// * `Ok(Json<bool>)` - True if cancellation was successful
+/// * `Err(StatusCode)` - NOT_FOUND if transaction doesn't exist, INTERNAL_SERVER_ERROR for other failures
 // TODO: should return a new tx hash
 async fn cancel_transaction(
     State(state): State<Arc<AppState>>,
@@ -223,6 +302,21 @@ async fn cancel_transaction(
     Ok(Json(status))
 }
 
+/// API endpoint to retrieve all transactions for a specific relayer.
+///
+/// Returns a paginated list of transactions associated with the given relayer.
+/// Currently API key validation is disabled (TODO).
+///
+/// # Arguments
+/// * `state` - The application state containing the database connection
+/// * `relayer_id` - The relayer ID path parameter
+/// * `paging` - Query parameters for pagination (limit, offset)
+/// * `headers` - HTTP headers (for future API key validation)
+/// * `auth_guard` - Authentication guard for access control
+///
+/// # Returns
+/// * `Ok(Json<PagingResult<Transaction>>)` - Paginated list of transactions
+/// * `Err(StatusCode)` - INTERNAL_SERVER_ERROR if database query fails
 // TODO! add paged caching
 async fn get_relayer_transactions(
     State(state): State<Arc<AppState>>,
@@ -248,6 +342,18 @@ async fn get_relayer_transactions(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
 }
 
+/// API endpoint to get the count of pending transactions for a relayer.
+///
+/// Returns the number of transactions currently pending in the queue for the given relayer.
+/// Currently API key validation is disabled (TODO).
+///
+/// # Arguments
+/// * `state` - The application state containing transaction queues
+/// * `relayer_id` - The relayer ID path parameter
+/// * `headers` - HTTP headers (for future API key validation)
+///
+/// # Returns
+/// * `Ok(Json<usize>)` - The count of pending transactions
 async fn get_transactions_pending_count(
     State(state): State<Arc<AppState>>,
     Path(relayer_id): Path<RelayerId>,
@@ -264,6 +370,18 @@ async fn get_transactions_pending_count(
     Ok(Json(count))
 }
 
+/// API endpoint to get the count of in-mempool transactions for a relayer.
+///
+/// Returns the number of transactions currently in the mempool for the given relayer.
+/// Currently API key validation is disabled (TODO).
+///
+/// # Arguments
+/// * `state` - The application state containing transaction queues
+/// * `relayer_id` - The relayer ID path parameter
+/// * `headers` - HTTP headers (for future API key validation)
+///
+/// # Returns
+/// * `Ok(Json<usize>)` - The count of in-mempool transactions
 async fn get_transactions_inmempool_count(
     State(state): State<Arc<AppState>>,
     Path(relayer_id): Path<RelayerId>,
@@ -280,6 +398,20 @@ async fn get_transactions_inmempool_count(
     Ok(Json(count))
 }
 
+/// Creates and configures the transaction API routes.
+///
+/// Sets up all HTTP routes for transaction-related operations including:
+/// - GET /:id - Get transaction by ID
+/// - GET /status/:id - Get transaction status and receipt
+/// - POST /relayers/:relayer_id/send - Send new transaction
+/// - PUT /replace/:transaction_id - Replace pending transaction
+/// - PUT /cancel/:transaction_id - Cancel pending transaction
+/// - GET /relayers/:relayer_id - Get relayer transactions (paginated)
+/// - GET /relayers/:relayer_id/pending/count - Get pending transaction count
+/// - GET /relayers/:relayer_id/inmempool/count - Get in-mempool transaction count
+///
+/// # Returns
+/// * `Router<Arc<AppState>>` - Configured router with all transaction routes
 pub fn create_transactions_routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/:id", get(get_transaction_by_id_api))

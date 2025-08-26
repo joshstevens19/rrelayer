@@ -39,7 +39,18 @@ pub struct WebhookManager {
 }
 
 impl WebhookManager {
-    /// Create a new webhook manager
+    /// Creates a new webhook manager from configuration.
+    ///
+    /// Initializes the webhook manager with delivery settings, HTTP client,
+    /// and background task intervals for processing and cleanup.
+    ///
+    /// # Arguments
+    /// * `config` - Application configuration containing webhook settings
+    /// * `delivery_config` - Optional delivery configuration (uses defaults if None)
+    ///
+    /// # Returns
+    /// * `Ok(WebhookManager)` - Configured webhook manager
+    /// * `Err(reqwest::Error)` - If HTTP client creation fails
     pub fn new(
         config: &SetupConfig,
         delivery_config: Option<WebhookDeliveryConfig>,

@@ -6,6 +6,10 @@ use crate::commands::{
     network::NetworkCommands, sign, tx, user,
 };
 
+/// Main CLI structure for the rrelayer command-line interface.
+///
+/// This struct defines the top-level CLI parser using clap, which handles
+/// command-line argument parsing and subcommand routing.
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 #[command(propagate_version = true)]
@@ -14,6 +18,10 @@ pub struct Cli {
     pub command: Commands,
 }
 
+/// Enumeration of all available CLI commands.
+///
+/// Each variant represents a different subcommand that can be executed,
+/// with their respective arguments and options defined inline.
 #[derive(Subcommand)]
 pub enum Commands {
     /// Initialize a new relayer project

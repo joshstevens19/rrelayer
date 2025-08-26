@@ -26,10 +26,26 @@ pub struct FallbackGasFeeEstimator {
 }
 
 impl FallbackGasFeeEstimator {
+    /// Creates a new fallback gas fee estimator using the provided RPC provider.
+    ///
+    /// # Arguments
+    /// * `provider` - The RPC provider to use for blockchain queries
+    ///
+    /// # Returns
+    /// * A new `FallbackGasFeeEstimator` instance
     pub fn new(provider: Arc<RelayerProvider>) -> Self {
         FallbackGasFeeEstimator { provider }
     }
 
+    /// Retrieves a block with full transaction details for the specified block number.
+    ///
+    /// # Arguments
+    /// * `block_num` - The block number to retrieve
+    ///
+    /// # Returns
+    /// * `Ok(Some(AnyRpcBlock))` - The block with transactions if found
+    /// * `Ok(None)` - If the block doesn't exist
+    /// * `Err(TransportError)` - If the RPC call fails
     pub async fn get_block_with_txs(
         &self,
         block_num: BlockNumber,
@@ -45,12 +61,27 @@ impl FallbackGasFeeEstimator {
         Ok(block)
     }
 
+    /// Generates a safe block range to prevent underflow when calculating historical blocks.
+    ///
+    /// # Arguments
+    /// * `latest_block` - The latest block number
+    /// * `num_blocks` - The number of blocks to include in the range
+    ///
+    /// # Returns
+    /// * `Vec<u64>` - A vector of block numbers in the safe range
     fn get_safe_block_range(&self, latest_block: u64, num_blocks: u64) -> Vec<u64> {
         let start_block = latest_block.saturating_sub(num_blocks - 1);
         (start_block..=latest_block).collect()
     }
 }
 
+/// Calculates the median value from a slice of prices.
+///
+/// # Arguments
+/// * `prices` - A mutable slice of price values (will be sorted in-place)
+///
+/// # Returns
+/// * `u128` - The median value, or 0 if the slice is empty
 fn calculate_median(prices: &mut [u128]) -> u128 {
     if prices.is_empty() {
         return 0;
@@ -65,6 +96,14 @@ fn calculate_median(prices: &mut [u128]) -> u128 {
     }
 }
 
+/// Calculates a specific percentile from a slice of prices.
+///
+/// # Arguments
+/// * `prices` - A mutable slice of price values (will be sorted in-place)
+/// * `percentile` - The percentile to calculate (0.0 to 1.0)
+///
+/// # Returns
+/// * `u128` - The value at the specified percentile, or 0 if the slice is empty
 fn calculate_percentile(prices: &mut [u128], percentile: f64) -> u128 {
     if prices.is_empty() {
         return 0;

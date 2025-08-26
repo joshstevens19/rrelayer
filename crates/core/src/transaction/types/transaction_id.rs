@@ -32,6 +32,10 @@ impl Display for TransactionId {
 }
 
 impl TransactionId {
+    /// Creates a new random transaction ID.
+    ///
+    /// # Returns
+    /// * `TransactionId` - A new unique transaction identifier
     pub fn new() -> TransactionId {
         TransactionId(Uuid::new_v4())
     }

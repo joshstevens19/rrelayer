@@ -52,6 +52,19 @@ enum NetworkFilter {
     Disabled,
 }
 
+/// Handles network command routing and execution.
+///
+/// Routes network commands to appropriate handlers for adding networks,
+/// listing networks, enabling/disabling networks, and viewing gas prices.
+///
+/// # Arguments
+/// * `command` - The network command to execute
+/// * `project_path` - Project location containing network configuration
+/// * `sdk` - Mutable reference to the SDK for API operations
+///
+/// # Returns
+/// * `Ok(())` - Command executed successfully
+/// * `Err(NetworkError)` - Command execution failed
 pub async fn handle_network(
     command: &NetworkCommands,
     project_path: &ProjectLocation,
@@ -72,6 +85,17 @@ pub async fn handle_network(
     }
 }
 
+/// Adds a new network to the project configuration.
+///
+/// Interactively prompts for network details including name, provider URLs,
+/// and block explorer URL, then validates connectivity before adding.
+///
+/// # Arguments
+/// * `project_path` - Project location to update configuration
+///
+/// # Returns
+/// * `Ok(())` - Network added successfully
+/// * `Err(NetworkError)` - Failed to add network or validate connectivity
 async fn handle_add(project_path: &ProjectLocation) -> Result<(), NetworkError> {
     let mut setup_config = project_path.setup_config(true)?;
 
@@ -148,6 +172,18 @@ async fn handle_add(project_path: &ProjectLocation) -> Result<(), NetworkError> 
     Ok(())
 }
 
+/// Handles the network list command to display all available networks.
+///
+/// Retrieves and displays information about all configured networks including their
+/// chain IDs, enabled/disabled status, and connection details.
+///
+/// # Arguments
+/// * `authentication` - Authentication data for API access
+/// * `args` - Command-line arguments for the list operation
+///
+/// # Returns
+/// * `Ok(())` - Networks listed successfully
+/// * `Err(CliError)` - Network listing failed (network error, authentication, etc.)
 async fn handle_list(
     args: &ListArgs,
     project_path: &ProjectLocation,
@@ -199,6 +235,16 @@ async fn handle_list(
     Ok(())
 }
 
+/// Formats gas price result wait time into a human-readable string.
+///
+/// Converts the wait time from a gas price result into a formatted string representation.
+/// This is used for displaying estimated transaction confirmation times to users.
+///
+/// # Arguments
+/// * `result` - Gas price result containing wait time information
+///
+/// # Returns
+/// * `String` - Formatted wait time string (e.g., "~2 minutes")
 fn get_wait_time(result: &GasPriceResult) -> String {
     match (result.min_wait_time_estimate, result.max_wait_time_estimate) {
         (Some(min), Some(max)) => format!("{}-{} sec", min, max),
@@ -208,6 +254,19 @@ fn get_wait_time(result: &GasPriceResult) -> String {
     }
 }
 
+/// Handles the gas command to display current gas prices for networks.
+///
+/// Retrieves and displays current gas price information for specified networks,
+/// including different speed tiers (slow, standard, fast) and estimated wait times.
+///
+/// # Arguments
+/// * `args` - Command-line arguments specifying which networks to query
+/// * `project_path` - Project location containing configuration
+/// * `sdk` - SDK instance for API communication
+///
+/// # Returns
+/// * `Ok(())` - Gas prices displayed successfully
+/// * `Err(NetworkError)` - Gas price retrieval failed
 async fn handle_gas(
     network_name: &str,
     project_path: &ProjectLocation,
@@ -275,6 +334,20 @@ async fn handle_gas(
     Ok(())
 }
 
+/// Handles network enable/disable toggle operations.
+///
+/// Enables or disables specified networks in the RRelayer system, allowing
+/// administrators to control which networks are available for transaction processing.
+///
+/// # Arguments
+/// * `network_name` - Name of the network to toggle
+/// * `enable` - True to enable the network, false to disable it
+/// * `project_path` - Project location containing configuration
+/// * `sdk` - SDK instance for API communication
+///
+/// # Returns
+/// * `Ok(())` - Network toggle operation completed successfully
+/// * `Err(NetworkError)` - Network toggle failed
 async fn handle_network_toggle(
     network_name: &str,
     project_path: &ProjectLocation,
@@ -299,6 +372,18 @@ async fn handle_network_toggle(
     Ok(())
 }
 
+/// Retrieves the chain ID for a configured network.
+///
+/// Looks up the network configuration by name, connects to the first
+/// provider URL, and queries the chain ID from the network.
+///
+/// # Arguments
+/// * `network_name` - Name of the network to look up
+/// * `project_path` - Project location containing network configuration
+///
+/// # Returns
+/// * `Ok(u64)` - Chain ID of the network
+/// * `Err(Box<dyn std::error::Error>)` - Network not found or connection failed
 pub async fn get_chain_id_for_network(
     network_name: &str,
     project_path: &ProjectLocation,

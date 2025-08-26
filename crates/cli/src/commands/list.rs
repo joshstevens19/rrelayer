@@ -9,6 +9,20 @@ use crate::{
     console::print_table,
 };
 
+/// Lists relayers, optionally filtered by network.
+///
+/// Authenticates the user and retrieves all relayers. If a network is specified,
+/// only relayers for that network's chain ID are returned. Displays the results
+/// in a formatted table with relayer details.
+///
+/// # Arguments
+/// * `network` - Optional network name to filter relayers by
+/// * `project_path` - The project location containing configuration and keystores
+/// * `sdk` - Mutable reference to the SDK for making API calls
+///
+/// # Returns
+/// * `Ok(())` - Relayers listed successfully
+/// * `Err(RelayerManagementError)` - Authentication failed or API call failed
 pub async fn handle_list(
     network: &Option<String>,
     project_path: &ProjectLocation,
@@ -27,6 +41,19 @@ pub async fn handle_list(
     Ok(())
 }
 
+/// Retrieves and displays relayers in a formatted table.
+///
+/// Fetches relayers from the API, optionally filtered by chain ID, and displays
+/// them in a table format with columns for ID, name, chain ID, address, max gas price,
+/// status, allowlisted status, and EIP-1559 enablement.
+///
+/// # Arguments
+/// * `sdk` - Mutable reference to the SDK for making API calls
+/// * `chain_id` - Optional chain ID to filter relayers by
+///
+/// # Returns
+/// * `Ok(())` - Relayers displayed successfully
+/// * `Err(RelayerManagementError)` - Failed to fetch relayers from API
 async fn log_relayers(sdk: &mut SDK, chain_id: Option<u64>) -> Result<(), RelayerManagementError> {
     let relayers = sdk
         .relayer

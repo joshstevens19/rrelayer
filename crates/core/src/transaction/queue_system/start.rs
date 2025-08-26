@@ -20,6 +20,15 @@ use crate::{
     transaction::types::{Transaction, TransactionStatus},
 };
 
+/// Spawns background processing tasks for all transaction queues.
+///
+/// Creates three concurrent processing tasks for each relayer:
+/// - Pending transactions processing
+/// - In-mempool transactions processing  
+/// - Mined transactions processing
+///
+/// # Arguments
+/// * `transaction_queue` - The shared transaction queues container
 async fn spawn_processing_tasks(transaction_queue: Arc<Mutex<TransactionsQueues>>) {
     let relay_ids: Vec<RelayerId> =
         { transaction_queue.lock().await.queues.keys().cloned().collect() };
@@ -42,10 +51,22 @@ async fn spawn_processing_tasks(transaction_queue: Arc<Mutex<TransactionsQueues>
     }
 }
 
+/// Pauses processing for the specified duration.
+///
+/// # Arguments
+/// * `process_again_after_ms` - The number of milliseconds to wait
 async fn processes_next_break(process_again_after_ms: &u64) {
     sleep_ms(process_again_after_ms).await
 }
 
+/// Continuously processes pending transactions for a specific relayer.
+///
+/// Runs in an infinite loop, processing one pending transaction at a time
+/// and waiting for the specified delay between iterations.
+///
+/// # Arguments
+/// * `queue` - The shared transaction queues container
+/// * `relayer_id` - The ID of the relayer to process transactions for
 async fn continuously_process_pending_transactions(
     queue: Arc<Mutex<TransactionsQueues>>,
     relayer_id: &RelayerId,
@@ -66,6 +87,14 @@ async fn continuously_process_pending_transactions(
     }
 }
 
+/// Continuously processes in-mempool transactions for a specific relayer.
+///
+/// Runs in an infinite loop, processing one in-mempool transaction at a time
+/// and waiting for the specified delay between iterations.
+///
+/// # Arguments
+/// * `queue` - The shared transaction queues container
+/// * `relayer_id` - The ID of the relayer to process transactions for
 async fn continuously_process_inmempool_transactions(
     queue: Arc<Mutex<TransactionsQueues>>,
     relayer_id: &RelayerId,
@@ -86,6 +115,14 @@ async fn continuously_process_inmempool_transactions(
     }
 }
 
+/// Continuously processes mined transactions for a specific relayer.
+///
+/// Runs in an infinite loop, processing one mined transaction at a time
+/// to check for confirmations and waiting for the specified delay between iterations.
+///
+/// # Arguments
+/// * `queue` - The shared transaction queues container
+/// * `relayer_id` - The ID of the relayer to process transactions for
 async fn continuously_process_mined_transactions(
     queue: Arc<Mutex<TransactionsQueues>>,
     relayer_id: &RelayerId,
@@ -108,12 +145,26 @@ async fn continuously_process_mined_transactions(
     }
 }
 
+/// Error types for transaction queue repopulation operations.
 #[derive(Error, Debug)]
 pub enum RepopulateTransactionsQueueError {
     #[error("Failed to load transactions with status {0} for relayer {1} from database: {1}")]
     CouldNotGetTransactionsByStatusFromDatabase(TransactionStatus, RelayerId, PostgresError),
 }
 
+/// Repopulates a transaction queue from the database for a specific status.
+///
+/// Loads all transactions with the given status for a relayer from the database,
+/// maintaining their nonce order in the queue.
+///
+/// # Arguments
+/// * `db` - The database client for querying transactions
+/// * `relayer_id` - The relayer ID to load transactions for
+/// * `status` - The transaction status to filter by
+///
+/// # Returns
+/// * `Ok(VecDeque<Transaction>)` - Queue of transactions ordered by nonce
+/// * `Err(RepopulateTransactionsQueueError)` - If database query fails
 async fn repopulate_transaction_queue(
     db: &PostgresClient,
     relayer_id: &RelayerId,
@@ -151,6 +202,17 @@ async fn repopulate_transaction_queue(
     Ok(transactions_queue)
 }
 
+/// Loads all relayers from the database.
+///
+/// Retrieves all relayer configurations from the database using pagination
+/// to handle large numbers of relayers efficiently.
+///
+/// # Arguments
+/// * `db` - The database client for querying relayers
+///
+/// # Returns
+/// * `Ok(Vec<Relayer>)` - List of all relayers
+/// * `Err(PostgresError)` - If database query fails
 async fn load_relayers(db: &PostgresClient) -> Result<Vec<Relayer>, PostgresError> {
     let mut relayers: Vec<Relayer> = Vec::new();
     let mut paging_context = PagingContext::new(1000, 0);
@@ -173,6 +235,7 @@ async fn load_relayers(db: &PostgresClient) -> Result<Vec<Relayer>, PostgresErro
     Ok(relayers)
 }
 
+/// Error types for transaction queue startup operations.
 #[derive(Error, Debug)]
 pub enum StartTransactionsQueuesError {
     #[error("Failed to connect to the database: {0}")]
@@ -193,6 +256,27 @@ pub enum StartTransactionsQueuesError {
     ),
 }
 
+/// Initializes and starts up the transaction queue system.
+///
+/// This function performs the following steps:
+/// 1. Connects to the database
+/// 2. Loads all relayers from the database
+/// 3. For each relayer, finds the corresponding network provider
+/// 4. Repopulates transaction queues with pending, in-mempool, and mined transactions
+/// 5. Creates the transaction queues system
+/// 6. Spawns background processing tasks for each relayer
+///
+/// # Arguments
+/// * `gas_oracle_cache` - Shared cache for gas price information
+/// * `blob_gas_oracle_cache` - Shared cache for blob gas price information
+/// * `providers` - Available EVM network providers
+/// * `cache` - General application cache
+/// * `webhook_manager` - Manager for webhook notifications
+/// * `safe_proxy_manager` - Optional Safe proxy manager for multisig operations
+///
+/// # Returns
+/// * `Ok(Arc<Mutex<TransactionsQueues>>)` - The initialized transaction queues system
+/// * `Err(StartTransactionsQueuesError)` - If initialization fails
 pub async fn startup_transactions_queues(
     gas_oracle_cache: Arc<Mutex<GasOracleCache>>,
     blob_gas_oracle_cache: Arc<Mutex<BlobGasOracleCache>>,

@@ -70,56 +70,126 @@ pub struct ProjectLocation {
 }
 
 impl ProjectLocation {
+    /// Creates a new ProjectLocation instance.
+    ///
+    /// # Arguments
+    /// * `output_dir` - The directory where keystores and configuration will be stored
+    ///
+    /// # Returns
+    /// * A new ProjectLocation instance
     pub fn new(output_dir: PathBuf) -> Self {
         Self { output_dir, override_project_name: None }
     }
 
+    /// Overrides the project name for this project location.
+    ///
+    /// # Arguments
+    /// * `name` - The name to override the project name with
     pub fn override_project_name(&mut self, name: &str) {
         self.override_project_name = Some(name.to_string());
     }
 
+    /// Returns the path to the keystores directory.
+    ///
+    /// # Returns
+    /// * Path to the keystores directory within the output directory
     fn get_keystore_dir(&self) -> PathBuf {
         self.output_dir.join("keystores")
     }
 
+    /// Checks if a keystore with the given name already exists.
+    ///
+    /// # Arguments
+    /// * `name` - The name of the keystore to check
+    ///
+    /// # Returns
+    /// * `true` if the keystore exists, `false` otherwise
     fn keystore_already_exists(&self, name: &str) -> bool {
         self.get_keystore_dir().join(name).exists()
     }
 
+    /// Returns the path to the account keystores directory.
+    ///
+    /// # Returns
+    /// * Path to the account keystores directory
     fn get_account_keystore_dir(&self) -> PathBuf {
         self.output_dir.join("keystores").join("accounts")
     }
 
+    /// Gets the path to a specific account keystore.
+    ///
+    /// # Arguments
+    /// * `account` - The account name
+    ///
+    /// # Returns
+    /// * Path to the specified account's keystore
     pub fn get_account_keystore(&self, account: &str) -> PathBuf {
         self.output_dir.join("keystores").join("accounts").join(account)
     }
 
+    /// Creates the keystore directory if it doesn't exist.
+    ///
+    /// # Returns
+    /// * `Ok(())` - Directory created successfully or already exists
+    /// * `Err(KeystoreError)` - Failed to create directory
     fn create_keystore_dir(&self) -> Result<(), KeystoreError> {
         fs::create_dir_all(&self.get_keystore_dir())?;
         Ok(())
     }
 
+    /// Creates the account keystore directory if it doesn't exist.
+    ///
+    /// # Returns
+    /// * `Ok(())` - Directory created successfully or already exists
+    /// * `Err(KeystoreError)` - Failed to create directory
     fn create_account_keystore_dir(&self) -> Result<(), KeystoreError> {
         fs::create_dir_all(&self.get_account_keystore_dir())?;
         Ok(())
     }
 
+    /// Checks if an account with the given name already exists.
+    ///
+    /// # Arguments
+    /// * `name` - The account name to check
+    ///
+    /// # Returns
+    /// * `true` if the account exists, `false` otherwise
     fn account_already_exists(&self, name: &str) -> bool {
         self.get_account_keystore_dir().join(name).exists()
     }
 
+    /// Reads and parses the setup configuration from the rrelayer.yaml file.
+    ///
+    /// # Arguments
+    /// * `raw_yaml` - Whether to read the YAML file as raw text
+    ///
+    /// # Returns
+    /// * `Ok(SetupConfig)` - Successfully parsed configuration
+    /// * `Err(KeystoreError)` - Failed to read or parse configuration
     pub fn setup_config(&self, raw_yaml: bool) -> Result<SetupConfig, KeystoreError> {
         let yaml = read(&self.output_dir.join("rrelayer.yaml"), raw_yaml)
             .map_err(|e| KeystoreError::ProjectConfig(format!("Failed to read config: {}", e)))?;
         Ok(yaml)
     }
 
+    /// Overwrites the setup configuration file with the provided configuration.
+    ///
+    /// # Arguments
+    /// * `config` - The setup configuration to write
+    ///
+    /// # Returns
+    /// * `Ok(())` - Configuration written successfully
+    /// * `Err(KeystoreError)` - Failed to serialize or write configuration
     pub fn overwrite_setup_config(&self, config: SetupConfig) -> Result<(), KeystoreError> {
         let yaml = serde_yaml::to_string(&config)?;
         fs::write(&self.output_dir.join("rrelayer.yaml"), yaml)?;
         Ok(())
     }
 
+    /// Gets the project name, either from override or from the configuration file.
+    ///
+    /// # Returns
+    /// * The project name, or "unknown_project" if unable to determine
     pub fn get_project_name(&self) -> String {
         self.override_project_name.clone().unwrap_or_else(|| {
             self.setup_config(false)
@@ -128,12 +198,25 @@ impl ProjectLocation {
         })
     }
 
+    /// Gets the API URL from the setup configuration.
+    ///
+    /// # Returns
+    /// * `Ok(String)` - The API URL (http://localhost:port)
+    /// * `Err(KeystoreError)` - Failed to read configuration
     pub fn get_api_url(&self) -> Result<String, KeystoreError> {
         let setup_config = self.setup_config(false)?;
         Ok(format!("http://localhost:{}", setup_config.api_config.port))
     }
 }
 
+/// Handles keystore commands by dispatching to the appropriate handler function.
+///
+/// # Arguments
+/// * `cmd` - The keystore command to execute
+///
+/// # Returns
+/// * `Ok(())` - Command executed successfully
+/// * `Err(KeystoreError)` - Command execution failed
 pub async fn handle_keystore_command(cmd: &KeystoreCommand) -> Result<(), KeystoreError> {
     match cmd {
         KeystoreCommand::CreateFromMnemonic { mnemonic, generate, name, output_dir } => {
@@ -158,6 +241,21 @@ pub async fn handle_keystore_command(cmd: &KeystoreCommand) -> Result<(), Keysto
     Ok(())
 }
 
+/// Creates a keystore from a mnemonic phrase.
+///
+/// Either uses the provided mnemonic phrase or generates a new one if `generate` is true.
+/// The keystore is encrypted with a password and stored in the project's keystore directory.
+///
+/// # Arguments
+/// * `mnemonic` - Optional existing mnemonic phrase to use
+/// * `generate` - Whether to generate a new random mnemonic phrase
+/// * `name` - The name for the keystore
+/// * `project_location` - The project location for storing the keystore
+/// * `password` - Optional password, will prompt user if not provided
+///
+/// # Returns
+/// * `Ok(PathBuf)` - Path to the created keystore file
+/// * `Err(KeystoreError)` - Invalid mnemonic, keystore already exists, or creation failed
 pub fn create_from_mnemonic(
     mnemonic: &Option<String>,
     generate: bool,
@@ -208,6 +306,21 @@ pub fn create_from_mnemonic(
     Ok(file_location)
 }
 
+/// Creates a keystore from a private key.
+///
+/// Either uses the provided private key or generates a new one if `generate` is true.
+/// The keystore is encrypted with a password and stored in the project's account keystore directory.
+///
+/// # Arguments
+/// * `private_key` - Optional existing private key (hex string with or without 0x prefix)
+/// * `generate` - Whether to generate a new random private key
+/// * `name` - The name for the account keystore
+/// * `project_location` - The project location for storing the keystore
+/// * `password` - Optional password, will prompt user if not provided
+///
+/// # Returns
+/// * `Ok(PathBuf)` - Path to the created keystore file
+/// * `Err(KeystoreError)` - Invalid private key, account already exists, or creation failed
 pub fn create_from_private_key(
     private_key: &Option<String>,
     generate: bool,
@@ -271,6 +384,18 @@ pub fn create_from_private_key(
     Ok(file_location)
 }
 
+/// Decrypts a keystore file and displays its contents.
+///
+/// Prompts the user for a password and attempts to decrypt the keystore.
+/// Allows up to 3 password attempts before failing. Displays the decrypted
+/// mnemonic phrase or private key along with the associated address.
+///
+/// # Arguments
+/// * `path` - Path to the keystore file to decrypt
+///
+/// # Returns
+/// * `Ok(())` - Keystore decrypted successfully
+/// * `Err(KeystoreError)` - File not found, wrong password, or decryption failed
 fn decrypt(path: &PathBuf) -> Result<(), KeystoreError> {
     if !path.exists() || !path.is_file() {
         return Err(KeystoreError::NotFound(format!("{:?}", path)));

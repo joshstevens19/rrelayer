@@ -75,6 +75,13 @@ pub enum WalletError {
 }
 
 impl From<alloy::signers::Error> for WalletError {
+    /// Converts an Alloy signer error into a WalletError.
+    ///
+    /// # Arguments
+    /// * `error` - The Alloy signer error to convert
+    ///
+    /// # Returns
+    /// * A WalletError with the GenericSignerError variant containing the formatted error message
     fn from(error: alloy::signers::Error) -> Self {
         WalletError::GenericSignerError(format!("Alloy signer error: {}", error))
     }

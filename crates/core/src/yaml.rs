@@ -80,6 +80,13 @@ pub struct SigningKey {
 }
 
 impl SigningKey {
+    /// Creates a new signing key configuration using keystore authentication.
+    ///
+    /// # Arguments
+    /// * `keystore` - Keystore configuration for wallet signing
+    ///
+    /// # Returns
+    /// * `SigningKey` - A signing key configured to use keystore authentication only
     pub fn from_keystore(keystore: KeystoreSigningKey) -> Self {
         Self {
             keystore: Some(keystore),
@@ -92,6 +99,14 @@ impl SigningKey {
 }
 
 impl SigningKey {
+    /// Validates that exactly one signing method is configured.
+    ///
+    /// Ensures that the signing key configuration is valid by checking that
+    /// only one of the available signing methods is set.
+    ///
+    /// # Returns
+    /// * `Ok(())` - If exactly one signing method is configured
+    /// * `Err(String)` - If no signing method or multiple methods are configured
     pub fn validate(&self) -> Result<(), String> {
         let configured_methods = [
             self.raw.is_some(),
@@ -133,6 +148,14 @@ pub struct NetworkSetupConfig {
 }
 
 impl NetworkSetupConfig {
+    /// Retrieves the chain ID by querying the first configured RPC provider.
+    ///
+    /// Makes an RPC call to the blockchain network to fetch the chain ID,
+    /// which is used to identify the specific blockchain network.
+    ///
+    /// # Returns
+    /// * `Ok(ChainId)` - The chain ID of the blockchain network
+    /// * `Err(String)` - If the RPC call fails or provider is invalid
     pub async fn get_chain_id(&self) -> Result<ChainId, String> {
         let provider_url = self.provider_urls[0].clone();
 
@@ -356,6 +379,20 @@ pub struct SetupConfig {
     pub safe_proxy: Option<Vec<SafeProxyConfig>>,
 }
 
+/// Substitutes environment variables in YAML content.
+///
+/// Replaces patterns like `${VARIABLE_NAME}` with the actual environment
+/// variable values. Panics if any referenced environment variable is not found.
+///
+/// # Arguments
+/// * `contents` - The YAML file contents with environment variable placeholders
+///
+/// # Returns
+/// * `Ok(String)` - The content with environment variables substituted
+/// * `Err(regex::Error)` - If the regex pattern is invalid
+///
+/// # Panics
+/// Panics if any referenced environment variable is not found.
 fn substitute_env_variables(contents: &str) -> Result<String, regex::Error> {
     let re = Regex::new(r"\$\{([^}]+)\}")?;
     let result = re.replace_all(contents, |caps: &Captures| {
@@ -395,6 +432,33 @@ pub enum ReadYamlError {
     NetworkProviderUrlsNotDefined(String),
 }
 
+/// Reads and parses the RRelayer configuration YAML file.
+///
+/// Loads the YAML configuration file, optionally substitutes environment variables,
+/// parses it into a `SetupConfig` struct, and validates the configuration.
+///
+/// # Arguments
+/// * `file_path` - Path to the rrelayer.yaml configuration file
+/// * `raw_yaml` - If true, skip environment variable substitution
+///
+/// # Returns
+/// * `Ok(SetupConfig)` - The parsed and validated configuration
+/// * `Err(ReadYamlError)` - If file reading, parsing, or validation fails
+///
+/// # Validation
+/// The function validates that:
+/// - At least one network is configured
+/// - Each network has at least one provider URL
+/// - Signing key configurations are valid (exactly one method per key)
+///
+/// # Example
+/// ```rust,no_run
+/// use std::path::PathBuf;
+/// use rrelayer_core::read;
+///
+/// let config_path = PathBuf::from("rrelayer.yaml");
+/// let config = read(&config_path, false).expect("Failed to read config");
+/// ```
 pub fn read(file_path: &PathBuf, raw_yaml: bool) -> Result<SetupConfig, ReadYamlError> {
     let mut file = File::open(file_path).map_err(|_| ReadYamlError::CanNotFindYaml)?;
     let mut contents = String::new();

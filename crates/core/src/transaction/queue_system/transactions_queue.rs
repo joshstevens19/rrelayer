@@ -39,6 +39,12 @@ use crate::{
     },
 };
 
+/// Queue system for managing transactions in different states for a single relayer.
+///
+/// Handles the complete lifecycle of transactions from pending to confirmed:
+/// - Pending: Transactions waiting to be sent
+/// - In-mempool: Transactions sent to the network but not yet mined
+/// - Mined: Transactions included in blocks but awaiting confirmations
 pub struct TransactionsQueue {
     pending_transactions: Mutex<VecDeque<Transaction>>,
     inmempool_transactions: Mutex<VecDeque<Transaction>>,
@@ -53,6 +59,15 @@ pub struct TransactionsQueue {
 }
 
 impl TransactionsQueue {
+    /// Creates a new TransactionsQueue for a specific relayer.
+    ///
+    /// # Arguments
+    /// * `setup` - Configuration and initial transaction queues for the relayer
+    /// * `gas_oracle_cache` - Shared cache for gas price information
+    /// * `blob_oracle_cache` - Shared cache for blob gas price information
+    ///
+    /// # Returns
+    /// * `TransactionsQueue` - A new queue system for the relayer
     pub fn new(
         setup: TransactionsQueueSetup,
         gas_oracle_cache: Arc<Mutex<GasOracleCache>>,
@@ -79,6 +94,13 @@ impl TransactionsQueue {
         }
     }
 
+    /// Returns the number of blocks to wait before bumping gas price based on transaction speed.
+    ///
+    /// # Arguments
+    /// * `speed` - The transaction speed tier
+    ///
+    /// # Returns
+    /// * `u64` - Number of blocks to wait before gas price bump
     fn blocks_to_wait_before_bump(&self, speed: &TransactionSpeed) -> u64 {
         match speed {
             TransactionSpeed::Slow => 10,
@@ -88,6 +110,14 @@ impl TransactionsQueue {
         }
     }
 
+    /// Determines if gas price should be bumped based on elapsed time and transaction speed.
+    ///
+    /// # Arguments
+    /// * `ms_between_times` - Milliseconds elapsed since the transaction was sent
+    /// * `speed` - The transaction speed tier
+    ///
+    /// # Returns
+    /// * `bool` - True if gas price should be bumped
     pub fn should_bump_gas(&self, ms_between_times: u64, speed: &TransactionSpeed) -> bool {
         let should_bump = ms_between_times
             > (self.evm_provider.blocks_every * self.blocks_to_wait_before_bump(speed));
@@ -103,6 +133,10 @@ impl TransactionsQueue {
         should_bump
     }
 
+    /// Adds a new transaction to the pending queue.
+    ///
+    /// # Arguments
+    /// * `transaction` - The transaction to add to the pending queue
     pub async fn add_pending_transaction(&mut self, transaction: Transaction) {
         rrelayer_info!(
             "Adding pending transaction {} to queue for relayer: {}",
@@ -118,12 +152,21 @@ impl TransactionsQueue {
         );
     }
 
+    /// Gets the next pending transaction without removing it from the queue.
+    ///
+    /// # Returns
+    /// * `Some(Transaction)` - The next pending transaction if queue is not empty
+    /// * `None` - If the pending queue is empty
     pub async fn get_next_pending_transaction(&self) -> Option<Transaction> {
         let transactions = self.pending_transactions.lock().await;
 
         transactions.front().cloned()
     }
 
+    /// Returns the number of transactions in the pending queue.
+    ///
+    /// # Returns
+    /// * `usize` - The count of pending transactions
     pub async fn get_pending_transaction_count(&self) -> usize {
         let transactions = self.pending_transactions.lock().await;
         let count = transactions.len();
@@ -346,6 +389,11 @@ impl TransactionsQueue {
         }
     }
 
+    /// Gets the next mined transaction awaiting confirmation.
+    ///
+    /// # Returns
+    /// * `Some(Transaction)` - A mined transaction if any exist
+    /// * `None` - If no mined transactions are awaiting confirmation
     pub async fn get_next_mined_transaction(&self) -> Option<Transaction> {
         let transactions = self.mined_transactions.lock().await;
 
@@ -356,6 +404,13 @@ impl TransactionsQueue {
         None
     }
 
+    /// Moves a transaction from mined to confirmed state.
+    ///
+    /// Removes the transaction from the mined queue as it has reached
+    /// the required number of confirmations.
+    ///
+    /// # Arguments
+    /// * `id` - The transaction ID to confirm
     pub async fn move_mining_to_confirmed(&mut self, id: &TransactionId) {
         rrelayer_info!(
             "Moving transaction {} from mined to confirmed for relayer: {}",
@@ -372,10 +427,18 @@ impl TransactionsQueue {
         );
     }
 
+    /// Returns the relayer's wallet address.
+    ///
+    /// # Returns
+    /// * `EvmAddress` - The relayer's wallet address
     pub fn relay_address(&self) -> EvmAddress {
         self.relayer.address
     }
 
+    /// Checks if the relayer uses legacy transaction types.
+    ///
+    /// # Returns
+    /// * `bool` - True if using legacy transactions (pre-EIP-1559)
     pub fn is_legacy_transactions(&self) -> bool {
         !self.relayer.eip_1559_enabled
     }
@@ -429,6 +492,10 @@ impl TransactionsQueue {
         self.relayer.max_gas_price = max_gas_price;
     }
 
+    /// Returns the blockchain network chain ID for this relayer.
+    ///
+    /// # Returns
+    /// * `ChainId` - The chain ID of the blockchain network
     pub fn chain_id(&self) -> ChainId {
         self.relayer.chain_id
     }
@@ -663,6 +730,18 @@ impl TransactionsQueue {
         Ok(estimated_gas_result)
     }
 
+    /// Sends a transaction to the blockchain network.
+    ///
+    /// Performs gas estimation, nonce management, transaction signing, and network submission.
+    /// Updates the database with transaction details upon successful submission.
+    ///
+    /// # Arguments
+    /// * `db` - Database client for persisting transaction state
+    /// * `transaction` - The transaction to send (will be mutated with gas estimates)
+    ///
+    /// # Returns
+    /// * `Ok(TransactionSentWithRelayer)` - Transaction details if successfully sent
+    /// * `Err(TransactionQueueSendTransactionError)` - If sending fails
     pub async fn send_transaction(
         &mut self,
         db: &mut PostgresClient,

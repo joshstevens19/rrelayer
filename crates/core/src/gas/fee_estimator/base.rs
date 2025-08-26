@@ -37,7 +37,13 @@ pub struct GasPriceResult {
 }
 
 impl GasPriceResult {
-    // Effective Gas Price = Base Fee + Priority Fee
+    /// Calculates the effective gas price for legacy transactions.
+    ///
+    /// For EIP-1559 transactions, the effective gas price is the sum of
+    /// the base fee and priority fee (max fee per gas).
+    ///
+    /// # Returns
+    /// * `GasPrice` - The combined gas price suitable for legacy transactions
     pub fn legacy_gas_price(&self) -> GasPrice {
         GasPrice::new(self.max_fee.into_u128() + self.max_priority_fee.into_u128())
     }
@@ -54,6 +60,14 @@ pub struct GasEstimatorResult {
     pub super_fast: GasPriceResult,
 }
 
+/// Parses a formatted gas price string (in gwei) to a u128 value.
+///
+/// # Arguments
+/// * `formatted_unit` - A string representing gas price in gwei format (e.g., "20.0")
+///
+/// # Returns
+/// * `Ok(u128)` - The parsed gas price in wei
+/// * `Err(UnitsError)` - If parsing fails or value overflows
 pub fn parse_formatted_gas_to_u128(formatted_unit: &str) -> Result<u128, UnitsError> {
     let pu: ParseUnits = parse_units(formatted_unit, "gwei")?;
     match pu {
@@ -102,6 +116,22 @@ pub trait BaseGasFeeEstimator {
     fn is_chain_supported(&self, chain_id: &ChainId) -> bool;
 }
 
+/// Creates and returns the appropriate gas fee estimator based on configuration.
+///
+/// Attempts to create gas estimators in order of preference:
+/// 1. Tenderly - If configured and provider is set to Tenderly
+/// 2. Infura - If configured and provider is set to Infura  
+/// 3. Custom - If configured and provider is set to Custom
+/// 4. Fallback - Uses direct RPC calls as last resort
+///
+/// # Arguments
+/// * `provider_urls` - Array of RPC provider URLs for fallback estimator
+/// * `setup_config` - Global setup configuration containing gas provider configs
+/// * `network` - Network-specific configuration including gas provider choice
+///
+/// # Returns
+/// * `Ok(Arc<dyn BaseGasFeeEstimator>)` - The configured gas estimator
+/// * `Err(GasEstimatorError)` - If estimator creation fails
 pub async fn get_gas_estimator(
     provider_urls: &[String],
     setup_config: &SetupConfig,

@@ -1,5 +1,38 @@
 use crate::postgres::{PostgresClient, PostgresError};
 
+/// Applies the RRelayer database schema version 1.0.0.
+///
+/// Creates the complete database schema including:
+/// 
+/// **Schemas and Types:**
+/// - `authentication` schema with `user_role` enum
+/// - `network` schema for blockchain networks
+/// - `relayer` schema with `speed` and `tx_status` enums
+///
+/// **Authentication Tables:**
+/// - `authentication.user_access` - User permissions and roles
+///
+/// **Network Tables:**
+/// - `network.record` - Blockchain network configurations
+/// - `network.node` - RPC provider endpoints per network
+///
+/// **Relayer Tables:**
+/// - `relayer.record` - Relayer configurations and settings
+/// - `relayer.api_key` - API keys for relayer access
+/// - `relayer.allowlisted_address` - Address allowlists per relayer
+/// - `relayer.transaction` - Transaction records and status
+/// - `relayer.transaction_audit_log` - Complete transaction history
+///
+/// All tables include appropriate constraints, indexes, and foreign key
+/// relationships. The schema uses PostgreSQL-specific features like enums
+/// and TIMESTAMPTZ for proper timezone handling.
+///
+/// # Arguments
+/// * `client` - PostgreSQL client with schema creation permissions
+///
+/// # Returns
+/// * `Ok(())` - If schema creation succeeds
+/// * `Err(PostgresError)` - If any schema operation fails
 pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), PostgresError> {
     let schema_sql = r#"
         CREATE SCHEMA IF NOT EXISTS authentication;

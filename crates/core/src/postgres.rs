@@ -15,6 +15,14 @@ use tokio_postgres::{
 };
 use tracing::{debug, error};
 
+/// Retrieves the database connection string from environment variables.
+///
+/// Attempts to load environment variables from a .env file first, then
+/// retrieves the DATABASE_URL environment variable.
+///
+/// # Returns
+/// * `Ok(String)` - The database connection string
+/// * `Err(env::VarError)` - If the DATABASE_URL environment variable is not found
 pub fn connection_string() -> Result<String, env::VarError> {
     dotenv().ok();
     let connection = env::var("DATABASE_URL")?;
@@ -51,10 +59,23 @@ pub enum PostgresError {
     ConnectionPoolError(#[from] RunError<tokio_postgres::Error>),
 }
 
+/// Wrapper around a PostgreSQL transaction for safer handling.
+/// 
+/// Provides methods to execute queries, commit, and rollback transactions
+/// with proper error handling.
 pub struct PostgresTransaction<'a> {
     pub transaction: PgTransaction<'a>,
 }
 impl<'a> PostgresTransaction<'a> {
+    /// Executes a query within this transaction.
+    ///
+    /// # Arguments
+    /// * `query` - The SQL query to execute
+    /// * `params` - Parameters to bind to the query
+    ///
+    /// # Returns
+    /// * `Ok(u64)` - Number of rows affected by the query
+    /// * `Err(PostgresError)` - If the query execution fails
     pub async fn execute(
         &mut self,
         query: &str,
@@ -63,10 +84,20 @@ impl<'a> PostgresTransaction<'a> {
         self.transaction.execute(query, params).await.map_err(PostgresError::PgError)
     }
 
+    /// Commits this transaction.
+    ///
+    /// # Returns
+    /// * `Ok(())` - If the transaction was committed successfully
+    /// * `Err(PostgresError)` - If the commit fails
     pub async fn commit(self) -> Result<(), PostgresError> {
         self.transaction.commit().await.map_err(PostgresError::PgError)
     }
 
+    /// Rolls back this transaction.
+    ///
+    /// # Returns
+    /// * `Ok(())` - If the transaction was rolled back successfully
+    /// * `Err(PostgresError)` - If the rollback fails
     pub async fn rollback(self) -> Result<(), PostgresError> {
         self.transaction.rollback().await.map_err(PostgresError::PgError)
     }
@@ -81,11 +112,24 @@ pub enum BulkInsertPostgresError {
     CouldNotWriteDataToPostgres(#[from] tokio_postgres::Error),
 }
 
+/// PostgreSQL client with connection pooling and TLS support.
+///
+/// Provides methods to execute queries, manage transactions, and perform
+/// bulk operations with proper error handling and connection management.
 pub struct PostgresClient {
     pub pool: Pool<PostgresConnectionManager<MakeTlsConnector>>,
 }
 
 impl PostgresClient {
+    /// Creates a new PostgreSQL client with connection pooling.
+    ///
+    /// Attempts to establish a connection using the DATABASE_URL environment variable.
+    /// Will retry without SSL if the initial SSL connection fails (unless sslmode=require).
+    /// Performs a test query to verify the connection is working.
+    ///
+    /// # Returns
+    /// * `Ok(PostgresClient)` - If the connection is established successfully
+    /// * `Err(PostgresConnectionError)` - If connection fails
     pub async fn new() -> Result<Self, PostgresConnectionError> {
         async fn _new(disable_ssl: bool) -> Result<PostgresClient, PostgresConnectionError> {
             let connection_str = connection_string()?;
@@ -152,11 +196,28 @@ impl PostgresClient {
         _new(false).await
     }
 
+    /// Executes multiple SQL statements in batch.
+    ///
+    /// # Arguments
+    /// * `sql` - Multiple SQL statements separated by semicolons
+    ///
+    /// # Returns
+    /// * `Ok(())` - If all statements execute successfully
+    /// * `Err(PostgresError)` - If any statement fails
     pub async fn batch_execute(&self, sql: &str) -> Result<(), PostgresError> {
         let conn = self.pool.get().await?;
         conn.batch_execute(sql).await.map_err(PostgresError::PgError)
     }
 
+    /// Executes a single SQL statement.
+    ///
+    /// # Arguments
+    /// * `query` - The SQL query or prepared statement
+    /// * `params` - Parameters to bind to the query
+    ///
+    /// # Returns
+    /// * `Ok(u64)` - Number of rows affected
+    /// * `Err(PostgresError)` - If the query execution fails
     pub async fn execute<T>(
         &self,
         query: &T,
@@ -169,6 +230,15 @@ impl PostgresClient {
         conn.execute(query, params).await.map_err(PostgresError::PgError)
     }
 
+    /// Prepares a SQL statement with explicit parameter types.
+    ///
+    /// # Arguments
+    /// * `query` - The SQL query to prepare
+    /// * `parameter_types` - Expected types of the parameters
+    ///
+    /// # Returns
+    /// * `Ok(Statement)` - The prepared statement
+    /// * `Err(PostgresError)` - If statement preparation fails
     pub async fn prepare(
         &self,
         query: &str,
@@ -201,6 +271,15 @@ impl PostgresClient {
         Ok(result)
     }
 
+    /// Executes a query and returns all matching rows.
+    ///
+    /// # Arguments
+    /// * `query` - The SQL query or prepared statement
+    /// * `params` - Parameters to bind to the query
+    ///
+    /// # Returns
+    /// * `Ok(Vec<Row>)` - All rows returned by the query
+    /// * `Err(PostgresError)` - If the query execution fails
     pub async fn query<T>(
         &self,
         query: &T,
@@ -214,6 +293,15 @@ impl PostgresClient {
         Ok(rows)
     }
 
+    /// Executes a query that is expected to return exactly one row.
+    ///
+    /// # Arguments
+    /// * `query` - The SQL query or prepared statement
+    /// * `params` - Parameters to bind to the query
+    ///
+    /// # Returns
+    /// * `Ok(Row)` - The single row returned by the query
+    /// * `Err(PostgresError)` - If the query fails or doesn't return exactly one row
     pub async fn query_one<T>(
         &self,
         query: &T,
@@ -227,6 +315,16 @@ impl PostgresClient {
         Ok(row)
     }
 
+    /// Executes a query that may return zero or one row.
+    ///
+    /// # Arguments
+    /// * `query` - The SQL query or prepared statement
+    /// * `params` - Parameters to bind to the query
+    ///
+    /// # Returns
+    /// * `Ok(Some(Row))` - If exactly one row is returned
+    /// * `Ok(None)` - If no rows are returned
+    /// * `Err(PostgresError)` - If the query fails or returns more than one row
     pub async fn query_one_or_none<T>(
         &self,
         query: &T,
@@ -240,6 +338,18 @@ impl PostgresClient {
         Ok(row)
     }
 
+    /// Performs a batch insert operation within a transaction.
+    ///
+    /// All inserts are performed within a single transaction, so they either
+    /// all succeed or all fail together.
+    ///
+    /// # Arguments
+    /// * `query` - The insert statement to execute
+    /// * `params_list` - List of parameter sets, one for each row to insert
+    ///
+    /// # Returns
+    /// * `Ok(())` - If all inserts succeed
+    /// * `Err(PostgresError)` - If any insert fails (all inserts will be rolled back)
     pub async fn batch_insert<T>(
         &self,
         query: &T,
@@ -261,6 +371,14 @@ impl PostgresClient {
         Ok(())
     }
 
+    /// Creates a COPY IN sink for high-performance bulk data loading.
+    ///
+    /// # Arguments
+    /// * `statement` - The COPY FROM STDIN statement
+    ///
+    /// # Returns
+    /// * `Ok(CopyInSink<U>)` - A sink that can accept bulk data
+    /// * `Err(PostgresError)` - If the COPY operation cannot be started
     pub async fn copy_in<T, U>(&self, statement: &T) -> Result<CopyInSink<U>, PostgresError>
     where
         T: ?Sized + ToStatement,

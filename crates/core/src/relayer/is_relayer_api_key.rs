@@ -11,6 +11,21 @@ use crate::{
     shared::{cache::Cache, common_types::api_key_from_headers},
 };
 
+/// Validates if the provided API key is valid for the specified relayer.
+///
+/// This function extracts the API key from the HTTP headers and checks if it's
+/// a valid API key for the given relayer. It uses caching to avoid repeated
+/// database queries for the same API key validations.
+///
+/// # Arguments
+/// * `db` - The PostgreSQL client for database operations
+/// * `cache` - The cache instance for storing/retrieving validation results
+/// * `relayer_id` - The unique identifier of the relayer
+/// * `headers` - HTTP headers containing the API key
+///
+/// # Returns
+/// * `true` - If a valid API key is found in headers and it belongs to the relayer
+/// * `false` - If no API key is provided, the API key is invalid, or database error occurs
 pub async fn is_relayer_api_key(
     db: &PostgresClient,
     cache: &Arc<Cache>,

@@ -9,14 +9,29 @@ use tokio_postgres::types::{to_sql_checked, FromSql, IsNull, ToSql, Type};
 pub struct EvmAddress(Address);
 
 impl EvmAddress {
+    /// Returns the hexadecimal string representation of the address.
+    ///
+    /// # Returns
+    /// * `String` - The address formatted as a hex string with 0x prefix
     pub fn hex(&self) -> String {
         format!("{:?}", self.0)
     }
 
+    /// Creates a new EvmAddress wrapper around an Alloy Address.
+    ///
+    /// # Arguments
+    /// * `address` - The Alloy Address to wrap
+    ///
+    /// # Returns
+    /// * `Self` - A new EvmAddress instance
     pub fn new(address: Address) -> Self {
         EvmAddress(address)
     }
 
+    /// Consumes this EvmAddress and returns the inner Alloy Address.
+    ///
+    /// # Returns
+    /// * `Address` - The inner Alloy Address
     pub fn into_address(self) -> Address {
         self.0
     }

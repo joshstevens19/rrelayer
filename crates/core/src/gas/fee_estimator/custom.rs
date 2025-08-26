@@ -36,6 +36,14 @@ struct CustomGasEstimateResult {
 }
 
 impl CustomGasEstimateResult {
+    /// Converts a custom gas estimate speed result to the standard gas price result format.
+    ///
+    /// # Arguments
+    /// * `speed` - The custom gas estimate data for a specific speed
+    ///
+    /// # Returns
+    /// * `Ok(GasPriceResult)` - The converted standard gas price result
+    /// * `Err(UnitsError)` - If parsing the gas price strings fails
     fn gas_price_result(
         speed: &CustomGasEstimateSpeedResult,
     ) -> Result<GasPriceResult, UnitsError> {
@@ -49,6 +57,11 @@ impl CustomGasEstimateResult {
         })
     }
 
+    /// Converts the custom gas estimate result to the standard gas estimator result format.
+    ///
+    /// # Returns
+    /// * `Ok(GasEstimatorResult)` - The converted standard gas estimator result
+    /// * `Err(UnitsError)` - If parsing any of the gas price strings fails
     pub fn to_base_result(&self) -> Result<GasEstimatorResult, UnitsError> {
         Ok(GasEstimatorResult {
             slow: Self::gas_price_result(&self.slow)?,
@@ -68,10 +81,25 @@ pub struct CustomGasFeeEstimator {
 }
 
 impl CustomGasFeeEstimator {
+    /// Builds the API endpoint URL for requesting gas prices for a specific chain.
+    ///
+    /// # Arguments
+    /// * `chain_id` - The chain ID to build the endpoint for
+    ///
+    /// # Returns
+    /// * `String` - The complete endpoint URL
     fn build_suggested_gas_price_endpoint(&self, chain_id: &ChainId) -> String {
         format!("{}/{}", self.endpoint, chain_id)
     }
 
+    /// Requests gas price estimates from the custom API endpoint.
+    ///
+    /// # Arguments
+    /// * `chain_id` - The chain ID to request gas prices for
+    ///
+    /// # Returns
+    /// * `Ok(CustomGasEstimateResult)` - The gas estimates from the custom API
+    /// * `Err(reqwest::Error)` - If the HTTP request fails
     async fn request_gas_estimate(
         &self,
         chain_id: &ChainId,

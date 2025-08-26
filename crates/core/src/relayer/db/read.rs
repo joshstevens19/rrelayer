@@ -7,6 +7,17 @@ use crate::{
 };
 
 impl PostgresClient {
+    /// Retrieves a paginated list of all relayers from the database.
+    ///
+    /// This method queries the database for all relayer records with pagination support.
+    /// Results are limited by the paging context and returned as a paginated result.
+    ///
+    /// # Arguments
+    /// * `paging_context` - Pagination parameters (limit and offset)
+    ///
+    /// # Returns
+    /// * `Ok(PagingResult<Relayer>)` - Paginated list of relayers
+    /// * `Err(PostgresError)` - If database query fails
     pub async fn get_relayers(
         &self,
         paging_context: &PagingContext,
@@ -30,6 +41,18 @@ impl PostgresClient {
         Ok(PagingResult::new(results, paging_context.next(result_count), paging_context.previous()))
     }
 
+    /// Retrieves a paginated list of relayers for a specific blockchain network.
+    ///
+    /// This method queries the database for relayer records filtered by chain ID,
+    /// excluding soft-deleted relayers. Results are paginated according to the paging context.
+    ///
+    /// # Arguments
+    /// * `chain_id` - The blockchain network ID to filter relayers by
+    /// * `paging_context` - Pagination parameters (limit and offset)
+    ///
+    /// # Returns
+    /// * `Ok(PagingResult<Relayer>)` - Paginated list of relayers for the specified chain
+    /// * `Err(PostgresError)` - If database query fails
     pub async fn get_relayers_for_chain(
         &self,
         chain_id: &ChainId,
@@ -56,6 +79,18 @@ impl PostgresClient {
         Ok(PagingResult::new(results, paging_context.next(result_count), paging_context.previous()))
     }
 
+    /// Retrieves a single relayer by its unique identifier.
+    ///
+    /// This method queries the database for a specific relayer using its ID,
+    /// excluding soft-deleted relayers. Returns None if the relayer doesn't exist.
+    ///
+    /// # Arguments
+    /// * `relayer_id` - The unique identifier of the relayer to retrieve
+    ///
+    /// # Returns
+    /// * `Ok(Some(Relayer))` - If the relayer is found and not deleted
+    /// * `Ok(None)` - If the relayer doesn't exist or is soft-deleted
+    /// * `Err(PostgresError)` - If database query fails
     pub async fn get_relayer(
         &self,
         relayer_id: &RelayerId,
@@ -78,6 +113,19 @@ impl PostgresClient {
         }
     }
 
+    /// Validates if an API key belongs to a specific relayer.
+    ///
+    /// This method checks if the provided API key is valid and associated with the
+    /// specified relayer. Only active (non-deleted) API keys are considered valid.
+    ///
+    /// # Arguments
+    /// * `relayer_id` - The unique identifier of the relayer
+    /// * `api_key` - The API key to validate
+    ///
+    /// # Returns
+    /// * `Ok(true)` - If the API key is valid and belongs to the relayer
+    /// * `Ok(false)` - If the API key is invalid, deleted, or doesn't belong to the relayer
+    /// * `Err(PostgresError)` - If database query fails
     pub async fn is_relayer_api_key(
         &self,
         relayer_id: &RelayerId,
@@ -103,6 +151,18 @@ impl PostgresClient {
         Ok(true)
     }
 
+    /// Retrieves a paginated list of API keys for a specific relayer.
+    ///
+    /// This method queries the database for all active API keys associated with a relayer,
+    /// ordered by creation date (newest first). Results are paginated according to the context.
+    ///
+    /// # Arguments
+    /// * `relayer_id` - The unique identifier of the relayer
+    /// * `paging_context` - Pagination parameters (limit and offset)
+    ///
+    /// # Returns
+    /// * `Ok(PagingResult<String>)` - Paginated list of API key strings
+    /// * `Err(PostgresError)` - If database query fails
     pub async fn get_relayer_api_keys(
         &self,
         relayer_id: &RelayerId,
@@ -131,6 +191,18 @@ impl PostgresClient {
         Ok(PagingResult::new(results, paging_context.next(result_count), paging_context.previous()))
     }
 
+    /// Retrieves a paginated list of allowlisted addresses for a specific relayer.
+    ///
+    /// This method queries the database for all Ethereum addresses that are allowed
+    /// to use the specified relayer for transaction processing, ordered by creation date.
+    ///
+    /// # Arguments
+    /// * `relayer_id` - The unique identifier of the relayer
+    /// * `paging_context` - Pagination parameters (limit and offset)
+    ///
+    /// # Returns
+    /// * `Ok(PagingResult<EvmAddress>)` - Paginated list of allowlisted Ethereum addresses
+    /// * `Err(PostgresError)` - If database query fails
     pub async fn relayer_get_allowlist_addresses(
         &self,
         relayer_id: &RelayerId,
@@ -158,6 +230,19 @@ impl PostgresClient {
         Ok(PagingResult::new(results, paging_context.next(result_count), paging_context.previous()))
     }
 
+    /// Checks if an Ethereum address is allowlisted for a specific relayer.
+    ///
+    /// This method verifies whether the given Ethereum address is present in the
+    /// allowlist for the specified relayer, allowing it to use the relayer's services.
+    ///
+    /// # Arguments
+    /// * `relayer_id` - The unique identifier of the relayer
+    /// * `address` - The Ethereum address to check
+    ///
+    /// # Returns
+    /// * `Ok(true)` - If the address is allowlisted for the relayer
+    /// * `Ok(false)` - If the address is not allowlisted
+    /// * `Err(PostgresError)` - If database query fails
     pub async fn is_relayer_allowlist_address(
         &self,
         relayer_id: &RelayerId,

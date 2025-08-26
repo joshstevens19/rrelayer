@@ -7,6 +7,22 @@ use crate::{
     commands::keystore::ProjectLocation,
 };
 
+/// Retrieves and displays the balance of a relayer.
+///
+/// Fetches either the native token balance (ETH) or ERC20 token balance
+/// for the specified relayer, depending on whether a token address is provided.
+/// For ERC20 tokens, it queries the contract for balance, decimals, and symbol
+/// to display a properly formatted balance.
+///
+/// # Arguments
+/// * `relayer_id` - Unique identifier of the relayer
+/// * `token` - Optional ERC20 token address; if None, shows native balance
+/// * `project_path` - Project location for authentication
+/// * `sdk` - Mutable reference to the SDK for API operations
+///
+/// # Returns
+/// * `Ok(())` - Balance retrieved and displayed successfully
+/// * `Err(BalanceError)` - Operation failed due to authentication, network, or query error
 pub async fn handle_balance(
     relayer_id: &RelayerId,
     token: &Option<EvmAddress>,

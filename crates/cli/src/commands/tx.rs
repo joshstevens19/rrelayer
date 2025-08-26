@@ -116,6 +116,20 @@ pub enum TxStatus {
     Success,
 }
 
+/// Handles transaction commands by dispatching to the appropriate handler function.
+///
+/// Routes transaction commands to their respective handlers based on the command type.
+/// Supports getting, listing, canceling, replacing, sending transactions, as well as
+/// withdrawal operations and queue status checking.
+///
+/// # Arguments
+/// * `command` - The transaction command to execute
+/// * `project_path` - The project location containing configuration and keystores
+/// * `sdk` - Mutable reference to the SDK for making API calls
+///
+/// # Returns
+/// * `Ok(())` - Command executed successfully
+/// * `Err(TransactionError)` - Command execution failed
 pub async fn handle_tx(
     command: &TxCommand,
     project_path: &ProjectLocation,
@@ -145,6 +159,19 @@ pub async fn handle_tx(
     }
 }
 
+/// Gets and displays details for a specific transaction.
+///
+/// Authenticates the user, fetches the transaction by ID, and displays
+/// its details in a formatted view.
+///
+/// # Arguments
+/// * `tx_id` - The unique identifier of the transaction to retrieve
+/// * `project_path` - The project location containing configuration and keystores
+/// * `sdk` - Mutable reference to the SDK for making API calls
+///
+/// # Returns
+/// * `Ok(())` - Transaction retrieved and displayed successfully
+/// * `Err(TransactionError)` - Authentication failed or transaction not found
 async fn handle_get(
     tx_id: &TransactionId,
     project_path: &ProjectLocation,
@@ -161,6 +188,21 @@ async fn handle_get(
     Ok(())
 }
 
+/// Withdraws funds from a relayer to a specified address.
+///
+/// Authenticates the user and sends a transaction from the relayer to withdraw
+/// the specified amount to the destination address. Uses fast transaction speed.
+///
+/// # Arguments
+/// * `relayer_id` - The unique identifier of the relayer to withdraw from
+/// * `to` - The destination address to send funds to
+/// * `amount` - The amount to withdraw
+/// * `project_path` - The project location containing configuration and keystores
+/// * `sdk` - Mutable reference to the SDK for making API calls
+///
+/// # Returns
+/// * `Ok(())` - Withdrawal transaction sent successfully
+/// * `Err(TransactionError)` - Authentication failed or transaction failed
 async fn handle_withdraw(
     relayer_id: &RelayerId,
     to: &EvmAddress,
@@ -192,6 +234,19 @@ async fn handle_withdraw(
     Ok(())
 }
 
+/// Gets and displays the status of a specific transaction.
+///
+/// Authenticates the user, fetches the transaction status by ID, and displays
+/// the current status and transaction hash if available.
+///
+/// # Arguments
+/// * `tx_id` - The unique identifier of the transaction to check
+/// * `project_path` - The project location containing configuration and keystores
+/// * `sdk` - Mutable reference to the SDK for making API calls
+///
+/// # Returns
+/// * `Ok(())` - Status retrieved and displayed successfully
+/// * `Err(TransactionError)` - Authentication failed or status check failed
 async fn handle_status(
     tx_id: &TransactionId,
     project_path: &ProjectLocation,
@@ -215,6 +270,20 @@ async fn handle_status(
     Ok(())
 }
 
+/// Lists transactions for a specific relayer.
+///
+/// Authenticates the user and retrieves all transactions for the specified relayer.
+/// Displays the transactions in a formatted view. Status filtering is not yet implemented.
+///
+/// # Arguments
+/// * `relayer_id` - The unique identifier of the relayer to list transactions for
+/// * `_status` - Optional status filter (not yet implemented)
+/// * `project_path` - The project location containing configuration and keystores
+/// * `sdk` - Mutable reference to the SDK for making API calls
+///
+/// # Returns
+/// * `Ok(())` - Transactions listed successfully
+/// * `Err(TransactionError)` - Authentication failed or transaction retrieval failed
 async fn handle_list(
     relayer_id: &RelayerId,
     // TODO: handle status filtering
@@ -241,6 +310,19 @@ async fn handle_list(
     Ok(())
 }
 
+/// Displays the transaction queue status for a specific relayer.
+///
+/// Authenticates the user and retrieves both pending and mempool transaction counts
+/// for the specified relayer. Displays the results in a formatted status box.
+///
+/// # Arguments
+/// * `relayer_id` - The unique identifier of the relayer to check queue status for
+/// * `project_path` - The project location containing configuration and keystores
+/// * `sdk` - Mutable reference to the SDK for making API calls
+///
+/// # Returns
+/// * `Ok(())` - Queue status displayed successfully
+/// * `Err(TransactionError)` - Authentication failed or queue status retrieval failed
 async fn handle_queue(
     relayer_id: &RelayerId,
     project_path: &ProjectLocation,
@@ -275,6 +357,20 @@ async fn handle_queue(
     Ok(())
 }
 
+/// Attempts to cancel a pending transaction.
+///
+/// Authenticates the user and attempts to cancel the specified transaction.
+/// Returns success if cancellation worked, or a message if the transaction
+/// cannot be cancelled (e.g., already mined).
+///
+/// # Arguments
+/// * `tx_id` - The unique identifier of the transaction to cancel
+/// * `project_path` - The project location containing configuration and keystores
+/// * `sdk` - Mutable reference to the SDK for making API calls
+///
+/// # Returns
+/// * `Ok(())` - Cancellation attempt completed (check output for actual result)
+/// * `Err(TransactionError)` - Authentication failed or cancellation request failed
 async fn handle_cancel(
     tx_id: &TransactionId,
     project_path: &ProjectLocation,
@@ -297,6 +393,21 @@ async fn handle_cancel(
     Ok(())
 }
 
+/// Attempts to replace a pending transaction with a new one.
+///
+/// Authenticates the user and attempts to replace the specified transaction
+/// with a new transaction request. Returns success if replacement worked,
+/// or a message if the transaction cannot be replaced.
+///
+/// # Arguments
+/// * `tx_id` - The unique identifier of the transaction to replace
+/// * `transaction` - The new transaction request to replace with
+/// * `project_path` - The project location containing configuration and keystores
+/// * `sdk` - Mutable reference to the SDK for making API calls
+///
+/// # Returns
+/// * `Ok(())` - Replacement attempt completed (check output for actual result)
+/// * `Err(TransactionError)` - Authentication failed or replacement request failed
 async fn handle_replace(
     tx_id: &TransactionId,
     transaction: &RelayTransactionRequest,
@@ -319,6 +430,20 @@ async fn handle_replace(
     Ok(())
 }
 
+/// Sends a new transaction using the specified relayer.
+///
+/// Authenticates the user and sends the provided transaction request using
+/// the specified relayer. Displays the transaction ID and hash upon success.
+///
+/// # Arguments
+/// * `relayer_id` - The unique identifier of the relayer to use for sending
+/// * `transaction` - The transaction request to send
+/// * `project_path` - The project location containing configuration and keystores
+/// * `sdk` - Mutable reference to the SDK for making API calls
+///
+/// # Returns
+/// * `Ok(())` - Transaction sent successfully
+/// * `Err(TransactionError)` - Authentication failed or transaction send failed
 async fn handle_send(
     relayer_id: &RelayerId,
     transaction: &RelayTransactionRequest,
@@ -337,6 +462,17 @@ async fn handle_send(
     Ok(())
 }
 
+/// Displays transactions in either detailed single-transaction format or JSON list format.
+///
+/// For a single transaction, displays detailed information in a formatted box.
+/// For multiple transactions, displays them as a JSON list with a summary.
+///
+/// # Arguments
+/// * `transactions` - Vector of transactions to display
+///
+/// # Returns
+/// * `Ok(())` - Transactions displayed successfully
+/// * `Err(TransactionError)` - Failed to serialize transactions to JSON
 fn log_transactions(transactions: Vec<Transaction>) -> Result<(), TransactionError> {
     if transactions.is_empty() {
         println!("No transactions found.");
@@ -413,6 +549,16 @@ fn log_transactions(transactions: Vec<Transaction>) -> Result<(), TransactionErr
     Ok(())
 }
 
+/// Formats a SystemTime as a human-readable UTC timestamp string.
+///
+/// Converts a SystemTime to a formatted string in "YYYY-MM-DD HH:MM:SS UTC" format.
+/// Returns "Invalid time" if the time cannot be formatted.
+///
+/// # Arguments
+/// * `time` - The SystemTime to format
+///
+/// # Returns
+/// * Formatted time string or "Invalid time" if formatting fails
 fn format_time(time: &SystemTime) -> String {
     match time.duration_since(SystemTime::UNIX_EPOCH) {
         Ok(duration) => {

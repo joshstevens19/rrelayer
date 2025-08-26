@@ -53,6 +53,13 @@ pub enum CliJwtRole {
 }
 
 impl From<CliJwtRole> for JwtRole {
+    /// Converts a CLI JWT role enum to the core JWT role enum.
+    ///
+    /// # Arguments
+    /// * `role` - The CLI JWT role to convert
+    ///
+    /// # Returns
+    /// * The corresponding core JWT role
     fn from(role: CliJwtRole) -> Self {
         match role {
             CliJwtRole::Admin => JwtRole::Admin,
@@ -63,6 +70,19 @@ impl From<CliJwtRole> for JwtRole {
     }
 }
 
+/// Handles user management commands by dispatching to the appropriate handler function.
+///
+/// Routes user commands to their respective handlers for listing, adding, editing,
+/// or deleting users and their roles.
+///
+/// # Arguments
+/// * `command` - The user management command to execute
+/// * `project_path` - The project location containing configuration and keystores
+/// * `sdk` - Mutable reference to the SDK for making API calls
+///
+/// # Returns
+/// * `Ok(())` - Command executed successfully
+/// * `Err(UserError)` - Command execution failed
 pub async fn handle_user(
     command: &UserCommand,
     project_path: &ProjectLocation,
@@ -76,6 +96,18 @@ pub async fn handle_user(
     }
 }
 
+/// Lists all users and their roles in a formatted table.
+///
+/// Authenticates the user and retrieves all users, then displays them
+/// in a table format with their addresses and assigned roles.
+///
+/// # Arguments
+/// * `project_path` - The project location containing configuration and keystores
+/// * `sdk` - Mutable reference to the SDK for making API calls
+///
+/// # Returns
+/// * `Ok(())` - Users listed successfully
+/// * `Err(UserError)` - Authentication failed or user retrieval failed
 async fn handle_list(project_path: &ProjectLocation, sdk: &mut SDK) -> Result<(), UserError> {
     handle_authenticate(sdk, "account1", project_path).await?;
 
@@ -84,6 +116,19 @@ async fn handle_list(project_path: &ProjectLocation, sdk: &mut SDK) -> Result<()
     Ok(())
 }
 
+/// Deletes a user from the system.
+///
+/// Authenticates the user and removes the specified user address from
+/// the system, revoking their access.
+///
+/// # Arguments
+/// * `address` - The Ethereum address of the user to delete
+/// * `project_path` - The project location containing configuration and keystores
+/// * `sdk` - Mutable reference to the SDK for making API calls
+///
+/// # Returns
+/// * `Ok(())` - User deleted successfully
+/// * `Err(UserError)` - Authentication failed or deletion failed
 async fn handle_delete(
     address: &EvmAddress,
     project_path: &ProjectLocation,
@@ -98,6 +143,20 @@ async fn handle_delete(
     Ok(())
 }
 
+/// Adds a new user to the system with the specified role.
+///
+/// Authenticates the user and adds the specified address with the given
+/// role to the system, granting them appropriate access permissions.
+///
+/// # Arguments
+/// * `user_address` - The Ethereum address of the user to add
+/// * `role` - The role to assign to the new user
+/// * `project_path` - The project location containing configuration and keystores
+/// * `sdk` - Mutable reference to the SDK for making API calls
+///
+/// # Returns
+/// * `Ok(())` - User added successfully
+/// * `Err(UserError)` - Authentication failed or user addition failed
 async fn handle_add(
     user_address: &EvmAddress,
     role: &CliJwtRole,
@@ -115,6 +174,20 @@ async fn handle_add(
     Ok(())
 }
 
+/// Updates an existing user's role.
+///
+/// Authenticates the user and updates the specified user's role to the
+/// new role, changing their access permissions accordingly.
+///
+/// # Arguments
+/// * `user_address` - The Ethereum address of the user to update
+/// * `role` - The new role to assign to the user
+/// * `project_path` - The project location containing configuration and keystores
+/// * `sdk` - Mutable reference to the SDK for making API calls
+///
+/// # Returns
+/// * `Ok(())` - User role updated successfully
+/// * `Err(UserError)` - Authentication failed or role update failed
 async fn handle_edit(
     user_address: &EvmAddress,
     role: &CliJwtRole,
@@ -131,6 +204,18 @@ async fn handle_edit(
     Ok(())
 }
 
+/// Retrieves and displays users in a formatted table.
+///
+/// Fetches all users from the API and displays them in a table format
+/// with columns for address and role. Includes pagination context
+/// but currently retrieves all users.
+///
+/// # Arguments
+/// * `sdk` - Mutable reference to the SDK for making API calls
+///
+/// # Returns
+/// * `Ok(())` - Users displayed successfully
+/// * `Err(UserError)` - Failed to fetch users from API
 async fn log_users(sdk: &mut SDK) -> Result<(), UserError> {
     let users = sdk
         .user

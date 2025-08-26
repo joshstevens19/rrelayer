@@ -28,6 +28,18 @@ pub struct PrivyWalletManager {
 }
 
 impl PrivyWalletManager {
+    /// Creates a new PrivyWalletManager and loads existing wallets from Privy API.
+    ///
+    /// This constructor initializes the Privy client with the provided credentials
+    /// and immediately loads all existing wallets from the Privy service.
+    ///
+    /// # Arguments
+    /// * `app_id` - The Privy application ID
+    /// * `app_secret` - The Privy application secret
+    ///
+    /// # Returns
+    /// * `Ok(Self)` - A fully initialized PrivyWalletManager with loaded wallets
+    /// * `Err(WalletError)` - If initialization or wallet loading fails
     pub async fn new(app_id: String, app_secret: String) -> Result<Self, WalletError> {
         let client = reqwest::Client::new();
         let manager = Self {
@@ -41,6 +53,15 @@ impl PrivyWalletManager {
         Ok(manager)
     }
 
+    /// Loads all wallets from the Privy API using pagination.
+    ///
+    /// This method fetches all wallets associated with the Privy app by making
+    /// paginated requests to the Privy API. It handles cursor-based pagination
+    /// to ensure all wallets are retrieved.
+    ///
+    /// # Returns
+    /// * `Ok(())` - If all wallets were successfully loaded
+    /// * `Err(WalletError)` - If any API request fails or JSON parsing fails
     async fn load_wallets(&self) -> Result<(), WalletError> {
         let mut all_wallets = Vec::new();
         let mut cursor: Option<String> = None;

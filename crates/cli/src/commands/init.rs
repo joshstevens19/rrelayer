@@ -15,10 +15,32 @@ use crate::{
     console::print_error_message,
 };
 
+/// Writes a Docker Compose file to the project directory.
+///
+/// Creates a docker-compose.yml file with PostgreSQL configuration
+/// for local development.
+///
+/// # Arguments
+/// * `path` - Project directory path where the file will be created
+///
+/// # Returns
+/// * `Ok(())` - File written successfully
+/// * `Err(WriteFileError)` - Failed to write file
 fn write_docker_compose(path: &Path) -> Result<(), WriteFileError> {
     write_file(&path.join("docker-compose.yml"), generate_docker_file())
 }
 
+/// Writes a .gitignore file to the project directory.
+///
+/// Creates a .gitignore file that excludes sensitive files like
+/// environment variables from version control.
+///
+/// # Arguments
+/// * `path` - Project directory path where the file will be created
+///
+/// # Returns
+/// * `Ok(())` - File written successfully
+/// * `Err(WriteFileError)` - Failed to write file
 fn write_gitignore(path: &Path) -> Result<(), WriteFileError> {
     write_file(
         &path.join(".gitignore"),
@@ -27,6 +49,23 @@ fn write_gitignore(path: &Path) -> Result<(), WriteFileError> {
     )
 }
 
+/// Initializes a new RRelayer project.
+///
+/// Creates a new project directory with all necessary configuration files,
+/// keystores, and Docker setup. This includes:
+/// - Project configuration file (rrelayer.yaml)
+/// - Signing key keystore with generated mnemonic
+/// - Admin account keystore with generated private key
+/// - Environment configuration (.env)
+/// - Docker Compose setup (optional)
+/// - Git ignore file
+///
+/// # Arguments
+/// * `path` - Base directory where the project will be created
+///
+/// # Returns
+/// * `Ok(())` - Project initialized successfully
+/// * `Err(InitError)` - Initialization failed
 pub async fn handle_init(path: &Path) -> Result<(), InitError> {
     let project_name: String = Input::new().with_prompt("Enter project name").interact_text()?;
 

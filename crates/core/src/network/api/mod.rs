@@ -22,6 +22,17 @@ use crate::{
     rrelayer_error, rrelayer_info,
 };
 
+/// HTTP handler for retrieving all networks.
+///
+/// Returns a list of all networks (enabled and disabled) from cache if available,
+/// otherwise fetches from database and caches the result.
+///
+/// # Arguments
+/// * `state` - Application state containing database connection and cache
+///
+/// # Returns
+/// * `Ok(Json<Vec<Network>>)` - List of all networks
+/// * `Err(StatusCode::INTERNAL_SERVER_ERROR)` - If database query fails
 async fn networks(State(state): State<Arc<AppState>>) -> Result<Json<Vec<Network>>, StatusCode> {
     if let Some(cached_result) = get_networks_cache(&state.cache).await {
         return Ok(Json(cached_result));
@@ -37,6 +48,17 @@ async fn networks(State(state): State<Arc<AppState>>) -> Result<Json<Vec<Network
     Ok(Json(networks))
 }
 
+/// HTTP handler for retrieving enabled networks only.
+///
+/// Returns a list of enabled networks from cache if available,
+/// otherwise fetches from database and caches the result.
+///
+/// # Arguments
+/// * `state` - Application state containing database connection and cache
+///
+/// # Returns
+/// * `Ok(Json<Vec<Network>>)` - List of enabled networks
+/// * `Err(StatusCode::INTERNAL_SERVER_ERROR)` - If database query fails
 async fn enabled_networks(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<Network>>, StatusCode> {
@@ -54,6 +76,17 @@ async fn enabled_networks(
     Ok(Json(enabled_networks))
 }
 
+/// HTTP handler for retrieving disabled networks only.
+///
+/// Returns a list of disabled networks from cache if available,
+/// otherwise fetches from database and caches the result.
+///
+/// # Arguments
+/// * `state` - Application state containing database connection and cache
+///
+/// # Returns
+/// * `Ok(Json<Vec<Network>>)` - List of disabled networks
+/// * `Err(StatusCode::INTERNAL_SERVER_ERROR)` - If database query fails
 async fn disabled_networks(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<Network>>, StatusCode> {
@@ -71,6 +104,18 @@ async fn disabled_networks(
     Ok(Json(disabled_networks))
 }
 
+/// HTTP handler for disabling a specific network.
+///
+/// Disables the network with the specified chain ID and invalidates
+/// related cache entries to ensure consistency.
+///
+/// # Arguments
+/// * `state` - Application state containing database connection and cache
+/// * `chain_id` - Chain ID of the network to disable
+///
+/// # Returns
+/// * `StatusCode::CREATED` - If network was successfully disabled
+/// * `StatusCode::INTERNAL_SERVER_ERROR` - If database operation fails
 async fn disable_network(
     State(state): State<Arc<AppState>>,
     Path(chain_id): Path<ChainId>,
@@ -87,6 +132,18 @@ async fn disable_network(
     }
 }
 
+/// HTTP handler for enabling a specific network.
+///
+/// Enables the network with the specified chain ID and invalidates
+/// related cache entries to ensure consistency.
+///
+/// # Arguments
+/// * `state` - Application state containing database connection and cache
+/// * `chain_id` - Chain ID of the network to enable
+///
+/// # Returns
+/// * `StatusCode::CREATED` - If network was successfully enabled
+/// * `StatusCode::BAD_REQUEST` - If database operation fails
 async fn enable_network(
     State(state): State<Arc<AppState>>,
     Path(chain_id): Path<ChainId>,
@@ -100,6 +157,17 @@ async fn enable_network(
     }
 }
 
+/// Creates and configures the network API routes.
+///
+/// Sets up all network-related HTTP endpoints with appropriate middleware:
+/// - GET /: Returns all networks (requires read-only access)
+/// - GET /enabled: Returns enabled networks (requires read-only access)  
+/// - GET /disabled: Returns disabled networks (requires read-only access)
+/// - PUT /disable/:chain_id: Disables a network (requires admin access)
+/// - PUT /enable/:chain_id: Enables a network (requires admin access)
+///
+/// # Returns
+/// * `Router<Arc<AppState>>` - Configured router with all network endpoints
 pub fn create_network_routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/", get(networks))

@@ -17,6 +17,13 @@ use crate::shared::from_param_u256;
 pub struct BlockHash(B256);
 
 impl BlockHash {
+    /// Creates a new BlockHash wrapper around a B256.
+    ///
+    /// # Arguments
+    /// * `block_hash` - The B256 block hash to wrap
+    ///
+    /// # Returns
+    /// * `Self` - A new BlockHash instance
     pub fn new(block_hash: B256) -> Self {
         BlockHash(block_hash)
     }

@@ -44,10 +44,30 @@ pub struct CreateRelayerResult {
     pub address: EvmAddress,
 }
 
+/// Generates a random API key string.
+///
+/// Creates a cryptographically secure random string of 32 alphanumeric characters
+/// suitable for use as an API key.
+///
+/// # Returns
+/// * A 32-character random alphanumeric string
 fn generate_api_key() -> String {
     rand::thread_rng().sample_iter(&Alphanumeric).take(32).map(char::from).collect()
 }
 
+/// Creates a new relayer for the specified blockchain network.
+///
+/// This endpoint creates a new relayer wallet, initializes it in the database,
+/// sets up the transaction queue, and returns the relayer ID and address.
+///
+/// # Arguments
+/// * `state` - Application state containing database and provider connections
+/// * `chain_id` - The blockchain network ID to create the relayer for
+/// * `relayer` - Request body containing the relayer name
+///
+/// # Returns
+/// * `Ok(Json<CreateRelayerResult>)` - The new relayer's ID and address
+/// * `Err(StatusCode)` - HTTP error code if creation fails
 async fn create_relayer(
     State(state): State<Arc<AppState>>,
     Path(chain_id): Path<ChainId>,
@@ -97,6 +117,20 @@ struct CloneRelayerRequest {
     pub chain_id: ChainId,
 }
 
+/// Clones an existing relayer to a new blockchain network.
+///
+/// This endpoint creates a new relayer by copying the wallet from an existing relayer
+/// but deploying it to a different chain. The new relayer inherits the same private key
+/// but operates on the specified target chain.
+///
+/// # Arguments
+/// * `state` - Application state containing database and provider connections
+/// * `relayer_id` - The ID of the existing relayer to clone from
+/// * `relayer` - Request body containing the new relayer name and target chain ID
+///
+/// # Returns
+/// * `Ok(Json<CreateRelayerResult>)` - The cloned relayer's ID and address
+/// * `Err(StatusCode)` - HTTP error code if cloning fails
 async fn clone_relayer(
     State(state): State<Arc<AppState>>,
     Path(relayer_id): Path<RelayerId>,
@@ -150,6 +184,18 @@ struct GetRelayersQuery {
     offset: u32,
 }
 
+/// Retrieves a paginated list of relayers, optionally filtered by chain ID.
+///
+/// This endpoint returns a list of all relayers with optional filtering by blockchain network.
+/// Results are paginated using limit and offset parameters.
+///
+/// # Arguments
+/// * `state` - Application state containing database connections
+/// * `query` - Query parameters including optional chain_id, limit, and offset
+///
+/// # Returns
+/// * `Ok(Json<PagingResult<Relayer>>)` - Paginated list of relayers
+/// * `Err(StatusCode)` - HTTP error code if retrieval fails
 async fn get_relayers(
     State(state): State<Arc<AppState>>,
     Query(query): Query<GetRelayersQuery>,
@@ -183,6 +229,20 @@ pub struct GetRelayerResult {
     pub provider_urls: Vec<String>,
 }
 
+/// Retrieves detailed information about a specific relayer.
+///
+/// This endpoint returns relayer details including its configuration and associated
+/// provider URLs. Access is controlled by JWT tokens or relayer-specific API keys.
+///
+/// # Arguments
+/// * `state` - Application state containing database and provider connections
+/// * `auth_guard` - Authentication guard that validates JWT tokens or API keys
+/// * `relayer_id` - The unique identifier of the relayer to retrieve
+/// * `headers` - HTTP headers for API key authentication
+///
+/// # Returns
+/// * `Ok(Json<GetRelayerResult>)` - Relayer details and provider URLs
+/// * `Err(StatusCode)` - HTTP error code if retrieval fails or unauthorized
 async fn get_relayer_api(
     State(state): State<Arc<AppState>>,
     ReadOnlyOrAboveJwtTokenOrApiKeyGuard(auth_guard): ReadOnlyOrAboveJwtTokenOrApiKeyGuard,
@@ -206,6 +266,18 @@ async fn get_relayer_api(
     Ok(Json(GetRelayerResult { relayer, provider_urls }))
 }
 
+/// Soft deletes a relayer from the system.
+///
+/// This endpoint marks a relayer as deleted in the database, invalidates its cache,
+/// and removes its transaction queue. The relayer data is preserved for audit purposes.
+///
+/// # Arguments
+/// * `state` - Application state containing database and queue connections
+/// * `relayer_id` - The unique identifier of the relayer to delete
+///
+/// # Returns
+/// * `StatusCode::NO_CONTENT` - If deletion succeeds
+/// * `StatusCode::INTERNAL_SERVER_ERROR` - If deletion fails
 async fn delete_relayer(
     State(state): State<Arc<AppState>>,
     Path(relayer_id): Path<RelayerId>,
@@ -220,6 +292,21 @@ async fn delete_relayer(
     }
 }
 
+/// Pauses transaction processing for a relayer.
+///
+/// This endpoint stops the relayer from processing new transactions while keeping
+/// it in the system. The relayer's queue is paused and the status is updated in the database.
+///
+/// # Arguments
+/// * `state` - Application state containing database and queue connections
+/// * `auth_guard` - Authentication guard requiring manager-level permissions
+/// * `relayer_id` - The unique identifier of the relayer to pause
+/// * `headers` - HTTP headers for API key authentication
+///
+/// # Returns
+/// * `StatusCode::NO_CONTENT` - If pause succeeds
+/// * `StatusCode::UNAUTHORIZED` - If authentication fails
+/// * `StatusCode::INTERNAL_SERVER_ERROR` - If database operation fails
 async fn pause_relayer(
     State(state): State<Arc<AppState>>,
     ManagerOrAboveJwtTokenOrApiKeyGuard(auth_guard): ManagerOrAboveJwtTokenOrApiKeyGuard,
@@ -247,6 +334,21 @@ async fn pause_relayer(
     }
 }
 
+/// Resumes transaction processing for a paused relayer.
+///
+/// This endpoint reactivates a paused relayer, allowing it to resume processing
+/// transactions. The relayer's queue is unpaused and the status is updated in the database.
+///
+/// # Arguments
+/// * `state` - Application state containing database and queue connections
+/// * `auth_guard` - Authentication guard requiring manager-level permissions
+/// * `relayer_id` - The unique identifier of the relayer to unpause
+/// * `headers` - HTTP headers for API key authentication
+///
+/// # Returns
+/// * `StatusCode::NO_CONTENT` - If unpause succeeds
+/// * `StatusCode::UNAUTHORIZED` - If authentication fails
+/// * `StatusCode::INTERNAL_SERVER_ERROR` - If database operation fails
 async fn unpause_relayer(
     State(state): State<Arc<AppState>>,
     ManagerOrAboveJwtTokenOrApiKeyGuard(auth_guard): ManagerOrAboveJwtTokenOrApiKeyGuard,
@@ -274,6 +376,23 @@ async fn unpause_relayer(
     }
 }
 
+/// Updates the maximum gas price limit for a relayer.
+///
+/// This endpoint sets or removes the gas price cap for a relayer. When set, the relayer
+/// will refuse to process transactions that would require gas prices above this limit.
+///
+/// # Arguments
+/// * `state` - Application state containing database and queue connections
+/// * `auth_guard` - Authentication guard requiring manager-level permissions
+/// * `relayer_id` - The unique identifier of the relayer
+/// * `cap` - The new gas price cap (None to remove the cap)
+/// * `headers` - HTTP headers for API key authentication
+///
+/// # Returns
+/// * `StatusCode::NO_CONTENT` - If update succeeds
+/// * `StatusCode::UNAUTHORIZED` - If authentication fails
+/// * `StatusCode::NOT_FOUND` - If relayer doesn't exist
+/// * `StatusCode::INTERNAL_SERVER_ERROR` - If database operation fails
 async fn update_relay_max_gas_price(
     State(state): State<Arc<AppState>>,
     ManagerOrAboveJwtTokenOrApiKeyGuard(auth_guard): ManagerOrAboveJwtTokenOrApiKeyGuard,
@@ -320,6 +439,19 @@ pub struct CreateRelayerApiResult {
     pub api_key: ApiKey,
 }
 
+/// Creates a new API key for a relayer.
+///
+/// This endpoint generates a new API key that can be used to authenticate requests
+/// for this specific relayer. The API key provides limited access to relayer-specific operations.
+///
+/// # Arguments
+/// * `state` - Application state containing database connections
+/// * `relayer_id` - The unique identifier of the relayer
+///
+/// # Returns
+/// * `Ok(Json<CreateRelayerApiResult>)` - The newly generated API key
+/// * `Err(StatusCode::NOT_FOUND)` - If relayer doesn't exist
+/// * `Err(StatusCode::INTERNAL_SERVER_ERROR)` - If key generation fails
 async fn create_relayer_api_key(
     State(state): State<Arc<AppState>>,
     Path(relayer_id): Path<RelayerId>,
@@ -345,6 +477,20 @@ struct GetRelayerApiKeysQuery {
     offset: u32,
 }
 
+/// Retrieves a paginated list of API keys for a relayer.
+///
+/// This endpoint returns all API keys associated with a specific relayer,
+/// with support for pagination through limit and offset parameters.
+///
+/// # Arguments
+/// * `state` - Application state containing database connections
+/// * `relayer_id` - The unique identifier of the relayer
+/// * `query` - Query parameters for pagination (limit and offset)
+///
+/// # Returns
+/// * `Ok(Json<PagingResult<String>>)` - Paginated list of API keys
+/// * `Err(StatusCode::NOT_FOUND)` - If relayer doesn't exist
+/// * `Err(StatusCode::INTERNAL_SERVER_ERROR)` - If retrieval fails
 async fn get_relayer_api_keys(
     State(state): State<Arc<AppState>>,
     Path(relayer_id): Path<RelayerId>,
@@ -369,6 +515,20 @@ struct DeleteRelayerApiKeyRequest {
     pub api_key: String,
 }
 
+/// Deletes a specific API key for a relayer.
+///
+/// This endpoint removes an API key from a relayer, revoking access for that key.
+/// The API key is soft-deleted and marked as inactive in the database.
+///
+/// # Arguments
+/// * `state` - Application state containing database connections
+/// * `relayer_id` - The unique identifier of the relayer
+/// * `body` - Request body containing the API key to delete
+///
+/// # Returns
+/// * `StatusCode::NO_CONTENT` - If deletion succeeds
+/// * `StatusCode::NOT_FOUND` - If relayer doesn't exist
+/// * `StatusCode::INTERNAL_SERVER_ERROR` - If deletion fails
 async fn delete_relayer_api_key(
     State(state): State<Arc<AppState>>,
     Path(relayer_id): Path<RelayerId>,
@@ -390,6 +550,23 @@ struct GetAllowlistAddressesQuery {
     offset: u32,
 }
 
+/// Retrieves the allowlist addresses for a relayer.
+///
+/// This endpoint returns a paginated list of Ethereum addresses that are allowed
+/// to use this relayer for transaction processing when allowlist mode is enabled.
+///
+/// # Arguments
+/// * `state` - Application state containing database connections
+/// * `auth_guard` - Authentication guard for access control
+/// * `relayer_id` - The unique identifier of the relayer
+/// * `query` - Query parameters for pagination (limit and offset)
+/// * `headers` - HTTP headers for API key authentication
+///
+/// # Returns
+/// * `Ok(Json<PagingResult<EvmAddress>>)` - Paginated list of allowlisted addresses
+/// * `Err(StatusCode::UNAUTHORIZED)` - If authentication fails
+/// * `Err(StatusCode::NOT_FOUND)` - If relayer doesn't exist
+/// * `Err(StatusCode::INTERNAL_SERVER_ERROR)` - If retrieval fails
 async fn get_allowlist_addresses(
     State(state): State<Arc<AppState>>,
     ReadOnlyOrAboveJwtTokenOrApiKeyGuard(auth_guard): ReadOnlyOrAboveJwtTokenOrApiKeyGuard,
@@ -419,6 +596,23 @@ async fn get_allowlist_addresses(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
 }
 
+/// Adds an address to the relayer's allowlist.
+///
+/// This endpoint adds an Ethereum address to the relayer's allowlist and automatically
+/// enables allowlist-only mode for the relayer's transaction queue.
+///
+/// # Arguments
+/// * `state` - Application state containing database and queue connections
+/// * `auth_guard` - Authentication guard requiring manager-level permissions
+/// * `relayer_id` - The unique identifier of the relayer
+/// * `address` - The Ethereum address to add to the allowlist
+/// * `headers` - HTTP headers for API key authentication
+///
+/// # Returns
+/// * `StatusCode::NO_CONTENT` - If addition succeeds
+/// * `StatusCode::UNAUTHORIZED` - If authentication fails
+/// * `StatusCode::NOT_FOUND` - If relayer doesn't exist
+/// * `StatusCode::INTERNAL_SERVER_ERROR` - If database operation fails
 async fn add_allowlist_address(
     State(state): State<Arc<AppState>>,
     ManagerOrAboveJwtTokenOrApiKeyGuard(auth_guard): ManagerOrAboveJwtTokenOrApiKeyGuard,
@@ -452,6 +646,23 @@ async fn add_allowlist_address(
     }
 }
 
+/// Removes an address from the relayer's allowlist.
+///
+/// This endpoint removes an Ethereum address from the relayer's allowlist.
+/// If no addresses remain in the allowlist, allowlist-only mode is automatically disabled.
+///
+/// # Arguments
+/// * `state` - Application state containing database and queue connections
+/// * `auth_guard` - Authentication guard requiring manager-level permissions
+/// * `relayer_id` - The unique identifier of the relayer
+/// * `address` - The Ethereum address to remove from the allowlist
+/// * `headers` - HTTP headers for API key authentication
+///
+/// # Returns
+/// * `StatusCode::NO_CONTENT` - If removal succeeds
+/// * `StatusCode::UNAUTHORIZED` - If authentication fails
+/// * `StatusCode::NOT_FOUND` - If relayer doesn't exist
+/// * `StatusCode::INTERNAL_SERVER_ERROR` - If database operation fails
 async fn delete_allowlist_address(
     State(state): State<Arc<AppState>>,
     ManagerOrAboveJwtTokenOrApiKeyGuard(auth_guard): ManagerOrAboveJwtTokenOrApiKeyGuard,
@@ -486,6 +697,23 @@ async fn delete_allowlist_address(
     }
 }
 
+/// Updates the EIP-1559 transaction status for a relayer.
+///
+/// This endpoint enables or disables EIP-1559 (London hard fork) transaction support
+/// for a relayer. When enabled, the relayer will use type-2 transactions with base fee
+/// and priority fee. When disabled, it uses legacy transactions with gas price.
+///
+/// # Arguments
+/// * `state` - Application state containing database and queue connections
+/// * `auth_guard` - Authentication guard requiring manager-level permissions
+/// * `relayer_id` - The unique identifier of the relayer
+/// * `enabled` - Whether to enable EIP-1559 transactions (true) or use legacy (false)
+/// * `headers` - HTTP headers for API key authentication
+///
+/// # Returns
+/// * `StatusCode::NO_CONTENT` - If update succeeds
+/// * `StatusCode::UNAUTHORIZED` - If authentication fails
+/// * `StatusCode::INTERNAL_SERVER_ERROR` - If database operation fails
 async fn update_relay_eip1559_status(
     State(state): State<Arc<AppState>>,
     ManagerOrAboveJwtTokenOrApiKeyGuard(auth_guard): ManagerOrAboveJwtTokenOrApiKeyGuard,
@@ -512,6 +740,14 @@ async fn update_relay_eip1559_status(
     }
 }
 
+/// Creates and configures the HTTP routes for relayer management endpoints.
+///
+/// This function sets up all the REST API endpoints for managing relayers, including
+/// CRUD operations, API key management, allowlist management, and configuration updates.
+/// Each route is protected with appropriate authentication guards.
+///
+/// # Returns
+/// * A configured Axum Router with all relayer management endpoints
 pub fn create_relayer_routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/:chain_id/new", post(create_relayer).route_layer(from_fn(admin_jwt_guard)))

@@ -44,6 +44,15 @@ struct InfuraGasEstimateResult {
 }
 
 impl InfuraGasEstimateResult {
+    /// Converts an Infura gas estimate speed result to the standard gas price result format.
+    ///
+    /// # Arguments
+    /// * `speed` - The Infura gas estimate data for a specific speed
+    /// * `is_super_fast` - Whether this is for the super fast tier (applies 120% multiplier)
+    ///
+    /// # Returns
+    /// * `Ok(GasPriceResult)` - The converted standard gas price result
+    /// * `Err(UnitsError)` - If parsing the gas price strings fails or overflow occurs
     fn gas_price_result(
         speed: &InfuraGasEstimateSpeedResult,
         is_super_fast: bool,
@@ -73,6 +82,14 @@ impl InfuraGasEstimateResult {
         })
     }
 
+    /// Converts the Infura gas estimate result to the standard gas estimator result format.
+    ///
+    /// Maps Infura's low/medium/high speeds to slow/medium/fast, and creates super_fast
+    /// by applying a multiplier to the high speed estimates.
+    ///
+    /// # Returns
+    /// * `Ok(GasEstimatorResult)` - The converted standard gas estimator result
+    /// * `Err(UnitsError)` - If parsing any of the gas price strings fails
     pub fn to_base_result(&self) -> Result<GasEstimatorResult, UnitsError> {
         Ok(GasEstimatorResult {
             slow: Self::gas_price_result(&self.low, false)?,
@@ -92,6 +109,14 @@ pub struct InfuraGasFeeEstimator {
 }
 
 impl InfuraGasFeeEstimator {
+    /// Creates a new Infura gas fee estimator with API credentials and supported chains.
+    ///
+    /// # Arguments
+    /// * `api_key` - The Infura API key for authentication
+    /// * `secret` - The Infura API secret for authentication
+    ///
+    /// # Returns
+    /// * A new `InfuraGasFeeEstimator` instance configured with all supported chains
     pub fn new(api_key: &str, secret: &str) -> Self {
         Self {
             base_url: "https://gas.api.infura.io/networks".to_string(),
@@ -125,10 +150,27 @@ impl InfuraGasFeeEstimator {
         }
     }
 
+    /// Builds the Infura API endpoint URL for requesting gas prices for a specific chain.
+    ///
+    /// # Arguments
+    /// * `chain_id` - The chain ID to build the endpoint for
+    ///
+    /// # Returns
+    /// * `String` - The complete Infura endpoint URL
     fn build_suggested_gas_price_endpoint(&self, chain_id: &ChainId) -> String {
         format!("{}/{}/suggestedGasFees", self.base_url, chain_id)
     }
 
+    /// Requests gas price estimates from the Infura API for a specific chain.
+    ///
+    /// Uses HTTP Basic authentication with base64-encoded credentials.
+    ///
+    /// # Arguments
+    /// * `chain_id` - The chain ID to request gas prices for
+    ///
+    /// # Returns
+    /// * `Ok(InfuraGasEstimateResult)` - The gas estimates from Infura's API
+    /// * `Err(reqwest::Error)` - If the HTTP request fails
     async fn request_gas_estimate(
         &self,
         chain_id: &ChainId,

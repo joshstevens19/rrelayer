@@ -6,12 +6,27 @@ use tracing::{debug, error, warn};
 
 use super::types::{WebhookDelivery, WebhookDeliveryConfig};
 
+/// HTTP client for sending webhook requests with retry logic.
+///
+/// Handles the actual HTTP delivery of webhook payloads including:
+/// - Request signing with HMAC-SHA256
+/// - Timeout management
+/// - Retry logic with exponential backoff
+/// - Concurrent delivery processing
 pub struct WebhookSender {
     client: Client,
     config: WebhookDeliveryConfig,
 }
 
 impl WebhookSender {
+    /// Creates a new webhook sender with the specified configuration.
+    ///
+    /// # Arguments
+    /// * `config` - Delivery configuration including timeouts and retry settings
+    ///
+    /// # Returns
+    /// * `Ok(WebhookSender)` - Configured webhook sender
+    /// * `Err(reqwest::Error)` - If HTTP client creation fails
     pub fn new(config: WebhookDeliveryConfig) -> Result<Self, reqwest::Error> {
         let client = Client::builder()
             .timeout(Duration::from_secs(config.timeout_seconds as u64))
@@ -21,7 +36,16 @@ impl WebhookSender {
         Ok(Self { client, config })
     }
 
-    /// Send a webhook with retry logic
+    /// Sends a webhook with automatic retry logic.
+    ///
+    /// Attempts to deliver the webhook and updates the delivery status based on
+    /// the response. On failure, schedules retries with exponential backoff.
+    ///
+    /// # Arguments
+    /// * `delivery` - The webhook delivery to process
+    ///
+    /// # Returns
+    /// * `WebhookDelivery` - Updated delivery with new status and retry information
     pub async fn send_webhook(&self, mut delivery: WebhookDelivery) -> WebhookDelivery {
         rrelayer_info!(
             "Sending webhook {} to {} for event {} (attempt {}/{})",

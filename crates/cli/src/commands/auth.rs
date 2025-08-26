@@ -44,6 +44,18 @@ pub enum AuthCommand {
     ListAccounts,
 }
 
+/// Handles authentication command routing and execution.
+///
+/// Routes the authentication command to the appropriate handler function
+/// based on the command type (Login, Logout, NewAccount, Info, or ListAccounts).
+///
+/// # Arguments
+/// * `cmd` - The authentication command to execute
+/// * `project_path` - Path to the project directory
+///
+/// # Returns
+/// * `Ok(())` - Command executed successfully
+/// * `Err(AuthError)` - Command execution failed
 pub async fn handle_auth_command(
     cmd: &AuthCommand,
     project_path: PathBuf,
@@ -69,6 +81,18 @@ pub async fn handle_auth_command(
     Ok(())
 }
 
+/// Logs in to a keystore account.
+///
+/// Prompts the user for their password, decrypts the keystore to verify
+/// credentials, and stores the password in the password manager for future use.
+///
+/// # Arguments
+/// * `account` - Name of the account to log in with
+/// * `project_location` - Project location containing keystore files
+///
+/// # Returns
+/// * `Ok(())` - Login successful
+/// * `Err(AuthError)` - Login failed due to invalid credentials or other error
 fn login(account: &str, project_location: ProjectLocation) -> Result<(), AuthError> {
     let password_manager = KeyStorePasswordManager::new(&project_location.get_project_name())?;
 
@@ -91,6 +115,18 @@ fn login(account: &str, project_location: ProjectLocation) -> Result<(), AuthErr
     }
 }
 
+/// Logs out from a keystore account.
+///
+/// Removes the stored password from the password manager, requiring
+/// re-authentication for future operations.
+///
+/// # Arguments
+/// * `account` - Name of the account to log out from
+/// * `project_location` - Project location containing keystore files
+///
+/// # Returns
+/// * `Ok(())` - Logout successful or account was not logged in
+/// * `Err(AuthError)` - Logout failed due to password manager error
 fn logout(account: &str, project_location: ProjectLocation) -> Result<(), AuthError> {
     let password_manager = KeyStorePasswordManager::new(&project_location.get_project_name())?;
 
@@ -107,12 +143,36 @@ fn logout(account: &str, project_location: ProjectLocation) -> Result<(), AuthEr
     }
 }
 
+/// Creates a new keystore account.
+///
+/// Generates a new random private key and creates an encrypted keystore
+/// file for the account.
+///
+/// # Arguments
+/// * `account` - Name for the new account
+/// * `project_location` - Project location where keystore will be created
+///
+/// # Returns
+/// * `Ok(())` - Account created successfully
+/// * `Err(AuthError)` - Account creation failed
 fn new_account(account: &str, project_location: ProjectLocation) -> Result<(), AuthError> {
     create_from_private_key(&None, true, account, project_location, None)?;
 
     Ok(())
 }
 
+/// Displays account information including address and private key.
+///
+/// Decrypts the keystore and shows the account's address and private key
+/// or mnemonic phrase. Prompts for password if not already logged in.
+///
+/// # Arguments
+/// * `account` - Name of the account to show information for
+/// * `project_location` - Project location containing keystore files
+///
+/// # Returns
+/// * `Ok(())` - Account information displayed successfully
+/// * `Err(AuthError)` - Failed to decrypt keystore or show information
 fn show_account_info(account: &str, project_location: ProjectLocation) -> Result<(), AuthError> {
     let password_manager = KeyStorePasswordManager::new(&project_location.get_project_name())?;
 
@@ -150,6 +210,17 @@ fn show_account_info(account: &str, project_location: ProjectLocation) -> Result
     Ok(())
 }
 
+/// Lists all logged-in accounts for the current project.
+///
+/// Shows all accounts that have stored passwords in the password manager,
+/// indicating which accounts are currently logged in.
+///
+/// # Arguments
+/// * `project_location` - Project location to check for logged-in accounts
+///
+/// # Returns
+/// * `Ok(())` - Account list displayed successfully
+/// * `Err(AuthError)` - Failed to retrieve account list
 fn list_accounts(project_location: ProjectLocation) -> Result<(), AuthError> {
     let project_name = project_location.get_project_name();
     let password_manager = KeyStorePasswordManager::new(&project_name)?;

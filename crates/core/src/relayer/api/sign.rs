@@ -26,6 +26,21 @@ pub struct SignTextResult {
     pub signature: PrimitiveSignature,
 }
 
+/// Signs a plain text message using the relayer's private key.
+///
+/// This endpoint signs a text message using the relayer's wallet, producing a signature
+/// that can be used for authentication or verification purposes. The signature follows
+/// Ethereum's personal message signing standard.
+///
+/// # Arguments
+/// * `state` - Application state containing database and provider connections
+/// * `relayer_id` - The unique identifier of the relayer to use for signing
+/// * `sign` - Request body containing the text message to sign
+///
+/// # Returns
+/// * `Ok(Json<SignTextResult>)` - The original message and its signature
+/// * `Err(StatusCode::NOT_FOUND)` - If relayer doesn't exist or no provider found
+/// * `Err(StatusCode::INTERNAL_SERVER_ERROR)` - If signing operation fails
 // TODO: handle guard
 async fn sign_text(
     State(state): State<Arc<AppState>>,
@@ -56,6 +71,21 @@ pub struct SignTypedDataResult {
     pub signature: PrimitiveSignature,
 }
 
+/// Signs structured typed data using the relayer's private key (EIP-712).
+///
+/// This endpoint signs structured typed data according to EIP-712 standard using the
+/// relayer's wallet. This is commonly used for signing permit transactions, meta-transactions,
+/// and other structured data that requires domain separation.
+///
+/// # Arguments
+/// * `state` - Application state containing database and provider connections
+/// * `relayer_id` - The unique identifier of the relayer to use for signing
+/// * `typed_data` - The structured typed data to sign following EIP-712 format
+///
+/// # Returns
+/// * `Ok(Json<SignTypedDataResult>)` - The signature of the typed data
+/// * `Err(StatusCode::NOT_FOUND)` - If relayer doesn't exist or no provider found
+/// * `Err(StatusCode::INTERNAL_SERVER_ERROR)` - If signing operation fails
 // TODO: handle guard
 async fn sign_typed_data(
     State(state): State<Arc<AppState>>,
@@ -81,6 +111,13 @@ async fn sign_typed_data(
     Ok(Json(SignTypedDataResult { signature }))
 }
 
+/// Creates and configures the HTTP routes for relayer signing operations.
+///
+/// This function sets up the REST API endpoints for signing operations using relayers,
+/// including text message signing and EIP-712 typed data signing.
+///
+/// # Returns
+/// * A configured Axum Router with signing endpoints
 pub fn create_sign_routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/:relayer_id/sign/message", post(sign_text))

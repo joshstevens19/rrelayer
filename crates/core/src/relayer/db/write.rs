@@ -29,6 +29,21 @@ pub enum CreateRelayerError {
 }
 
 impl PostgresClient {
+    /// Creates a new relayer in the database and initializes its wallet.
+    ///
+    /// This method creates a new relayer entry in the database, assigns it a wallet index,
+    /// creates the corresponding wallet using the EVM provider, and updates the database
+    /// with the wallet address. Optionally clones configuration from an existing relayer.
+    ///
+    /// # Arguments
+    /// * `name` - The name for the new relayer
+    /// * `chain_id` - The blockchain network ID for the relayer
+    /// * `evm_provider` - The EVM provider for wallet operations
+    /// * `clone_relayer_id` - Optional ID of existing relayer to clone settings from
+    ///
+    /// # Returns
+    /// * `Ok(Relayer)` - The newly created relayer with all details
+    /// * `Err(CreateRelayerError)` - If creation fails at any step
     pub async fn create_relayer(
         &self,
         name: &str,
@@ -121,6 +136,18 @@ impl PostgresClient {
         }
     }
 
+    /// Soft deletes a relayer by marking it as deleted in the database.
+    ///
+    /// This method performs a soft delete by setting the deleted flag to true rather
+    /// than physically removing the relayer record. This preserves audit trails and
+    /// allows for potential recovery.
+    ///
+    /// # Arguments
+    /// * `relayer_id` - The unique identifier of the relayer to delete
+    ///
+    /// # Returns
+    /// * `Ok(())` - If the relayer was successfully marked as deleted
+    /// * `Err(PostgresError)` - If the database operation fails
     pub async fn delete_relayer(&self, relayer_id: &RelayerId) -> Result<(), PostgresError> {
         let _ = self
             .execute(
@@ -136,6 +163,17 @@ impl PostgresClient {
         Ok(())
     }
 
+    /// Pauses a relayer by updating its status in the database.
+    ///
+    /// This method sets the paused flag to true for the specified relayer,
+    /// which prevents it from processing new transactions.
+    ///
+    /// # Arguments
+    /// * `relayer_id` - The unique identifier of the relayer to pause
+    ///
+    /// # Returns
+    /// * `Ok(())` - If the relayer was successfully paused
+    /// * `Err(PostgresError)` - If the database operation fails
     pub async fn pause_relayer(&self, relayer_id: &RelayerId) -> Result<(), PostgresError> {
         let _ = self
             .execute(
@@ -151,6 +189,17 @@ impl PostgresClient {
         Ok(())
     }
 
+    /// Unpauses a relayer by updating its status in the database.
+    ///
+    /// This method sets the paused flag to false for the specified relayer,
+    /// allowing it to resume processing transactions.
+    ///
+    /// # Arguments
+    /// * `relayer_id` - The unique identifier of the relayer to unpause
+    ///
+    /// # Returns
+    /// * `Ok(())` - If the relayer was successfully unpaused
+    /// * `Err(PostgresError)` - If the database operation fails
     pub async fn unpause_relayer(&self, relayer_id: &RelayerId) -> Result<(), PostgresError> {
         let _ = self
             .execute(
@@ -166,6 +215,19 @@ impl PostgresClient {
         Ok(())
     }
 
+    /// Creates a new API key for a specific relayer.
+    ///
+    /// This method inserts a new API key record in the database, associating it
+    /// with the specified relayer. The API key can be used for authenticated access
+    /// to relayer-specific operations.
+    ///
+    /// # Arguments
+    /// * `relayer_id` - The unique identifier of the relayer
+    /// * `api_key` - The API key string to store
+    ///
+    /// # Returns
+    /// * `Ok(())` - If the API key was successfully created
+    /// * `Err(PostgresError)` - If the database operation fails
     pub async fn create_relayer_api_key(
         &self,
         relayer_id: &RelayerId,
@@ -184,6 +246,18 @@ impl PostgresClient {
         Ok(())
     }
 
+    /// Soft deletes an API key for a specific relayer.
+    ///
+    /// This method marks an API key as deleted rather than physically removing it,
+    /// preserving audit trails while revoking access for that key.
+    ///
+    /// # Arguments
+    /// * `relayer_id` - The unique identifier of the relayer
+    /// * `api_key` - The API key string to delete
+    ///
+    /// # Returns
+    /// * `Ok(())` - If the API key was successfully marked as deleted
+    /// * `Err(PostgresError)` - If the database operation fails
     pub async fn delete_relayer_api_key(
         &self,
         relayer_id: &RelayerId,
@@ -204,6 +278,19 @@ impl PostgresClient {
         Ok(())
     }
 
+    /// Updates the maximum gas price cap for a relayer.
+    ///
+    /// This method sets or removes the gas price limit for a relayer. When set,
+    /// the relayer will refuse to process transactions that would require gas prices
+    /// above this limit. Setting to None removes the cap.
+    ///
+    /// # Arguments
+    /// * `relayer_id` - The unique identifier of the relayer
+    /// * `cap` - The new gas price cap (None to remove the cap)
+    ///
+    /// # Returns
+    /// * `Ok(())` - If the gas price cap was successfully updated
+    /// * `Err(PostgresError)` - If the database operation fails
     pub async fn update_relayer_max_gas_price(
         &self,
         relayer_id: &RelayerId,
@@ -223,6 +310,19 @@ impl PostgresClient {
         Ok(())
     }
 
+    /// Updates the EIP-1559 transaction support status for a relayer.
+    ///
+    /// This method enables or disables EIP-1559 (London hard fork) transaction support
+    /// for a relayer. When enabled, the relayer uses type-2 transactions with base fee
+    /// and priority fee. When disabled, it uses legacy transactions with gas price.
+    ///
+    /// # Arguments
+    /// * `relayer_id` - The unique identifier of the relayer
+    /// * `enable` - Whether to enable EIP-1559 transactions (true) or use legacy (false)
+    ///
+    /// # Returns
+    /// * `Ok(())` - If the EIP-1559 status was successfully updated
+    /// * `Err(PostgresError)` - If the database operation fails
     pub async fn update_relayer_eip_1559_status(
         &self,
         relayer_id: &RelayerId,
@@ -233,7 +333,7 @@ impl PostgresClient {
                 "
                 UPDATE relayer.record
                 SET eip_1559_enabled = $1
-                AND id = $2
+                WHERE id = $2
                 ",
                 &[enable, relayer_id],
             )
@@ -242,6 +342,19 @@ impl PostgresClient {
         Ok(())
     }
 
+    /// Adds an Ethereum address to a relayer's allowlist.
+    ///
+    /// This method inserts an address into the allowlist table for the specified relayer.
+    /// If the address is already allowlisted, the operation is ignored (ON CONFLICT DO NOTHING).
+    /// After adding the address, it syncs the allowlist-only state for the relayer.
+    ///
+    /// # Arguments
+    /// * `relayer_id` - The unique identifier of the relayer
+    /// * `address` - The Ethereum address to add to the allowlist
+    ///
+    /// # Returns
+    /// * `Ok(())` - If the address was successfully added or already existed
+    /// * `Err(PostgresError)` - If the database operation fails
     pub async fn relayer_add_allowlist_address(
         &self,
         relayer_id: &RelayerId,
@@ -263,6 +376,18 @@ impl PostgresClient {
         Ok(())
     }
 
+    /// Removes an Ethereum address from a relayer's allowlist.
+    ///
+    /// This method deletes an address from the allowlist table for the specified relayer.
+    /// After removing the address, it syncs the allowlist-only state for the relayer.
+    ///
+    /// # Arguments
+    /// * `relayer_id` - The unique identifier of the relayer
+    /// * `address` - The Ethereum address to remove from the allowlist
+    ///
+    /// # Returns
+    /// * `Ok(())` - If the address was successfully removed
+    /// * `Err(PostgresError)` - If the database operation fails
     pub async fn relayer_delete_allowlist_address(
         &self,
         relayer_id: &RelayerId,
@@ -284,6 +409,18 @@ impl PostgresClient {
         Ok(())
     }
 
+    /// Synchronizes the allowlist-only state for a relayer based on existing allowlist entries.
+    ///
+    /// This private method updates the allowlisted_addresses_only flag for a relayer based on
+    /// whether any allowlist addresses exist. The query incorrectly checks for API keys instead
+    /// of allowlisted addresses - this appears to be a bug in the original code.
+    ///
+    /// # Arguments
+    /// * `relayer_id` - The unique identifier of the relayer
+    ///
+    /// # Returns
+    /// * `Ok(())` - If the state was successfully synchronized
+    /// * `Err(PostgresError)` - If the database operation fails
     async fn relayer_allowlist_addresses_only_sync_state(
         &self,
         relayer_id: &RelayerId,
@@ -295,9 +432,8 @@ impl PostgresClient {
                 SET allowlisted_addresses_only = COALESCE(
                     (
                         SELECT TRUE 
-                        FROM relayer.api_key 
+                        FROM relayer.allowlisted_address 
                         WHERE relayer_id = $1 
-                        AND deleted = FALSE 
                         LIMIT 1
                     ), 
                     FALSE)

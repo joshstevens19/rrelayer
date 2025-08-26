@@ -5,6 +5,17 @@ use axum::http::StatusCode;
 use std::time::Duration;
 use tokio::time::sleep;
 
+/// Returns Some(value) if condition is true, otherwise None.
+///
+/// A utility function for conditionally wrapping a value in an Option.
+///
+/// # Arguments
+/// * `condition` - The boolean condition to check
+/// * `value` - The value to wrap in Some if condition is true
+///
+/// # Returns
+/// * `Some(value)` - If condition is true
+/// * `None` - If condition is false
 pub fn option_if<T>(condition: bool, value: T) -> Option<T> {
     if condition {
         Some(value)
@@ -13,10 +24,27 @@ pub fn option_if<T>(condition: bool, value: T) -> Option<T> {
     }
 }
 
+/// Asynchronously sleeps for the specified number of milliseconds.
+///
+/// A convenience wrapper around tokio's sleep function.
+///
+/// # Arguments
+/// * `ms` - The number of milliseconds to sleep
 pub async fn sleep_ms(ms: &u64) {
     sleep(Duration::from_millis(*ms)).await
 }
 
+/// Converts optional blob strings to optional blob objects.
+///
+/// Parses hex-encoded blob strings into Alloy Blob objects for EIP-4844 transactions.
+///
+/// # Arguments
+/// * `blob_strings` - Optional vector of hex-encoded blob strings
+///
+/// # Returns
+/// * `Ok(Some(Vec<Blob>))` - Successfully parsed blobs
+/// * `Ok(None)` - If input was None
+/// * `Err(StatusCode::BAD_REQUEST)` - If any blob string failed to parse
 pub fn convert_blob_strings_to_blobs(
     blob_strings: Option<Vec<String>>,
 ) -> Result<Option<Vec<Blob>>, StatusCode> {

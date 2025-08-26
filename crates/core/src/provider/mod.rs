@@ -32,6 +32,18 @@ pub enum LoadProvidersError {
     GasEstimatorError(String),
 }
 
+/// Loads and initializes EVM providers for all configured networks.
+///
+/// This function creates an EvmProvider instance for each network configuration,
+/// setting up the appropriate signing mechanism (mnemonic or Privy) and gas estimator.
+///
+/// # Arguments
+/// * `project_path` - Path to the project directory for loading signing keys
+/// * `setup_config` - Configuration containing network settings and signing keys
+///
+/// # Returns
+/// * `Ok(Vec<EvmProvider>)` - Vector of initialized EVM providers
+/// * `Err(LoadProvidersError)` - Error if providers cannot be created
 pub async fn load_providers(
     project_path: &PathBuf,
     setup_config: &SetupConfig,
@@ -89,6 +101,18 @@ pub async fn load_providers(
     Ok(providers)
 }
 
+/// Finds an EVM provider for a specific chain ID.
+///
+/// Searches through the provided list of EVM providers to find one that matches
+/// the specified chain ID.
+///
+/// # Arguments
+/// * `providers` - List of available EVM providers
+/// * `chain_id` - The chain ID to search for
+///
+/// # Returns
+/// * `Some(&EvmProvider)` - Reference to the matching provider if found
+/// * `None` - If no provider matches the chain ID
 pub async fn find_provider_for_chain_id<'a>(
     providers: &'a Vec<EvmProvider>,
     chain_id: &ChainId,
@@ -102,6 +126,17 @@ pub async fn find_provider_for_chain_id<'a>(
     None
 }
 
+/// Checks if a specific chain ID is enabled in the provider configuration.
+///
+/// Determines whether any of the configured EVM providers support the specified chain ID.
+///
+/// # Arguments
+/// * `providers` - List of available EVM providers
+/// * `chain_id` - The chain ID to check for support
+///
+/// # Returns
+/// * `true` - If at least one provider supports the chain ID
+/// * `false` - If no providers support the chain ID
 pub fn chain_enabled(providers: &Vec<EvmProvider>, chain_id: &ChainId) -> bool {
     for provider in providers {
         if &provider.chain_id == chain_id {

@@ -6,6 +6,17 @@ use crate::{
 };
 
 impl PostgresClient {
+    /// Retrieves networks from the database with optional filtering.
+    ///
+    /// Fetches network data including provider URLs based on the specified filter.
+    /// Networks with multiple provider URLs are consolidated into single Network objects.
+    ///
+    /// # Arguments
+    /// * `filter` - Specifies which networks to retrieve (All, Enabled, or Disabled)
+    ///
+    /// # Returns
+    /// * `Ok(Vec<Network>)` - List of networks matching the filter criteria
+    /// * `Err(PostgresError)` - If database query fails
     pub async fn get_networks(
         &self,
         filter: NetworksFilterState,

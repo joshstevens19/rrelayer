@@ -21,6 +21,17 @@ mod commands;
 mod console;
 mod error;
 
+/// Resolves a path from an optional string input to an absolute canonical path.
+///
+/// If no override path is provided, uses the current working directory.
+/// The resolved path is canonicalized to ensure it exists and is valid.
+///
+/// # Arguments
+/// * `override_path` - Optional path string to resolve, defaults to current directory if None
+///
+/// # Returns
+/// * `Ok(PathBuf)` - Canonicalized absolute path
+/// * `Err(String)` - Error message if path resolution or canonicalization fails
 fn resolve_path(override_path: &Option<String>) -> Result<PathBuf, String> {
     let path = match override_path {
         Some(path) => {
@@ -34,6 +45,14 @@ fn resolve_path(override_path: &Option<String>) -> Result<PathBuf, String> {
     path.canonicalize().map_err(|e| format!("Failed to resolve path '{}': {}", path.display(), e))
 }
 
+/// Main entry point for the rrelayer CLI application.
+///
+/// Parses command line arguments and routes to appropriate command handlers.
+/// Sets up logging and handles path resolution for each command.
+///
+/// # Returns
+/// * `Ok(())` - Command executed successfully
+/// * `Err(CliError)` - Command execution failed with specific error details
 #[tokio::main]
 async fn main() -> Result<(), CliError> {
     let cli = Cli::parse();

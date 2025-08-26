@@ -14,10 +14,21 @@ use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 pub struct MaxPriorityFee(u128);
 
 impl MaxPriorityFee {
+    /// Creates a new MaxPriorityFee instance.
+    ///
+    /// # Arguments
+    /// * `value` - The maximum priority fee value in wei
+    ///
+    /// # Returns
+    /// * A new `MaxPriorityFee` instance
     pub fn new(value: u128) -> Self {
         MaxPriorityFee(value)
     }
 
+    /// Extracts the inner u128 value from the MaxPriorityFee.
+    ///
+    /// # Returns
+    /// * `u128` - The raw maximum priority fee value in wei
     pub fn into_u128(self) -> u128 {
         self.0
     }

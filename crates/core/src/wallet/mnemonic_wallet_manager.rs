@@ -23,6 +23,13 @@ pub struct MnemonicWalletManager {
 }
 
 impl MnemonicWalletManager {
+    /// Creates a new MnemonicWalletManager with the provided mnemonic phrase.
+    ///
+    /// # Arguments
+    /// * `mnemonic` - The mnemonic phrase to use for wallet derivation
+    ///
+    /// # Returns
+    /// * A new MnemonicWalletManager instance
     pub fn new(mnemonic: &str) -> Self {
         MnemonicWalletManager {
             wallets: Mutex::new(HashMap::new()),
@@ -30,6 +37,18 @@ impl MnemonicWalletManager {
         }
     }
 
+    /// Retrieves or creates a wallet at the specified index for the given chain.
+    ///
+    /// This method uses mnemonic-based key derivation to generate a wallet at the specified
+    /// index. Wallets are cached to avoid re-derivation on subsequent calls.
+    ///
+    /// # Arguments
+    /// * `index` - The derivation index for the wallet (BIP-44 account index)
+    /// * `chain_id` - The chain ID to configure the wallet for
+    ///
+    /// # Returns
+    /// * `Ok(PrivateKeySigner)` - The wallet signer configured for the specified chain
+    /// * `Err(LocalSignerError)` - If wallet derivation fails
     async fn get_wallet(
         &self,
         index: u32,
@@ -130,6 +149,20 @@ impl WalletManagerTrait for MnemonicWalletManager {
     }
 }
 
+/// Generates a new 24-word BIP39 mnemonic seed phrase.
+///
+/// This function creates a cryptographically secure random mnemonic phrase
+/// using the BIP39 standard with 24 words from the English wordlist.
+///
+/// # Returns
+/// * `Ok(String)` - A 24-word mnemonic phrase
+/// * `Err(WalletError)` - If mnemonic generation fails
+///
+/// # Examples
+/// ```
+/// let mnemonic = generate_seed_phrase()?;
+/// println!("Generated mnemonic: {}", mnemonic);
+/// ```
 pub fn generate_seed_phrase() -> Result<String, WalletError> {
     let mut rng = thread_rng();
     let mnemonic = Mnemonic::<English>::new_with_count(&mut rng, 24)

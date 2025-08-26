@@ -11,26 +11,55 @@ use crate::{
     transaction::types::TransactionSpeed,
 };
 
-// could use generic cache and kill code?
+/// Cache for gas prices across different chains.
+///
+/// Stores gas estimation results by chain ID and provides thread-safe access
+/// using a Mutex to prevent race conditions during concurrent updates.
 pub struct GasOracleCache {
     gas_prices: Mutex<HashMap<ChainId, GasEstimatorResult>>,
 }
 
 impl GasOracleCache {
+    /// Creates a new empty gas oracle cache.
+    ///
+    /// # Returns
+    /// * A new `GasOracleCache` instance with an empty hash map
     pub fn new() -> Self {
         GasOracleCache { gas_prices: Mutex::new(HashMap::new()) }
     }
 
+    /// Updates the cached gas price for a specific chain.
+    ///
+    /// # Arguments
+    /// * `chain_id` - The chain ID to update gas prices for
+    /// * `gas_price` - The new gas estimation result to cache
     async fn update_gas_price(&self, chain_id: ChainId, gas_price: GasEstimatorResult) {
         let mut cache = self.gas_prices.lock().await;
         cache.insert(chain_id, gas_price);
     }
 
+    /// Retrieves the cached gas price for a specific chain.
+    ///
+    /// # Arguments
+    /// * `chain_id` - The chain ID to retrieve gas prices for
+    ///
+    /// # Returns
+    /// * `Some(GasEstimatorResult)` - The cached gas estimation if available
+    /// * `None` - If no gas prices are cached for this chain
     pub async fn get_gas_price(&self, chain_id: &ChainId) -> Option<GasEstimatorResult> {
         let cache = self.gas_prices.lock().await;
         cache.get(chain_id).cloned()
     }
 
+    /// Retrieves the gas price for a specific chain and transaction speed.
+    ///
+    /// # Arguments
+    /// * `chain_id` - The chain ID to retrieve gas prices for
+    /// * `speed` - The desired transaction speed (Super, Fast, Medium, or Slow)
+    ///
+    /// # Returns
+    /// * `Some(GasPriceResult)` - The gas price for the specified speed if available
+    /// * `None` - If no gas prices are cached for this chain
     pub async fn get_gas_price_for_speed(
         &self,
         chain_id: &ChainId,
@@ -47,6 +76,15 @@ impl GasOracleCache {
     }
 }
 
+/// Main gas oracle function that manages gas price collection and updates.
+///
+/// Initializes gas prices for all providers, then starts periodic updates
+/// every 10 seconds. Handles errors gracefully by logging and continuing
+/// with the next update cycle.
+///
+/// # Arguments
+/// * `providers` - Vector of EVM providers to collect gas prices from
+/// * `gas_oracle_cache` - Shared cache to store gas price results
 pub async fn gas_oracle(
     providers: Arc<Vec<EvmProvider>>,
     gas_oracle_cache: Arc<Mutex<GasOracleCache>>,

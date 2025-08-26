@@ -20,6 +20,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::{commands::keystore::ProjectLocation, error::CliError};
 
+/// Cached authentication token data with expiration tracking.
+///
+/// Stores authentication tokens securely on disk with automatic expiration
+/// to prevent indefinite token reuse.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct StoredTokenData {
     token_pair: TokenPair,
@@ -27,6 +31,17 @@ struct StoredTokenData {
     expires_at: SystemTime,
 }
 
+/// Generates a secure file path for storing authentication tokens.
+///
+/// Creates a platform-appropriate configuration directory structure for token storage
+/// with restricted permissions on Unix systems.
+///
+/// # Arguments
+/// * `project_name` - Name of the rrelayer project
+/// * `account` - Account identifier for the token
+///
+/// # Returns
+/// * `PathBuf` - Secure path for token file storage
 fn get_secure_token_path(project_name: &str, account: &str) -> PathBuf {
     let base_dir = dirs::config_dir()
         .unwrap_or_else(|| PathBuf::from("."))
@@ -48,6 +63,20 @@ fn get_secure_token_path(project_name: &str, account: &str) -> PathBuf {
     base_dir.join(format!("{}.json", account))
 }
 
+/// Saves authentication token data to secure local cache.
+///
+/// Stores token pair, address, and expiration time to a JSON file with
+/// restricted file permissions for security.
+///
+/// # Arguments
+/// * `sdk` - SDK instance containing the token pair to save
+/// * `project_name` - Name of the rrelayer project
+/// * `account` - Account identifier for the token
+/// * `address` - Ethereum address associated with the token
+///
+/// # Returns
+/// * `Ok(())` - Token saved successfully
+/// * `Err(CliError)` - Token save failed (no token available, file write error, etc.)
 fn save_token_to_cache(
     sdk: &SDK,
     project_name: &str,
@@ -78,6 +107,18 @@ fn save_token_to_cache(
     }
 }
 
+/// Loads authentication token data from secure local cache.
+///
+/// Reads and validates cached token data, automatically removing expired tokens.
+///
+/// # Arguments
+/// * `project_name` - Name of the rrelayer project
+/// * `account` - Account identifier for the token
+///
+/// # Returns
+/// * `Ok(Some(StoredTokenData))` - Valid token data found
+/// * `Ok(None)` - No token found or token expired
+/// * `Err(CliError)` - File read or deserialization error
 fn load_token_from_cache(
     project_name: &str,
     account: &str,
@@ -103,6 +144,17 @@ fn load_token_from_cache(
     Ok(Some(token_data))
 }
 
+/// Verifies that the rrelayer API server is running and accessible.
+///
+/// Performs a health check request to ensure the API server is available
+/// before attempting authentication operations.
+///
+/// # Arguments
+/// * `sdk` - SDK instance configured with API endpoint
+///
+/// # Returns
+/// * `Ok(())` - API server is running and accessible
+/// * `Err(CliError)` - API server is unreachable or not running
 pub async fn check_api_running(sdk: &SDK) -> Result<(), CliError> {
     match sdk.health.check().await {
         Ok(_) => Ok(()),
@@ -118,6 +170,20 @@ pub async fn check_api_running(sdk: &SDK) -> Result<(), CliError> {
     }
 }
 
+/// Handles the complete authentication flow for a relayer account.
+///
+/// Performs authentication using cached tokens when available, or prompts for
+/// keystore password to authenticate with private key signature. Manages token
+/// caching and refresh automatically.
+///
+/// # Arguments
+/// * `sdk` - Mutable SDK instance to authenticate
+/// * `account` - Account identifier to authenticate
+/// * `project_location` - Project configuration for keystore access
+///
+/// # Returns
+/// * `Ok(())` - Authentication successful
+/// * `Err(CliError)` - Authentication failed (API unavailable, invalid credentials, etc.)
 pub async fn handle_authenticate(
     sdk: &mut SDK,
     account: &str,

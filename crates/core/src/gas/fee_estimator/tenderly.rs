@@ -39,6 +39,15 @@ struct TenderlyGasEstimatePriceResult {
 }
 
 impl TenderlyGasEstimatePriceResult {
+    /// Converts a Tenderly gas estimate speed result to the standard gas price result format.
+    ///
+    /// # Arguments
+    /// * `speed` - The Tenderly gas estimate data for a specific speed
+    /// * `is_super_fast` - Whether this is for the super fast tier (applies 120% multiplier)
+    ///
+    /// # Returns
+    /// * `Ok(GasPriceResult)` - The converted standard gas price result
+    /// * `Err(UnitsError)` - If parsing the gas price strings fails or overflow occurs
     fn gas_price_result(
         speed: &TenderlyGasEstimateSpeedResult,
         is_super_fast: bool,
@@ -67,6 +76,14 @@ impl TenderlyGasEstimatePriceResult {
         })
     }
 
+    /// Converts the Tenderly gas estimate result to the standard gas estimator result format.
+    ///
+    /// Maps Tenderly's low/medium/high speeds to slow/medium/fast, and creates super_fast
+    /// by applying a multiplier to the high speed estimates.
+    ///
+    /// # Returns
+    /// * `Ok(GasEstimatorResult)` - The converted standard gas estimator result
+    /// * `Err(UnitsError)` - If parsing any of the gas price strings fails
     pub fn to_base_result(&self) -> Result<GasEstimatorResult, UnitsError> {
         Ok(GasEstimatorResult {
             slow: Self::gas_price_result(&self.low, false)?,
@@ -102,6 +119,16 @@ struct TenderlyGasEstimateResult {
 }
 
 impl TenderlyGasFeeEstimator {
+    /// Creates a new Tenderly gas fee estimator with API key and all supported chains.
+    ///
+    /// Initializes with a comprehensive list of supported chains across multiple networks
+    /// including Ethereum mainnet/testnets, L2s, and other EVM-compatible chains.
+    ///
+    /// # Arguments
+    /// * `api_key` - The Tenderly API key for authentication
+    ///
+    /// # Returns
+    /// * A new `TenderlyGasFeeEstimator` instance configured with all supported chains
     pub fn new(api_key: &String) -> Self {
         let supported_chains = vec![
             TenderlyGasFeeChainConfig {
@@ -413,6 +440,14 @@ impl TenderlyGasFeeEstimator {
         Self { supported_chains, api_key: api_key.clone() }
     }
 
+    /// Builds the Tenderly API endpoint URL for requesting gas prices for a specific chain.
+    ///
+    /// # Arguments
+    /// * `chain_id` - The chain ID to build the endpoint for
+    ///
+    /// # Returns
+    /// * `Ok(String)` - The complete Tenderly endpoint URL if chain is supported
+    /// * `Err(String)` - Error message if the chain is not supported
     fn build_suggested_gas_price_endpoint(&self, chain_id: &ChainId) -> Result<String, String> {
         let rpc_url = self
             .supported_chains
@@ -424,6 +459,16 @@ impl TenderlyGasFeeEstimator {
         Ok(format!("{}/{}", rpc_url, self.api_key))
     }
 
+    /// Requests gas price estimates from the Tenderly API for a specific chain.
+    ///
+    /// Uses Tenderly's JSON-RPC API with the `tenderly_gasPrice` method.
+    ///
+    /// # Arguments
+    /// * `chain_id` - The chain ID to request gas prices for
+    ///
+    /// # Returns
+    /// * `Ok(TenderlyGasEstimatePriceResult)` - The gas estimates from Tenderly's API
+    /// * `Err(reqwest::Error)` - If the HTTP request fails or chain is unsupported
     async fn request_gas_estimate(
         &self,
         chain_id: &ChainId,

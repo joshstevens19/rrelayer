@@ -94,26 +94,40 @@ pub enum CliError {
     Internal(String),
 }
 
-// For backwards compatibility with existing Box<dyn std::error::Error> code
+/// Converts boxed dynamic error types to CliError for backwards compatibility.
+///
+/// This implementation allows legacy code that returns boxed errors to work
+/// seamlessly with the typed CliError system.
+/// For backwards compatibility with existing Box<dyn std::error::Error> code
 impl From<Box<dyn std::error::Error>> for CliError {
     fn from(err: Box<dyn std::error::Error>) -> Self {
         CliError::Internal(err.to_string())
     }
 }
 
+/// Converts thread-safe boxed dynamic error types to CliError.
+///
+/// Similar to the above implementation but for errors that implement Send + Sync,
+/// commonly used in async contexts.
 impl From<Box<dyn std::error::Error + Send + Sync>> for CliError {
     fn from(err: Box<dyn std::error::Error + Send + Sync>) -> Self {
         CliError::Internal(err.to_string())
     }
 }
 
-// Convert string errors
+/// Converts String errors to CliError as Internal errors.
+///
+/// Provides convenient conversion from string-based error messages.
+/// Convert string errors
 impl From<String> for CliError {
     fn from(err: String) -> Self {
         CliError::Internal(err)
     }
 }
 
+/// Converts string slice errors to CliError as Internal errors.
+///
+/// Provides convenient conversion from string slice error messages.
 impl From<&str> for CliError {
     fn from(err: &str) -> Self {
         CliError::Internal(err.to_string())

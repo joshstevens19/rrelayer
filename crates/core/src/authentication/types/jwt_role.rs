@@ -24,6 +24,17 @@ impl Display for JwtRole {
 }
 
 impl JwtRole {
+    /// Formats the JWT role as a string representation.
+    ///
+    /// Converts the role enum variant to its corresponding uppercase string format
+    /// used in the database and external representations.
+    ///
+    /// # Returns
+    /// * `String` - The uppercase string representation of the role:
+    ///   - Admin -> "ADMIN"
+    ///   - ReadOnly -> "READONLY" 
+    ///   - Manager -> "MANAGER"
+    ///   - Integrator -> "INTEGRATOR"
     pub fn format(&self) -> String {
         match self {
             JwtRole::Admin => "ADMIN".to_string(),
@@ -35,6 +46,19 @@ impl JwtRole {
 }
 
 impl<'a> FromSql<'a> for JwtRole {
+    /// Deserializes a JWT role from PostgreSQL database types.
+    ///
+    /// Converts raw bytes from PostgreSQL into a JwtRole enum variant.
+    /// Supports both custom "user_role" enum type and standard text types.
+    ///
+    /// # Arguments
+    /// * `ty` - The PostgreSQL type information
+    /// * `raw` - The raw bytes from the database
+    ///
+    /// # Returns
+    /// * `Ok(Self)` - The parsed JwtRole if the value is recognized
+    /// * `Err(Box<dyn Error + Sync + Send>)` - If parsing fails due to invalid UTF-8,
+    ///   unknown role string, or unsupported PostgreSQL type
     fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
         if ty.name() == "user_role" {
             let role = from_utf8(raw).map_err(|err| format!("Invalid UTF-8 sequence: {}", err))?;
@@ -65,6 +89,17 @@ impl<'a> FromSql<'a> for JwtRole {
         }
     }
 
+    /// Checks if the PostgreSQL type is supported for deserialization.
+    ///
+    /// Determines whether the given PostgreSQL type can be converted to a JwtRole.
+    /// Supports text types (TEXT, CHAR, VARCHAR, BPCHAR) and the custom "user_role" enum.
+    ///
+    /// # Arguments
+    /// * `ty` - The PostgreSQL type to check
+    ///
+    /// # Returns
+    /// * `true` - If the type can be converted to JwtRole
+    /// * `false` - If the type is not supported
     fn accepts(ty: &Type) -> bool {
         (*ty == Type::TEXT || *ty == Type::CHAR || *ty == Type::VARCHAR || *ty == Type::BPCHAR)
             || (ty.name() == "user_role")
@@ -72,6 +107,18 @@ impl<'a> FromSql<'a> for JwtRole {
 }
 
 impl ToSql for JwtRole {
+    /// Serializes a JWT role to PostgreSQL database format.
+    ///
+    /// Converts a JwtRole enum variant to its string representation and writes
+    /// it to the output buffer for storage in PostgreSQL.
+    ///
+    /// # Arguments
+    /// * `ty` - The target PostgreSQL type
+    /// * `out` - The output buffer to write the serialized data to
+    ///
+    /// # Returns
+    /// * `Ok(IsNull::No)` - If serialization succeeds (never null)
+    /// * `Err(Box<dyn Error + Sync + Send>)` - If the target type is not supported
     fn to_sql(
         &self,
         ty: &Type,
@@ -93,6 +140,17 @@ impl ToSql for JwtRole {
         Ok(IsNull::No)
     }
 
+    /// Checks if the PostgreSQL type is supported for serialization.
+    ///
+    /// Determines whether the given PostgreSQL type can accept a JwtRole value.
+    /// Supports text types (TEXT, CHAR, VARCHAR, BPCHAR) and the custom "user_role" enum.
+    ///
+    /// # Arguments
+    /// * `ty` - The PostgreSQL type to check
+    ///
+    /// # Returns
+    /// * `true` - If the type can accept JwtRole values
+    /// * `false` - If the type is not supported
     fn accepts(ty: &Type) -> bool {
         (*ty == Type::TEXT || *ty == Type::CHAR || *ty == Type::VARCHAR || *ty == Type::BPCHAR)
             || (ty.name() == "user_role")

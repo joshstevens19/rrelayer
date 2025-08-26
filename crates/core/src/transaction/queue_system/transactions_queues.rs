@@ -11,6 +11,7 @@ use alloy::{
 use thiserror::Error;
 use tokio::sync::Mutex;
 
+/// Error types for transaction queues operations.
 #[derive(Error, Debug)]
 pub enum TransactionsQueuesError {
     #[error("Wallet or provider error: {0}")]
@@ -48,6 +49,10 @@ use crate::{
     webhooks::WebhookManager,
 };
 
+/// Container for managing multiple transaction queues across different relayers.
+///
+/// This struct coordinates transaction processing for all active relayers,
+/// providing centralized access to individual queue operations and shared resources.
 pub struct TransactionsQueues {
     pub queues: HashMap<RelayerId, Arc<Mutex<TransactionsQueue>>>,
     pub relayer_block_times_ms: HashMap<RelayerId, u64>,
@@ -60,6 +65,22 @@ pub struct TransactionsQueues {
 }
 
 impl TransactionsQueues {
+    /// Creates a new TransactionsQueues instance with the given relayer setups.
+    ///
+    /// Initializes individual transaction queues for each relayer and establishes
+    /// connections to shared resources like databases, caches, and oracles.
+    ///
+    /// # Arguments
+    /// * `setups` - Configuration for each relayer's transaction queue
+    /// * `gas_oracle_cache` - Shared cache for gas price information
+    /// * `blob_gas_oracle_cache` - Shared cache for blob gas price information  
+    /// * `cache` - General application cache
+    /// * `webhook_manager` - Manager for webhook notifications
+    /// * `safe_proxy_manager` - Optional Safe proxy manager for multisig operations
+    ///
+    /// # Returns
+    /// * `Ok(TransactionsQueues)` - The initialized queues system
+    /// * `Err(TransactionsQueuesError)` - If initialization fails
     pub async fn new(
         setups: Vec<TransactionRelayerSetup>,
         gas_oracle_cache: Arc<Mutex<GasOracleCache>>,
@@ -131,6 +152,13 @@ impl TransactionsQueues {
         invalidate_transaction_no_state_cache(&self.cache, id).await;
     }
 
+    /// Returns the count of pending transactions for a specific relayer.
+    ///
+    /// # Arguments
+    /// * `relayer_id` - The relayer to get the pending count for
+    ///
+    /// # Returns
+    /// * `usize` - Number of pending transactions (0 if relayer not found)
     pub async fn pending_transactions_count(&self, relayer_id: &RelayerId) -> usize {
         if let Some(queue_arc) = self.get_transactions_queue(relayer_id) {
             let queue = queue_arc.lock().await;
@@ -140,6 +168,13 @@ impl TransactionsQueues {
         }
     }
 
+    /// Returns the count of in-mempool transactions for a specific relayer.
+    ///
+    /// # Arguments
+    /// * `relayer_id` - The relayer to get the in-mempool count for
+    ///
+    /// # Returns
+    /// * `usize` - Number of in-mempool transactions (0 if relayer not found)
     pub async fn inmempool_transactions_count(&self, relayer_id: &RelayerId) -> usize {
         if let Some(queue_arc) = self.get_transactions_queue(relayer_id) {
             let queue = queue_arc.lock().await;
@@ -217,6 +252,17 @@ impl TransactionsQueues {
         Ok(relayer)
     }
 
+    /// Adds a new transaction to the specified relayer's queue.
+    ///
+    /// Validates relayer permissions, creates the transaction, and adds it to the pending queue.
+    ///
+    /// # Arguments
+    /// * `relayer_id` - The relayer to add the transaction to
+    /// * `transaction_to_send` - The transaction parameters
+    ///
+    /// # Returns
+    /// * `Ok(Transaction)` - The created transaction if successful
+    /// * `Err(AddTransactionError)` - If adding the transaction fails
     pub async fn add_transaction(
         &mut self,
         relayer_id: &RelayerId,

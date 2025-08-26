@@ -12,6 +12,13 @@ use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 pub struct BlockNumber(u64);
 
 impl BlockNumber {
+    /// Creates a new BlockNumber wrapper around a u64.
+    ///
+    /// # Arguments
+    /// * `number` - The block number to wrap
+    ///
+    /// # Returns
+    /// * `Self` - A new BlockNumber instance
     pub fn new(number: u64) -> Self {
         BlockNumber(number)
     }

@@ -149,6 +149,10 @@ impl Display for Transaction {
 }
 
 impl Transaction {
+    /// Checks if this transaction has been previously sent to the network.
+    ///
+    /// # Returns
+    /// * `bool` - True if the transaction has a sent_at timestamp
     pub fn has_been_sent_before(&self) -> bool {
         self.sent_at.is_some()
     }
@@ -158,6 +162,16 @@ impl Transaction {
             && self.sent_with_max_fee_per_gas.is_some()
     }
 
+    /// Converts this transaction to an EIP-1559 typed transaction.
+    ///
+    /// Creates an EIP-1559 transaction with max priority fee and max fee per gas.
+    ///
+    /// # Arguments
+    /// * `override_gas_price` - Optional gas price to override stored values
+    ///
+    /// # Returns
+    /// * `Ok(TypedTransaction)` - EIP-1559 typed transaction
+    /// * `Err(TransactionConversionError)` - If gas price information is missing
     pub fn to_eip1559_typed_transaction(
         &self,
         override_gas_price: Option<&GasPriceResult>,
@@ -259,6 +273,10 @@ impl Transaction {
         )))
     }
 
+    /// Checks if this is a blob transaction (EIP-4844).
+    ///
+    /// # Returns
+    /// * `bool` - True if the transaction has blob data
     pub fn is_blob_transaction(&self) -> bool {
         self.blobs.is_some()
     }

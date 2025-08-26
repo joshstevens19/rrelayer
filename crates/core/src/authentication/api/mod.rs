@@ -30,6 +30,19 @@ pub struct GenerateSecretResult {
     pub address: EvmAddress,
 }
 
+/// Generates an authentication challenge for wallet signature verification.
+///
+/// Creates a unique challenge string that includes a welcome message, the user's wallet address,
+/// and a random nonce. The challenge is cached for later verification during authentication.
+/// This endpoint requires the user to exist in the database.
+///
+/// # Arguments
+/// * `state` - The application state containing database and cache connections
+/// * `secret_request` - The request containing the EVM address to generate a challenge for
+///
+/// # Returns
+/// * `Ok(Json<GenerateSecretResult>)` - The generated challenge with ID, message, and address
+/// * `Err(StatusCode)` - UNAUTHORIZED if user doesn't exist, INTERNAL_SERVER_ERROR for database errors
 async fn generate_auth_secret(
     State(state): State<Arc<AppState>>,
     Json(secret_request): Json<GenerateSecretRequest>,
@@ -63,6 +76,20 @@ pub struct AuthenticateRequest {
     pub signature: signers::Signature,
 }
 
+/// Authenticates a user using wallet signature verification.
+///
+/// Verifies that the provided signature was created by signing the cached challenge
+/// with the private key corresponding to the claimed address. Upon successful verification,
+/// invalidates the challenge and generates a new JWT token pair for the user.
+///
+/// # Arguments
+/// * `state` - The application state containing database and cache connections
+/// * `authenticate_request` - The authentication request containing ID, address, and signature
+///
+/// # Returns
+/// * `Ok(Json<TokenPair>)` - A pair of access and refresh tokens for the authenticated user
+/// * `Err(StatusCode)` - UNAUTHORIZED for invalid signatures, missing challenges, or non-existent users;
+///                       INTERNAL_SERVER_ERROR for database or token generation errors
 async fn authenticate(
     State(state): State<Arc<AppState>>,
     Json(authenticate_request): Json<AuthenticateRequest>,
@@ -111,6 +138,20 @@ struct RefreshRequest {
     pub token: RefreshToken,
 }
 
+/// Refreshes JWT tokens using a valid refresh token.
+///
+/// Validates the provided refresh token, verifies the user still exists and has the same role,
+/// then generates a new pair of access and refresh tokens. This allows users to maintain
+/// authentication without re-signing challenges.
+///
+/// # Arguments
+/// * `state` - The application state containing database connections
+/// * `refresh_request` - The request containing the refresh token to validate
+///
+/// # Returns
+/// * `Ok(Json<TokenPair>)` - A new pair of access and refresh tokens
+/// * `Err(StatusCode)` - UNAUTHORIZED for invalid tokens, non-existent users, or role mismatches;
+///                       INTERNAL_SERVER_ERROR for database or token generation errors
 async fn refresh_auth_token(
     State(state): State<Arc<AppState>>,
     Json(refresh_request): Json<RefreshRequest>,
@@ -134,6 +175,16 @@ async fn refresh_auth_token(
     Ok(Json(token_pair))
 }
 
+/// Creates the authentication router with all authentication endpoints.
+///
+/// Sets up the authentication routes including challenge generation, authentication,
+/// and token refresh. The refresh endpoint is protected by a refresh JWT token guard.
+///
+/// # Returns
+/// * `Router<Arc<AppState>>` - A configured router with authentication endpoints:
+///   - POST /secret/generate - Generates authentication challenges
+///   - POST /authenticate - Authenticates users with wallet signatures
+///   - POST /refresh - Refreshes JWT tokens (requires valid refresh token)
 pub fn create_authentication_routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/secret/generate", post(generate_auth_secret))

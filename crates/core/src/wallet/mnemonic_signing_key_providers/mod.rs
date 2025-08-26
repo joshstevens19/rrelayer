@@ -10,6 +10,28 @@ use gcp_secret_manager::get_gcp_secret;
 
 pub mod keystore;
 
+/// Retrieves a mnemonic phrase from various signing key sources.
+///
+/// This function supports multiple methods for retrieving mnemonic phrases:
+/// - Raw mnemonic directly from configuration
+/// - AWS Secrets Manager
+/// - GCP Secret Manager  
+/// - Local keystore files
+///
+/// The function tries each method in order and returns the first successful result.
+///
+/// # Arguments
+/// * `project_path` - Path to the project directory for resolving relative paths
+/// * `project_name` - Name of the project for keystore password management
+/// * `signing_key` - Configuration specifying which method to use for mnemonic retrieval
+///
+/// # Returns
+/// * `Ok(String)` - The retrieved mnemonic phrase
+/// * `Err(WalletError)` - If no signing key method is configured or all methods fail
+///
+/// # Errors
+/// Returns `WalletError::NoSigningKey` if no signing key source is configured.
+/// Other errors depend on the specific method used (API errors, authentication errors, etc.)
 pub async fn get_mnemonic_from_signing_key(
     project_path: &PathBuf,
     project_name: &str,

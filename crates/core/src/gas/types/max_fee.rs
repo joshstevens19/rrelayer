@@ -14,10 +14,21 @@ use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 pub struct MaxFee(u128);
 
 impl MaxFee {
+    /// Creates a new MaxFee instance.
+    ///
+    /// # Arguments
+    /// * `value` - The maximum fee value in wei
+    ///
+    /// # Returns
+    /// * A new `MaxFee` instance
     pub fn new(value: u128) -> Self {
         MaxFee(value)
     }
 
+    /// Extracts the inner u128 value from the MaxFee.
+    ///
+    /// # Returns
+    /// * `u128` - The raw maximum fee value in wei
     pub fn into_u128(self) -> u128 {
         self.0
     }

@@ -58,10 +58,28 @@ pub enum StartApiError {
     ApiStartupError(#[from] std::io::Error),
 }
 
+/// Health check endpoint that returns HTTP 200 OK.
+///
+/// Used by load balancers and monitoring systems to verify the service is running.
+///
+/// # Returns
+/// * `StatusCode::OK` - Always returns HTTP 200
 async fn health_check() -> impl IntoResponse {
     StatusCode::OK
 }
 
+/// Middleware that logs all HTTP requests and responses with timing information.
+///
+/// Provides detailed logging for client and server errors, including response body
+/// content for debugging purposes. For successful requests, logs basic timing info.
+///
+/// # Arguments
+/// * `req` - The incoming HTTP request
+/// * `next` - The next middleware or handler in the chain
+///
+/// # Returns
+/// * `Ok(Response)` - The response from the downstream handler
+/// * `Err(StatusCode)` - Internal server error if response processing fails
 async fn activity_logger(req: Request<Body>, next: Next) -> Result<Response, StatusCode> {
     let method = req.method().clone();
     let uri = req.uri().clone();
@@ -162,6 +180,23 @@ async fn activity_logger(req: Request<Body>, next: Next) -> Result<Response, Sta
     }
 }
 
+/// Starts the HTTP API server with all configured routes and middleware.
+///
+/// Sets up the Axum web server with CORS, logging middleware, and all API routes.
+/// Initializes the application state with database connections, caches, and providers.
+///
+/// # Arguments
+/// * `api_config` - API configuration including port and allowed origins
+/// * `gas_oracle_cache` - Shared cache for gas price estimations
+/// * `blob_gas_oracle_cache` - Shared cache for blob gas prices
+/// * `transactions_queues` - Transaction processing queues
+/// * `providers` - EVM provider connections
+/// * `cache` - General purpose cache
+/// * `webhook_manager` - Webhook delivery manager
+///
+/// # Returns
+/// * `Ok(())` - If the server starts successfully
+/// * `Err(StartApiError)` - If server startup fails
 async fn start_api(
     api_config: ApiConfig,
     gas_oracle_cache: Arc<Mutex<GasOracleCache>>,
@@ -263,6 +298,36 @@ pub enum StartError {
     IoError(#[from] std::io::Error),
 }
 
+/// Starts the RRelayer service with full initialization.
+///
+/// This is the main entry point that:
+/// 1. Sets up logging
+/// 2. Loads configuration from rrelayer.yaml
+/// 3. Initializes database connection and applies schema
+/// 4. Sets up admin users and authentication
+/// 5. Initializes blockchain providers and caches
+/// 6. Starts background tasks for gas estimation and transaction processing
+/// 7. Starts the HTTP API server
+///
+/// # Arguments
+/// * `project_path` - Path to the project directory containing rrelayer.yaml
+///
+/// # Returns
+/// * `Ok(())` - If the service starts successfully
+/// * `Err(StartError)` - If any initialization step fails
+///
+/// # Example
+/// ```rust,no_run
+/// use std::path::PathBuf;
+/// use rrelayer_core::start;
+///
+/// #[tokio::main]
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let project_path = PathBuf::from(".");
+///     start(&project_path).await?;
+///     Ok(())
+/// }
+/// ```
 pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
     setup_info_logger();
     dotenv().ok();

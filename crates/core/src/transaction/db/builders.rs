@@ -2,6 +2,16 @@ use tokio_postgres::Row;
 
 use crate::{shared::common_types::EvmAddress, transaction::types::Transaction};
 
+/// Builds a Transaction struct from a database row.
+///
+/// Maps all fields from a transaction database view row to a Transaction instance.
+/// Some fields are currently not loaded from the database (marked with TODOs).
+///
+/// # Arguments
+/// * `row` - The database row containing transaction data
+///
+/// # Returns
+/// * `Transaction` - A fully populated Transaction struct
 pub fn build_transaction_from_transaction_view(row: &Row) -> Transaction {
     let to: EvmAddress = row.get("to");
     let from: EvmAddress = row.get("from");
