@@ -127,6 +127,14 @@ impl TransactionsQueues {
         })
     }
 
+    /// Retrieves a transaction queue for the specified relayer.
+    ///
+    /// # Arguments
+    /// * `relayer_id` - The ID of the relayer to get the queue for
+    ///
+    /// # Returns
+    /// * `Some(Arc<Mutex<TransactionsQueue>>)` - The queue if found
+    /// * `None` - If no queue exists for the relayer
     pub fn get_transactions_queue(
         &self,
         relayer_id: &RelayerId,
@@ -134,6 +142,16 @@ impl TransactionsQueues {
         self.queues.get(relayer_id).cloned()
     }
 
+    /// Retrieves a transaction queue for the specified relayer or returns an error.
+    ///
+    /// This is the "unsafe" version that returns an error instead of None when the queue is not found.
+    ///
+    /// # Arguments
+    /// * `relayer_id` - The ID of the relayer to get the queue for
+    ///
+    /// # Returns
+    /// * `Ok(Arc<Mutex<TransactionsQueue>>)` - The queue if found
+    /// * `Err(String)` - Error message if no queue exists for the relayer
     pub fn get_transactions_queue_unsafe(
         &self,
         relayer_id: &RelayerId,
@@ -144,10 +162,22 @@ impl TransactionsQueues {
             .ok_or_else(|| format!("transactions queue does not exist for relayer: {}", relayer_id))
     }
 
+    /// Removes a transaction queue for the specified relayer.
+    ///
+    /// This permanently deletes the queue and all its state. Use with caution.
+    ///
+    /// # Arguments
+    /// * `relayer_id` - The ID of the relayer whose queue should be removed
     pub async fn delete_queue(&mut self, relayer_id: &RelayerId) {
         self.queues.remove(relayer_id);
     }
 
+    /// Invalidates the cache entry for a specific transaction.
+    ///
+    /// This ensures that cached transaction data is refreshed on the next access.
+    ///
+    /// # Arguments
+    /// * `id` - The ID of the transaction to invalidate in cache
     async fn invalidate_transaction_cache(&self, id: &TransactionId) {
         invalidate_transaction_no_state_cache(&self.cache, id).await;
     }
@@ -184,6 +214,17 @@ impl TransactionsQueues {
         }
     }
 
+    /// Adds a new relayer and its transaction queue to the system.
+    ///
+    /// Creates a new transaction queue for the relayer with fresh state (empty queues).
+    /// The current nonce is fetched from the provider to ensure proper initialization.
+    ///
+    /// # Arguments
+    /// * `setup` - The configuration for the new relayer's transaction queue
+    ///
+    /// # Returns
+    /// * `Ok(())` - If the relayer was added successfully
+    /// * `Err(WalletOrProviderError)` - If nonce retrieval or setup fails
     pub async fn add_new_relayer(
         &mut self,
         setup: TransactionsQueueSetup,
@@ -210,15 +251,37 @@ impl TransactionsQueues {
         Ok(())
     }
 
+    /// Calculates the expiration time for new transactions.
+    ///
+    /// Transactions expire after 12 hours, after which they are converted to no-op transactions.
+    ///
+    /// # Returns
+    /// * `SystemTime` - The expiration time (12 hours from now)
     fn expires_at(&self) -> SystemTime {
         // 12 hours we then send them to noop
         SystemTime::now() + Duration::from_secs(12 * 60 * 60)
     }
 
+    /// Checks if a transaction has expired.
+    ///
+    /// # Arguments
+    /// * `transaction` - The transaction to check for expiration
+    ///
+    /// # Returns
+    /// * `true` - If the transaction has expired
+    /// * `false` - If the transaction is still valid
     fn has_expired(&self, transaction: &Transaction) -> bool {
         transaction.expires_at < SystemTime::now()
     }
 
+    /// Converts a transaction to a no-op transaction.
+    ///
+    /// This is used for expired or cancelled transactions. The transaction is modified
+    /// to send zero value with no data to the relayer's own address.
+    ///
+    /// # Arguments
+    /// * `transactions_queue` - The queue containing the relayer's configuration
+    /// * `transaction` - The transaction to convert to no-op
     fn transaction_to_noop(
         &self,
         transactions_queue: &mut TransactionsQueue,
@@ -231,6 +294,14 @@ impl TransactionsQueues {
         transaction.is_noop = true;
     }
 
+    /// Replaces the content of an existing transaction with new parameters.
+    ///
+    /// Updates the transaction's destination, data, and value while preserving
+    /// other metadata like nonce and timing information.
+    ///
+    /// # Arguments
+    /// * `current_transaction` - The transaction to modify
+    /// * `replace_with` - The new transaction parameters to apply
     fn transaction_replace(
         &self,
         current_transaction: &mut Transaction,
@@ -243,6 +314,19 @@ impl TransactionsQueues {
         current_transaction.gas_limit = None;
     }
 
+    /// Checks if a relayer is allowed to send transactions to a specific address.
+    ///
+    /// Queries the database to verify if the target address is on the relayer's allowlist.
+    /// This is used when relayers have restricted transaction destinations.
+    ///
+    /// # Arguments
+    /// * `relayer_id` - The relayer attempting to send the transaction
+    /// * `to` - The destination address to check
+    ///
+    /// # Returns
+    /// * `Ok(true)` - If the relayer is allowed to send to this address
+    /// * `Ok(false)` - If the relayer is not allowed
+    /// * `Err(PostgresError)` - If database query fails
     async fn relayer_allowed_to_send_transaction_to(
         &self,
         relayer_id: &RelayerId,
@@ -398,6 +482,19 @@ impl TransactionsQueues {
         }
     }
 
+    /// Cancels an existing transaction by converting it to a no-op.
+    ///
+    /// For pending transactions, the cancellation happens immediately.
+    /// For in-mempool transactions, a replacement no-op transaction is sent.
+    /// Mined transactions cannot be cancelled.
+    ///
+    /// # Arguments
+    /// * `transaction` - The transaction to cancel
+    ///
+    /// # Returns
+    /// * `Ok(true)` - If the transaction was successfully cancelled
+    /// * `Ok(false)` - If the transaction was not found or cannot be cancelled
+    /// * `Err(CancelTransactionError)` - If cancellation fails
     pub async fn cancel_transaction(
         &mut self,
         transaction: &Transaction,
@@ -444,6 +541,20 @@ impl TransactionsQueues {
         }
     }
 
+    /// Replaces an existing transaction with new parameters.
+    ///
+    /// For pending transactions, the replacement happens immediately.
+    /// For in-mempool transactions, a replacement transaction is sent with higher gas.
+    /// Mined transactions cannot be replaced.
+    ///
+    /// # Arguments
+    /// * `transaction` - The transaction to replace
+    /// * `replace_with` - The new transaction parameters
+    ///
+    /// # Returns
+    /// * `Ok(true)` - If the transaction was successfully replaced
+    /// * `Ok(false)` - If the transaction was not found or cannot be replaced
+    /// * `Err(ReplaceTransactionError)` - If replacement fails
     pub async fn replace_transaction(
         &mut self,
         transaction: &Transaction,
@@ -510,6 +621,18 @@ impl TransactionsQueues {
         }
     }
 
+    /// Processes a single pending transaction for the specified relayer.
+    ///
+    /// Takes the next pending transaction, validates it, estimates gas, and sends it
+    /// to the network. If successful, moves the transaction to the in-mempool state.
+    /// Handles various error conditions including gas price issues and simulation failures.
+    ///
+    /// # Arguments
+    /// * `relayer_id` - The relayer whose pending transactions to process
+    ///
+    /// # Returns
+    /// * `Ok(ProcessResult<ProcessPendingStatus>)` - Processing result with status
+    /// * `Err(ProcessPendingTransactionError)` - If processing fails critically
     pub async fn process_single_pending(
         &mut self,
         relayer_id: &RelayerId,
@@ -651,6 +774,19 @@ impl TransactionsQueues {
         }
     }
 
+    /// Processes a single in-mempool transaction for the specified relayer.
+    ///
+    /// Checks if the transaction has been mined by querying for its receipt.
+    /// If mined, moves it to the mined state. If still pending and enough time
+    /// has passed, may bump the gas price and resend. Handles transaction lifecycle
+    /// from in-mempool to mined/failed/expired states.
+    ///
+    /// # Arguments
+    /// * `relayer_id` - The relayer whose in-mempool transactions to process
+    ///
+    /// # Returns
+    /// * `Ok(ProcessResult<ProcessInmempoolStatus>)` - Processing result with status
+    /// * `Err(ProcessInmempoolTransactionError)` - If processing fails critically
     pub async fn process_single_inmempool(
         &mut self,
         relayer_id: &RelayerId,
@@ -786,6 +922,19 @@ impl TransactionsQueues {
         }
     }
 
+    /// Processes a single mined transaction for the specified relayer.
+    ///
+    /// Checks if enough confirmations have passed to consider the transaction
+    /// confirmed. Once confirmed, moves the transaction to the confirmed state
+    /// and triggers confirmation webhooks. Handles the final stage of transaction
+    /// lifecycle from mined to confirmed.
+    ///
+    /// # Arguments
+    /// * `relayer_id` - The relayer whose mined transactions to process
+    ///
+    /// # Returns
+    /// * `Ok(ProcessResult<ProcessMinedStatus>)` - Processing result with status
+    /// * `Err(ProcessMinedTransactionError)` - If processing fails critically
     pub async fn process_single_mined(
         &mut self,
         relayer_id: &RelayerId,

@@ -178,6 +178,17 @@ impl TransactionsQueue {
         count
     }
 
+    /// Searches for a transaction by ID across pending and inmempool queues.
+    ///
+    /// Returns an editable wrapper that indicates which queue the transaction is in.
+    /// This is useful for transaction management and status updates.
+    ///
+    /// # Arguments
+    /// * `id` - The transaction ID to search for
+    ///
+    /// # Returns
+    /// * `Some(EditableTransaction)` - The transaction if found, wrapped with queue location info
+    /// * `None` - If the transaction is not found in any queue
     pub async fn get_editable_transaction_by_id(
         &self,
         id: &TransactionId,
@@ -225,6 +236,17 @@ impl TransactionsQueue {
         }
     }
 
+    /// Moves a transaction from pending to inmempool queue after successful network submission.
+    ///
+    /// Updates the transaction with network details (hash, gas prices, timestamps) and moves it
+    /// from the pending queue to the inmempool queue where it awaits confirmation.
+    ///
+    /// # Arguments
+    /// * `transaction_sent` - Details of the successfully sent transaction including hash and gas info
+    ///
+    /// # Returns
+    /// * `Ok(())` - If the transaction was successfully moved
+    /// * `Err(MovePendingTransactionToInmempoolError)` - If transaction not found or ID mismatch
     pub async fn move_pending_to_inmempool(
         &mut self,
         transaction_sent: &TransactionSentWithRelayer,
@@ -277,6 +299,10 @@ impl TransactionsQueue {
         }
     }
 
+    /// Removes the next pending transaction from the queue, marking it as failed.
+    ///
+    /// This is typically called when a transaction cannot be sent due to errors
+    /// like insufficient funds, network issues, or validation failures.
     pub async fn move_next_pending_to_failed(&mut self) {
         let mut transactions = self.pending_transactions.lock().await;
         if let Some(tx) = transactions.front() {
@@ -294,12 +320,24 @@ impl TransactionsQueue {
         );
     }
 
+    /// Gets the next transaction from the inmempool queue without removing it.
+    ///
+    /// Inmempool transactions are those that have been sent to the network
+    /// but have not yet been mined into a block.
+    ///
+    /// # Returns
+    /// * `Some(Transaction)` - The next inmempool transaction if queue is not empty
+    /// * `None` - If the inmempool queue is empty
     pub async fn get_next_inmempool_transaction(&self) -> Option<Transaction> {
         let transactions = self.inmempool_transactions.lock().await;
 
         transactions.front().cloned()
     }
 
+    /// Returns the number of transactions currently in the inmempool queue.
+    ///
+    /// # Returns
+    /// * `usize` - The count of transactions awaiting mining
     pub async fn get_inmempool_transaction_count(&self) -> usize {
         let transactions = self.inmempool_transactions.lock().await;
         let count = transactions.len();
@@ -311,6 +349,18 @@ impl TransactionsQueue {
         count
     }
 
+    /// Moves a transaction from inmempool to mined queue after receiving a block receipt.
+    ///
+    /// Analyzes the transaction receipt to determine final status (Mined, Failed, or Expired)
+    /// and updates the transaction accordingly. The transaction then awaits final confirmation.
+    ///
+    /// # Arguments
+    /// * `id` - The transaction ID to move
+    /// * `receipt` - The blockchain receipt containing execution results
+    ///
+    /// # Returns
+    /// * `Ok(TransactionStatus)` - The final transaction status (Mined/Failed/Expired)
+    /// * `Err(MoveInmempoolTransactionToMinedError)` - If transaction not found or ID mismatch
     pub async fn move_inmempool_to_mining(
         &mut self,
         id: &TransactionId,
@@ -443,6 +493,13 @@ impl TransactionsQueue {
         !self.relayer.eip_1559_enabled
     }
 
+    /// Sets whether this relayer should use legacy transaction format.
+    ///
+    /// Legacy transactions use the pre-EIP-1559 format with only gas price,
+    /// while modern transactions use max fee and priority fee structures.
+    ///
+    /// # Arguments
+    /// * `is_legacy_transactions` - True to use legacy format, false for EIP-1559
     pub fn set_is_legacy_transactions(&mut self, is_legacy_transactions: bool) {
         rrelayer_info!(
             "Setting legacy transactions to {} for relayer: {}",
@@ -452,10 +509,20 @@ impl TransactionsQueue {
         self.relayer.eip_1559_enabled = is_legacy_transactions;
     }
 
+    /// Checks if this relayer only accepts transactions from allowlisted addresses.
+    ///
+    /// # Returns
+    /// * `bool` - True if only allowlisted addresses can use this relayer
     pub fn is_allowlisted_only(&self) -> bool {
         self.relayer.allowlisted_only
     }
 
+    /// Sets whether this relayer should only accept allowlisted transactions.
+    ///
+    /// When enabled, only transactions from pre-approved addresses will be processed.
+    ///
+    /// # Arguments
+    /// * `is_allowlisted_only` - True to restrict to allowlisted addresses only
     pub fn set_is_allowlisted_only(&mut self, is_allowlisted_only: bool) {
         rrelayer_info!(
             "Setting allowlisted only to {} for relayer: {}",
@@ -465,24 +532,54 @@ impl TransactionsQueue {
         self.relayer.allowlisted_only = is_allowlisted_only;
     }
 
+    /// Checks if this relayer is currently paused.
+    ///
+    /// Paused relayers will not process new transactions until unpaused.
+    ///
+    /// # Returns
+    /// * `bool` - True if the relayer is paused
     pub fn is_paused(&self) -> bool {
         self.relayer.paused
     }
 
+    /// Sets the paused state of this relayer.
+    ///
+    /// Paused relayers stop processing new transactions but maintain their queues.
+    ///
+    /// # Arguments
+    /// * `is_paused` - True to pause the relayer, false to resume
     pub fn set_is_paused(&mut self, is_paused: bool) {
         rrelayer_info!("Setting paused to {} for relayer: {}", is_paused, self.relayer.name);
         self.relayer.paused = is_paused;
     }
 
+    /// Updates the display name of this relayer.
+    ///
+    /// # Arguments
+    /// * `name` - The new name for the relayer
     pub fn set_name(&mut self, name: &str) {
         rrelayer_info!("Changing relayer name from {} to {}", self.relayer.name, name);
         self.relayer.name = name.to_string();
     }
 
+    /// Returns the maximum gas price this relayer will pay for transactions.
+    ///
+    /// Transactions requiring higher gas prices will be rejected to prevent
+    /// excessive costs during network congestion.
+    ///
+    /// # Returns
+    /// * `Some(GasPrice)` - The maximum gas price limit if set
+    /// * `None` - If no limit is configured (unlimited)
     pub fn max_gas_price(&self) -> Option<GasPrice> {
         self.relayer.max_gas_price
     }
 
+    /// Sets the maximum gas price this relayer will pay for transactions.
+    ///
+    /// This provides cost control by rejecting transactions that would be too expensive.
+    ///
+    /// # Arguments
+    /// * `max_gas_price` - The new maximum gas price, or None for no limit
     pub fn set_max_gas_price(&mut self, max_gas_price: Option<GasPrice>) {
         rrelayer_info!(
             "Setting max gas price to {:?} for relayer: {}",
@@ -500,6 +597,16 @@ impl TransactionsQueue {
         self.relayer.chain_id
     }
 
+    /// Checks if the proposed gas price is within configured bounds.
+    ///
+    /// Compares the gas price against the relayer's maximum limit to prevent
+    /// overpaying during network congestion.
+    ///
+    /// # Arguments
+    /// * `gas` - The gas price result to validate
+    ///
+    /// # Returns
+    /// * `bool` - True if within bounds or no limit set, false if exceeds maximum
     fn within_gas_price_bounds(&self, gas: &GasPriceResult) -> bool {
         if let Some(max) = &self.max_gas_price() {
             let within_bounds = if self.relayer.eip_1559_enabled {
@@ -527,10 +634,26 @@ impl TransactionsQueue {
         true
     }
 
+    /// Returns the average block time in milliseconds for this blockchain.
+    ///
+    /// Used for timing calculations like confirmation waits and gas price bumping.
+    ///
+    /// # Returns
+    /// * `u64` - Block time in milliseconds
     pub fn blocks_every_ms(&self) -> u64 {
         self.evm_provider.blocks_every
     }
 
+    /// Checks if enough time has passed for a transaction to be considered confirmed.
+    ///
+    /// Uses the blockchain's block time and required confirmation count to determine
+    /// if sufficient time has elapsed for confidence in transaction finality.
+    ///
+    /// # Arguments
+    /// * `elapsed` - Time since the transaction was mined
+    ///
+    /// # Returns
+    /// * `bool` - True if enough time has passed for confirmation
     pub fn in_confirmed_range(&self, elapsed: Duration) -> bool {
         let threshold = self.blocks_every_ms() * self.confirmations;
         let in_range = elapsed.as_secs() > threshold;
@@ -545,6 +668,19 @@ impl TransactionsQueue {
         in_range
     }
 
+    /// Computes the appropriate gas price for a transaction based on speed tier.
+    ///
+    /// Queries the gas oracle for current network conditions and applies speed-based
+    /// multipliers. If the transaction was previously sent, bumps the gas price by 10%
+    /// to improve confirmation chances.
+    ///
+    /// # Arguments
+    /// * `transaction_speed` - The desired transaction speed tier (Slow/Medium/Fast/Super)
+    /// * `sent_last_with` - Previous gas price if this is a retry attempt
+    ///
+    /// # Returns
+    /// * `Ok(GasPriceResult)` - The computed gas prices (max fee and priority fee)
+    /// * `Err(SendTransactionGasPriceError)` - If gas price calculation fails
     pub async fn compute_gas_price_for_transaction(
         &self,
         transaction_speed: &TransactionSpeed,
@@ -600,6 +736,18 @@ impl TransactionsQueue {
         Ok(gas_price)
     }
 
+    /// Computes the appropriate blob gas price for EIP-4844 blob transactions.
+    ///
+    /// Queries the blob gas oracle for current blob space pricing and applies
+    /// speed-based adjustments. Bumps price by 10% on retry attempts.
+    ///
+    /// # Arguments
+    /// * `transaction_speed` - The desired transaction speed tier
+    /// * `sent_last_with` - Previous blob gas price if this is a retry
+    ///
+    /// # Returns
+    /// * `Ok(BlobGasPriceResult)` - The computed blob gas price and total fee
+    /// * `Err(SendTransactionGasPriceError)` - If blob gas price calculation fails
     pub async fn compute_blob_gas_price_for_transaction(
         &self,
         transaction_speed: &TransactionSpeed,
@@ -648,6 +796,17 @@ impl TransactionsQueue {
         Ok(blob_gas_price)
     }
 
+    /// Computes the transaction hash by signing the transaction.
+    ///
+    /// Creates a signature for the transaction using the relayer's wallet
+    /// and derives the final transaction hash that will appear on-chain.
+    ///
+    /// # Arguments
+    /// * `transaction` - The transaction to compute hash for
+    ///
+    /// # Returns
+    /// * `Ok(TransactionHash)` - The computed transaction hash
+    /// * `Err(LocalSignerError)` - If signing fails
     pub async fn compute_tx_hash(
         &self,
         transaction: &TypedTransaction,
@@ -688,6 +847,17 @@ impl TransactionsQueue {
         Ok(tx_hash)
     }
 
+    /// Simulates a transaction to verify it would execute successfully.
+    ///
+    /// Performs a gas estimation call which simulates transaction execution
+    /// without actually submitting it, allowing validation before sending.
+    ///
+    /// # Arguments
+    /// * `transaction_request` - The transaction to simulate
+    ///
+    /// # Returns
+    /// * `Ok(())` - If simulation succeeds
+    /// * `Err(RpcError)` - If simulation fails or transaction would revert
     pub async fn simulate_transaction(
         &self,
         transaction_request: &TypedTransaction,
@@ -698,6 +868,18 @@ impl TransactionsQueue {
         Ok(())
     }
 
+    /// Estimates the gas limit required for a transaction.
+    ///
+    /// Calls the network to estimate gas usage and applies a 20% buffer
+    /// for non-noop transactions to account for state changes during execution.
+    ///
+    /// # Arguments
+    /// * `transaction_request` - The transaction to estimate gas for
+    /// * `is_noop` - True if this is a no-op transaction (no buffer applied)
+    ///
+    /// # Returns
+    /// * `Ok(GasLimit)` - The estimated gas limit
+    /// * `Err(RpcError)` - If estimation fails
     pub async fn estimate_gas(
         &self,
         transaction_request: &TypedTransaction,
@@ -948,6 +1130,18 @@ impl TransactionsQueue {
         Ok(transaction_sent)
     }
 
+    /// Retrieves the transaction receipt from the blockchain.
+    ///
+    /// Queries the network for the receipt of a transaction that has been mined.
+    /// The receipt contains execution results, gas used, and success/failure status.
+    ///
+    /// # Arguments
+    /// * `transaction_hash` - The hash of the transaction to get receipt for
+    ///
+    /// # Returns
+    /// * `Ok(Some(AnyTransactionReceipt))` - The receipt if transaction is mined
+    /// * `Ok(None)` - If transaction is not yet mined
+    /// * `Err(RpcError)` - If network query fails
     pub async fn get_receipt(
         &mut self,
         transaction_hash: &TransactionHash,
