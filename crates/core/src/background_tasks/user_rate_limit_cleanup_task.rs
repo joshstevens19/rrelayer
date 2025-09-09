@@ -1,4 +1,4 @@
-use crate::{user_rate_limiting::UserRateLimiter, rrelayer_error, rrelayer_info};
+use crate::{rrelayer_error, rrelayer_info, user_rate_limiting::UserRateLimiter};
 use std::{sync::Arc, time::Duration};
 use tracing::{error, info};
 

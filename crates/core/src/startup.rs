@@ -27,7 +27,6 @@ use crate::{
     network::api::create_network_routes,
     postgres::{PostgresClient, PostgresConnectionError, PostgresError},
     provider::{load_providers, EvmProvider, LoadProvidersError},
-    user_rate_limiting::UserRateLimiter,
     read,
     relayer::api::create_relayer_routes,
     rrelayer_error, rrelayer_info,
@@ -43,6 +42,7 @@ use crate::{
         },
     },
     user::api::create_user_routes,
+    user_rate_limiting::UserRateLimiter,
     AdminIdentifier, ApiConfig, RateLimitConfig,
 };
 
@@ -439,7 +439,8 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
     // Initialize rate limiter from config
     let user_rate_limiter = if let Some(ref rate_limit_config) = config.user_rate_limits {
         rrelayer_info!("Initializing user rate limiter with configuration");
-        let user_rate_limiter = UserRateLimiter::new(rate_limit_config.clone(), postgres_client.clone());
+        let user_rate_limiter =
+            UserRateLimiter::new(rate_limit_config.clone(), postgres_client.clone());
 
         // Initialize and load existing rate limits from database
         if let Err(e) = user_rate_limiter.initialize().await {

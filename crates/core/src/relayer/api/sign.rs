@@ -11,9 +11,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     app_state::AppState,
-    user_rate_limiting::UserRateLimitError,
     relayer::{get_relayer_provider_context_by_relayer_id, types::RelayerId},
     rrelayer_error,
+    user_rate_limiting::UserRateLimitError,
 };
 
 #[derive(Debug, Deserialize)]
@@ -67,7 +67,12 @@ async fn sign_text(
                     return Err(StatusCode::TOO_MANY_REQUESTS);
                 }
             }
-            Err(UserRateLimitError::LimitExceeded { rule_type, current, limit, window_seconds }) => {
+            Err(UserRateLimitError::LimitExceeded {
+                rule_type,
+                current,
+                limit,
+                window_seconds,
+            }) => {
                 rrelayer_error!(
                     "Signing rate limit exceeded for relayer {}: {}/{} {} in {}s",
                     relayer_id,
@@ -148,7 +153,12 @@ async fn sign_typed_data(
                     return Err(StatusCode::TOO_MANY_REQUESTS);
                 }
             }
-            Err(UserRateLimitError::LimitExceeded { rule_type, current, limit, window_seconds }) => {
+            Err(UserRateLimitError::LimitExceeded {
+                rule_type,
+                current,
+                limit,
+                window_seconds,
+            }) => {
                 rrelayer_error!(
                     "Signing rate limit exceeded for relayer {}: {}/{} {} in {}s",
                     relayer_id,

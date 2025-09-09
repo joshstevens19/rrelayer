@@ -6,9 +6,9 @@ use crate::{
     gas::{blob_gas_oracle::BlobGasOracleCache, gas_oracle::GasOracleCache},
     postgres::PostgresClient,
     provider::EvmProvider,
-    user_rate_limiting::UserRateLimiter,
     shared::cache::Cache,
     transaction::queue_system::transactions_queues::TransactionsQueues,
+    user_rate_limiting::UserRateLimiter,
     webhooks::WebhookManager,
     yaml::RateLimitConfig,
 };

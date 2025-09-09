@@ -13,8 +13,8 @@ use crate::{
         gas_oracle::{gas_oracle, GasOracleCache},
     },
     provider::EvmProvider,
-    user_rate_limiting::UserRateLimiter,
     rrelayer_info,
+    user_rate_limiting::UserRateLimiter,
     webhooks::WebhookManager,
     PostgresClient, SetupConfig,
 };

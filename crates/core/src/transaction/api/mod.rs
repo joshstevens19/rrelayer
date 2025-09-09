@@ -17,7 +17,6 @@ use crate::{
     app_state::AppState,
     authentication::guards::ReadOnlyOrAboveJwtTokenOrApiKeyGuard,
     provider::find_provider_for_chain_id,
-    user_rate_limiting::{UserRateLimitError, UserDetectionError, UserDetector},
     relayer::{get_relayer, is_relayer_api_key, types::RelayerId},
     rrelayer_error, rrelayer_info,
     shared::common_types::{EvmAddress, PagingContext, PagingQuery, PagingResult},
@@ -29,6 +28,7 @@ use crate::{
             TransactionValue,
         },
     },
+    user_rate_limiting::{UserDetectionError, UserDetector, UserRateLimitError},
 };
 
 /// API endpoint to retrieve a transaction by its ID.
@@ -225,7 +225,10 @@ async fn send_transaction(
         let user_identifier = format!("{:?}", user_context.user_address);
 
         // Check transaction rate limit
-        match user_rate_limiter.check_rate_limit(&user_identifier, "transactions_per_minute", 1).await {
+        match user_rate_limiter
+            .check_rate_limit(&user_identifier, "transactions_per_minute", 1)
+            .await
+        {
             Ok(check) => {
                 if !check.allowed {
                     rrelayer_error!(
@@ -236,7 +239,12 @@ async fn send_transaction(
                     return Err(StatusCode::TOO_MANY_REQUESTS);
                 }
             }
-            Err(UserRateLimitError::LimitExceeded { rule_type, current, limit, window_seconds }) => {
+            Err(UserRateLimitError::LimitExceeded {
+                rule_type,
+                current,
+                limit,
+                window_seconds,
+            }) => {
                 rrelayer_error!(
                     "Rate limit exceeded for user {}: {}/{} {} in {}s",
                     user_identifier,
