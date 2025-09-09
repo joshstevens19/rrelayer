@@ -58,7 +58,7 @@ fn validate_secret(secret: &str) -> bool {
 ///
 /// This type is inserted into request extensions by the auth middleware
 /// and can be extracted by handlers to ensure authentication has occurred.
-/// 
+///
 /// # Example
 /// ```rust,ignore
 /// async fn protected_handler(auth: Authenticated) -> &'static str {

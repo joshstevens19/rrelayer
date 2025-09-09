@@ -60,7 +60,7 @@ pub enum PostgresError {
 }
 
 /// Wrapper around a PostgreSQL transaction for safer handling.
-/// 
+///
 /// Provides methods to execute queries, commit, and rollback transactions
 /// with proper error handling.
 pub struct PostgresTransaction<'a> {

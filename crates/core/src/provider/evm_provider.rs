@@ -25,7 +25,9 @@ use rand::{thread_rng, Rng};
 use reqwest::Url;
 use thiserror::Error;
 
-use crate::wallet::{AwsKmsWalletManager, MnemonicWalletManager, PrivyWalletManager, WalletError, WalletManagerTrait};
+use crate::wallet::{
+    AwsKmsWalletManager, MnemonicWalletManager, PrivyWalletManager, WalletError, WalletManagerTrait,
+};
 use crate::yaml::AwsKmsSigningKey;
 use crate::{
     gas::{

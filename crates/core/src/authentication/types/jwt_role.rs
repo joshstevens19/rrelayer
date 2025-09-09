@@ -32,7 +32,7 @@ impl JwtRole {
     /// # Returns
     /// * `String` - The uppercase string representation of the role:
     ///   - Admin -> "ADMIN"
-    ///   - ReadOnly -> "READONLY" 
+    ///   - ReadOnly -> "READONLY"
     ///   - Manager -> "MANAGER"
     ///   - Integrator -> "INTEGRATOR"
     pub fn format(&self) -> String {

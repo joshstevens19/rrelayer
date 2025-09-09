@@ -12,8 +12,8 @@ use thiserror::Error;
 
 mod mnemonic_signing_key_providers;
 pub use mnemonic_signing_key_providers::{get_mnemonic_from_signing_key, keystore};
-mod privy_wallet_manager;
 mod aws_kms_wallet_manager;
+mod privy_wallet_manager;
 pub use aws_kms_wallet_manager::AwsKmsWalletManager;
 
 #[derive(Error, Debug)]

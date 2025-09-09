@@ -16,7 +16,7 @@ use tracing_subscriber::{
 static SHUTDOWN_IN_PROGRESS: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(false));
 
 /// A writer that adapts its behavior during application shutdown.
-/// 
+///
 /// Uses buffered writing during normal operation for performance,
 /// but switches to direct stdout writing during shutdown to ensure
 /// log messages are flushed immediately.
@@ -55,7 +55,7 @@ impl Write for ShutdownAwareWriter {
 }
 
 /// Factory for creating shutdown-aware writers.
-/// 
+///
 /// Implements the MakeWriter trait to provide writers that can adapt
 /// their behavior during application shutdown.
 struct ShutdownAwareWriterMaker;
@@ -69,7 +69,7 @@ impl<'a> MakeWriter<'a> for ShutdownAwareWriterMaker {
 }
 
 /// Custom timer formatter for log messages.
-/// 
+///
 /// Provides different time formats for normal operation and shutdown:
 /// - Normal: "DD Month - HH:MM:SS.microseconds"
 /// - Shutdown: "HH:MM:SS"
@@ -122,7 +122,7 @@ pub fn setup_logger(log_level: LevelFilter) {
 ///
 /// Convenience function that configures logging at INFO level,
 /// which is the standard level for production deployments.
-/// 
+///
 /// Equivalent to calling `setup_logger(LevelFilter::INFO)`.
 pub fn setup_info_logger() {
     setup_logger(LevelFilter::INFO);
@@ -141,7 +141,7 @@ pub fn mark_shutdown_started() {
 }
 
 /// RAII guard for temporarily suppressing shutdown mode.
-/// 
+///
 /// When this guard is dropped, it resets the shutdown flag to false,
 /// allowing normal buffered logging to resume. This is useful for
 /// testing or temporary operations during shutdown.

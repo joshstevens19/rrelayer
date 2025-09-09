@@ -3,7 +3,7 @@ use crate::postgres::{PostgresClient, PostgresError};
 /// Applies the RRelayer database schema version 1.0.0.
 ///
 /// Creates the complete database schema including:
-/// 
+///
 /// **Schemas and Types:**
 /// - `authentication` schema with `user_role` enum
 /// - `network` schema for blockchain networks

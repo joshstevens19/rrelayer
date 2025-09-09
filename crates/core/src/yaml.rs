@@ -146,8 +146,11 @@ impl KmsKeyIds {
             KmsKeyIds::Multiple(key_ids) => {
                 let index = wallet_index as usize;
                 if index >= key_ids.len() {
-                    return Err(format!("Wallet index {} is out of bounds for {} KMS keys", 
-                                     wallet_index, key_ids.len()));
+                    return Err(format!(
+                        "Wallet index {} is out of bounds for {} KMS keys",
+                        wallet_index,
+                        key_ids.len()
+                    ));
                 }
                 Ok(&key_ids[index])
             }
@@ -634,7 +637,7 @@ pub fn read(file_path: &PathBuf, raw_yaml: bool) -> Result<SetupConfig, ReadYaml
 
     if let Some(signing_key) = &config.signing_key {
         signing_key.validate().map_err(ReadYamlError::SigningKeyYamlError)?;
-        
+
         // Additional validation for AWS KMS if present
         if let Some(aws_kms) = &signing_key.aws_kms {
             aws_kms.validate().map_err(ReadYamlError::SigningKeyYamlError)?;

@@ -4,8 +4,8 @@ use crate::wallet::{WalletError, WalletManagerTrait};
 use crate::yaml::AwsKmsSigningKey;
 use alloy::consensus::TypedTransaction;
 use alloy::dyn_abi::TypedData;
-use alloy::primitives::PrimitiveSignature;
 use alloy::network::TxSigner;
+use alloy::primitives::PrimitiveSignature;
 use alloy::signers::{aws::AwsSigner, Signer};
 use async_trait::async_trait;
 use aws_config::{BehaviorVersion, Region};
@@ -17,7 +17,7 @@ use tokio::sync::RwLock;
 /// AWS KMS-based wallet manager.
 ///
 /// This manager instantiates and caches AWS KMS signers for different wallet indices and chain IDs.
-/// Supports both single key configuration (all indices use same key) and multiple key 
+/// Supports both single key configuration (all indices use same key) and multiple key
 /// configuration (each index maps to a specific KMS key ID).
 #[derive(Debug)]
 pub struct AwsKmsWalletManager {
@@ -37,10 +37,7 @@ impl AwsKmsWalletManager {
     /// # Returns
     /// * `AwsKmsWalletManager` - A new wallet manager instance
     pub fn new(config: AwsKmsSigningKey) -> Self {
-        Self {
-            config,
-            signers: Arc::new(RwLock::new(HashMap::new())),
-        }
+        Self { config, signers: Arc::new(RwLock::new(HashMap::new())) }
     }
 
     /// Gets the KMS key ID for the specified wallet index.
@@ -52,7 +49,8 @@ impl AwsKmsWalletManager {
     /// * `Ok(String)` - The KMS key ID to use
     /// * `Err(WalletError)` - If the wallet index is out of bounds
     fn get_key_id_for_index(&self, wallet_index: u32) -> Result<String, WalletError> {
-        self.config.key_ids
+        self.config
+            .key_ids
             .get_key_for_index(wallet_index)
             .map(|key| key.to_string())
             .map_err(|e| WalletError::ConfigurationError { message: e })
@@ -67,10 +65,14 @@ impl AwsKmsWalletManager {
     /// # Returns
     /// * `Ok(AwsSigner)` - A signer instance configured for the specified KMS key and chain
     /// * `Err(WalletError)` - If signer initialization fails
-    async fn get_or_initialize_signer(&self, wallet_index: u32, chain_id: &ChainId) -> Result<AwsSigner, WalletError> {
+    async fn get_or_initialize_signer(
+        &self,
+        wallet_index: u32,
+        chain_id: &ChainId,
+    ) -> Result<AwsSigner, WalletError> {
         let chain_id_u64 = chain_id.u64();
         let cache_key = (wallet_index, chain_id_u64);
-        
+
         // Check if signer already exists
         {
             let signers = self.signers.read().await;
@@ -82,7 +84,7 @@ impl AwsKmsWalletManager {
         // Initialize new signer instance
         let key_id = self.get_key_id_for_index(wallet_index)?;
         let signer = self.initialize_aws_kms_signer(&key_id, Some(chain_id_u64)).await?;
-        
+
         // Cache the signer
         {
             let mut signers = self.signers.write().await;
@@ -93,17 +95,22 @@ impl AwsKmsWalletManager {
     }
 
     /// Initializes an AWS KMS signer instance from the configuration.
-    /// 
+    ///
     /// This configures the AWS KMS client and returns a signer that will use
     /// the specified KMS key for all cryptographic operations.
-    async fn initialize_aws_kms_signer(&self, key_id: &str, chain_id: Option<u64>) -> Result<AwsSigner, WalletError> {
+    async fn initialize_aws_kms_signer(
+        &self,
+        key_id: &str,
+        chain_id: Option<u64>,
+    ) -> Result<AwsSigner, WalletError> {
         // Build AWS config
         let mut aws_config_builder = aws_config::defaults(BehaviorVersion::latest())
             .region(Region::new(self.config.region.clone()));
 
         // Add credentials if provided
-        if let (Some(access_key), Some(secret_key)) = 
-            (&self.config.access_key_id, &self.config.secret_access_key) {
+        if let (Some(access_key), Some(secret_key)) =
+            (&self.config.access_key_id, &self.config.secret_access_key)
+        {
             let credentials = Credentials::new(
                 access_key.clone(),
                 secret_key.clone(),
@@ -118,11 +125,9 @@ impl AwsKmsWalletManager {
         let client = Client::new(&shared_config);
 
         // Initialize AWS KMS signer instance
-        let signer = AwsSigner::new(client, key_id.to_string(), chain_id)
-            .await
-            .map_err(|e| WalletError::ApiError {
-                message: format!("Failed to initialize AWS KMS signer: {}", e),
-            })?;
+        let signer = AwsSigner::new(client, key_id.to_string(), chain_id).await.map_err(|e| {
+            WalletError::ApiError { message: format!("Failed to initialize AWS KMS signer: {}", e) }
+        })?;
 
         Ok(signer)
     }
@@ -131,7 +136,7 @@ impl AwsKmsWalletManager {
 #[async_trait]
 impl WalletManagerTrait for AwsKmsWalletManager {
     /// Gets the wallet address using AWS KMS.
-    /// 
+    ///
     /// The wallet_index determines which KMS key ID to use from the configured key_ids.
     /// For single key configuration, all indices use the same key.
     /// For multiple key configuration, the index maps to the array position.
@@ -146,7 +151,7 @@ impl WalletManagerTrait for AwsKmsWalletManager {
     }
 
     /// Gets the address of the AWS KMS wallet.
-    /// 
+    ///
     /// The wallet_index determines which KMS key ID to use from the configured key_ids.
     /// Returns the Ethereum address derived from the KMS key.
     async fn get_address(
@@ -222,12 +227,10 @@ impl WalletManagerTrait for AwsKmsWalletManager {
         typed_data: &TypedData,
     ) -> Result<PrimitiveSignature, WalletError> {
         // For typed data signing, we use chain ID from the typed data or default to 1
-        let chain_id_u64 = typed_data.domain().chain_id
-            .map(|id| id.to::<u64>())
-            .unwrap_or(1);
+        let chain_id_u64 = typed_data.domain().chain_id.map(|id| id.to::<u64>()).unwrap_or(1);
         let chain_id = ChainId::new(chain_id_u64);
         let signer = self.get_or_initialize_signer(wallet_index, &chain_id).await?;
-        
+
         // Sign the EIP-712 hash using AWS KMS
         let hash = typed_data.eip712_signing_hash()?;
         let signature = signer.sign_hash(&hash).await?;
