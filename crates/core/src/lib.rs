@@ -41,7 +41,7 @@ pub mod relayer;
 pub mod safe_proxy;
 pub use safe_proxy::{SafeProxyError, SafeProxyManager, SafeTransaction};
 pub use yaml::{
-    read, AdminIdentifier, ApiConfig, GasProviders, KeystoreSigningKey, NetworkSetupConfig,
+    read, AdminIdentifier, ApiConfig, AwsKmsSigningKey, GasProviders, KeystoreSigningKey, KmsKeyIds, NetworkSetupConfig,
     SafeProxyConfig, SetupConfig, SigningKey,
 };
 mod shared;
@@ -55,7 +55,7 @@ mod schema;
 pub mod transaction;
 pub mod user;
 mod wallet;
-pub use wallet::{generate_seed_phrase, keystore, WalletError};
+pub use wallet::{generate_seed_phrase, keystore, AwsKmsWalletManager, WalletError};
 mod background_tasks;
 mod webhooks;
 mod yaml;

@@ -13,6 +13,8 @@ use thiserror::Error;
 mod mnemonic_signing_key_providers;
 pub use mnemonic_signing_key_providers::{get_mnemonic_from_signing_key, keystore};
 mod privy_wallet_manager;
+mod aws_kms_wallet_manager;
+pub use aws_kms_wallet_manager::AwsKmsWalletManager;
 
 #[derive(Error, Debug)]
 pub enum WalletError {
@@ -72,6 +74,9 @@ pub enum WalletError {
 
     #[error("Key derivation error: {0}")]
     KeyDerivationError(String),
+
+    #[error("EIP712 signing error: {0}")]
+    Eip712Error(String),
 }
 
 impl From<alloy::signers::Error> for WalletError {
@@ -87,10 +92,18 @@ impl From<alloy::signers::Error> for WalletError {
     }
 }
 
+impl From<alloy::dyn_abi::Error> for WalletError {
+    /// Converts an Alloy DynABI error into a WalletError.
+    fn from(error: alloy::dyn_abi::Error) -> Self {
+        WalletError::Eip712Error(format!("EIP712 error: {}", error))
+    }
+}
+
 #[derive(Debug)]
 pub enum WalletSource {
     Mnemonic(String),
     Privy(PrivyWalletManager),
+    AwsKms(AwsKmsWalletManager),
 }
 
 #[async_trait]

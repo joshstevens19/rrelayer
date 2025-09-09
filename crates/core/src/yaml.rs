@@ -62,6 +62,29 @@ pub struct PrivySigningKey {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AwsKmsSigningKey {
+    /// AWS KMS key IDs mapped by wallet index
+    /// Can be a single key ID string or an array of key IDs
+    pub key_ids: KmsKeyIds,
+    pub region: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub access_key_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub secret_access_key: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub session_token: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum KmsKeyIds {
+    /// Single key ID used for all wallet indices
+    Single(String),
+    /// Array of key IDs where index maps to wallet index
+    Multiple(Vec<String>),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SigningKey {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub keystore: Option<KeystoreSigningKey>,
@@ -77,6 +100,73 @@ pub struct SigningKey {
 
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub privy: Option<PrivySigningKey>,
+
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub aws_kms: Option<AwsKmsSigningKey>,
+}
+
+impl KmsKeyIds {
+    /// Validates the KMS key IDs configuration.
+    ///
+    /// # Returns
+    /// * `Ok(())` - If the configuration is valid
+    /// * `Err(String)` - If the configuration is invalid
+    pub fn validate(&self) -> Result<(), String> {
+        match self {
+            KmsKeyIds::Single(key_id) => {
+                if key_id.is_empty() {
+                    return Err("Single KMS key ID cannot be empty".to_string());
+                }
+            }
+            KmsKeyIds::Multiple(key_ids) => {
+                if key_ids.is_empty() {
+                    return Err("Multiple KMS key IDs cannot be empty".to_string());
+                }
+                for (index, key_id) in key_ids.iter().enumerate() {
+                    if key_id.is_empty() {
+                        return Err(format!("KMS key ID at index {} cannot be empty", index));
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Gets the key ID for a given wallet index.
+    ///
+    /// # Arguments
+    /// * `wallet_index` - The wallet index to get the key for
+    ///
+    /// # Returns
+    /// * `Ok(String)` - The KMS key ID to use
+    /// * `Err(String)` - If the wallet index is out of bounds
+    pub fn get_key_for_index(&self, wallet_index: u32) -> Result<&str, String> {
+        match self {
+            KmsKeyIds::Single(key_id) => Ok(key_id),
+            KmsKeyIds::Multiple(key_ids) => {
+                let index = wallet_index as usize;
+                if index >= key_ids.len() {
+                    return Err(format!("Wallet index {} is out of bounds for {} KMS keys", 
+                                     wallet_index, key_ids.len()));
+                }
+                Ok(&key_ids[index])
+            }
+        }
+    }
+}
+
+impl AwsKmsSigningKey {
+    /// Validates the AWS KMS signing key configuration.
+    ///
+    /// # Returns
+    /// * `Ok(())` - If the configuration is valid
+    /// * `Err(String)` - If the configuration is invalid
+    pub fn validate(&self) -> Result<(), String> {
+        if self.region.is_empty() {
+            return Err("AWS region cannot be empty".to_string());
+        }
+        self.key_ids.validate()
+    }
 }
 
 impl SigningKey {
@@ -94,7 +184,64 @@ impl SigningKey {
             aws_secret_manager: None,
             gcp_secret_manager: None,
             privy: None,
+            aws_kms: None,
         }
+    }
+
+    /// Creates a new signing key configuration using AWS KMS authentication.
+    ///
+    /// # Arguments
+    /// * `aws_kms` - AWS KMS configuration for wallet signing
+    ///
+    /// # Returns
+    /// * `SigningKey` - A signing key configured to use AWS KMS authentication only
+    pub fn from_aws_kms(aws_kms: AwsKmsSigningKey) -> Self {
+        Self {
+            keystore: None,
+            raw: None,
+            aws_secret_manager: None,
+            gcp_secret_manager: None,
+            privy: None,
+            aws_kms: Some(aws_kms),
+        }
+    }
+
+    /// Creates a new signing key configuration using AWS KMS with a single key ID.
+    ///
+    /// # Arguments
+    /// * `key_id` - AWS KMS key ID or ARN
+    /// * `region` - AWS region
+    ///
+    /// # Returns
+    /// * `SigningKey` - A signing key configured to use AWS KMS with a single key
+    pub fn from_aws_kms_single(key_id: String, region: String) -> Self {
+        let aws_kms = AwsKmsSigningKey {
+            key_ids: KmsKeyIds::Single(key_id),
+            region,
+            access_key_id: None,
+            secret_access_key: None,
+            session_token: None,
+        };
+        Self::from_aws_kms(aws_kms)
+    }
+
+    /// Creates a new signing key configuration using AWS KMS with multiple key IDs.
+    ///
+    /// # Arguments
+    /// * `key_ids` - Array of AWS KMS key IDs or ARNs, indexed by wallet index
+    /// * `region` - AWS region
+    ///
+    /// # Returns
+    /// * `SigningKey` - A signing key configured to use AWS KMS with multiple keys
+    pub fn from_aws_kms_multiple(key_ids: Vec<String>, region: String) -> Self {
+        let aws_kms = AwsKmsSigningKey {
+            key_ids: KmsKeyIds::Multiple(key_ids),
+            region,
+            access_key_id: None,
+            secret_access_key: None,
+            session_token: None,
+        };
+        Self::from_aws_kms(aws_kms)
     }
 }
 
@@ -114,6 +261,7 @@ impl SigningKey {
             self.gcp_secret_manager.is_some(),
             self.keystore.is_some(),
             self.privy.is_some(),
+            self.aws_kms.is_some(),
         ]
         .iter()
         .filter(|&&x| x)
@@ -486,6 +634,11 @@ pub fn read(file_path: &PathBuf, raw_yaml: bool) -> Result<SetupConfig, ReadYaml
 
     if let Some(signing_key) = &config.signing_key {
         signing_key.validate().map_err(ReadYamlError::SigningKeyYamlError)?;
+        
+        // Additional validation for AWS KMS if present
+        if let Some(aws_kms) = &signing_key.aws_kms {
+            aws_kms.validate().map_err(ReadYamlError::SigningKeyYamlError)?;
+        }
     }
 
     Ok(config)
