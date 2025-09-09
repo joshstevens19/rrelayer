@@ -23,6 +23,11 @@ use crate::postgres::{PostgresClient, PostgresError};
 /// - `relayer.transaction` - Transaction records and status
 /// - `relayer.transaction_audit_log` - Complete transaction history
 ///
+/// **Rate Limiting Tables:**
+/// - `rate_limit_rules` - Per-user rate limiting rules and overrides
+/// - `rate_limit_usage` - Time-windowed usage tracking
+/// - `transaction_rate_limit_metadata` - Transaction metadata for analytics
+///
 /// All tables include appropriate constraints, indexes, and foreign key
 /// relationships. The schema uses PostgreSQL-specific features like enums
 /// and TIMESTAMPTZ for proper timezone handling.
@@ -232,6 +237,71 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
                 FOREIGN KEY (relayer_id) REFERENCES relayer.record (id);
         END;
         $$;
+
+        -- Rate Limiting Tables
+        
+        -- Store rate limit rules (from config + runtime overrides)
+        CREATE TABLE IF NOT EXISTS rate_limit_rules (
+            id SERIAL PRIMARY KEY,
+            user_identifier VARCHAR(255) NOT NULL, -- Address, relayer_id, or special identifier
+            rule_type VARCHAR(50) NOT NULL, -- 'transactions_per_minute', 'gas_per_hour', etc.
+            limit_value BIGINT NOT NULL,
+            window_duration_seconds INTEGER NOT NULL,
+            is_unlimited BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW(),
+            UNIQUE(user_identifier, rule_type)
+        );
+
+        -- Track rate limit usage in time windows
+        CREATE TABLE IF NOT EXISTS rate_limit_usage (
+            id SERIAL PRIMARY KEY,
+            user_identifier VARCHAR(255) NOT NULL,
+            rule_type VARCHAR(50) NOT NULL,
+            window_start TIMESTAMPTZ NOT NULL,
+            usage_count BIGINT DEFAULT 0,
+            last_request_at TIMESTAMPTZ DEFAULT NOW(),
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            UNIQUE(user_identifier, rule_type, window_start)
+        );
+
+        -- Index for fast lookups during rate limit checks
+        CREATE INDEX IF NOT EXISTS idx_rate_limit_usage_lookup 
+        ON rate_limit_usage(user_identifier, rule_type, window_start);
+
+        -- Index for cleanup of old usage records
+        CREATE INDEX IF NOT EXISTS idx_rate_limit_usage_cleanup 
+        ON rate_limit_usage(window_start);
+
+        -- Store transaction metadata for analytics and user tracking
+        CREATE TABLE IF NOT EXISTS transaction_rate_limit_metadata (
+            id SERIAL PRIMARY KEY,
+            transaction_hash VARCHAR(66),
+            relayer_id UUID,
+            end_user_address VARCHAR(42), -- The actual end user if determinable
+            detection_method VARCHAR(20), -- 'header', 'eip2771', 'fallback'
+            transaction_type VARCHAR(20), -- 'direct', 'gasless', 'automated'
+            gas_used BIGINT,
+            rate_limits_applied JSONB, -- Which rate limits were checked
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        );
+
+        -- Index for querying transaction metadata
+        CREATE INDEX IF NOT EXISTS idx_transaction_metadata_user 
+        ON transaction_rate_limit_metadata(end_user_address, created_at);
+
+        CREATE INDEX IF NOT EXISTS idx_transaction_metadata_relayer 
+        ON transaction_rate_limit_metadata(relayer_id, created_at);
+
+        -- Function to clean up old rate limit usage records
+        CREATE OR REPLACE FUNCTION cleanup_old_rate_limit_usage()
+        RETURNS void AS $$
+        BEGIN
+            -- Delete usage records older than 24 hours
+            DELETE FROM rate_limit_usage 
+            WHERE window_start < NOW() - INTERVAL '24 hours';
+        END;
+        $$ LANGUAGE plpgsql;
     "#;
 
     client.batch_execute(schema_sql).await?;

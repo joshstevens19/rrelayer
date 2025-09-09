@@ -147,6 +147,7 @@ pub async fn handle_init(path: &Path) -> Result<(), InitError> {
         api_config: ApiConfig { port: 8000, allowed_origins: None },
         webhooks: None,
         safe_proxy: None,
+        user_rate_limits: None,
     };
     fs::write(project_path.join("rrelayer.yaml"), serde_yaml::to_string(&yaml_content)?)?;
 

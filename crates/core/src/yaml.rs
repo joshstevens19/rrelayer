@@ -105,6 +105,81 @@ pub struct SigningKey {
     pub aws_kms: Option<AwsKmsSigningKey>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RateLimitConfig {
+    pub default_rules: DefaultRateLimits,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub user_overrides: Option<std::collections::HashMap<String, UserRateLimits>>,
+    pub global_limits: GlobalRateLimits,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub user_detection: Option<UserDetectionConfig>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DefaultRateLimits {
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub transactions_per_minute: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub transactions_per_hour: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub gas_per_minute: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub signing_operations_per_minute: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub concurrent_transactions: Option<u64>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct UserRateLimits {
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub transactions_per_minute: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub transactions_per_hour: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub gas_per_minute: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub signing_operations_per_minute: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub concurrent_transactions: Option<u64>,
+    #[serde(default)]
+    pub unlimited: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GlobalRateLimits {
+    pub max_concurrent_transactions: u64,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub max_transactions_per_second: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub max_gas_per_second: Option<u64>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct UserDetectionConfig {
+    #[serde(default = "default_enable_header_detection")]
+    pub enable_header_detection: bool,
+    #[serde(default = "default_header_name")]
+    pub header_name: String,
+    #[serde(default = "default_enable_eip2771")]
+    pub enable_eip2771_parsing: bool,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub trusted_forwarders: Option<Vec<String>>, // EIP-2771 trusted forwarder addresses
+    #[serde(default)]
+    pub fallback_to_relayer: bool, // If true, use relayer ID when user can't be determined
+}
+
+fn default_enable_header_detection() -> bool {
+    true
+}
+
+fn default_header_name() -> String {
+    "X-End-User-Address".to_string()
+}
+
+fn default_enable_eip2771() -> bool {
+    true
+}
+
 impl KmsKeyIds {
     /// Validates the KMS key IDs configuration.
     ///
@@ -528,6 +603,8 @@ pub struct SetupConfig {
     pub webhooks: Option<Vec<WebhookConfig>>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub safe_proxy: Option<Vec<SafeProxyConfig>>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub user_rate_limits: Option<RateLimitConfig>,
 }
 
 /// Substitutes environment variables in YAML content.

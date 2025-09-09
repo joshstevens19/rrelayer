@@ -27,6 +27,7 @@ use crate::{
     network::api::create_network_routes,
     postgres::{PostgresClient, PostgresConnectionError, PostgresError},
     provider::{load_providers, EvmProvider, LoadProvidersError},
+    user_rate_limiting::UserRateLimiter,
     read,
     relayer::api::create_relayer_routes,
     rrelayer_error, rrelayer_info,
@@ -42,7 +43,7 @@ use crate::{
         },
     },
     user::api::create_user_routes,
-    AdminIdentifier, ApiConfig,
+    AdminIdentifier, ApiConfig, RateLimitConfig,
 };
 
 #[derive(Error, Debug)]
@@ -199,12 +200,14 @@ async fn activity_logger(req: Request<Body>, next: Next) -> Result<Response, Sta
 /// * `Err(StartApiError)` - If server startup fails
 async fn start_api(
     api_config: ApiConfig,
+    rate_limit_config: Option<RateLimitConfig>,
     gas_oracle_cache: Arc<Mutex<GasOracleCache>>,
     blob_gas_oracle_cache: Arc<Mutex<BlobGasOracleCache>>,
     transactions_queues: Arc<Mutex<TransactionsQueues>>,
     providers: Arc<Vec<EvmProvider>>,
     cache: Arc<Cache>,
-    webhook_manager: Arc<Mutex<crate::webhooks::WebhookManager>>,
+    webhook_manager: Option<Arc<Mutex<crate::webhooks::WebhookManager>>>,
+    user_rate_limiter: Option<Arc<UserRateLimiter>>,
 ) -> Result<(), StartApiError> {
     let mut db = PostgresClient::new().await.map_err(StartApiError::DatabaseConnectionError)?;
 
@@ -221,6 +224,8 @@ async fn start_api(
         transactions_queues,
         cache,
         webhook_manager,
+        user_rate_limiter,
+        rate_limit_config,
     });
 
     let cors = CorsLayer::new()
@@ -410,18 +415,16 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
 
     let postgres_client = Arc::new(postgres);
 
-    // Initialize webhook manager first
-    let webhook_manager =
-        Arc::new(Mutex::new(crate::webhooks::WebhookManager::new(&config, None)?));
+    // Initialize webhook manager only if webhooks are configured
+    let webhook_manager = if config.webhooks.is_some() {
+        rrelayer_info!("Initializing webhook manager with configuration");
+        Some(Arc::new(Mutex::new(crate::webhooks::WebhookManager::new(&config, None)?)))
+    } else {
+        rrelayer_info!("Webhooks disabled - no webhook configuration found");
+        None
+    };
 
-    run_background_tasks(
-        &config,
-        gas_oracle_cache.clone(),
-        blob_gas_oracle_cache.clone(),
-        providers.clone(),
-        postgres_client.clone(),
-    )
-    .await;
+    // Background tasks will be started after rate limiter initialization
 
     let transaction_queue = startup_transactions_queues(
         gas_oracle_cache.clone(),
@@ -433,30 +436,46 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
     )
     .await?;
 
-    // Start webhook manager background tasks
-    {
-        let manager = webhook_manager.lock().await;
-        // Update network name mappings
-        let network_mappings: Vec<_> =
-            providers.iter().map(|p| (p.chain_id, p.name.clone())).collect();
-        manager.update_network_names(&network_mappings).await;
+    // Initialize rate limiter from config
+    let user_rate_limiter = if let Some(ref rate_limit_config) = config.user_rate_limits {
+        rrelayer_info!("Initializing user rate limiter with configuration");
+        let user_rate_limiter = UserRateLimiter::new(rate_limit_config.clone(), postgres_client.clone());
 
-        // Spawn background tasks
-        let manager_clone = webhook_manager.clone();
-        tokio::spawn(async move {
-            let mut manager = manager_clone.lock().await;
-            manager.run_background_tasks().await;
-        });
-    }
+        // Initialize and load existing rate limits from database
+        if let Err(e) = user_rate_limiter.initialize().await {
+            rrelayer_error!("Failed to initialize user rate limiter: {}", e);
+            None
+        } else {
+            rrelayer_info!("User rate limiter initialized successfully");
+            Some(Arc::new(user_rate_limiter))
+        }
+    } else {
+        rrelayer_info!("Rate limiting disabled - no configuration found");
+        None
+    };
+
+    // Start all background tasks now that rate limiter is initialized
+    run_background_tasks(
+        &config,
+        gas_oracle_cache.clone(),
+        blob_gas_oracle_cache.clone(),
+        providers.clone(),
+        postgres_client.clone(),
+        user_rate_limiter.clone(),
+        webhook_manager.clone(),
+    )
+    .await;
 
     start_api(
         config.api_config,
+        config.user_rate_limits.clone(),
         gas_oracle_cache,
         blob_gas_oracle_cache,
         transaction_queue,
         providers,
         cache,
         webhook_manager,
+        user_rate_limiter,
     )
     .await?;
 

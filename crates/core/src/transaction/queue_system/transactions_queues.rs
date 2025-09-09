@@ -60,7 +60,7 @@ pub struct TransactionsQueues {
     blob_gas_oracle_cache: Arc<Mutex<BlobGasOracleCache>>,
     db: PostgresClient,
     cache: Arc<Cache>,
-    webhook_manager: Arc<Mutex<WebhookManager>>,
+    webhook_manager: Option<Arc<Mutex<WebhookManager>>>,
     safe_proxy_manager: Option<SafeProxyManager>,
 }
 
@@ -75,7 +75,7 @@ impl TransactionsQueues {
     /// * `gas_oracle_cache` - Shared cache for gas price information
     /// * `blob_gas_oracle_cache` - Shared cache for blob gas price information  
     /// * `cache` - General application cache
-    /// * `webhook_manager` - Manager for webhook notifications
+    /// * `webhook_manager` - Optional manager for webhook notifications
     /// * `safe_proxy_manager` - Optional Safe proxy manager for multisig operations
     ///
     /// # Returns
@@ -86,7 +86,7 @@ impl TransactionsQueues {
         gas_oracle_cache: Arc<Mutex<GasOracleCache>>,
         blob_gas_oracle_cache: Arc<Mutex<BlobGasOracleCache>>,
         cache: Arc<Cache>,
-        webhook_manager: Arc<Mutex<WebhookManager>>,
+        webhook_manager: Option<Arc<Mutex<WebhookManager>>>,
         safe_proxy_manager: Option<SafeProxyManager>,
     ) -> Result<Self, TransactionsQueuesError> {
         let mut queues = HashMap::new();
@@ -471,8 +471,8 @@ impl TransactionsQueues {
             transactions_queue.nonce_manager.increase().await;
             self.invalidate_transaction_cache(&transaction.id).await;
 
-            {
-                let webhook_manager = self.webhook_manager.lock().await;
+            if let Some(webhook_manager) = &self.webhook_manager {
+                let webhook_manager = webhook_manager.lock().await;
                 webhook_manager.on_transaction_queued(&transaction).await;
             }
 
@@ -525,8 +525,8 @@ impl TransactionsQueues {
 
                         self.invalidate_transaction_cache(&transaction.id).await;
 
-                        {
-                            let webhook_manager = self.webhook_manager.lock().await;
+                        if let Some(webhook_manager) = &self.webhook_manager {
+                            let webhook_manager = webhook_manager.lock().await;
                             webhook_manager.on_transaction_cancelled(&result.transaction).await;
                         }
 
@@ -603,8 +603,8 @@ impl TransactionsQueues {
 
                         self.invalidate_transaction_cache(&transaction.id).await;
 
-                        {
-                            let webhook_manager = self.webhook_manager.lock().await;
+                        if let Some(webhook_manager) = &self.webhook_manager {
+                            let webhook_manager = webhook_manager.lock().await;
                             webhook_manager
                                 .on_transaction_replaced(&result.transaction, &original_transaction)
                                 .await;
@@ -662,8 +662,8 @@ impl TransactionsQueues {
                         )?;
                         self.invalidate_transaction_cache(&transaction.id).await;
 
-                        {
-                            let webhook_manager = self.webhook_manager.lock().await;
+                        if let Some(webhook_manager) = &self.webhook_manager {
+                            let webhook_manager = webhook_manager.lock().await;
                             let sent_transaction = Transaction {
                                 status: TransactionStatus::Inmempool,
                                 known_transaction_hash: Some(transaction_sent.hash),
@@ -810,8 +810,8 @@ impl TransactionsQueues {
                                         .await.map_err(|e| ProcessInmempoolTransactionError::CouldNotUpdateTransactionStatusInTheDatabase(*relayer_id, transaction.clone(), TransactionStatus::Mined, e))?;
                                     self.invalidate_transaction_cache(&transaction.id).await;
 
-                                    {
-                                        let webhook_manager = self.webhook_manager.lock().await;
+                                    if let Some(webhook_manager) = &self.webhook_manager {
+                                        let webhook_manager = webhook_manager.lock().await;
                                         let mined_transaction = Transaction {
                                             status: TransactionStatus::Mined,
                                             mined_at: Some(SystemTime::now()),
@@ -826,8 +826,8 @@ impl TransactionsQueues {
                                     self.db.transaction_expired(&transaction.id).await.map_err(|e| ProcessInmempoolTransactionError::CouldNotUpdateTransactionStatusInTheDatabase(*relayer_id, transaction.clone(), TransactionStatus::Expired, e))?;
                                     self.invalidate_transaction_cache(&transaction.id).await;
 
-                                    {
-                                        let webhook_manager = self.webhook_manager.lock().await;
+                                    if let Some(webhook_manager) = &self.webhook_manager {
+                                        let webhook_manager = webhook_manager.lock().await;
                                         let expired_transaction = Transaction {
                                             status: TransactionStatus::Expired,
                                             ..transaction
@@ -843,8 +843,8 @@ impl TransactionsQueues {
                                         .await.map_err(|e| ProcessInmempoolTransactionError::CouldNotUpdateTransactionStatusInTheDatabase(*relayer_id, transaction.clone(), TransactionStatus::Failed, e))?;
                                     self.invalidate_transaction_cache(&transaction.id).await;
 
-                                    {
-                                        let webhook_manager = self.webhook_manager.lock().await;
+                                    if let Some(webhook_manager) = &self.webhook_manager {
+                                        let webhook_manager = webhook_manager.lock().await;
                                         let failed_transaction = Transaction {
                                             status: TransactionStatus::Failed,
                                             ..transaction
@@ -989,8 +989,8 @@ impl TransactionsQueues {
 
                                 self.invalidate_transaction_cache(&transaction.id).await;
 
-                                {
-                                    let webhook_manager = self.webhook_manager.lock().await;
+                                if let Some(webhook_manager) = &self.webhook_manager {
+                                    let webhook_manager = webhook_manager.lock().await;
                                     let confirmed_transaction = Transaction {
                                         status: TransactionStatus::Confirmed,
                                         confirmed_at: Some(SystemTime::now()),

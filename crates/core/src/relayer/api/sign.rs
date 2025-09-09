@@ -11,7 +11,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     app_state::AppState,
+    user_rate_limiting::UserRateLimitError,
     relayer::{get_relayer_provider_context_by_relayer_id, types::RelayerId},
+    rrelayer_error,
 };
 
 #[derive(Debug, Deserialize)]
@@ -47,6 +49,42 @@ async fn sign_text(
     Path(relayer_id): Path<RelayerId>,
     Json(sign): Json<SignTextDto>,
 ) -> Result<Json<SignTextResult>, StatusCode> {
+    // Apply rate limiting for signing operations (AWS KMS costs)
+    if let Some(ref user_rate_limiter) = state.user_rate_limiter {
+        let user_identifier = format!("{:?}", relayer_id); // Use relayer ID as signing operations are relayer-specific
+
+        match user_rate_limiter
+            .check_rate_limit(&user_identifier, "signing_operations_per_minute", 1)
+            .await
+        {
+            Ok(check) => {
+                if !check.allowed {
+                    rrelayer_error!(
+                        "Signing rate limit exceeded for relayer {}: {}",
+                        relayer_id,
+                        check.rule_type
+                    );
+                    return Err(StatusCode::TOO_MANY_REQUESTS);
+                }
+            }
+            Err(UserRateLimitError::LimitExceeded { rule_type, current, limit, window_seconds }) => {
+                rrelayer_error!(
+                    "Signing rate limit exceeded for relayer {}: {}/{} {} in {}s",
+                    relayer_id,
+                    current,
+                    limit,
+                    rule_type,
+                    window_seconds
+                );
+                return Err(StatusCode::TOO_MANY_REQUESTS);
+            }
+            Err(e) => {
+                rrelayer_error!("Rate limiting error for signing: {}", e);
+                // Don't block signing for rate limiting errors, just log
+            }
+        }
+    }
+
     let relayer_provider_context = get_relayer_provider_context_by_relayer_id(
         &state.db,
         &state.cache,
@@ -92,6 +130,42 @@ async fn sign_typed_data(
     Path(relayer_id): Path<RelayerId>,
     Json(typed_data): Json<TypedData>,
 ) -> Result<Json<SignTypedDataResult>, StatusCode> {
+    // Apply rate limiting for signing operations (AWS KMS costs)
+    if let Some(ref user_rate_limiter) = state.user_rate_limiter {
+        let user_identifier = format!("{:?}", relayer_id); // Use relayer ID as signing operations are relayer-specific
+
+        match user_rate_limiter
+            .check_rate_limit(&user_identifier, "signing_operations_per_minute", 1)
+            .await
+        {
+            Ok(check) => {
+                if !check.allowed {
+                    rrelayer_error!(
+                        "Signing rate limit exceeded for relayer {}: {}",
+                        relayer_id,
+                        check.rule_type
+                    );
+                    return Err(StatusCode::TOO_MANY_REQUESTS);
+                }
+            }
+            Err(UserRateLimitError::LimitExceeded { rule_type, current, limit, window_seconds }) => {
+                rrelayer_error!(
+                    "Signing rate limit exceeded for relayer {}: {}/{} {} in {}s",
+                    relayer_id,
+                    current,
+                    limit,
+                    rule_type,
+                    window_seconds
+                );
+                return Err(StatusCode::TOO_MANY_REQUESTS);
+            }
+            Err(e) => {
+                rrelayer_error!("Rate limiting error for signing: {}", e);
+                // Don't block signing for rate limiting errors, just log
+            }
+        }
+    }
+
     let relayer_provider_context = get_relayer_provider_context_by_relayer_id(
         &state.db,
         &state.cache,

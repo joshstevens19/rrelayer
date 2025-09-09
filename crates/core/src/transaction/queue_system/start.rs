@@ -282,7 +282,7 @@ pub async fn startup_transactions_queues(
     blob_gas_oracle_cache: Arc<Mutex<BlobGasOracleCache>>,
     providers: Arc<Vec<EvmProvider>>,
     cache: Arc<Cache>,
-    webhook_manager: Arc<Mutex<crate::webhooks::WebhookManager>>,
+    webhook_manager: Option<Arc<Mutex<crate::webhooks::WebhookManager>>>,
     safe_proxy_manager: Option<SafeProxyManager>,
 ) -> Result<Arc<Mutex<TransactionsQueues>>, StartTransactionsQueuesError> {
     let postgres = PostgresClient::new()

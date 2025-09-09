@@ -17,6 +17,7 @@ use crate::{
     app_state::AppState,
     authentication::guards::ReadOnlyOrAboveJwtTokenOrApiKeyGuard,
     provider::find_provider_for_chain_id,
+    user_rate_limiting::{UserRateLimitError, UserDetectionError, UserDetector},
     relayer::{get_relayer, is_relayer_api_key, types::RelayerId},
     rrelayer_error, rrelayer_info,
     shared::common_types::{EvmAddress, PagingContext, PagingQuery, PagingResult},
@@ -191,6 +192,88 @@ async fn send_transaction(
     //     .get("x-api-key")
     //     .and_then(|value| value.to_str().ok())
     //     .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    // Apply rate limiting if enabled
+    if let Some(ref user_rate_limiter) = state.user_rate_limiter {
+        // Detect user from headers or transaction data (EIP-2771)
+        let relayer = get_relayer(&state.db, &state.cache, &relayer_id)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+            .ok_or(StatusCode::NOT_FOUND)?;
+
+        // Get user detection config from app config
+        let user_detection_config = state
+            .rate_limit_config
+            .as_ref()
+            .and_then(|config| config.user_detection.clone())
+            .unwrap_or_default();
+        let user_detector = UserDetector::new(user_detection_config);
+
+        // Detect end user from request
+        let transaction_bytes = transaction.data.clone().into_inner();
+        let user_context = user_detector
+            .detect_user(&headers, Some(&transaction.to), &transaction_bytes, &relayer.address)
+            .unwrap_or_else(|_| {
+                // Fallback to relayer address if detection fails
+                crate::user_rate_limiting::UserContext {
+                    user_address: relayer.address,
+                    detection_method: crate::user_rate_limiting::UserDetectionMethod::Fallback,
+                    transaction_type: crate::user_rate_limiting::TransactionType::Direct,
+                }
+            });
+
+        let user_identifier = format!("{:?}", user_context.user_address);
+
+        // Check transaction rate limit
+        match user_rate_limiter.check_rate_limit(&user_identifier, "transactions_per_minute", 1).await {
+            Ok(check) => {
+                if !check.allowed {
+                    rrelayer_error!(
+                        "Rate limit exceeded for user {}: {}",
+                        user_identifier,
+                        check.rule_type
+                    );
+                    return Err(StatusCode::TOO_MANY_REQUESTS);
+                }
+            }
+            Err(UserRateLimitError::LimitExceeded { rule_type, current, limit, window_seconds }) => {
+                rrelayer_error!(
+                    "Rate limit exceeded for user {}: {}/{} {} in {}s",
+                    user_identifier,
+                    current,
+                    limit,
+                    rule_type,
+                    window_seconds
+                );
+                return Err(StatusCode::TOO_MANY_REQUESTS);
+            }
+            Err(e) => {
+                rrelayer_error!("Rate limiting error: {}", e);
+                // Don't block transaction for rate limiting errors, just log
+            }
+        }
+
+        // Record transaction metadata for analytics
+        tokio::spawn({
+            let user_rate_limiter = user_rate_limiter.clone();
+            let relayer_id = relayer_id;
+            let user_context = user_context.clone();
+            async move {
+                let relayer_uuid: uuid::Uuid = relayer_id.into();
+                let _ = user_rate_limiter
+                    .record_transaction_metadata(
+                        None, // Transaction hash not available yet
+                        &relayer_uuid,
+                        &user_context.user_address,
+                        &format!("{:?}", user_context.detection_method).to_lowercase(),
+                        &format!("{:?}", user_context.transaction_type).to_lowercase(),
+                        None, // Gas usage not known until after execution
+                        &["transactions_per_minute".to_string()],
+                    )
+                    .await;
+            }
+        });
+    }
 
     let transaction_to_send = TransactionToSend::new(
         transaction.to,
