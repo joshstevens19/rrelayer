@@ -10,10 +10,10 @@ use postgres_native_tls::MakeTlsConnector;
 use tokio::{task, time::timeout};
 pub use tokio_postgres::types::{ToSql, Type as PgType};
 use tokio_postgres::{
-    binary_copy::BinaryCopyInWriter, config::SslMode, Config, CopyInSink, Error as PgError, Row,
-    Statement, ToStatement, Transaction as PgTransaction, Transaction,
+    config::SslMode, Config, CopyInSink, Error as PgError, Row, Statement, ToStatement,
+    Transaction as PgTransaction,
 };
-use tracing::{debug, error};
+use tracing::error;
 
 /// Retrieves the database connection string from environment variables.
 ///

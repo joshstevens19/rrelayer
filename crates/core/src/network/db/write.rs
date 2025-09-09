@@ -1,5 +1,3 @@
-use tokio_postgres::Transaction;
-
 use crate::{
     network::types::ChainId,
     postgres::{PostgresClient, PostgresError},

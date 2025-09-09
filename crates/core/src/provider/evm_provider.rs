@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use alloy::consensus::{SignableTransaction, TxEnvelope};
-use alloy::network::{AnyNetwork, AnyTransactionReceipt, AnyTxEnvelope};
+use alloy::network::{AnyNetwork, AnyTransactionReceipt};
 use alloy::rpc::types::serde_helpers::WithOtherFields;
 use alloy::{
     consensus::TypedTransaction,

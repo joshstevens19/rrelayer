@@ -1,12 +1,11 @@
 use std::sync::Arc;
 
 use alloy::network::AnyRpcBlock;
-use alloy::transports::TransportResult;
 use alloy::{
     consensus::Transaction,
     eips::{BlockId, BlockNumberOrTag},
     providers::Provider,
-    rpc::types::{Block, BlockTransactionsKind, Transaction as RpcTransaction},
+    rpc::types::BlockTransactionsKind,
     transports::TransportError,
 };
 use async_trait::async_trait;

@@ -1,6 +1,4 @@
 use alloy::network::AnyTransactionReceipt;
-use alloy::rpc::types::TransactionReceipt;
-use alloy_eips::eip4844::Blob;
 use axum::{
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
@@ -17,8 +15,8 @@ use crate::{
     app_state::AppState,
     authentication::guards::ReadOnlyOrAboveJwtTokenOrApiKeyGuard,
     provider::find_provider_for_chain_id,
-    relayer::{get_relayer, is_relayer_api_key, types::RelayerId},
-    rrelayer_error, rrelayer_info,
+    relayer::{get_relayer, types::RelayerId},
+    rrelayer_error,
     shared::common_types::{EvmAddress, PagingContext, PagingQuery, PagingResult},
     transaction::{
         get_transaction_by_id,
@@ -28,7 +26,7 @@ use crate::{
             TransactionValue,
         },
     },
-    user_rate_limiting::{UserDetectionError, UserDetector, UserRateLimitError},
+    user_rate_limiting::{UserDetector, UserRateLimitError},
 };
 
 /// API endpoint to retrieve a transaction by its ID.

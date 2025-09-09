@@ -6,7 +6,7 @@ use serde::de::Visitor;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::{env, fmt, fs::File, io::Read, path::PathBuf};
 use thiserror::Error;
-use tracing::{error, info};
+use tracing::error;
 
 use crate::network::types::ChainId;
 use crate::{

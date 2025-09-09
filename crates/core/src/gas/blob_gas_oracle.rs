@@ -5,7 +5,6 @@ use tokio::{
     sync::Mutex,
     time::{self, Duration},
 };
-use tracing::info;
 
 use crate::{
     network::types::ChainId, provider::EvmProvider, rrelayer_error, rrelayer_info,

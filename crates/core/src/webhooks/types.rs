@@ -3,7 +3,6 @@ use std::time::SystemTime;
 use uuid::Uuid;
 
 use crate::{
-    network::types::ChainId,
     transaction::types::{Transaction, TransactionStatus},
     yaml::WebhookConfig,
 };

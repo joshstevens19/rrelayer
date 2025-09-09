@@ -1,5 +1,4 @@
 use alloy::network::AnyTransactionReceipt;
-use alloy::rpc::types::TransactionReceipt;
 
 use crate::{
     gas::{fee_estimator::base::GasPriceResult, types::GasLimit},

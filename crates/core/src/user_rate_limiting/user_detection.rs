@@ -1,6 +1,6 @@
 use crate::common_types::EvmAddress;
 use crate::yaml::UserDetectionConfig;
-use alloy::primitives::{Address, U256};
+use alloy::primitives::Address;
 use axum::http::HeaderMap;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;

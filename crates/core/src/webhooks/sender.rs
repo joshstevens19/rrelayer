@@ -2,7 +2,7 @@ use crate::{rrelayer_error, rrelayer_info};
 use reqwest::{Client, Response};
 use serde_json::Value;
 use std::time::{Duration, SystemTime};
-use tracing::{debug, error, warn};
+use tracing::{debug, warn};
 
 use super::types::{WebhookDelivery, WebhookDeliveryConfig};
 

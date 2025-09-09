@@ -19,7 +19,7 @@ use super::{
 use crate::{
     app_state::AppState,
     authentication::guards::{admin_jwt_guard, read_only_or_above_jwt_guard},
-    rrelayer_error, rrelayer_info,
+    rrelayer_error,
 };
 
 /// HTTP handler for retrieving all networks.

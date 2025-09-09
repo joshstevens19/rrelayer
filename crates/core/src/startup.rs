@@ -13,7 +13,7 @@ use dotenv::dotenv;
 use thiserror::Error;
 use tokio::sync::Mutex;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
-use tracing::{error, info};
+use tracing::error;
 
 use crate::background_tasks::run_background_tasks;
 use crate::keystore::{recover_wallet_from_keystore, KeyStorePasswordManager};

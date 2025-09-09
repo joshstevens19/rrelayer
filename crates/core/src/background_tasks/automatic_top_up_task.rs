@@ -19,7 +19,7 @@ use alloy::sol;
 use alloy::sol_types::SolCall;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::time::{interval, Interval};
-use tracing::{error, info, warn};
+use tracing::warn;
 
 sol! {
     #[sol(rpc)]

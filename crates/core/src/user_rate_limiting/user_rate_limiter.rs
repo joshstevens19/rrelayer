@@ -1,6 +1,6 @@
 use crate::common_types::EvmAddress;
 use crate::postgres::{PostgresClient, PostgresError};
-use crate::yaml::{DefaultRateLimits, RateLimitConfig, UserRateLimits};
+use crate::yaml::RateLimitConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
