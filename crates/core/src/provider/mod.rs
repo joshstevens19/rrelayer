@@ -67,13 +67,20 @@ pub async fn load_providers(
             return Err(LoadProvidersError::NoSigningKey);
         };
 
-        // Create the appropriate provider based on signing key type
         let provider = if let Some(privy) = &signing_key.privy {
-            // Use Privy wallet manager
             EvmProvider::new_with_privy(
                 &config,
                 privy.app_id.clone(),
                 privy.app_secret.clone(),
+                get_gas_estimator(&config.provider_urls, setup_config, config)
+                    .await
+                    .map_err(|e| LoadProvidersError::GasEstimatorError(e.to_string()))?,
+            )
+            .await?
+        } else if let Some(aws_kms) = &signing_key.aws_kms {
+            EvmProvider::new_with_aws_kms(
+                &config,
+                aws_kms.clone(),
                 get_gas_estimator(&config.provider_urls, setup_config, config)
                     .await
                     .map_err(|e| LoadProvidersError::GasEstimatorError(e.to_string()))?,

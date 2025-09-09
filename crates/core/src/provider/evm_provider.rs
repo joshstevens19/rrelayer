@@ -25,7 +25,8 @@ use rand::{thread_rng, Rng};
 use reqwest::Url;
 use thiserror::Error;
 
-use crate::wallet::{MnemonicWalletManager, PrivyWalletManager, WalletError, WalletManagerTrait};
+use crate::wallet::{AwsKmsWalletManager, MnemonicWalletManager, PrivyWalletManager, WalletError, WalletManagerTrait};
+use crate::yaml::AwsKmsSigningKey;
 use crate::{
     gas::{
         blob_gas_oracle::{BlobGasEstimatorResult, BlobGasPriceResult},
@@ -225,6 +226,28 @@ impl EvmProvider {
             .await
             .map_err(|e| EvmProviderNewError::WalletManagerError(e.to_string()))?;
         let wallet_manager = Arc::new(privy_manager);
+        Self::new_internal(network_setup_config, wallet_manager, gas_estimator).await
+    }
+
+    /// Creates a new EvmProvider using AWS KMS for wallet management.
+    ///
+    /// This constructor initializes an EvmProvider with AWS KMS wallet management
+    /// for signing transactions using AWS Key Management Service keys.
+    ///
+    /// # Arguments
+    /// * `network_setup_config` - Network configuration including RPC URLs and chain settings
+    /// * `aws_kms_config` - AWS KMS configuration containing key IDs, region, and credentials
+    /// * `gas_estimator` - Gas fee estimation service for transaction pricing
+    ///
+    /// # Returns
+    /// * `Ok(EvmProvider)` - Successfully initialized provider with AWS KMS wallet manager
+    /// * `Err(EvmProviderNewError)` - Error if provider or AWS KMS setup fails
+    pub async fn new_with_aws_kms(
+        network_setup_config: &NetworkSetupConfig,
+        aws_kms_config: AwsKmsSigningKey,
+        gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
+    ) -> Result<Self, EvmProviderNewError> {
+        let wallet_manager = Arc::new(AwsKmsWalletManager::new(aws_kms_config));
         Self::new_internal(network_setup_config, wallet_manager, gas_estimator).await
     }
 
