@@ -5,16 +5,8 @@ init:
 start:
 	RUST_BACKTRACE=1 cargo run -- start --path $(CURDIR)/../../playground/example
 
-auth_new_account:
-	cargo run -- auth --path $(CURDIR)/../../playground/example new-account account2
-auth_login:
-	cargo run -- auth --path $(CURDIR)/../../playground/example login account2
-auth_logout:
-	cargo run -- auth --path $(CURDIR)/../../playground/example logout account2
-auth_info:
-	cargo run -- auth --path $(CURDIR)/../../playground/example info account1
-auth_list_accounts:
-	cargo run -- auth --path $(CURDIR)/../../playground/example list-accounts
+auth_status:
+	cargo run -- auth --path $(CURDIR)/../../playground/example status
 
 network_list:
 	cargo run -- network --path $(CURDIR)/../../playground/example list

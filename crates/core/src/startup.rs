@@ -288,8 +288,8 @@ pub enum StartError {
     #[error("Failed to connect to the database: {0}")]
     DatabaseConnectionError(#[from] PostgresConnectionError),
 
-    #[error("Could not add admins to database: {0}")]
-    CouldNotAddAdmins(#[from] PostgresError),
+    #[error("Could not apply db schema to postgres: {0}")]
+    CouldNotApplyDbSchema(#[from] PostgresError),
 
     #[error("Could not load keystore admin: {0} - make sure you have logged in with that account")]
     CouldNotLoadKeystoreAdmin(String),

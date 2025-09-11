@@ -3,7 +3,7 @@ use std::{fs, path::Path};
 use dialoguer::{Confirm, Input};
 use rrelayer_core::{
     ApiConfig, NetworkSetupConfig, RawSigningKey, SetupConfig, SigningKey, WriteFileError,
-    generate_docker_file, generate_seed_phrase, rrelayer_info, write_file,
+    generate_docker_file, generate_seed_phrase, write_file,
 };
 use serde_yaml;
 
@@ -46,7 +46,7 @@ pub async fn handle_init(path: &Path) -> Result<(), InitError> {
         name: project_name.clone(),
         description: if !project_description.is_empty() { Some(project_description) } else { None },
         signing_key: Some(SigningKey::from_raw(RawSigningKey {
-            mnemonic: "RAW_DANGEROUS_MNEMONIC".to_string(),
+            mnemonic: "${RAW_DANGEROUS_MNEMONIC}".to_string(),
         })),
         networks: vec![NetworkSetupConfig {
             name: "sepolia_ethereum".to_string(),
@@ -69,7 +69,7 @@ pub async fn handle_init(path: &Path) -> Result<(), InitError> {
 
     if docker_support {
         let env = format!(
-            "RAW_DANGEROUS_MNEMONIC={}\nDATABASE_URL=postgresql://postgres:rrelayer@localhost:5441/postgres\nPOSTGRES_PASSWORD=rrelayer",
+            "RAW_DANGEROUS_MNEMONIC=\"{}\"\nDATABASE_URL=postgresql://postgres:rrelayer@localhost:5441/postgres\nPOSTGRES_PASSWORD=rrelayer\nRRELAYER_AUTH_USERNAME=your_username\nRRELAYER_AUTH_PASSWORD=your_password\n",
             phrase
         );
 
@@ -84,7 +84,7 @@ pub async fn handle_init(path: &Path) -> Result<(), InitError> {
         })?;
     } else {
         let env = format!(
-            "RAW_DANGEROUS_MNEMONIC={}\nDATABASE_URL=postgresql://[user[:password]@][host][:port][/dbname]",
+            "RAW_DANGEROUS_MNEMONIC=\"{}\"\nDATABASE_URL=postgresql://[user[:password]@][host][:port][/dbname]\nRRELAYER_AUTH_USERNAME=your_username\nRRELAYER_AUTH_PASSWORD=your_password\n",
             phrase
         );
 
@@ -96,8 +96,8 @@ pub async fn handle_init(path: &Path) -> Result<(), InitError> {
 
     write_gitignore(&project_path).map_err(InitError::ConfigWrite)?;
 
-    rrelayer_info!(
-        "\nProject '{}' initialized successfully! note we advise to not use the raw mnemonic in production and use one of the secure key management signing keys",
+    println!(
+        "\nProject '{}' initialized successfully! note we advise to not use the RAW_DANGEROUS_MNEMONIC in production and use one of the secure key management signing keys. Alongside replace RRELAYER_AUTH_USERNAME and RRELAYER_AUTH_PASSWORD in the .env",
         project_name
     );
 

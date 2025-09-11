@@ -112,10 +112,10 @@ impl AutomaticTopUpTask {
     /// This method queries the database to get the latest relayer information
     /// for each network that has automatic top-up configured.
     async fn refresh_relayer_cache(&mut self) {
-        rrelayer_info!("Refreshing relayer cache");
-
         for network_config in &self.config.networks {
             if let Some(_automatic_top_up) = &network_config.automatic_top_up {
+                rrelayer_info!("Refreshing relayer cache for {}", network_config.name);
+
                 let chain_id = match network_config.get_chain_id().await {
                     Ok(id) => id,
                     Err(e) => {
@@ -185,10 +185,10 @@ impl AutomaticTopUpTask {
     /// checks balances against minimum thresholds, and initiates top-up transactions
     /// for addresses that fall below the configured minimum balance.
     async fn check_and_top_up_addresses(&self) {
-        rrelayer_info!("Checking addresses for top-up");
-
         for network_config in &self.config.networks {
             if let Some(automatic_top_up) = &network_config.automatic_top_up {
+                rrelayer_info!("Checking addresses for top-up on {}", network_config.name);
+
                 let chain_id = match network_config.get_chain_id().await {
                     Ok(id) => id,
                     Err(e) => {

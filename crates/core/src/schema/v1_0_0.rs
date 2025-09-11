@@ -14,10 +14,10 @@ use crate::postgres::{PostgresClient, PostgresError};
 /// * `Err(PostgresError)` - If any schema operation fails
 pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), PostgresError> {
     let schema_sql = r#"
+        CREATE SCHEMA IF NOT EXISTS public;
         CREATE SCHEMA IF NOT EXISTS network;
         CREATE SCHEMA IF NOT EXISTS relayer;
 
-        -- Network Schema
         CREATE TABLE IF NOT EXISTS network.record (
             chain_id BIGINT PRIMARY KEY NOT NULL,
             name VARCHAR(50) NOT NULL,
@@ -30,17 +30,11 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
             chain_id BIGINT NOT NULL,
             provider_url VARCHAR(200) NOT NULL,
             created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-            PRIMARY KEY (chain_id, provider_url)
+            PRIMARY KEY (chain_id, provider_url),
+            CONSTRAINT fk_network_node_chain_id
+                FOREIGN KEY (chain_id)
+                    REFERENCES network.record (chain_id)
         );
-        DO $$
-        BEGIN
-            IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_network_node_chain_id') THEN
-                ALTER TABLE network.node DROP CONSTRAINT fk_network_node_chain_id;
-            END IF;
-            ALTER TABLE network.node ADD CONSTRAINT fk_network_node_chain_id
-                FOREIGN KEY (chain_id) REFERENCES network.record (chain_id);
-        END;
-        $$;
 
         CREATE TABLE IF NOT EXISTS relayer.record (
             id UUID PRIMARY KEY NOT NULL,
@@ -55,33 +49,21 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
             deleted BOOLEAN DEFAULT FALSE NOT NULL,
             updated_on TIMESTAMPTZ DEFAULT NOW() NOT NULL,
             created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-            UNIQUE (chain_id, wallet_index)
+            UNIQUE (chain_id, wallet_index),
+            CONSTRAINT fk_relayer_record_chain_id
+                FOREIGN KEY (chain_id)
+                    REFERENCES network.record (chain_id)
         );
-        DO $$
-        BEGIN
-            IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_relayer_record_chain_id') THEN
-                ALTER TABLE relayer.record DROP CONSTRAINT fk_relayer_record_chain_id;
-            END IF;
-            ALTER TABLE relayer.record ADD CONSTRAINT fk_relayer_record_chain_id
-                FOREIGN KEY (chain_id) REFERENCES network.record (chain_id);
-        END;
-        $$;
 
         CREATE TABLE IF NOT EXISTS relayer.allowlisted_address (
             address BYTEA NOT NULL,
             relayer_id UUID NOT NULL,
             created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-            PRIMARY KEY (address, relayer_id)
+            PRIMARY KEY (address, relayer_id),
+            CONSTRAINT fk_relayer_allowlisted_address_relayer_id
+                FOREIGN KEY (relayer_id)
+                    REFERENCES relayer.record (id)
         );
-        DO $$
-        BEGIN
-            IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_relayer_allowlisted_address_relayer_id') THEN
-                ALTER TABLE relayer.allowlisted_address DROP CONSTRAINT fk_relayer_allowlisted_address_relayer_id;
-            END IF;
-            ALTER TABLE relayer.allowlisted_address ADD CONSTRAINT fk_relayer_allowlisted_address_relayer_id
-                FOREIGN KEY (relayer_id) REFERENCES relayer.record (id);
-        END;
-        $$;
 
         DO $$
         BEGIN
@@ -126,17 +108,11 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
             failed_reason TEXT NULL,
             sent_at TIMESTAMPTZ NULL,
             confirmed_at TIMESTAMPTZ NULL,
-            external_id VARCHAR(255) NULL
+            external_id VARCHAR(255) NULL,
+            CONSTRAINT fk_relayer_transaction_relayer_id
+               FOREIGN KEY (relayer_id)
+                   REFERENCES relayer.record (id)
         );
-        DO $$
-        BEGIN
-            IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_relayer_transaction_relayer_id') THEN
-                ALTER TABLE relayer.transaction DROP CONSTRAINT fk_relayer_transaction_relayer_id;
-            END IF;
-            ALTER TABLE relayer.transaction ADD CONSTRAINT fk_relayer_transaction_relayer_id
-                FOREIGN KEY (relayer_id) REFERENCES relayer.record (id);
-        END;
-        $$;
 
         CREATE TABLE IF NOT EXISTS relayer.transaction_audit_log (
             history_id SERIAL PRIMARY KEY NOT NULL,
@@ -166,19 +142,15 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
             failed_reason TEXT NULL,
             sent_at TIMESTAMPTZ NULL,
             confirmed_at TIMESTAMPTZ NULL,
-            external_id VARCHAR(255) NULL
+            external_id VARCHAR(255) NULL,
+            CONSTRAINT fk_relayer_transaction_audit_log_relayer_id
+               FOREIGN KEY (relayer_id)
+                   REFERENCES relayer.record (id)
         );
-        DO $$
-        BEGIN
-            IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_relayer_transaction_audit_log_relayer_id') THEN
-                ALTER TABLE relayer.transaction_audit_log DROP CONSTRAINT fk_relayer_transaction_audit_log_relayer_id;
-            END IF;
-            ALTER TABLE relayer.transaction_audit_log ADD CONSTRAINT fk_relayer_transaction_audit_log_relayer_id
-                FOREIGN KEY (relayer_id) REFERENCES relayer.record (id);
-        END;
-        $$;
 
-        CREATE TABLE IF NOT EXISTS rate_limit_rules (
+        CREATE SCHEMA IF NOT EXISTS rate_limit;
+
+        CREATE TABLE IF NOT EXISTS rate_limit.rules (
             id SERIAL PRIMARY KEY,
             user_identifier VARCHAR(255) NOT NULL, -- Address, relayer_id, or special identifier
             rule_type VARCHAR(50) NOT NULL, -- 'transactions_per_minute', 'gas_per_hour', etc.
@@ -190,7 +162,7 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
             UNIQUE(user_identifier, rule_type)
         );
 
-        CREATE TABLE IF NOT EXISTS rate_limit_usage (
+        CREATE TABLE IF NOT EXISTS rate_limit.usage (
             id SERIAL PRIMARY KEY,
             user_identifier VARCHAR(255) NOT NULL,
             rule_type VARCHAR(50) NOT NULL,
@@ -202,12 +174,12 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
         );
 
         CREATE INDEX IF NOT EXISTS idx_rate_limit_usage_lookup 
-        ON rate_limit_usage(user_identifier, rule_type, window_start);
+        ON rate_limit.usage(user_identifier, rule_type, window_start);
 
         CREATE INDEX IF NOT EXISTS idx_rate_limit_usage_cleanup 
-        ON rate_limit_usage(window_start);
+        ON rate_limit.usage(window_start);
 
-        CREATE TABLE IF NOT EXISTS transaction_rate_limit_metadata (
+        CREATE TABLE IF NOT EXISTS rate_limit.transaction_metadata (
             id SERIAL PRIMARY KEY,
             transaction_hash VARCHAR(66),
             relayer_id UUID,
@@ -220,15 +192,15 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
         );
 
         CREATE INDEX IF NOT EXISTS idx_transaction_metadata_user 
-        ON transaction_rate_limit_metadata(end_user_address, created_at);
+        ON rate_limit.transaction_metadata(end_user_address, created_at);
 
         CREATE INDEX IF NOT EXISTS idx_transaction_metadata_relayer 
-        ON transaction_rate_limit_metadata(relayer_id, created_at);
+        ON rate_limit.transaction_metadata(relayer_id, created_at);
 
         CREATE OR REPLACE FUNCTION cleanup_old_rate_limit_usage()
         RETURNS void AS $$
         BEGIN
-            DELETE FROM rate_limit_usage 
+            DELETE FROM rate_limit.usage
             WHERE window_start < NOW() - INTERVAL '24 hours';
         END;
         $$ LANGUAGE plpgsql;
