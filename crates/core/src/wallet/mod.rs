@@ -11,7 +11,7 @@ pub use privy_wallet_manager::PrivyWalletManager;
 use thiserror::Error;
 
 mod mnemonic_signing_key_providers;
-pub use mnemonic_signing_key_providers::{get_mnemonic_from_signing_key, keystore};
+pub use mnemonic_signing_key_providers::get_mnemonic_from_signing_key;
 mod aws_kms_wallet_manager;
 mod privy_wallet_manager;
 pub use aws_kms_wallet_manager::AwsKmsWalletManager;
@@ -41,12 +41,6 @@ pub enum WalletError {
 
     #[error("Signature parsing error: {0}")]
     SignatureError(#[from] alloy::primitives::SignatureError),
-
-    #[error("Keystore error: {0}")]
-    KeystoreError(#[from] eth_keystore::KeystoreError),
-
-    #[error("Password management error: {0}")]
-    PasswordError(#[from] keystore::PasswordError),
 
     #[error("Wallet not found at index {index}")]
     WalletNotFound { index: u32 },

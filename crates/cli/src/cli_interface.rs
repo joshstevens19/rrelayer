@@ -1,10 +1,7 @@
 use clap::{Parser, Subcommand};
 use rrelayer_core::{common_types::EvmAddress, relayer::types::RelayerId};
 
-use crate::commands::{
-    allowlist, auth::AuthCommand, config, keystore::KeystoreCommand,
-    network::NetworkCommands, sign, tx, user,
-};
+use crate::commands::{allowlist, auth::AuthCommand, config, network::NetworkCommands, sign, tx};
 
 /// Main CLI structure for the rrelayer command-line interface.
 ///
@@ -54,11 +51,6 @@ pub enum Commands {
 
         #[clap(subcommand)]
         command: AuthCommand,
-    },
-    /// Keystore management commands
-    Keystore {
-        #[clap(subcommand)]
-        command: KeystoreCommand,
     },
     /// Start the relayer service
     Start {
@@ -138,13 +130,5 @@ pub enum Commands {
 
         #[command(subcommand)]
         command: tx::TxCommand,
-    },
-    /// Manage user access and permissions
-    User {
-        #[clap(long, short)]
-        path: Option<String>,
-
-        #[command(subcommand)]
-        command: user::UserCommand,
     },
 }

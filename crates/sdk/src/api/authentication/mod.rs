@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 use crate::api::{http::HttpClient, types::ApiResult};
 
@@ -9,11 +10,11 @@ pub struct StatusResponse {
 }
 
 pub struct Authentication {
-    client: HttpClient,
+    client: Arc<HttpClient>,
 }
 
 impl Authentication {
-    pub fn new(client: HttpClient) -> Self {
+    pub fn new(client: Arc<HttpClient>) -> Self {
         Self { client }
     }
 

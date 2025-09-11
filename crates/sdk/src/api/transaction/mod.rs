@@ -6,15 +6,16 @@ use rrelayer_core::{
         types::{Transaction, TransactionId},
     },
 };
+use std::sync::Arc;
 
 use crate::api::{http::HttpClient, types::ApiResult};
 
 pub struct TransactionApi {
-    client: HttpClient,
+    client: Arc<HttpClient>,
 }
 
 impl TransactionApi {
-    pub fn new(client: HttpClient) -> Self {
+    pub fn new(client: Arc<HttpClient>) -> Self {
         Self { client }
     }
 

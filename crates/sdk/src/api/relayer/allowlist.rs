@@ -2,15 +2,16 @@ use rrelayer_core::{
     common_types::{EvmAddress, PagingContext, PagingResult},
     relayer::types::RelayerId,
 };
+use std::sync::Arc;
 
 use crate::api::{http::HttpClient, types::ApiResult};
 
 pub struct RelayerAllowlist {
-    client: HttpClient,
+    client: Arc<HttpClient>,
 }
 
 impl RelayerAllowlist {
-    pub(crate) fn new(client: HttpClient) -> Self {
+    pub(crate) fn new(client: Arc<HttpClient>) -> Self {
         Self { client }
     }
 

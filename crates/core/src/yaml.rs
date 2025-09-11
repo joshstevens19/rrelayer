@@ -48,14 +48,6 @@ pub struct RawSigningKey {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct KeystoreSigningKey {
-    pub path: String,
-    pub name: String,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub dangerous_define_raw_password: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PrivySigningKey {
     pub app_id: String,
     pub app_secret: String,
@@ -86,9 +78,6 @@ pub enum KmsKeyIds {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SigningKey {
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub keystore: Option<KeystoreSigningKey>,
-
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub raw: Option<RawSigningKey>,
 
@@ -248,17 +237,16 @@ impl AwsKmsSigningKey {
 }
 
 impl SigningKey {
-    /// Creates a new signing key configuration using keystore authentication.
+    /// Creates a new signing key configuration using raw authentication.
     ///
     /// # Arguments
-    /// * `keystore` - Keystore configuration for wallet signing
+    /// * `raw` - Raw configuration for wallet signing
     ///
     /// # Returns
     /// * `SigningKey` - A signing key configured to use keystore authentication only
-    pub fn from_keystore(keystore: KeystoreSigningKey) -> Self {
+    pub fn from_raw(raw: RawSigningKey) -> Self {
         Self {
-            keystore: Some(keystore),
-            raw: None,
+            raw: Some(raw),
             aws_secret_manager: None,
             gcp_secret_manager: None,
             privy: None,
@@ -275,7 +263,6 @@ impl SigningKey {
     /// * `SigningKey` - A signing key configured to use AWS KMS authentication only
     pub fn from_aws_kms(aws_kms: AwsKmsSigningKey) -> Self {
         Self {
-            keystore: None,
             raw: None,
             aws_secret_manager: None,
             gcp_secret_manager: None,
@@ -337,7 +324,6 @@ impl SigningKey {
             self.raw.is_some(),
             self.aws_secret_manager.is_some(),
             self.gcp_secret_manager.is_some(),
-            self.keystore.is_some(),
             self.privy.is_some(),
             self.aws_kms.is_some(),
         ]
@@ -404,13 +390,6 @@ pub struct GasProviders {
     pub tenderly: Option<TenderlyGasProviderSetupConfig>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub custom: Option<CustomGasFeeEstimator>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(untagged)]
-pub enum AdminIdentifier {
-    EvmAddress(EvmAddress),
-    Name(String),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -594,7 +573,6 @@ pub struct SetupConfig {
     pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub signing_key: Option<SigningKey>,
-    pub admins: Vec<AdminIdentifier>,
     pub networks: Vec<NetworkSetupConfig>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub gas_providers: Option<GasProviders>,

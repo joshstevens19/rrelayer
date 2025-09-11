@@ -13,10 +13,7 @@ use rrelayer_core::{
 };
 use rrelayer_sdk::SDK;
 
-use crate::{
-    authentication::handle_authenticate, commands::error::TransactionError,
-    commands::keystore::ProjectLocation,
-};
+use crate::commands::error::TransactionError;
 
 #[derive(Subcommand)]
 pub enum TxCommand {
@@ -116,41 +113,19 @@ pub enum TxStatus {
     Success,
 }
 
-/// Handles transaction commands by dispatching to the appropriate handler function.
-///
-/// Routes transaction commands to their respective handlers based on the command type.
-/// Supports getting, listing, canceling, replacing, sending transactions, as well as
-/// withdrawal operations and queue status checking.
-///
-/// # Arguments
-/// * `command` - The transaction command to execute
-/// * `project_path` - The project location containing configuration and keystores
-/// * `sdk` - Mutable reference to the SDK for making API calls
-///
-/// # Returns
-/// * `Ok(())` - Command executed successfully
-/// * `Err(TransactionError)` - Command execution failed
-pub async fn handle_tx(
-    command: &TxCommand,
-    project_path: &ProjectLocation,
-    sdk: &mut SDK,
-) -> Result<(), TransactionError> {
+pub async fn handle_tx(command: &TxCommand, sdk: &SDK) -> Result<(), TransactionError> {
     match command {
-        TxCommand::Get { tx_id } => handle_get(tx_id, project_path, sdk).await,
+        TxCommand::Get { tx_id } => handle_get(tx_id, sdk).await,
         TxCommand::Withdraw { relayer_id, to, amount, token: _ } => {
-            handle_withdraw(relayer_id, to, amount, project_path, sdk).await
+            handle_withdraw(relayer_id, to, amount, sdk).await
         }
-        TxCommand::Status { tx_id } => handle_status(tx_id, project_path, sdk).await,
-        TxCommand::List { relayer_id, status } => {
-            handle_list(relayer_id, status, project_path, sdk).await
-        }
-        TxCommand::Queue { relayer_id } => handle_queue(relayer_id, project_path, sdk).await,
-        TxCommand::Cancel { tx_id } => handle_cancel(tx_id, project_path, sdk).await,
-        TxCommand::Replace { tx_id, transaction } => {
-            handle_replace(tx_id, transaction, project_path, sdk).await
-        }
+        TxCommand::Status { tx_id } => handle_status(tx_id, sdk).await,
+        TxCommand::List { relayer_id, status } => handle_list(relayer_id, status, sdk).await,
+        TxCommand::Queue { relayer_id } => handle_queue(relayer_id, sdk).await,
+        TxCommand::Cancel { tx_id } => handle_cancel(tx_id, sdk).await,
+        TxCommand::Replace { tx_id, transaction } => handle_replace(tx_id, transaction, sdk).await,
         TxCommand::Send { relayer_id, transaction } => {
-            handle_send(relayer_id, transaction, project_path, sdk).await
+            handle_send(relayer_id, transaction, sdk).await
         }
         TxCommand::Fund { relayer_id: _, amount: _, token: _ } => {
             // TODO: Implement Fund command
@@ -159,26 +134,7 @@ pub async fn handle_tx(
     }
 }
 
-/// Gets and displays details for a specific transaction.
-///
-/// Authenticates the user, fetches the transaction by ID, and displays
-/// its details in a formatted view.
-///
-/// # Arguments
-/// * `tx_id` - The unique identifier of the transaction to retrieve
-/// * `project_path` - The project location containing configuration and keystores
-/// * `sdk` - Mutable reference to the SDK for making API calls
-///
-/// # Returns
-/// * `Ok(())` - Transaction retrieved and displayed successfully
-/// * `Err(TransactionError)` - Authentication failed or transaction not found
-async fn handle_get(
-    tx_id: &TransactionId,
-    project_path: &ProjectLocation,
-    sdk: &mut SDK,
-) -> Result<(), TransactionError> {
-    handle_authenticate(sdk, "account1", project_path).await?;
-
+async fn handle_get(tx_id: &TransactionId, sdk: &SDK) -> Result<(), TransactionError> {
     let tx = sdk.transaction.get_transaction(tx_id).await?;
     if let Some(tx) = tx {
         log_transactions(vec![tx])?;
@@ -188,30 +144,12 @@ async fn handle_get(
     Ok(())
 }
 
-/// Withdraws funds from a relayer to a specified address.
-///
-/// Authenticates the user and sends a transaction from the relayer to withdraw
-/// the specified amount to the destination address. Uses fast transaction speed.
-///
-/// # Arguments
-/// * `relayer_id` - The unique identifier of the relayer to withdraw from
-/// * `to` - The destination address to send funds to
-/// * `amount` - The amount to withdraw
-/// * `project_path` - The project location containing configuration and keystores
-/// * `sdk` - Mutable reference to the SDK for making API calls
-///
-/// # Returns
-/// * `Ok(())` - Withdrawal transaction sent successfully
-/// * `Err(TransactionError)` - Authentication failed or transaction failed
 async fn handle_withdraw(
     relayer_id: &RelayerId,
     to: &EvmAddress,
     amount: &U256,
-    project_path: &ProjectLocation,
-    sdk: &mut SDK,
+    sdk: &SDK,
 ) -> Result<(), TransactionError> {
-    handle_authenticate(sdk, "account1", project_path).await?;
-
     let tx = sdk
         .transaction
         .send_transaction(
@@ -234,26 +172,7 @@ async fn handle_withdraw(
     Ok(())
 }
 
-/// Gets and displays the status of a specific transaction.
-///
-/// Authenticates the user, fetches the transaction status by ID, and displays
-/// the current status and transaction hash if available.
-///
-/// # Arguments
-/// * `tx_id` - The unique identifier of the transaction to check
-/// * `project_path` - The project location containing configuration and keystores
-/// * `sdk` - Mutable reference to the SDK for making API calls
-///
-/// # Returns
-/// * `Ok(())` - Status retrieved and displayed successfully
-/// * `Err(TransactionError)` - Authentication failed or status check failed
-async fn handle_status(
-    tx_id: &TransactionId,
-    project_path: &ProjectLocation,
-    sdk: &mut SDK,
-) -> Result<(), TransactionError> {
-    handle_authenticate(sdk, "account1", project_path).await?;
-
+async fn handle_status(tx_id: &TransactionId, sdk: &SDK) -> Result<(), TransactionError> {
     let status = sdk.transaction.get_transaction_status(tx_id).await?;
     match status {
         None => {
@@ -270,29 +189,12 @@ async fn handle_status(
     Ok(())
 }
 
-/// Lists transactions for a specific relayer.
-///
-/// Authenticates the user and retrieves all transactions for the specified relayer.
-/// Displays the transactions in a formatted view. Status filtering is not yet implemented.
-///
-/// # Arguments
-/// * `relayer_id` - The unique identifier of the relayer to list transactions for
-/// * `_status` - Optional status filter (not yet implemented)
-/// * `project_path` - The project location containing configuration and keystores
-/// * `sdk` - Mutable reference to the SDK for making API calls
-///
-/// # Returns
-/// * `Ok(())` - Transactions listed successfully
-/// * `Err(TransactionError)` - Authentication failed or transaction retrieval failed
 async fn handle_list(
     relayer_id: &RelayerId,
     // TODO: handle status filtering
     _status: &Option<TxStatus>,
-    project_path: &ProjectLocation,
-    sdk: &mut SDK,
+    sdk: &SDK,
 ) -> Result<(), TransactionError> {
-    handle_authenticate(sdk, "account1", project_path).await?;
-
     let transactions = sdk
         .transaction
         .get_transactions(
@@ -310,26 +212,7 @@ async fn handle_list(
     Ok(())
 }
 
-/// Displays the transaction queue status for a specific relayer.
-///
-/// Authenticates the user and retrieves both pending and mempool transaction counts
-/// for the specified relayer. Displays the results in a formatted status box.
-///
-/// # Arguments
-/// * `relayer_id` - The unique identifier of the relayer to check queue status for
-/// * `project_path` - The project location containing configuration and keystores
-/// * `sdk` - Mutable reference to the SDK for making API calls
-///
-/// # Returns
-/// * `Ok(())` - Queue status displayed successfully
-/// * `Err(TransactionError)` - Authentication failed or queue status retrieval failed
-async fn handle_queue(
-    relayer_id: &RelayerId,
-    project_path: &ProjectLocation,
-    sdk: &mut SDK,
-) -> Result<(), TransactionError> {
-    handle_authenticate(sdk, "account1", project_path).await?;
-
+async fn handle_queue(relayer_id: &RelayerId, sdk: &SDK) -> Result<(), TransactionError> {
     let (pending_result, mempool_result) = tokio::join!(
         sdk.transaction.get_transactions_pending_count(relayer_id),
         sdk.transaction.get_transactions_inmempool_count(relayer_id)
@@ -357,26 +240,7 @@ async fn handle_queue(
     Ok(())
 }
 
-/// Attempts to cancel a pending transaction.
-///
-/// Authenticates the user and attempts to cancel the specified transaction.
-/// Returns success if cancellation worked, or a message if the transaction
-/// cannot be cancelled (e.g., already mined).
-///
-/// # Arguments
-/// * `tx_id` - The unique identifier of the transaction to cancel
-/// * `project_path` - The project location containing configuration and keystores
-/// * `sdk` - Mutable reference to the SDK for making API calls
-///
-/// # Returns
-/// * `Ok(())` - Cancellation attempt completed (check output for actual result)
-/// * `Err(TransactionError)` - Authentication failed or cancellation request failed
-async fn handle_cancel(
-    tx_id: &TransactionId,
-    project_path: &ProjectLocation,
-    sdk: &mut SDK,
-) -> Result<(), TransactionError> {
-    handle_authenticate(sdk, "account1", project_path).await?;
+async fn handle_cancel(tx_id: &TransactionId, sdk: &SDK) -> Result<(), TransactionError> {
     println!("Canceling transaction: {}", tx_id);
 
     let cancelled = sdk.transaction.cancel_transaction(tx_id).await?;
@@ -393,28 +257,11 @@ async fn handle_cancel(
     Ok(())
 }
 
-/// Attempts to replace a pending transaction with a new one.
-///
-/// Authenticates the user and attempts to replace the specified transaction
-/// with a new transaction request. Returns success if replacement worked,
-/// or a message if the transaction cannot be replaced.
-///
-/// # Arguments
-/// * `tx_id` - The unique identifier of the transaction to replace
-/// * `transaction` - The new transaction request to replace with
-/// * `project_path` - The project location containing configuration and keystores
-/// * `sdk` - Mutable reference to the SDK for making API calls
-///
-/// # Returns
-/// * `Ok(())` - Replacement attempt completed (check output for actual result)
-/// * `Err(TransactionError)` - Authentication failed or replacement request failed
 async fn handle_replace(
     tx_id: &TransactionId,
     transaction: &RelayTransactionRequest,
-    project_path: &ProjectLocation,
-    sdk: &mut SDK,
+    sdk: &SDK,
 ) -> Result<(), TransactionError> {
-    handle_authenticate(sdk, "account1", project_path).await?;
     println!("Replacing transaction: {}", tx_id);
 
     let replaced = sdk.transaction.replace_transaction(tx_id, transaction).await?;
@@ -430,27 +277,11 @@ async fn handle_replace(
     Ok(())
 }
 
-/// Sends a new transaction using the specified relayer.
-///
-/// Authenticates the user and sends the provided transaction request using
-/// the specified relayer. Displays the transaction ID and hash upon success.
-///
-/// # Arguments
-/// * `relayer_id` - The unique identifier of the relayer to use for sending
-/// * `transaction` - The transaction request to send
-/// * `project_path` - The project location containing configuration and keystores
-/// * `sdk` - Mutable reference to the SDK for making API calls
-///
-/// # Returns
-/// * `Ok(())` - Transaction sent successfully
-/// * `Err(TransactionError)` - Authentication failed or transaction send failed
 async fn handle_send(
     relayer_id: &RelayerId,
     transaction: &RelayTransactionRequest,
-    project_path: &ProjectLocation,
-    sdk: &mut SDK,
+    sdk: &SDK,
 ) -> Result<(), TransactionError> {
-    handle_authenticate(sdk, "account1", project_path).await?;
     println!("Sending transaction: {:?}", transaction);
 
     let tx = sdk.transaction.send_transaction(relayer_id, transaction).await?;
@@ -480,7 +311,6 @@ fn log_transactions(transactions: Vec<Transaction>) -> Result<(), TransactionErr
     }
 
     if transactions.len() == 1 {
-        // Keep the detailed single transaction view as-is
         let tx = &transactions[0];
         println!("\n┌─────────────────────────────────────────────────────────────────────");
         println!("│ TRANSACTION DETAILS");

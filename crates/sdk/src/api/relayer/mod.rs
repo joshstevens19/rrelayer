@@ -8,6 +8,7 @@ use rrelayer_core::{
         types::{Relayer, RelayerId},
     },
 };
+use std::sync::Arc;
 
 use crate::api::{
     http::HttpClient,
@@ -15,16 +16,13 @@ use crate::api::{
 };
 
 pub struct RelayerApi {
-    client: HttpClient,
+    client: Arc<HttpClient>,
     pub allowlist: RelayerAllowlist,
 }
 
 impl RelayerApi {
-    pub fn new(client: HttpClient) -> Self {
-        Self {
-            allowlist: RelayerAllowlist::new(client.clone()),
-            client,
-        }
+    pub fn new(client: Arc<HttpClient>) -> Self {
+        Self { allowlist: RelayerAllowlist::new(client.clone()), client }
     }
 
     pub async fn get_all(

@@ -2,15 +2,16 @@ use rrelayer_core::relayer::{
     api::sign::{SignTextResult, SignTypedDataResult},
     types::RelayerId,
 };
+use std::sync::Arc;
 
 use crate::api::{http::HttpClient, types::ApiResult};
 
 pub struct SignApi {
-    client: HttpClient,
+    client: Arc<HttpClient>,
 }
 
 impl SignApi {
-    pub fn new(client: HttpClient) -> Self {
+    pub fn new(client: Arc<HttpClient>) -> Self {
         Self { client }
     }
 

@@ -1,35 +1,17 @@
 use rrelayer_core::common_types::PagingContext;
 use rrelayer_sdk::SDK;
 
+use crate::project_location::ProjectLocation;
 use crate::{
-    authentication::handle_authenticate,
-    commands::{
-        error::RelayerManagementError, keystore::ProjectLocation, network::get_chain_id_for_network,
-    },
+    commands::{error::RelayerManagementError, network::get_chain_id_for_network},
     console::print_table,
 };
 
-/// Lists relayers, optionally filtered by network.
-///
-/// Authenticates the user and retrieves all relayers. If a network is specified,
-/// only relayers for that network's chain ID are returned. Displays the results
-/// in a formatted table with relayer details.
-///
-/// # Arguments
-/// * `network` - Optional network name to filter relayers by
-/// * `project_path` - The project location containing configuration and keystores
-/// * `sdk` - Mutable reference to the SDK for making API calls
-///
-/// # Returns
-/// * `Ok(())` - Relayers listed successfully
-/// * `Err(RelayerManagementError)` - Authentication failed or API call failed
 pub async fn handle_list(
     network: &Option<String>,
     project_path: &ProjectLocation,
-    sdk: &mut SDK,
+    sdk: &SDK,
 ) -> Result<(), RelayerManagementError> {
-    handle_authenticate(sdk, "account1", project_path).await?;
-
     if let Some(network) = network {
         let chain_id = get_chain_id_for_network(&network, project_path).await?;
         log_relayers(sdk, Some(chain_id)).await?;
@@ -41,20 +23,7 @@ pub async fn handle_list(
     Ok(())
 }
 
-/// Retrieves and displays relayers in a formatted table.
-///
-/// Fetches relayers from the API, optionally filtered by chain ID, and displays
-/// them in a table format with columns for ID, name, chain ID, address, max gas price,
-/// status, allowlisted status, and EIP-1559 enablement.
-///
-/// # Arguments
-/// * `sdk` - Mutable reference to the SDK for making API calls
-/// * `chain_id` - Optional chain ID to filter relayers by
-///
-/// # Returns
-/// * `Ok(())` - Relayers displayed successfully
-/// * `Err(RelayerManagementError)` - Failed to fetch relayers from API
-async fn log_relayers(sdk: &mut SDK, chain_id: Option<u64>) -> Result<(), RelayerManagementError> {
+async fn log_relayers(sdk: &SDK, chain_id: Option<u64>) -> Result<(), RelayerManagementError> {
     let relayers = sdk
         .relayer
         .get_all(

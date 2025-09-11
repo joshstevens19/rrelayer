@@ -17,11 +17,10 @@ use tracing::error;
 
 use crate::authentication::api::create_basic_auth_routes;
 use crate::background_tasks::run_background_tasks;
-use crate::keystore::{recover_wallet_from_keystore, KeyStorePasswordManager};
 use crate::yaml::ReadYamlError;
 use crate::{
     app_state::AppState,
-    authentication::{guards::basic_auth_guard, types::JwtRole},
+    authentication::guards::basic_auth_guard,
     gas::{
         api::create_gas_routes, blob_gas_oracle::BlobGasOracleCache, gas_oracle::GasOracleCache,
     },
@@ -34,7 +33,7 @@ use crate::{
     safe_proxy::SafeProxyManager,
     schema::apply_schema,
     setup_info_logger,
-    shared::{cache::Cache, common_types::EvmAddress},
+    shared::cache::Cache,
     transaction::{
         api::create_transactions_routes,
         queue_system::{
@@ -42,9 +41,8 @@ use crate::{
             StartTransactionsQueuesError,
         },
     },
-    user::api::create_user_routes,
     user_rate_limiting::UserRateLimiter,
-    AdminIdentifier, ApiConfig, RateLimitConfig,
+    ApiConfig, RateLimitConfig,
 };
 
 #[derive(Error, Debug)]
@@ -254,7 +252,6 @@ async fn start_api(
         .nest("/networks", create_network_routes())
         .nest("/relayers", create_relayer_routes())
         .nest("/transactions", create_transactions_routes())
-        .nest("/users", create_user_routes())
         .route_layer(middleware::from_fn(basic_auth_guard))
         .layer(middleware::from_fn(activity_logger))
         .layer(cors)
@@ -353,7 +350,6 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
 
     let config = read(&yaml_path, false)?;
 
-    // Create safe proxy manager from configuration
     let safe_proxy_manager = if let Some(ref safe_proxy_configs) = config.safe_proxy {
         if !safe_proxy_configs.is_empty() {
             rrelayer_info!(
@@ -368,45 +364,6 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
         None
     };
 
-    let password_manager = KeyStorePasswordManager::new(&config.name)?;
-    let mut admins: Vec<(EvmAddress, JwtRole)> = vec![];
-    for admin in config.admins.iter() {
-        match admin {
-            AdminIdentifier::Name(account) => {
-                match password_manager.load(account) {
-                    Ok(password) => {
-                        let signer = match recover_wallet_from_keystore(
-                            &project_path.join("keystores").join("accounts").join(account),
-                            &password,
-                        ) {
-                            Ok(signer) => signer,
-                            Err(e) => {
-                                rrelayer_error!(
-                                    "Failed to recover wallet for account {}: {}",
-                                    account,
-                                    e
-                                );
-                                continue;
-                            }
-                        };
-                        let address: EvmAddress = signer.address().into();
-                        admins.push((address, JwtRole::Admin))
-                    }
-                    Err(_) => {
-                        return Err(StartError::CouldNotLoadKeystoreAdmin(account.to_string()))
-                    }
-                }
-                if password_manager.load(account).is_err() {
-                    return Err(StartError::CouldNotLoadKeystoreAdmin(account.to_string()));
-                }
-            }
-            AdminIdentifier::EvmAddress(address) => admins.push((address.clone(), JwtRole::Admin)),
-        }
-    }
-
-    postgres.add_users(&admins).await?;
-    rrelayer_info!("Added admin users to database");
-
     let cache = Arc::new(Cache::new().await);
 
     let providers = Arc::new(load_providers(&project_path, &config).await?);
@@ -416,7 +373,6 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
 
     let postgres_client = Arc::new(postgres);
 
-    // Initialize webhook manager only if webhooks are configured
     let webhook_manager = if config.webhooks.is_some() {
         rrelayer_info!("Initializing webhook manager with configuration");
         Some(Arc::new(Mutex::new(crate::webhooks::WebhookManager::new(&config, None)?)))
@@ -424,8 +380,6 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
         rrelayer_info!("Webhooks disabled - no webhook configuration found");
         None
     };
-
-    // Background tasks will be started after rate limiter initialization
 
     let transaction_queue = startup_transactions_queues(
         gas_oracle_cache.clone(),
@@ -437,13 +391,11 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
     )
     .await?;
 
-    // Initialize rate limiter from config
     let user_rate_limiter = if let Some(ref rate_limit_config) = config.user_rate_limits {
         rrelayer_info!("Initializing user rate limiter with configuration");
         let user_rate_limiter =
             UserRateLimiter::new(rate_limit_config.clone(), postgres_client.clone());
 
-        // Initialize and load existing rate limits from database
         if let Err(e) = user_rate_limiter.initialize().await {
             rrelayer_error!("Failed to initialize user rate limiter: {}", e);
             None
@@ -456,7 +408,6 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
         None
     };
 
-    // Start all background tasks now that rate limiter is initialized
     run_background_tasks(
         &config,
         gas_oracle_cache.clone(),

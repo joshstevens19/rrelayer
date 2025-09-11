@@ -1,31 +1,3 @@
-//! RRelayer Core Library
-//!
-//! This is the core library for RRelayer, a blockchain transaction relaying service
-//! that provides secure, scalable, and efficient transaction relaying capabilities.
-//!
-//! The library provides modules for:
-//! - Authentication and user management
-//! - Gas fee estimation and management
-//! - Network configuration and provider management
-//! - PostgreSQL database integration
-//! - Transaction queuing and processing
-//! - Wallet management and signing
-//! - Background task processing
-//! - Webhook integration
-//!
-//! # Example Usage
-//!
-//! ```rust,no_run
-//! use std::path::PathBuf;
-//! use rrelayer_core::{start, StartError};
-//!
-//! #[tokio::main]
-//! async fn main() -> Result<(), StartError> {
-//!     let project_path = PathBuf::from(".");
-//!     start(&project_path).await
-//! }
-//! ```
-
 mod app_state;
 pub mod authentication;
 pub mod gas;
@@ -41,9 +13,9 @@ pub mod relayer;
 pub mod safe_proxy;
 pub use safe_proxy::{SafeProxyError, SafeProxyManager, SafeTransaction};
 pub use yaml::{
-    read, AdminIdentifier, ApiConfig, AwsKmsSigningKey, DefaultRateLimits, GasProviders,
-    GlobalRateLimits, KeystoreSigningKey, KmsKeyIds, NetworkSetupConfig, RateLimitConfig,
-    SafeProxyConfig, SetupConfig, SigningKey, UserDetectionConfig, UserRateLimits,
+    read, ApiConfig, AwsKmsSigningKey, DefaultRateLimits, GasProviders, GlobalRateLimits,
+    KmsKeyIds, NetworkSetupConfig, RateLimitConfig, RawSigningKey, SafeProxyConfig, SetupConfig,
+    SigningKey, UserDetectionConfig, UserRateLimits,
 };
 mod shared;
 pub use shared::common_types;
@@ -54,9 +26,8 @@ mod environment;
 mod file;
 mod schema;
 pub mod transaction;
-pub mod user;
 mod wallet;
-pub use wallet::{generate_seed_phrase, keystore, AwsKmsWalletManager, WalletError};
+pub use wallet::{generate_seed_phrase, AwsKmsWalletManager, WalletError};
 mod background_tasks;
 pub mod user_rate_limiting;
 mod webhooks;

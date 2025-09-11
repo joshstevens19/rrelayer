@@ -1,62 +1,15 @@
 use thiserror::Error;
 
-/// Errors that can occur during authentication operations
 #[derive(Error, Debug)]
-pub enum AuthError {
-    #[error("Invalid password or keystore not found")]
-    InvalidCredentials,
-
-    #[error("Password manager error: {0}")]
-    PasswordManager(#[from] rrelayer_core::keystore::PasswordError),
-
-    #[error("Keystore operation failed: {0}")]
-    KeystoreOperation(#[from] rrelayer_core::WalletError),
-
-    #[error("Terminal interaction failed: {0}")]
-    Terminal(#[from] dialoguer::Error),
-
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
-
-    #[error("Keystore error: {0}")]
-    Keystore(#[from] KeystoreError),
-}
-
-/// Errors that can occur during keystore operations  
-#[derive(Error, Debug)]
-pub enum KeystoreError {
-    #[error("Keystore already exists: {0}")]
-    AlreadyExists(String),
-
-    #[error("Invalid mnemonic phrase")]
-    InvalidMnemonic,
-
-    #[error("Invalid private key")]
-    InvalidPrivateKey,
-
-    #[error("Keystore not found: {0}")]
-    NotFound(String),
-
-    #[error("Failed to decrypt keystore: {0}")]
-    DecryptionFailed(String),
-
+pub enum ProjectLocationError {
     #[error("Project configuration error: {0}")]
     ProjectConfig(String),
 
     #[error("Wallet operation failed: {0}")]
     WalletOperation(#[from] rrelayer_core::WalletError),
 
-    #[error("Password manager error: {0}")]
-    PasswordManager(#[from] rrelayer_core::keystore::PasswordError),
-
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
-
-    #[error("Terminal interaction failed: {0}")]
-    Terminal(#[from] dialoguer::Error),
-
-    #[error("Hex decode error: {0}")]
-    HexDecode(#[from] hex::FromHexError),
 
     #[error("YAML serialization error: {0}")]
     Yaml(#[from] serde_yaml::Error),
@@ -90,8 +43,8 @@ impl From<crate::error::CliError> for NetworkError {
     }
 }
 
-impl From<KeystoreError> for NetworkError {
-    fn from(err: KeystoreError) -> Self {
+impl From<ProjectLocationError> for NetworkError {
+    fn from(err: ProjectLocationError) -> Self {
         Self::InvalidConfig(err.to_string())
     }
 }
@@ -247,8 +200,8 @@ pub enum InitError {
     Terminal(#[from] dialoguer::Error),
 }
 
-impl From<KeystoreError> for InitError {
-    fn from(err: KeystoreError) -> Self {
+impl From<ProjectLocationError> for InitError {
+    fn from(err: ProjectLocationError) -> Self {
         Self::InvalidConfig(err.to_string())
     }
 }
@@ -340,8 +293,8 @@ impl From<Box<dyn std::error::Error>> for RelayerManagementError {
     }
 }
 
-impl From<KeystoreError> for RelayerManagementError {
-    fn from(err: KeystoreError) -> Self {
+impl From<ProjectLocationError> for RelayerManagementError {
+    fn from(err: ProjectLocationError) -> Self {
         Self::ProjectConfig(err.to_string())
     }
 }

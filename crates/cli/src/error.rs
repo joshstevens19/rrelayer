@@ -1,20 +1,15 @@
 use thiserror::Error;
 
 use crate::commands::error::{
-    AllowlistError, ApiKeyError, AuthError, BalanceError, ConfigError, InitError, KeystoreError,
-    NetworkError, ProjectStartupError, RelayerManagementError, SigningError, TransactionError,
-    UserError,
+    AllowlistError, ApiKeyError, BalanceError, ConfigError, InitError, NetworkError,
+    ProjectLocationError, ProjectStartupError, RelayerManagementError, SigningError,
+    TransactionError, UserError,
 };
 
-/// Top-level CLI error that composes all module-specific errors
 #[derive(Error, Debug)]
 pub enum CliError {
-    // Module-specific errors
-    #[error("Authentication error: {0}")]
-    Auth(#[from] AuthError),
-
-    #[error("Keystore error: {0}")]
-    Keystore(#[from] KeystoreError),
+    #[error("Project location error: {0}")]
+    ProjectLocation(#[from] ProjectLocationError),
 
     #[error("Network error: {0}")]
     Network(#[from] NetworkError),
@@ -49,7 +44,6 @@ pub enum CliError {
     #[error("Relayer management error: {0}")]
     RelayerManagement(#[from] RelayerManagementError),
 
-    // Core library errors (for interoperability)
     #[error("Core startup error: {0}")]
     CoreStartup(#[from] rrelayer_core::StartError),
 
@@ -59,7 +53,6 @@ pub enum CliError {
     #[error("Wallet operation error: {0}")]
     WalletError(#[from] rrelayer_core::WalletError),
 
-    // Generic/fallback errors
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
@@ -80,9 +73,6 @@ pub enum CliError {
 
     #[error("Terminal interaction error: {0}")]
     Terminal(#[from] dialoguer::Error),
-
-    #[error("Address parse error: {0}")]
-    AddressParse(String),
 
     #[error("API error: {0}")]
     Api(String),

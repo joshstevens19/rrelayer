@@ -87,10 +87,9 @@ pub async fn load_providers(
             )
             .await?
         } else {
-            let mnemonic =
-                get_mnemonic_from_signing_key(project_path, &setup_config.name, signing_key)
-                    .await
-                    .map_err(|e| LoadProvidersError::SigningKeyError(e.to_string()))?;
+            let mnemonic = get_mnemonic_from_signing_key(project_path, signing_key)
+                .await
+                .map_err(|e| LoadProvidersError::SigningKeyError(e.to_string()))?;
 
             EvmProvider::new_with_mnemonic(
                 &config,

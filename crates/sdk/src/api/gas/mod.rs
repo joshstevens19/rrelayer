@@ -1,13 +1,14 @@
 use rrelayer_core::gas::fee_estimator::base::GasEstimatorResult;
+use std::sync::Arc;
 
 use crate::api::{http::HttpClient, types::ApiResult};
 
 pub struct GasApi {
-    client: HttpClient,
+    client: Arc<HttpClient>,
 }
 
 impl GasApi {
-    pub fn new(client: HttpClient) -> Self {
+    pub fn new(client: Arc<HttpClient>) -> Self {
         Self { client }
     }
 

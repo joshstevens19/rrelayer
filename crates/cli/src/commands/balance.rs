@@ -2,145 +2,112 @@ use alloy::{primitives::U256, providers::Provider, sol};
 use rrelayer_core::{common_types::EvmAddress, create_retry_client, relayer::types::RelayerId};
 use rrelayer_sdk::SDK;
 
-use crate::{
-    authentication::handle_authenticate, commands::error::BalanceError,
-    commands::keystore::ProjectLocation,
-};
+use crate::commands::error::BalanceError;
 
-/// Retrieves and displays the balance of a relayer.
-///
-/// Fetches either the native token balance (ETH) or ERC20 token balance
-/// for the specified relayer, depending on whether a token address is provided.
-/// For ERC20 tokens, it queries the contract for balance, decimals, and symbol
-/// to display a properly formatted balance.
-///
-/// # Arguments
-/// * `relayer_id` - Unique identifier of the relayer
-/// * `token` - Optional ERC20 token address; if None, shows native balance
-/// * `project_path` - Project location for authentication
-/// * `sdk` - Mutable reference to the SDK for API operations
-///
-/// # Returns
-/// * `Ok(())` - Balance retrieved and displayed successfully
-/// * `Err(BalanceError)` - Operation failed due to authentication, network, or query error
 pub async fn handle_balance(
     relayer_id: &RelayerId,
     token: &Option<EvmAddress>,
-    project_path: &ProjectLocation,
-    sdk: &mut SDK,
+    sdk: &SDK,
 ) -> Result<(), BalanceError> {
-    handle_authenticate(sdk, "account1", project_path).await?;
-
     let relayer_result = sdk.relayer.get(relayer_id).await?;
     match relayer_result {
         None => {
             println!("Relayer {} not found", relayer_id);
             Ok(())
         }
-        Some(relayer_result) => {
-            match &token {
-                Some(token_address) => {
-                    let provider = create_retry_client(
-                        relayer_result.provider_urls.get(0).ok_or_else(|| {
-                            BalanceError::Provider("No provider URLs found for relayer".to_string())
-                        })?,
-                    )
+        Some(relayer_result) => match &token {
+            Some(token_address) => {
+                let provider =
+                    create_retry_client(relayer_result.provider_urls.get(0).ok_or_else(|| {
+                        BalanceError::Provider("No provider URLs found for relayer".to_string())
+                    })?)
                     .map_err(|e| BalanceError::CoreProvider(e.to_string()))?;
 
-                    let relayer_address = relayer_result.relayer.address.into_address();
+                let relayer_address = relayer_result.relayer.address.into_address();
 
-                    sol! {
-                        #[sol(rpc)]
-                        interface IERC20 {
-                            function balanceOf(address owner) external view returns (uint256);
-                            function decimals() external view returns (uint8);
-                            function symbol() external view returns (string);
-                        }
+                sol! {
+                    #[sol(rpc)]
+                    interface IERC20 {
+                        function balanceOf(address owner) external view returns (uint256);
+                        function decimals() external view returns (uint8);
+                        function symbol() external view returns (string);
                     }
+                }
 
-                    let erc20 = IERC20::new(token_address.into_address(), &provider);
+                let erc20 = IERC20::new(token_address.into_address(), &provider);
 
-                    let balance_result = erc20.balanceOf(relayer_address).call().await;
-                    let balance = match balance_result {
-                        Ok(result) => result._0,
-                        Err(e) => {
-                            println!("Failed to get token balance: {}", e);
-                            return Err(BalanceError::QueryFailed(format!(
-                                "Failed to get token balance: {}",
-                                e
-                            )));
-                        }
-                    };
+                let balance_result = erc20.balanceOf(relayer_address).call().await;
+                let balance = match balance_result {
+                    Ok(result) => result._0,
+                    Err(e) => {
+                        println!("Failed to get token balance: {}", e);
+                        return Err(BalanceError::QueryFailed(format!(
+                            "Failed to get token balance: {}",
+                            e
+                        )));
+                    }
+                };
 
-                    let decimals = match erc20.decimals().call().await {
-                        Ok(result) => result._0,
-                        Err(_) => 18,
-                    };
+                let decimals = match erc20.decimals().call().await {
+                    Ok(result) => result._0,
+                    Err(_) => 18,
+                };
 
-                    let token_symbol = match erc20.symbol().call().await {
-                        Ok(result) => result._0,
-                        Err(_) => "Unknown".to_string(),
-                    };
+                let token_symbol = match erc20.symbol().call().await {
+                    Ok(result) => result._0,
+                    Err(_) => "Unknown".to_string(),
+                };
 
-                    let divisor = U256::from(10).pow(U256::from(decimals));
-                    let token_value = if balance.is_zero() {
-                        "0".to_string()
+                let divisor = U256::from(10).pow(U256::from(decimals));
+                let token_value = if balance.is_zero() {
+                    "0".to_string()
+                } else {
+                    let integer_part = balance / divisor;
+                    let fractional_part = balance % divisor;
+
+                    if fractional_part.is_zero() {
+                        format!("{}", integer_part)
                     } else {
-                        // Format with proper decimals
-                        let integer_part = balance / divisor;
-                        let fractional_part = balance % divisor;
+                        let frac_str =
+                            format!("{:0>width$}", fractional_part, width = decimals as usize);
+                        let frac_str = frac_str.trim_end_matches('0');
 
-                        if fractional_part.is_zero() {
+                        if frac_str.is_empty() {
                             format!("{}", integer_part)
                         } else {
-                            // Format fractional part with proper leading zeros
-                            let frac_str =
-                                format!("{:0>width$}", fractional_part, width = decimals as usize);
-                            // Trim trailing zeros
-                            let frac_str = frac_str.trim_end_matches('0');
-
-                            if frac_str.is_empty() {
-                                format!("{}", integer_part)
-                            } else {
-                                format!("{}.{}", integer_part, frac_str)
-                            }
+                            format!("{}.{}", integer_part, frac_str)
                         }
-                    };
+                    }
+                };
 
-                    println!(
-                        "Relayer {} token balance: {} {}",
-                        relayer_id, token_value, token_symbol
-                    );
+                println!("Relayer {} token balance: {} {}", relayer_id, token_value, token_symbol);
 
-                    Ok(())
-                }
-                None => {
-                    // Native token balance logic remains unchanged
-                    let provider = create_retry_client(
-                        relayer_result.provider_urls.get(0).ok_or_else(|| {
-                            BalanceError::Provider("No provider URLs found for relayer".to_string())
-                        })?,
-                    )
+                Ok(())
+            }
+            None => {
+                let provider =
+                    create_retry_client(relayer_result.provider_urls.get(0).ok_or_else(|| {
+                        BalanceError::Provider("No provider URLs found for relayer".to_string())
+                    })?)
                     .map_err(|e| BalanceError::CoreProvider(e.to_string()))?;
 
-                    let balance = provider
-                        .get_balance(relayer_result.relayer.address.into_address())
-                        .await
-                        .map_err(|e| {
-                            BalanceError::QueryFailed(format!("Failed to get balance: {}", e))
-                        })?;
+                let balance = provider
+                    .get_balance(relayer_result.relayer.address.into_address())
+                    .await
+                    .map_err(|e| {
+                        BalanceError::QueryFailed(format!("Failed to get balance: {}", e))
+                    })?;
 
-                    let eth_value = if balance.is_zero() {
-                        "0".to_string()
-                    } else {
-                        alloy::primitives::utils::format_ether(balance)
-                    };
+                let eth_value = if balance.is_zero() {
+                    "0".to_string()
+                } else {
+                    alloy::primitives::utils::format_ether(balance)
+                };
 
-                    println!("Relayer {} native balance: {} ETH", relayer_id, eth_value);
+                println!("Relayer {} native balance: {} ETH", relayer_id, eth_value);
 
-                    Ok(())
-                }
+                Ok(())
             }
-        }
+        },
     }
 }

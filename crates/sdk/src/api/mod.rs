@@ -6,15 +6,16 @@ mod relayer;
 mod sign;
 mod transaction;
 pub mod types;
+
+use std::sync::Arc;
 pub use types::{ApiResult, ApiSdkError};
-mod user;
 
 pub struct HealthApi {
-    client: HttpClient,
+    client: Arc<HttpClient>,
 }
 
 impl HealthApi {
-    pub fn new(client: HttpClient) -> Self {
+    pub fn new(client: Arc<HttpClient>) -> Self {
         Self { client }
     }
 
@@ -29,7 +30,5 @@ pub use network::NetworkApi;
 pub use relayer::RelayerApi;
 pub use sign::SignApi;
 pub use transaction::TransactionApi;
-pub use types::ApiBaseConfig;
-pub use user::UserApi;
 
 use crate::api::http::HttpClient;

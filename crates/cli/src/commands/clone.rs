@@ -1,37 +1,17 @@
 use rrelayer_core::relayer::types::RelayerId;
 use rrelayer_sdk::SDK;
 
+use crate::commands::error::RelayerManagementError;
 use crate::commands::network::get_chain_id_for_network;
-use crate::{
-    authentication::handle_authenticate,
-    commands::{error::RelayerManagementError, keystore::ProjectLocation},
-};
+use crate::project_location::ProjectLocation;
 
-/// Clones an existing relayer to a different network.
-///
-/// Creates a new relayer instance based on an existing relayer's configuration,
-/// but deploys it to a different network. This is useful for deploying the same
-/// relayer logic across multiple chains.
-///
-/// # Arguments
-/// * `relayer_id` - Unique identifier of the relayer to clone
-/// * `name` - Name for the new cloned relayer
-/// * `network` - Target network name where the relayer will be cloned
-/// * `project_path` - Project location containing network configuration
-/// * `sdk` - Mutable reference to the SDK for API operations
-///
-/// # Returns
-/// * `Ok(())` - Relayer cloned successfully
-/// * `Err(RelayerManagementError)` - Operation failed due to authentication, network, or API error
 pub async fn handle_clone(
     relayer_id: &RelayerId,
     name: &str,
     network: &str,
     project_path: &ProjectLocation,
-    sdk: &mut SDK,
+    sdk: &SDK,
 ) -> Result<(), RelayerManagementError> {
-    handle_authenticate(sdk, "account1", project_path).await?;
-
     let setup_config = project_path.setup_config(false)?;
     if !setup_config.networks.iter().any(|n| n.name == network) {
         println!("Network {} does not exist", network);

@@ -291,12 +291,10 @@ async fn send_transaction(
 /// API endpoint to replace an existing pending transaction.
 ///
 /// Replaces a pending transaction with new transaction parameters.
-/// Currently API key validation is disabled (TODO).
 ///
 /// # Arguments
 /// * `state` - The application state containing transaction queues and database
 /// * `transaction_id` - The transaction ID to replace
-/// * `headers` - HTTP headers (for future API key validation)
 /// * `replace_with` - The new transaction parameters
 ///
 /// # Returns
@@ -306,18 +304,12 @@ async fn send_transaction(
 async fn replace_transaction(
     State(state): State<Arc<AppState>>,
     Path(transaction_id): Path<TransactionId>,
-    headers: HeaderMap,
     Json(replace_with): Json<RelayTransactionRequest>,
 ) -> Result<Json<bool>, StatusCode> {
     let transaction = get_transaction_by_id(&state.cache, &state.db, transaction_id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
-
-    // TODO: validate API key
-    // if !is_relayer_api_key(&state.db, &state.cache, &transaction.relayer_id, &headers).await {
-    //     return Err(StatusCode::UNAUTHORIZED);
-    // }
 
     let status = state
         .transactions_queues
@@ -333,12 +325,10 @@ async fn replace_transaction(
 /// API endpoint to cancel a pending transaction.
 ///
 /// Cancels a pending transaction by sending a replacement with higher gas price.
-/// Currently API key validation is disabled (TODO).
 ///
 /// # Arguments
 /// * `state` - The application state containing transaction queues and database
 /// * `transaction_id` - The transaction ID to cancel
-/// * `headers` - HTTP headers (for future API key validation)
 ///
 /// # Returns
 /// * `Ok(Json<bool>)` - True if cancellation was successful
@@ -347,17 +337,11 @@ async fn replace_transaction(
 async fn cancel_transaction(
     State(state): State<Arc<AppState>>,
     Path(transaction_id): Path<TransactionId>,
-    headers: HeaderMap,
 ) -> Result<Json<bool>, StatusCode> {
     let transaction = get_transaction_by_id(&state.cache, &state.db, transaction_id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
-
-    // TODO: validate API key
-    // if !is_relayer_api_key(&state.db, &state.cache, &transaction.relayer_id, &headers).await {
-    //     return Err(StatusCode::UNAUTHORIZED);
-    // }
 
     let status = state
         .transactions_queues
@@ -373,7 +357,6 @@ async fn cancel_transaction(
 /// API endpoint to retrieve all transactions for a specific relayer.
 ///
 /// Returns a paginated list of transactions associated with the given relayer.
-/// Currently API key validation is disabled (TODO).
 ///
 /// # Arguments
 /// * `state` - The application state containing the database connection
@@ -404,25 +387,17 @@ async fn get_relayer_transactions(
 /// API endpoint to get the count of pending transactions for a relayer.
 ///
 /// Returns the number of transactions currently pending in the queue for the given relayer.
-/// Currently API key validation is disabled (TODO).
 ///
 /// # Arguments
 /// * `state` - The application state containing transaction queues
 /// * `relayer_id` - The relayer ID path parameter
-/// * `headers` - HTTP headers (for future API key validation)
 ///
 /// # Returns
 /// * `Ok(Json<usize>)` - The count of pending transactions
 async fn get_transactions_pending_count(
     State(state): State<Arc<AppState>>,
-    Path(relayer_id): Path<RelayerId>,
-    headers: HeaderMap,
+    Path(relayer_id): Path<RelayerId>
 ) -> Result<Json<usize>, StatusCode> {
-    // TODO: validate API key
-    // if !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await {
-    //     return Err(StatusCode::UNAUTHORIZED);
-    // }
-
     let count =
         state.transactions_queues.lock().await.pending_transactions_count(&relayer_id).await;
 
@@ -432,25 +407,17 @@ async fn get_transactions_pending_count(
 /// API endpoint to get the count of in-mempool transactions for a relayer.
 ///
 /// Returns the number of transactions currently in the mempool for the given relayer.
-/// Currently API key validation is disabled (TODO).
 ///
 /// # Arguments
 /// * `state` - The application state containing transaction queues
 /// * `relayer_id` - The relayer ID path parameter
-/// * `headers` - HTTP headers (for future API key validation)
 ///
 /// # Returns
 /// * `Ok(Json<usize>)` - The count of in-mempool transactions
 async fn get_transactions_inmempool_count(
     State(state): State<Arc<AppState>>,
     Path(relayer_id): Path<RelayerId>,
-    headers: HeaderMap,
 ) -> Result<Json<usize>, StatusCode> {
-    // TODO: validate API key
-    // if !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await {
-    //     return Err(StatusCode::UNAUTHORIZED);
-    // }
-
     let count =
         state.transactions_queues.lock().await.inmempool_transactions_count(&relayer_id).await;
 

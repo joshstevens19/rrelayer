@@ -3,8 +3,7 @@ use std::sync::Arc;
 
 use axum::{
     extract::{Path, Query, State},
-    http::{HeaderMap, StatusCode},
-    middleware::from_fn,
+    http::{StatusCode},
     routing::{delete, get, post, put},
     Json, Router,
 };
@@ -260,7 +259,7 @@ async fn delete_relayer(
     match state.db.delete_relayer(&relayer_id).await {
         Ok(_) => {
             invalidate_relayer_cache(&state.cache, &relayer_id).await;
-            state.transactions_queues.lock().await.delete_queue(&relayer_id);
+            state.transactions_queues.lock().await.delete_queue(&relayer_id).await;
             StatusCode::NO_CONTENT
         }
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR,

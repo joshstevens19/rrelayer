@@ -4,17 +4,6 @@ use rrelayer_core::{PostgresClient, rrelayer_error, rrelayer_info, start};
 
 use crate::{commands::error::ProjectStartupError, console::print_error_message};
 
-/// Starts the RRelayer project and its dependencies.
-///
-/// Validates the project structure, starts Docker containers for PostgreSQL,
-/// establishes database connection, and launches the RRelayer service.
-///
-/// # Arguments
-/// * `project_path` - Path to the project directory containing rrelayer.yaml
-///
-/// # Returns
-/// * `Ok(())` - Project started successfully
-/// * `Err(ProjectStartupError)` - Startup failed due to configuration, Docker, or database issues
 pub async fn handle_start(project_path: &PathBuf) -> Result<(), ProjectStartupError> {
     rrelayer_info!("Loading from path {:?}", project_path);
     let rrelayer_yaml_path = project_path.join("rrelayer.yaml");
@@ -49,18 +38,6 @@ pub async fn handle_start(project_path: &PathBuf) -> Result<(), ProjectStartupEr
     Ok(())
 }
 
-/// Checks Docker Compose container status with retries.
-///
-/// Monitors Docker Compose containers to ensure they are running properly
-/// before proceeding with the startup process.
-///
-/// # Arguments
-/// * `project_path` - Project directory containing docker-compose.yml
-/// * `max_retries` - Maximum number of retry attempts
-///
-/// # Returns
-/// * `Ok(())` - All containers are running and DATABASE_URL is set
-/// * `Err(ProjectStartupError)` - Containers failed to start or environment not configured
 fn check_docker_compose_status(
     project_path: &PathBuf,
     max_retries: u32,
@@ -104,17 +81,6 @@ fn check_docker_compose_status(
     Err("Docker containers did not start successfully within the given retries.".into())
 }
 
-/// Starts Docker Compose services for the RRelayer project.
-///
-/// Executes `docker compose up -d` in the specified project directory to start
-/// all required services (database, cache, etc.) in detached mode.
-///
-/// # Arguments
-/// * `project_path` - Path to the project directory containing docker-compose.yml
-///
-/// # Returns
-/// * `Ok(())` - Docker services started successfully
-/// * `Err(ProjectStartupError)` - Docker startup failed or project path invalid
 fn start_docker_compose(project_path: &PathBuf) -> Result<(), ProjectStartupError> {
     if !project_path.exists() {
         return Err(ProjectStartupError::InvalidConfig(format!(

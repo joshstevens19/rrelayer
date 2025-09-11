@@ -1,9 +1,9 @@
+use base64::{Engine as _, engine::general_purpose};
 use reqwest::{
     Client,
     header::{AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderValue},
 };
 use serde::{Serialize, de::DeserializeOwned};
-use base64::{Engine as _, engine::general_purpose};
 
 use crate::api::types::{ApiBaseConfig, ApiResult};
 
@@ -19,7 +19,11 @@ impl HttpClient {
     }
 
     fn build_url(&self, endpoint: &str) -> String {
-        format!("{}/{}", self.base_config.server_url.trim_end_matches('/'), endpoint.trim_start_matches('/'))
+        format!(
+            "{}/{}",
+            self.base_config.server_url.trim_end_matches('/'),
+            endpoint.trim_start_matches('/')
+        )
     }
 
     fn build_headers(&self, additional_headers: Option<HeaderMap>) -> HeaderMap {
@@ -29,10 +33,8 @@ impl HttpClient {
         // Add basic auth header
         let credentials = format!("{}:{}", self.base_config.username, self.base_config.password);
         let encoded = general_purpose::STANDARD.encode(credentials);
-        headers.insert(
-            AUTHORIZATION,
-            HeaderValue::from_str(&format!("Basic {}", encoded)).unwrap(),
-        );
+        headers
+            .insert(AUTHORIZATION, HeaderValue::from_str(&format!("Basic {}", encoded)).unwrap());
 
         if let Some(additional) = additional_headers {
             for (key, value) in additional {
