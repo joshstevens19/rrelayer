@@ -28,10 +28,6 @@
 - relayer balance <relayer_id> - gets the native balance for the relayer by id
 - relayer balance <relayer_id> --token <token_address> - gets the ERC20 balance for the relayer by id and token address
 
-- relayer api_key add <relayer_id> - adds an API key for the relayer by id
-- relayer api_key list <relayer_id> - lists all the API keys for the relayer by id
-- relayer api_key delete <relayer_id> <api_key> - deletes an API key for the relayer by id
-
 - relayer allowlist add <relayer_id> <address> - adds an allowlist address for the relayer by id
 - relayer allowlist list <relayer_id> - lists all the allowlist addresses for the relayer by id
 - relayer allowlist delete <relayer_id> <address> - deletes an allowlist address for the relayer by id

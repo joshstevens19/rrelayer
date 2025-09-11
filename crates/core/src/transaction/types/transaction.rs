@@ -41,7 +41,7 @@ use crate::{
     network::types::ChainId,
     relayer::types::RelayerId,
     shared::{
-        common_types::{ApiKey, EvmAddress},
+        common_types::EvmAddress,
         serializers::{
             deserialize_system_time, deserialize_system_time_option, serialize_system_time,
             serialize_system_time_option,
@@ -135,9 +135,6 @@ pub struct Transaction {
 
     #[serde(skip_serializing, skip_deserializing, default)]
     pub is_noop: bool,
-
-    #[serde(skip_serializing, skip_deserializing, default)]
-    pub from_api_key: ApiKey,
 
     pub external_id: Option<String>,
 }

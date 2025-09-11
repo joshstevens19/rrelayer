@@ -215,69 +215,6 @@ impl PostgresClient {
         Ok(())
     }
 
-    /// Creates a new API key for a specific relayer.
-    ///
-    /// This method inserts a new API key record in the database, associating it
-    /// with the specified relayer. The API key can be used for authenticated access
-    /// to relayer-specific operations.
-    ///
-    /// # Arguments
-    /// * `relayer_id` - The unique identifier of the relayer
-    /// * `api_key` - The API key string to store
-    ///
-    /// # Returns
-    /// * `Ok(())` - If the API key was successfully created
-    /// * `Err(PostgresError)` - If the database operation fails
-    pub async fn create_relayer_api_key(
-        &self,
-        relayer_id: &RelayerId,
-        api_key: &str,
-    ) -> Result<(), PostgresError> {
-        let _ = self
-            .execute(
-                "
-                INSERT INTO relayer.api_key(api_key, relayer_id)
-                VALUES ($1, $2)
-                ",
-                &[&api_key, relayer_id],
-            )
-            .await?;
-
-        Ok(())
-    }
-
-    /// Soft deletes an API key for a specific relayer.
-    ///
-    /// This method marks an API key as deleted rather than physically removing it,
-    /// preserving audit trails while revoking access for that key.
-    ///
-    /// # Arguments
-    /// * `relayer_id` - The unique identifier of the relayer
-    /// * `api_key` - The API key string to delete
-    ///
-    /// # Returns
-    /// * `Ok(())` - If the API key was successfully marked as deleted
-    /// * `Err(PostgresError)` - If the database operation fails
-    pub async fn delete_relayer_api_key(
-        &self,
-        relayer_id: &RelayerId,
-        api_key: &str,
-    ) -> Result<(), PostgresError> {
-        let _ = self
-            .execute(
-                "
-                UPDATE relayer.api_key
-                SET deleted = TRUE
-                WHERE api_key = $1
-                AND relayer_id = $2
-                ",
-                &[&api_key, relayer_id],
-            )
-            .await?;
-
-        Ok(())
-    }
-
     /// Updates the maximum gas price cap for a relayer.
     ///
     /// This method sets or removes the gas price limit for a relayer. When set,
@@ -409,18 +346,6 @@ impl PostgresClient {
         Ok(())
     }
 
-    /// Synchronizes the allowlist-only state for a relayer based on existing allowlist entries.
-    ///
-    /// This private method updates the allowlisted_addresses_only flag for a relayer based on
-    /// whether any allowlist addresses exist. The query incorrectly checks for API keys instead
-    /// of allowlisted addresses - this appears to be a bug in the original code.
-    ///
-    /// # Arguments
-    /// * `relayer_id` - The unique identifier of the relayer
-    ///
-    /// # Returns
-    /// * `Ok(())` - If the state was successfully synchronized
-    /// * `Err(PostgresError)` - If the database operation fails
     async fn relayer_allowlist_addresses_only_sync_state(
         &self,
         relayer_id: &RelayerId,

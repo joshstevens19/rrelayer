@@ -13,7 +13,6 @@ use super::types::TransactionSpeed;
 use crate::shared::utils::convert_blob_strings_to_blobs;
 use crate::{
     app_state::AppState,
-    authentication::guards::ReadOnlyOrAboveJwtTokenOrApiKeyGuard,
     provider::find_provider_for_chain_id,
     relayer::{get_relayer, types::RelayerId},
     rrelayer_error,
@@ -81,7 +80,6 @@ async fn get_transaction_status(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
 
-    // Early return for statuses that don't need receipt lookup
     if matches!(
         transaction.status,
         TransactionStatus::Pending | TransactionStatus::Inmempool | TransactionStatus::Expired
@@ -164,7 +162,6 @@ pub struct SendTransactionResult {
 /// API endpoint to send a new transaction through a relayer.
 ///
 /// Creates a new transaction and adds it to the transaction queue for processing.
-/// Currently API key validation is disabled (TODO).
 ///
 /// # Arguments
 /// * `state` - The application state containing transaction queues and other services
@@ -181,25 +178,12 @@ async fn send_transaction(
     headers: HeaderMap,
     Json(transaction): Json<RelayTransactionRequest>,
 ) -> Result<Json<SendTransactionResult>, StatusCode> {
-    // TODO: validate API key
-    // if !is_reayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await {
-    //     return Err(StatusCode::UNAUTHORIZED);
-    // }
-    //
-    // let api_key = headers
-    //     .get("x-api-key")
-    //     .and_then(|value| value.to_str().ok())
-    //     .ok_or(StatusCode::UNAUTHORIZED)?;
-
-    // Apply rate limiting if enabled
     if let Some(ref user_rate_limiter) = state.user_rate_limiter {
-        // Detect user from headers or transaction data (EIP-2771)
         let relayer = get_relayer(&state.db, &state.cache, &relayer_id)
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
             .ok_or(StatusCode::NOT_FOUND)?;
 
-        // Get user detection config from app config
         let user_detection_config = state
             .rate_limit_config
             .as_ref()
@@ -207,7 +191,6 @@ async fn send_transaction(
             .unwrap_or_default();
         let user_detector = UserDetector::new(user_detection_config);
 
-        // Detect end user from request
         let transaction_bytes = transaction.data.clone().into_inner();
         let user_context = user_detector
             .detect_user(&headers, Some(&transaction.to), &transaction_bytes, &relayer.address)
@@ -222,7 +205,6 @@ async fn send_transaction(
 
         let user_identifier = format!("{:?}", user_context.user_address);
 
-        // Check transaction rate limit
         match user_rate_limiter
             .check_rate_limit(&user_identifier, "transactions_per_minute", 1)
             .await
@@ -259,7 +241,6 @@ async fn send_transaction(
             }
         }
 
-        // Record transaction metadata for analytics
         tokio::spawn({
             let user_rate_limiter = user_rate_limiter.clone();
             let relayer_id = relayer_id;
@@ -268,12 +249,12 @@ async fn send_transaction(
                 let relayer_uuid: uuid::Uuid = relayer_id.into();
                 let _ = user_rate_limiter
                     .record_transaction_metadata(
-                        None, // Transaction hash not available yet
+                        None,
                         &relayer_uuid,
                         &user_context.user_address,
                         &format!("{:?}", user_context.detection_method).to_lowercase(),
                         &format!("{:?}", user_context.transaction_type).to_lowercase(),
-                        None, // Gas usage not known until after execution
+                        None,
                         &["transactions_per_minute".to_string()],
                     )
                     .await;
@@ -283,8 +264,6 @@ async fn send_transaction(
 
     let transaction_to_send = TransactionToSend::new(
         transaction.to,
-        // api_key.to_string(),
-        "bob".to_string(),
         transaction.value,
         transaction.data.clone(),
         transaction.speed.clone(),
@@ -411,16 +390,7 @@ async fn get_relayer_transactions(
     State(state): State<Arc<AppState>>,
     Path(relayer_id): Path<RelayerId>,
     Query(paging): Query<PagingQuery>,
-    headers: HeaderMap,
-    auth_guard: ReadOnlyOrAboveJwtTokenOrApiKeyGuard,
 ) -> Result<Json<PagingResult<Transaction>>, StatusCode> {
-    // TODO: validate API key
-    // if auth_guard.is_api_key()
-    //     && !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await
-    // {
-    //     return Err(StatusCode::UNAUTHORIZED);
-    // }
-
     let paging_context = PagingContext::new(paging.limit, paging.offset);
 
     state

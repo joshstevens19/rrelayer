@@ -3,16 +3,12 @@ use std::sync::Arc;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
-    middleware::from_fn,
     routing::get,
     Json, Router,
 };
 
 use super::fee_estimator::base::GasEstimatorResult;
-use crate::{
-    app_state::AppState, authentication::guards::read_only_or_above_jwt_guard,
-    network::types::ChainId,
-};
+use crate::{app_state::AppState, network::types::ChainId};
 
 /// Retrieves gas price estimates for a specific chain via HTTP API.
 ///
@@ -46,7 +42,5 @@ async fn get_gas_price(
 /// # Returns
 /// * `Router<Arc<AppState>>` - Configured router with gas price endpoints
 pub fn create_gas_routes() -> Router<Arc<AppState>> {
-    Router::new()
-        .route("/price/:chain_id", get(get_gas_price))
-        .route_layer(from_fn(read_only_or_above_jwt_guard))
+    Router::new().route("/price/:chain_id", get(get_gas_price))
 }

@@ -1,10 +1,10 @@
 use thiserror::Error;
 
 #[derive(Debug, Clone)]
-pub enum ApiBaseConfig {
-    WithAuthToken { server_url: String, auth_token: String },
-    WithApiKey { server_url: String, api_key: String },
-    Basic { server_url: String },
+pub struct ApiBaseConfig {
+    pub server_url: String,
+    pub username: String,
+    pub password: String,
 }
 
 #[derive(Error, Debug)]

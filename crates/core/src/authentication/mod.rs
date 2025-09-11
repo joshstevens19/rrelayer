@@ -1,5 +1,5 @@
 pub mod api;
-mod cache;
+pub mod auth_middleware;
+pub mod basic_auth;
 pub mod guards;
-mod jwt;
 pub mod types;

@@ -10,7 +10,7 @@ use crate::{
     gas::types::{GasLimit, GasPrice, MaxFee, MaxPriorityFee},
     relayer::types::Relayer,
     shared::{
-        common_types::{ApiKey, BlockHash, BlockNumber, EvmAddress},
+        common_types::{BlockHash, BlockNumber, EvmAddress},
         serializers::{serialize_system_time, serialize_system_time_option},
     },
 };
@@ -22,10 +22,6 @@ pub struct RelayerTransaction {
 
     /// The relayer sent from
     pub relayer: Relayer,
-
-    /// The API key used to submit the transaction
-    #[serde(rename = "apiKey")]
-    pub api_key: ApiKey,
 
     /// The address the transaction is being sent to
     pub to: EvmAddress,

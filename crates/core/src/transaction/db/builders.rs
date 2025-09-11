@@ -43,7 +43,6 @@ pub fn build_transaction_from_transaction_view(row: &Row) -> Transaction {
         sent_with_max_priority_fee_per_gas: row.get("sent_max_priority_fee_per_gas"),
         sent_with_max_fee_per_gas: row.get("sent_max_fee_per_gas"),
         is_noop: to == from,
-        from_api_key: row.get("api_key"),
         external_id: row.get("external_id"),
     }
 }

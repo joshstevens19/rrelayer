@@ -2,7 +2,7 @@ use clap::{Parser, Subcommand};
 use rrelayer_core::{common_types::EvmAddress, relayer::types::RelayerId};
 
 use crate::commands::{
-    allowlist, api_key, auth::AuthCommand, config, keystore::KeystoreCommand,
+    allowlist, auth::AuthCommand, config, keystore::KeystoreCommand,
     network::NetworkCommands, sign, tx, user,
 };
 
@@ -101,14 +101,6 @@ pub enum Commands {
         /// The token address if you want an erc20/721 balance
         #[arg(long)]
         token: Option<EvmAddress>,
-    },
-    /// Manage API keys for relayer access
-    ApiKey {
-        #[clap(long, short)]
-        path: Option<String>,
-
-        #[command(subcommand)]
-        command: api_key::ApiKeyCommand,
     },
     /// Manage allowlist addresses for restricted access
     Allowlist {

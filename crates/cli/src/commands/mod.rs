@@ -1,5 +1,4 @@
 pub mod allowlist;
-pub mod api_key;
 pub mod auth;
 pub mod balance;
 pub mod clone;

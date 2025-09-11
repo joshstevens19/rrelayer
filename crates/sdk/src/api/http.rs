@@ -3,6 +3,7 @@ use reqwest::{
     header::{AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderValue},
 };
 use serde::{Serialize, de::DeserializeOwned};
+use base64::{Engine as _, engine::general_purpose};
 
 use crate::api::types::{ApiBaseConfig, ApiResult};
 
@@ -18,30 +19,20 @@ impl HttpClient {
     }
 
     fn build_url(&self, endpoint: &str) -> String {
-        let server_url = match &self.base_config {
-            ApiBaseConfig::WithAuthToken { server_url, .. } => server_url,
-            ApiBaseConfig::WithApiKey { server_url, .. } => server_url,
-            ApiBaseConfig::Basic { server_url } => server_url,
-        };
-        format!("{}/{}", server_url.trim_end_matches('/'), endpoint.trim_start_matches('/'))
+        format!("{}/{}", self.base_config.server_url.trim_end_matches('/'), endpoint.trim_start_matches('/'))
     }
 
     fn build_headers(&self, additional_headers: Option<HeaderMap>) -> HeaderMap {
         let mut headers = HeaderMap::new();
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
 
-        match &self.base_config {
-            ApiBaseConfig::WithAuthToken { auth_token, .. } => {
-                headers.insert(
-                    AUTHORIZATION,
-                    HeaderValue::from_str(&format!("Bearer {}", auth_token)).unwrap(),
-                );
-            }
-            ApiBaseConfig::WithApiKey { api_key, .. } => {
-                headers.insert("x-api-key", HeaderValue::from_str(api_key).unwrap());
-            }
-            ApiBaseConfig::Basic { .. } => {}
-        }
+        // Add basic auth header
+        let credentials = format!("{}:{}", self.base_config.username, self.base_config.password);
+        let encoded = general_purpose::STANDARD.encode(credentials);
+        headers.insert(
+            AUTHORIZATION,
+            HeaderValue::from_str(&format!("Basic {}", encoded)).unwrap(),
+        );
 
         if let Some(additional) = additional_headers {
             for (key, value) in additional {

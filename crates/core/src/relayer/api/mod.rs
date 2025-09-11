@@ -14,18 +14,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     app_state::AppState,
-    authentication::guards::{
-        admin_jwt_guard, integrator_or_above_jwt_guard, read_only_or_above_jwt_guard,
-        ManagerOrAboveJwtTokenOrApiKeyGuard, ReadOnlyOrAboveJwtTokenOrApiKeyGuard,
-    },
-    common_types::ApiKey,
     gas::types::GasPrice,
     network::types::ChainId,
     provider::{chain_enabled, find_provider_for_chain_id},
     relayer::{
         api::sign::create_sign_routes,
         cache::invalidate_relayer_cache,
-        get_relayer, is_relayer_api_key,
+        get_relayer,
         types::{Relayer, RelayerId},
     },
     rrelayer_error,
@@ -42,17 +37,6 @@ struct CreateRelayerRequest {
 pub struct CreateRelayerResult {
     pub id: RelayerId,
     pub address: EvmAddress,
-}
-
-/// Generates a random API key string.
-///
-/// Creates a cryptographically secure random string of 32 alphanumeric characters
-/// suitable for use as an API key.
-///
-/// # Returns
-/// * A 32-character random alphanumeric string
-fn generate_api_key() -> String {
-    rand::thread_rng().sample_iter(&Alphanumeric).take(32).map(char::from).collect()
 }
 
 /// Creates a new relayer for the specified blockchain network.
@@ -232,29 +216,20 @@ pub struct GetRelayerResult {
 /// Retrieves detailed information about a specific relayer.
 ///
 /// This endpoint returns relayer details including its configuration and associated
-/// provider URLs. Access is controlled by JWT tokens or relayer-specific API keys.
+/// provider URLs.
 ///
 /// # Arguments
 /// * `state` - Application state containing database and provider connections
-/// * `auth_guard` - Authentication guard that validates JWT tokens or API keys
+/// * `auth_guard` - Authentication guard that validates basic auth
 /// * `relayer_id` - The unique identifier of the relayer to retrieve
-/// * `headers` - HTTP headers for API key authentication
 ///
 /// # Returns
 /// * `Ok(Json<GetRelayerResult>)` - Relayer details and provider URLs
 /// * `Err(StatusCode)` - HTTP error code if retrieval fails or unauthorized
 async fn get_relayer_api(
     State(state): State<Arc<AppState>>,
-    ReadOnlyOrAboveJwtTokenOrApiKeyGuard(auth_guard): ReadOnlyOrAboveJwtTokenOrApiKeyGuard,
     Path(relayer_id): Path<RelayerId>,
-    headers: HeaderMap,
 ) -> Result<Json<GetRelayerResult>, StatusCode> {
-    if auth_guard.is_api_key()
-        && !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await
-    {
-        return Err(StatusCode::UNAUTHORIZED);
-    }
-
     let relayer = get_relayer(&state.db, &state.cache, &relayer_id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
@@ -301,7 +276,6 @@ async fn delete_relayer(
 /// * `state` - Application state containing database and queue connections
 /// * `auth_guard` - Authentication guard requiring manager-level permissions
 /// * `relayer_id` - The unique identifier of the relayer to pause
-/// * `headers` - HTTP headers for API key authentication
 ///
 /// # Returns
 /// * `StatusCode::NO_CONTENT` - If pause succeeds
@@ -309,16 +283,8 @@ async fn delete_relayer(
 /// * `StatusCode::INTERNAL_SERVER_ERROR` - If database operation fails
 async fn pause_relayer(
     State(state): State<Arc<AppState>>,
-    ManagerOrAboveJwtTokenOrApiKeyGuard(auth_guard): ManagerOrAboveJwtTokenOrApiKeyGuard,
     Path(relayer_id): Path<RelayerId>,
-    headers: HeaderMap,
 ) -> StatusCode {
-    if auth_guard.is_api_key()
-        && !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await
-    {
-        return StatusCode::UNAUTHORIZED;
-    }
-
     match state.db.pause_relayer(&relayer_id).await {
         Ok(_) => {
             invalidate_relayer_cache(&state.cache, &relayer_id).await;
@@ -343,7 +309,6 @@ async fn pause_relayer(
 /// * `state` - Application state containing database and queue connections
 /// * `auth_guard` - Authentication guard requiring manager-level permissions
 /// * `relayer_id` - The unique identifier of the relayer to unpause
-/// * `headers` - HTTP headers for API key authentication
 ///
 /// # Returns
 /// * `StatusCode::NO_CONTENT` - If unpause succeeds
@@ -351,16 +316,8 @@ async fn pause_relayer(
 /// * `StatusCode::INTERNAL_SERVER_ERROR` - If database operation fails
 async fn unpause_relayer(
     State(state): State<Arc<AppState>>,
-    ManagerOrAboveJwtTokenOrApiKeyGuard(auth_guard): ManagerOrAboveJwtTokenOrApiKeyGuard,
     Path(relayer_id): Path<RelayerId>,
-    headers: HeaderMap,
 ) -> StatusCode {
-    if auth_guard.is_api_key()
-        && !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await
-    {
-        return StatusCode::UNAUTHORIZED;
-    }
-
     match state.db.unpause_relayer(&relayer_id).await {
         Ok(_) => {
             invalidate_relayer_cache(&state.cache, &relayer_id).await;
@@ -386,7 +343,6 @@ async fn unpause_relayer(
 /// * `auth_guard` - Authentication guard requiring manager-level permissions
 /// * `relayer_id` - The unique identifier of the relayer
 /// * `cap` - The new gas price cap (None to remove the cap)
-/// * `headers` - HTTP headers for API key authentication
 ///
 /// # Returns
 /// * `StatusCode::NO_CONTENT` - If update succeeds
@@ -395,16 +351,8 @@ async fn unpause_relayer(
 /// * `StatusCode::INTERNAL_SERVER_ERROR` - If database operation fails
 async fn update_relay_max_gas_price(
     State(state): State<Arc<AppState>>,
-    ManagerOrAboveJwtTokenOrApiKeyGuard(auth_guard): ManagerOrAboveJwtTokenOrApiKeyGuard,
     Path((relayer_id, cap)): Path<(RelayerId, Option<GasPrice>)>,
-    headers: HeaderMap,
 ) -> StatusCode {
-    if auth_guard.is_api_key()
-        && !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await
-    {
-        return StatusCode::UNAUTHORIZED;
-    }
-
     match get_relayer(&state.db, &state.cache, &relayer_id).await {
         Ok(Some(_)) => match state.db.update_relayer_max_gas_price(&relayer_id, cap).await {
             Ok(_) => {
@@ -433,117 +381,6 @@ async fn update_relay_max_gas_price(
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CreateRelayerApiResult {
-    #[serde(rename = "apiKey")]
-    pub api_key: ApiKey,
-}
-
-/// Creates a new API key for a relayer.
-///
-/// This endpoint generates a new API key that can be used to authenticate requests
-/// for this specific relayer. The API key provides limited access to relayer-specific operations.
-///
-/// # Arguments
-/// * `state` - Application state containing database connections
-/// * `relayer_id` - The unique identifier of the relayer
-///
-/// # Returns
-/// * `Ok(Json<CreateRelayerApiResult>)` - The newly generated API key
-/// * `Err(StatusCode::NOT_FOUND)` - If relayer doesn't exist
-/// * `Err(StatusCode::INTERNAL_SERVER_ERROR)` - If key generation fails
-async fn create_relayer_api_key(
-    State(state): State<Arc<AppState>>,
-    Path(relayer_id): Path<RelayerId>,
-) -> Result<Json<CreateRelayerApiResult>, StatusCode> {
-    get_relayer(&state.db, &state.cache, &relayer_id)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .ok_or(StatusCode::NOT_FOUND)?;
-
-    let new_api_key = generate_api_key();
-    state
-        .db
-        .create_relayer_api_key(&relayer_id, &new_api_key)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    Ok(Json(CreateRelayerApiResult { api_key: new_api_key }))
-}
-
-#[derive(Debug, Deserialize)]
-struct GetRelayerApiKeysQuery {
-    limit: u32,
-    offset: u32,
-}
-
-/// Retrieves a paginated list of API keys for a relayer.
-///
-/// This endpoint returns all API keys associated with a specific relayer,
-/// with support for pagination through limit and offset parameters.
-///
-/// # Arguments
-/// * `state` - Application state containing database connections
-/// * `relayer_id` - The unique identifier of the relayer
-/// * `query` - Query parameters for pagination (limit and offset)
-///
-/// # Returns
-/// * `Ok(Json<PagingResult<String>>)` - Paginated list of API keys
-/// * `Err(StatusCode::NOT_FOUND)` - If relayer doesn't exist
-/// * `Err(StatusCode::INTERNAL_SERVER_ERROR)` - If retrieval fails
-async fn get_relayer_api_keys(
-    State(state): State<Arc<AppState>>,
-    Path(relayer_id): Path<RelayerId>,
-    Query(query): Query<GetRelayerApiKeysQuery>,
-) -> Result<Json<PagingResult<String>>, StatusCode> {
-    get_relayer(&state.db, &state.cache, &relayer_id)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .ok_or(StatusCode::NOT_FOUND)?;
-
-    state
-        .db
-        .get_relayer_api_keys(&relayer_id, &PagingContext::new(query.limit, query.offset))
-        .await
-        .map(Json)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct DeleteRelayerApiKeyRequest {
-    #[serde(rename = "apiKey")]
-    pub api_key: String,
-}
-
-/// Deletes a specific API key for a relayer.
-///
-/// This endpoint removes an API key from a relayer, revoking access for that key.
-/// The API key is soft-deleted and marked as inactive in the database.
-///
-/// # Arguments
-/// * `state` - Application state containing database connections
-/// * `relayer_id` - The unique identifier of the relayer
-/// * `body` - Request body containing the API key to delete
-///
-/// # Returns
-/// * `StatusCode::NO_CONTENT` - If deletion succeeds
-/// * `StatusCode::NOT_FOUND` - If relayer doesn't exist
-/// * `StatusCode::INTERNAL_SERVER_ERROR` - If deletion fails
-async fn delete_relayer_api_key(
-    State(state): State<Arc<AppState>>,
-    Path(relayer_id): Path<RelayerId>,
-    Json(body): Json<DeleteRelayerApiKeyRequest>,
-) -> StatusCode {
-    match get_relayer(&state.db, &state.cache, &relayer_id).await {
-        Ok(Some(_)) => match state.db.delete_relayer_api_key(&relayer_id, &body.api_key).await {
-            Ok(_) => StatusCode::NO_CONTENT,
-            Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
-        },
-        Ok(None) => StatusCode::NOT_FOUND,
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
-    }
-}
-
 #[derive(Debug, Deserialize)]
 struct GetAllowlistAddressesQuery {
     limit: u32,
@@ -560,7 +397,6 @@ struct GetAllowlistAddressesQuery {
 /// * `auth_guard` - Authentication guard for access control
 /// * `relayer_id` - The unique identifier of the relayer
 /// * `query` - Query parameters for pagination (limit and offset)
-/// * `headers` - HTTP headers for API key authentication
 ///
 /// # Returns
 /// * `Ok(Json<PagingResult<EvmAddress>>)` - Paginated list of allowlisted addresses
@@ -569,17 +405,9 @@ struct GetAllowlistAddressesQuery {
 /// * `Err(StatusCode::INTERNAL_SERVER_ERROR)` - If retrieval fails
 async fn get_allowlist_addresses(
     State(state): State<Arc<AppState>>,
-    ReadOnlyOrAboveJwtTokenOrApiKeyGuard(auth_guard): ReadOnlyOrAboveJwtTokenOrApiKeyGuard,
     Path(relayer_id): Path<RelayerId>,
     Query(query): Query<GetAllowlistAddressesQuery>,
-    headers: HeaderMap,
 ) -> Result<Json<PagingResult<EvmAddress>>, StatusCode> {
-    if auth_guard.is_api_key()
-        && !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await
-    {
-        return Err(StatusCode::UNAUTHORIZED);
-    }
-
     get_relayer(&state.db, &state.cache, &relayer_id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
@@ -606,7 +434,6 @@ async fn get_allowlist_addresses(
 /// * `auth_guard` - Authentication guard requiring manager-level permissions
 /// * `relayer_id` - The unique identifier of the relayer
 /// * `address` - The Ethereum address to add to the allowlist
-/// * `headers` - HTTP headers for API key authentication
 ///
 /// # Returns
 /// * `StatusCode::NO_CONTENT` - If addition succeeds
@@ -615,16 +442,8 @@ async fn get_allowlist_addresses(
 /// * `StatusCode::INTERNAL_SERVER_ERROR` - If database operation fails
 async fn add_allowlist_address(
     State(state): State<Arc<AppState>>,
-    ManagerOrAboveJwtTokenOrApiKeyGuard(auth_guard): ManagerOrAboveJwtTokenOrApiKeyGuard,
     Path((relayer_id, address)): Path<(RelayerId, EvmAddress)>,
-    headers: HeaderMap,
 ) -> StatusCode {
-    if auth_guard.is_api_key()
-        && !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await
-    {
-        return StatusCode::UNAUTHORIZED;
-    }
-
     match get_relayer(&state.db, &state.cache, &relayer_id).await {
         Ok(Some(_)) => match state.db.relayer_add_allowlist_address(&relayer_id, &address).await {
             Ok(_) => {
@@ -656,7 +475,6 @@ async fn add_allowlist_address(
 /// * `auth_guard` - Authentication guard requiring manager-level permissions
 /// * `relayer_id` - The unique identifier of the relayer
 /// * `address` - The Ethereum address to remove from the allowlist
-/// * `headers` - HTTP headers for API key authentication
 ///
 /// # Returns
 /// * `StatusCode::NO_CONTENT` - If removal succeeds
@@ -665,16 +483,8 @@ async fn add_allowlist_address(
 /// * `StatusCode::INTERNAL_SERVER_ERROR` - If database operation fails
 async fn delete_allowlist_address(
     State(state): State<Arc<AppState>>,
-    ManagerOrAboveJwtTokenOrApiKeyGuard(auth_guard): ManagerOrAboveJwtTokenOrApiKeyGuard,
     Path((relayer_id, address)): Path<(RelayerId, EvmAddress)>,
-    headers: HeaderMap,
 ) -> StatusCode {
-    if auth_guard.is_api_key()
-        && !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await
-    {
-        return StatusCode::UNAUTHORIZED;
-    }
-
     match state.db.relayer_delete_allowlist_address(&relayer_id, &address).await {
         Ok(_) => match state.db.get_relayer(&relayer_id).await {
             Ok(Some(relayer)) => {
@@ -708,7 +518,6 @@ async fn delete_allowlist_address(
 /// * `auth_guard` - Authentication guard requiring manager-level permissions
 /// * `relayer_id` - The unique identifier of the relayer
 /// * `enabled` - Whether to enable EIP-1559 transactions (true) or use legacy (false)
-/// * `headers` - HTTP headers for API key authentication
 ///
 /// # Returns
 /// * `StatusCode::NO_CONTENT` - If update succeeds
@@ -716,16 +525,8 @@ async fn delete_allowlist_address(
 /// * `StatusCode::INTERNAL_SERVER_ERROR` - If database operation fails
 async fn update_relay_eip1559_status(
     State(state): State<Arc<AppState>>,
-    ManagerOrAboveJwtTokenOrApiKeyGuard(auth_guard): ManagerOrAboveJwtTokenOrApiKeyGuard,
     Path((relayer_id, enabled)): Path<(RelayerId, bool)>,
-    headers: HeaderMap,
 ) -> StatusCode {
-    if auth_guard.is_api_key()
-        && !is_relayer_api_key(&state.db, &state.cache, &relayer_id, &headers).await
-    {
-        return StatusCode::UNAUTHORIZED;
-    }
-
     match state.db.update_relayer_eip_1559_status(&relayer_id, &enabled).await {
         Ok(_) => {
             if let Ok(queue) =
@@ -740,36 +541,16 @@ async fn update_relay_eip1559_status(
     }
 }
 
-/// Creates and configures the HTTP routes for relayer management endpoints.
-///
-/// This function sets up all the REST API endpoints for managing relayers, including
-/// CRUD operations, API key management, allowlist management, and configuration updates.
-/// Each route is protected with appropriate authentication guards.
-///
-/// # Returns
-/// * A configured Axum Router with all relayer management endpoints
 pub fn create_relayer_routes() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/:chain_id/new", post(create_relayer).route_layer(from_fn(admin_jwt_guard)))
-        .route("/", get(get_relayers).route_layer(from_fn(read_only_or_above_jwt_guard)))
+        .route("/:chain_id/new", post(create_relayer))
+        .route("/", get(get_relayers))
         .route("/:relayer_id", get(get_relayer_api))
-        .route("/:relayer_id", delete(delete_relayer).route_layer(from_fn(admin_jwt_guard)))
+        .route("/:relayer_id", delete(delete_relayer))
         .route("/:relayer_id/pause", put(pause_relayer))
         .route("/:relayer_id/unpause", put(unpause_relayer))
         .route("/:relayer_id/gas/max/:cap", put(update_relay_max_gas_price))
-        .route("/:relayer_id/clone", post(clone_relayer).route_layer(from_fn(admin_jwt_guard)))
-        .route(
-            "/:relayer_id/api-keys",
-            post(create_relayer_api_key).route_layer(from_fn(integrator_or_above_jwt_guard)),
-        )
-        .route(
-            "/:relayer_id/api-keys",
-            get(get_relayer_api_keys).route_layer(from_fn(integrator_or_above_jwt_guard)),
-        )
-        .route(
-            "/:relayer_id/api-keys/delete",
-            post(delete_relayer_api_key).route_layer(from_fn(integrator_or_above_jwt_guard)),
-        )
+        .route("/:relayer_id/clone", post(clone_relayer))
         .route("/:relayer_id/allowlists", get(get_allowlist_addresses))
         .route("/:relayer_id/allowlists/:address", post(add_allowlist_address))
         .route("/:relayer_id/allowlists/:address", delete(delete_allowlist_address))

@@ -3,7 +3,7 @@ use crate::{
     network::types::ChainId,
     postgres::{PostgresClient, PostgresError},
     relayer::types::{Relayer, RelayerId},
-    shared::common_types::{ApiKey, EvmAddress, PagingContext, PagingResult},
+    shared::common_types::{EvmAddress, PagingContext, PagingResult},
 };
 
 impl PostgresClient {
@@ -111,84 +111,6 @@ impl PostgresClient {
             None => Ok(None),
             Some(row) => Ok(Some(build_relayer(&row))),
         }
-    }
-
-    /// Validates if an API key belongs to a specific relayer.
-    ///
-    /// This method checks if the provided API key is valid and associated with the
-    /// specified relayer. Only active (non-deleted) API keys are considered valid.
-    ///
-    /// # Arguments
-    /// * `relayer_id` - The unique identifier of the relayer
-    /// * `api_key` - The API key to validate
-    ///
-    /// # Returns
-    /// * `Ok(true)` - If the API key is valid and belongs to the relayer
-    /// * `Ok(false)` - If the API key is invalid, deleted, or doesn't belong to the relayer
-    /// * `Err(PostgresError)` - If database query fails
-    pub async fn is_relayer_api_key(
-        &self,
-        relayer_id: &RelayerId,
-        api_key: &ApiKey,
-    ) -> Result<bool, PostgresError> {
-        let rows = self
-            .query_one_or_none(
-                "
-                    SELECT 1
-                    FROM relayer.api_key r
-                    WHERE r.relayer_id = $1
-                    AND r.deleted = FALSE
-                    AND r.api_key = $2;
-                ",
-                &[relayer_id, api_key],
-            )
-            .await?;
-
-        if rows.is_none() {
-            return Ok(false);
-        }
-
-        Ok(true)
-    }
-
-    /// Retrieves a paginated list of API keys for a specific relayer.
-    ///
-    /// This method queries the database for all active API keys associated with a relayer,
-    /// ordered by creation date (newest first). Results are paginated according to the context.
-    ///
-    /// # Arguments
-    /// * `relayer_id` - The unique identifier of the relayer
-    /// * `paging_context` - Pagination parameters (limit and offset)
-    ///
-    /// # Returns
-    /// * `Ok(PagingResult<String>)` - Paginated list of API key strings
-    /// * `Err(PostgresError)` - If database query fails
-    pub async fn get_relayer_api_keys(
-        &self,
-        relayer_id: &RelayerId,
-        paging_context: &PagingContext,
-    ) -> Result<PagingResult<String>, PostgresError> {
-        let rows = self
-            .query(
-                "
-                    SELECT 
-                        r.api_key
-                    FROM relayer.api_key r
-                    WHERE r.relayer_id = $1
-                    AND r.deleted = FALSE
-                    ORDER BY r.created_at DESC
-                    LIMIT $2
-                    OFFSET $3;
-                ",
-                &[&relayer_id, &(paging_context.limit as i64), &(paging_context.offset as i64)],
-            )
-            .await?;
-
-        let results: Vec<String> = rows.iter().map(|row| row.get("api_key")).collect();
-
-        let result_count = results.len();
-
-        Ok(PagingResult::new(results, paging_context.next(result_count), paging_context.previous()))
     }
 
     /// Retrieves a paginated list of allowlisted addresses for a specific relayer.

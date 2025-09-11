@@ -15,12 +15,13 @@ use tokio::sync::Mutex;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 use tracing::error;
 
+use crate::authentication::api::create_basic_auth_routes;
 use crate::background_tasks::run_background_tasks;
 use crate::keystore::{recover_wallet_from_keystore, KeyStorePasswordManager};
 use crate::yaml::ReadYamlError;
 use crate::{
     app_state::AppState,
-    authentication::{api::create_authentication_routes, types::JwtRole},
+    authentication::{guards::basic_auth_guard, types::JwtRole},
     gas::{
         api::create_gas_routes, blob_gas_oracle::BlobGasOracleCache, gas_oracle::GasOracleCache,
     },
@@ -248,14 +249,14 @@ async fn start_api(
 
     let app = Router::new()
         .route("/health", get(health_check))
-        .nest("/authentication", create_authentication_routes())
+        .nest("/auth", create_basic_auth_routes())
         .nest("/gas", create_gas_routes())
         .nest("/networks", create_network_routes())
         .nest("/relayers", create_relayer_routes())
         .nest("/transactions", create_transactions_routes())
         .nest("/users", create_user_routes())
+        .route_layer(middleware::from_fn(basic_auth_guard))
         .layer(middleware::from_fn(activity_logger))
-        // .layer(from_fn(auth_middleware)) // TODO: add auth middleware
         .layer(cors)
         .with_state(app_state)
         .into_make_service_with_connect_info::<SocketAddr>();

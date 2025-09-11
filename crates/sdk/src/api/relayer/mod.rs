@@ -1,8 +1,6 @@
 mod allowlist;
-mod api_keys;
 
 pub use allowlist::RelayerAllowlist;
-pub use api_keys::RelayerApiKeys;
 use rrelayer_core::{
     common_types::{PagingContext, PagingResult},
     relayer::{
@@ -18,14 +16,12 @@ use crate::api::{
 
 pub struct RelayerApi {
     client: HttpClient,
-    pub api_keys: RelayerApiKeys,
     pub allowlist: RelayerAllowlist,
 }
 
 impl RelayerApi {
     pub fn new(client: HttpClient) -> Self {
         Self {
-            api_keys: RelayerApiKeys::new(client.clone()),
             allowlist: RelayerAllowlist::new(client.clone()),
             client,
         }

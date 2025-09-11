@@ -2,32 +2,6 @@ use crate::postgres::{PostgresClient, PostgresError};
 
 /// Applies the RRelayer database schema version 1.0.0.
 ///
-/// Creates the complete database schema including:
-///
-/// **Schemas and Types:**
-/// - `authentication` schema with `user_role` enum
-/// - `network` schema for blockchain networks
-/// - `relayer` schema with `speed` and `tx_status` enums
-///
-/// **Authentication Tables:**
-/// - `authentication.user_access` - User permissions and roles
-///
-/// **Network Tables:**
-/// - `network.record` - Blockchain network configurations
-/// - `network.node` - RPC provider endpoints per network
-///
-/// **Relayer Tables:**
-/// - `relayer.record` - Relayer configurations and settings
-/// - `relayer.api_key` - API keys for relayer access
-/// - `relayer.allowlisted_address` - Address allowlists per relayer
-/// - `relayer.transaction` - Transaction records and status
-/// - `relayer.transaction_audit_log` - Complete transaction history
-///
-/// **Rate Limiting Tables:**
-/// - `rate_limit_rules` - Per-user rate limiting rules and overrides
-/// - `rate_limit_usage` - Time-windowed usage tracking
-/// - `transaction_rate_limit_metadata` - Transaction metadata for analytics
-///
 /// All tables include appropriate constraints, indexes, and foreign key
 /// relationships. The schema uses PostgreSQL-specific features like enums
 /// and TIMESTAMPTZ for proper timezone handling.
@@ -40,24 +14,8 @@ use crate::postgres::{PostgresClient, PostgresError};
 /// * `Err(PostgresError)` - If any schema operation fails
 pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), PostgresError> {
     let schema_sql = r#"
-        CREATE SCHEMA IF NOT EXISTS authentication;
         CREATE SCHEMA IF NOT EXISTS network;
         CREATE SCHEMA IF NOT EXISTS relayer;
-
-        DO $$
-        BEGIN
-            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role' AND typtype = 'e') THEN
-                CREATE TYPE authentication.user_role AS ENUM ('ADMIN', 'READONLY', 'MANAGER', 'INTEGRATOR');
-            END IF;
-        END;
-        $$;
-
-        CREATE TABLE IF NOT EXISTS authentication.user_access (
-            address BYTEA PRIMARY KEY NOT NULL,
-            role authentication.user_role NOT NULL,
-            updated_on TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-            created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
-        );
 
         -- Network Schema
         CREATE TABLE IF NOT EXISTS network.record (
@@ -109,22 +67,6 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
         END;
         $$;
 
-        CREATE TABLE IF NOT EXISTS relayer.api_key (
-            api_key CHAR(32) PRIMARY KEY NOT NULL,
-            relayer_id UUID NOT NULL,
-            deleted BOOLEAN DEFAULT FALSE NOT NULL,
-            created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
-        );
-        DO $$
-        BEGIN
-            IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_relayer_api_key_relayer_id') THEN
-                ALTER TABLE relayer.api_key DROP CONSTRAINT fk_relayer_api_key_relayer_id;
-            END IF;
-            ALTER TABLE relayer.api_key ADD CONSTRAINT fk_relayer_api_key_relayer_id
-                FOREIGN KEY (relayer_id) REFERENCES relayer.record (id);
-        END;
-        $$;
-
         CREATE TABLE IF NOT EXISTS relayer.allowlisted_address (
             address BYTEA NOT NULL,
             relayer_id UUID NOT NULL,
@@ -160,7 +102,6 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
         CREATE TABLE IF NOT EXISTS relayer.transaction (
             id UUID PRIMARY KEY NOT NULL,
             relayer_id UUID NOT NULL,
-            api_key CHAR(32) NOT NULL,
             "to" BYTEA NOT NULL,
             "from" BYTEA NOT NULL,
             nonce BIGINT NOT NULL,
@@ -201,7 +142,6 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
             history_id SERIAL PRIMARY KEY NOT NULL,
             id UUID NOT NULL,
             relayer_id UUID NOT NULL,
-            api_key CHAR(32) NOT NULL,
             "to" BYTEA NOT NULL,
             "from" BYTEA NOT NULL,
             nonce BIGINT NOT NULL,
@@ -238,9 +178,6 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
         END;
         $$;
 
-        -- Rate Limiting Tables
-        
-        -- Store rate limit rules (from config + runtime overrides)
         CREATE TABLE IF NOT EXISTS rate_limit_rules (
             id SERIAL PRIMARY KEY,
             user_identifier VARCHAR(255) NOT NULL, -- Address, relayer_id, or special identifier
@@ -253,7 +190,6 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
             UNIQUE(user_identifier, rule_type)
         );
 
-        -- Track rate limit usage in time windows
         CREATE TABLE IF NOT EXISTS rate_limit_usage (
             id SERIAL PRIMARY KEY,
             user_identifier VARCHAR(255) NOT NULL,
@@ -265,39 +201,33 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
             UNIQUE(user_identifier, rule_type, window_start)
         );
 
-        -- Index for fast lookups during rate limit checks
         CREATE INDEX IF NOT EXISTS idx_rate_limit_usage_lookup 
         ON rate_limit_usage(user_identifier, rule_type, window_start);
 
-        -- Index for cleanup of old usage records
         CREATE INDEX IF NOT EXISTS idx_rate_limit_usage_cleanup 
         ON rate_limit_usage(window_start);
 
-        -- Store transaction metadata for analytics and user tracking
         CREATE TABLE IF NOT EXISTS transaction_rate_limit_metadata (
             id SERIAL PRIMARY KEY,
             transaction_hash VARCHAR(66),
             relayer_id UUID,
-            end_user_address VARCHAR(42), -- The actual end user if determinable
-            detection_method VARCHAR(20), -- 'header', 'eip2771', 'fallback'
-            transaction_type VARCHAR(20), -- 'direct', 'gasless', 'automated'
+            end_user_address VARCHAR(42),
+            detection_method VARCHAR(20),
+            transaction_type VARCHAR(20),
             gas_used BIGINT,
-            rate_limits_applied JSONB, -- Which rate limits were checked
+            rate_limits_applied JSONB,
             created_at TIMESTAMPTZ DEFAULT NOW()
         );
 
-        -- Index for querying transaction metadata
         CREATE INDEX IF NOT EXISTS idx_transaction_metadata_user 
         ON transaction_rate_limit_metadata(end_user_address, created_at);
 
         CREATE INDEX IF NOT EXISTS idx_transaction_metadata_relayer 
         ON transaction_rate_limit_metadata(relayer_id, created_at);
 
-        -- Function to clean up old rate limit usage records
         CREATE OR REPLACE FUNCTION cleanup_old_rate_limit_usage()
         RETURNS void AS $$
         BEGIN
-            -- Delete usage records older than 24 hours
             DELETE FROM rate_limit_usage 
             WHERE window_start < NOW() - INTERVAL '24 hours';
         END;

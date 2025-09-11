@@ -3,7 +3,6 @@ use std::sync::Arc;
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
-    middleware::from_fn,
     routing::{delete, get, post, put},
     Json, Router,
 };
@@ -12,7 +11,7 @@ use serde::Deserialize;
 use super::types::User;
 use crate::{
     app_state::AppState,
-    authentication::{guards::admin_jwt_guard, types::JwtRole},
+    authentication::types::JwtRole,
     rrelayer_error,
     shared::common_types::{EvmAddress, PagingContext, PagingQuery, PagingResult},
 };
@@ -77,10 +76,11 @@ async fn delete_user(
 }
 
 pub fn create_user_routes() -> Router<Arc<AppState>> {
-    Router::new()
+    let admin_routes = Router::new()
         .route("/", get(get_users))
         .route("/edit", put(edit_user))
         .route("/add", post(add_user))
-        .route("/:user", delete(delete_user))
-        .route_layer(from_fn(admin_jwt_guard))
+        .route("/:user", delete(delete_user));
+
+    admin_routes
 }

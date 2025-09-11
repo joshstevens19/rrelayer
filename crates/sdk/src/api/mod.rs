@@ -5,7 +5,7 @@ mod network;
 mod relayer;
 mod sign;
 mod transaction;
-mod types;
+pub mod types;
 pub use types::{ApiResult, ApiSdkError};
 mod user;
 

@@ -1,4 +1,4 @@
-use std::{path::PathBuf, str::FromStr};
+use std::{env, path::PathBuf, str::FromStr};
 
 use clap::Parser;
 use rrelayer_core::{load_env_from_project_path, setup_info_logger};
@@ -8,7 +8,7 @@ use crate::commands::clone;
 use crate::{
     cli_interface::{Cli, Commands},
     commands::{
-        allowlist, api_key, auth, balance, config, create, init, keystore,
+        allowlist, auth, balance, config, create, init, keystore,
         keystore::ProjectLocation, list, network, sign, start, tx, user,
     },
     console::print_error_message,
@@ -43,6 +43,23 @@ fn resolve_path(override_path: &Option<String>) -> Result<PathBuf, String> {
     };
 
     path.canonicalize().map_err(|e| format!("Failed to resolve path '{}': {}", path.display(), e))
+}
+
+/// Creates an SDK instance with basic auth credentials from environment variables.
+///
+/// # Arguments
+/// * `server_url` - The server URL to connect to
+///
+/// # Returns
+/// * `Ok(SDK)` - Configured SDK instance with basic auth
+/// * `Err(String)` - Error message if environment variables are missing
+fn create_sdk_with_basic_auth(server_url: String) -> Result<SDK, String> {
+    let username = env::var("RRELAYER_AUTH_USERNAME")
+        .map_err(|_| "Missing RRELAYER_AUTH_USERNAME environment variable".to_string())?;
+    let password = env::var("RRELAYER_AUTH_PASSWORD")
+        .map_err(|_| "Missing RRELAYER_AUTH_PASSWORD environment variable".to_string())?;
+    
+    Ok(SDK::new(server_url, username, password))
 }
 
 /// Main entry point for the rrelayer CLI application.
@@ -81,7 +98,8 @@ async fn main() -> Result<(), CliError> {
             load_env_from_project_path(&resolved_path);
 
             let project_location = ProjectLocation::new(resolved_path);
-            let mut sdk = SDK::new(project_location.get_api_url()?);
+            let mut sdk = create_sdk_with_basic_auth(project_location.get_api_url()?)
+                .map_err(|e| CliError::Authentication(e))?;
 
             network::handle_network(command, &project_location, &mut sdk).await?;
         }
@@ -90,7 +108,8 @@ async fn main() -> Result<(), CliError> {
             load_env_from_project_path(&resolved_path);
 
             let project_location = ProjectLocation::new(resolved_path);
-            let mut sdk = SDK::new(project_location.get_api_url()?);
+            let mut sdk = create_sdk_with_basic_auth(project_location.get_api_url()?)
+                .map_err(|e| CliError::Authentication(e))?;
 
             list::handle_list(network, &project_location, &mut sdk).await?;
         }
@@ -99,7 +118,8 @@ async fn main() -> Result<(), CliError> {
             load_env_from_project_path(&resolved_path);
 
             let project_location = ProjectLocation::new(resolved_path);
-            let mut sdk = SDK::new(project_location.get_api_url()?);
+            let mut sdk = create_sdk_with_basic_auth(project_location.get_api_url()?)
+                .map_err(|e| CliError::Authentication(e))?;
 
             config::handle_config(command, &project_location, &mut sdk).await?;
         }
@@ -108,25 +128,18 @@ async fn main() -> Result<(), CliError> {
             load_env_from_project_path(&resolved_path);
 
             let project_location = ProjectLocation::new(resolved_path);
-            let mut sdk = SDK::new(project_location.get_api_url()?);
+            let mut sdk = create_sdk_with_basic_auth(project_location.get_api_url()?)
+                .map_err(|e| CliError::Authentication(e))?;
 
             balance::handle_balance(relayer, token, &project_location, &mut sdk).await?;
-        }
-        Commands::ApiKey { path, command } => {
-            let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;
-            load_env_from_project_path(&resolved_path);
-
-            let project_location = ProjectLocation::new(resolved_path);
-            let mut sdk = SDK::new(project_location.get_api_url()?);
-
-            api_key::handle_api_key(command, &project_location, &mut sdk).await?;
         }
         Commands::Allowlist { path, command } => {
             let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;
             load_env_from_project_path(&resolved_path);
 
             let project_location = ProjectLocation::new(resolved_path);
-            let mut sdk = SDK::new(project_location.get_api_url()?);
+            let mut sdk = create_sdk_with_basic_auth(project_location.get_api_url()?)
+                .map_err(|e| CliError::Authentication(e))?;
 
             allowlist::handle_allowlist(command, &project_location, &mut sdk).await?;
         }
@@ -135,7 +148,8 @@ async fn main() -> Result<(), CliError> {
             load_env_from_project_path(&resolved_path);
 
             let project_location = ProjectLocation::new(resolved_path);
-            let mut sdk = SDK::new(project_location.get_api_url()?);
+            let mut sdk = create_sdk_with_basic_auth(project_location.get_api_url()?)
+                .map_err(|e| CliError::Authentication(e))?;
 
             create::handle_create(name, network, &project_location, &mut sdk).await?;
         }
@@ -144,7 +158,8 @@ async fn main() -> Result<(), CliError> {
             load_env_from_project_path(&resolved_path);
 
             let project_location = ProjectLocation::new(resolved_path);
-            let mut sdk = SDK::new(project_location.get_api_url()?);
+            let mut sdk = create_sdk_with_basic_auth(project_location.get_api_url()?)
+                .map_err(|e| CliError::Authentication(e))?;
 
             clone::handle_clone(relayer, name, network, &project_location, &mut sdk).await?;
         }
@@ -153,7 +168,8 @@ async fn main() -> Result<(), CliError> {
             load_env_from_project_path(&resolved_path);
 
             let project_location = ProjectLocation::new(resolved_path);
-            let mut sdk = SDK::new(project_location.get_api_url()?);
+            let mut sdk = create_sdk_with_basic_auth(project_location.get_api_url()?)
+                .map_err(|e| CliError::Authentication(e))?;
 
             sign::handle_sign(command, &project_location, &mut sdk).await?;
         }
@@ -162,7 +178,8 @@ async fn main() -> Result<(), CliError> {
             load_env_from_project_path(&resolved_path);
 
             let project_location = ProjectLocation::new(resolved_path);
-            let mut sdk = SDK::new(project_location.get_api_url()?);
+            let mut sdk = create_sdk_with_basic_auth(project_location.get_api_url()?)
+                .map_err(|e| CliError::Authentication(e))?;
 
             tx::handle_tx(command, &project_location, &mut sdk).await?;
         }
@@ -171,7 +188,8 @@ async fn main() -> Result<(), CliError> {
             load_env_from_project_path(&resolved_path);
 
             let project_location = ProjectLocation::new(resolved_path);
-            let mut sdk = SDK::new(project_location.get_api_url()?);
+            let mut sdk = create_sdk_with_basic_auth(project_location.get_api_url()?)
+                .map_err(|e| CliError::Authentication(e))?;
 
             user::handle_user(command, &project_location, &mut sdk).await?;
         }

@@ -3,7 +3,6 @@ use std::sync::Arc;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
-    middleware::from_fn,
     routing::{get, put},
     Json, Router,
 };
@@ -16,11 +15,7 @@ use super::{
     },
     types::{ChainId, Network, NetworksFilterState},
 };
-use crate::{
-    app_state::AppState,
-    authentication::guards::{admin_jwt_guard, read_only_or_above_jwt_guard},
-    rrelayer_error,
-};
+use crate::{app_state::AppState, rrelayer_error};
 
 /// HTTP handler for retrieving all networks.
 ///
@@ -173,8 +168,6 @@ pub fn create_network_routes() -> Router<Arc<AppState>> {
         .route("/", get(networks))
         .route("/enabled", get(enabled_networks))
         .route("/disabled", get(disabled_networks))
-        .route_layer(from_fn(read_only_or_above_jwt_guard))
         .route("/disable/:chain_id", put(disable_network))
         .route("/enable/:chain_id", put(enable_network))
-        .route_layer(from_fn(admin_jwt_guard))
 }

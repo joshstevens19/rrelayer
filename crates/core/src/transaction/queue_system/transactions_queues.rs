@@ -396,7 +396,6 @@ impl TransactionsQueues {
                 sent_with_max_priority_fee_per_gas: None,
                 sent_with_max_fee_per_gas: None,
                 is_noop: false,
-                from_api_key: transaction_to_send.from_api_key.clone(),
                 sent_with_gas: None,
                 sent_with_blob_gas: None,
                 external_id: transaction_to_send.external_id.clone(),
