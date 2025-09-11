@@ -2,17 +2,22 @@
 
 // copy from docs
 
-# PROD RUN
+# TODO LIST
 
-RUSTFLAGS="-C target-cpu=native" cargo run --profile maxperf --features jemalloc
-
-# AWS env
-
-must be a string
-
-```bash
-AWS_ACCESS_KEY_ID: Your access key ID.
-AWS_SECRET_ACCESS_KEY: Your secret access key.
-AWS_SESSION_TOKEN(optional): Required only if you are using temporary credentials, for example, credentials for an IAM role obtained through AWS STS.
-AWS_DEFAULT_REGION(optional): The AWS region where your Secrets Manager secrets are stored. While your code attempts to default to "us-east-1" if no region is found in the environment or configuration, setting this environment variable can provide an explicit default.
-```
+- Save signing text in the database
+- Endpoint to bring back the list of signing text you did and when
+- Save signing typed data in the database
+- Endpoint to bring back the list of signing text you did and when
+- Testing sending all tx flows with
+  - Raw signer
+  - Aws key manager
+  - GCP key manager
+  - KMS
+  - Privy
+- Test webhooks
+- Test automatic top-ups
+- Test safe proxy
+- Change the TS sdk to work with the changes in the playground (copy make files to allow them to be runnable)
+- Finish documentation
+- Create CLI (copy from rindexer)
+- Publish NPM packages and make repo public

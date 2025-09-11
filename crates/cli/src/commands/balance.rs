@@ -80,7 +80,7 @@ pub async fn handle_balance(
                     }
                 };
 
-                println!("Relayer {} token balance: {} {}", relayer_id, token_value, token_symbol);
+                println!("token balance: {} {}", token_value, token_symbol);
 
                 Ok(())
             }

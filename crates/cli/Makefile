@@ -27,42 +27,48 @@ list:
 	cargo run -- list --path $(CURDIR)/../../playground/example
 
 create:
-	cargo run -- create --path $(CURDIR)/../../playground/example relayer1 base
+	cargo run -- create --path $(CURDIR)/../../playground/example relayer1 sepolia_ethereum
 
 clone:
-	cargo run -- clone --path $(CURDIR)/../../playground/example 3c24e942-3109-4516-bd3b-6e2a904ef473 relayer_base2 base
+	cargo run -- clone --path $(CURDIR)/../../playground/example  7c73fbbb-04b1-4a9a-9597-b6b83d891a8f relayer2 sepolia_ethereum
 
 config_get:
-	cargo run -- config --path $(CURDIR)/../../playground/example get 3c24e942-3109-4516-bd3b-6e2a904ef473
+	cargo run -- config --path $(CURDIR)/../../playground/example get 7c73fbbb-04b1-4a9a-9597-b6b83d891a8f
 config_pause:
-	cargo run -- config --path $(CURDIR)/../../playground/example pause 3c24e942-3109-4516-bd3b-6e2a904ef473
+	cargo run -- config --path $(CURDIR)/../../playground/example pause 7c73fbbb-04b1-4a9a-9597-b6b83d891a8f
 config_unpause:
-	cargo run -- config --path $(CURDIR)/../../playground/example unpause 3c24e942-3109-4516-bd3b-6e2a904ef473
+	cargo run -- config --path $(CURDIR)/../../playground/example unpause 7c73fbbb-04b1-4a9a-9597-b6b83d891a8f
+# TODO: How to set back to EIP-1559
 config_gas_latest:
-	cargo run -- config --path $(CURDIR)/../../playground/example gas 3c24e942-3109-4516-bd3b-6e2a904ef473 latest
+	cargo run -- config --path $(CURDIR)/../../playground/example gas 7c73fbbb-04b1-4a9a-9597-b6b83d891a8f latest
 config_gas_legacy:
-	cargo run -- config --path $(CURDIR)/../../playground/example gas 3c24e942-3109-4516-bd3b-6e2a904ef473 legacy
+	cargo run -- config --path $(CURDIR)/../../playground/example gas 7c73fbbb-04b1-4a9a-9597-b6b83d891a8f legacy
+# TODO: How to unset max price
 config_gas_max_price:
-	cargo run -- config --path $(CURDIR)/../../playground/example gas 3c24e942-3109-4516-bd3b-6e2a904ef473 max-price 1000000
+	cargo run -- config --path $(CURDIR)/../../playground/example gas 7c73fbbb-04b1-4a9a-9597-b6b83d891a8f max-price 1000000
 
 balance:
-	cargo run -- balance --path $(CURDIR)/../../playground/example 3c24e942-3109-4516-bd3b-6e2a904ef473
+	cargo run -- balance --path $(CURDIR)/../../playground/example 7c73fbbb-04b1-4a9a-9597-b6b83d891a8f
 
 balance_token:
-	cargo run -- balance --path $(CURDIR)/../../playground/example 3c24e942-3109-4516-bd3b-6e2a904ef473 --token 0x73d219B3881E481394DA6B5008A081d623992200
+	cargo run -- balance --path $(CURDIR)/../../playground/example 7c73fbbb-04b1-4a9a-9597-b6b83d891a8f --token 0x73d219B3881E481394DA6B5008A081d623992200
 
 allowlist_create:
-	cargo run -- allowlist --path $(CURDIR)/../../playground/example add 3c24e942-3109-4516-bd3b-6e2a904ef473 0x73d219B3881E481394DA6B5008A081d623992200
+	cargo run -- allowlist --path $(CURDIR)/../../playground/example add 7c73fbbb-04b1-4a9a-9597-b6b83d891a8f 0x73d219B3881E481394DA6B5008A081d623992200
 allowlist__list:
-	cargo run -- allowlist --path $(CURDIR)/../../playground/example list 3c24e942-3109-4516-bd3b-6e2a904ef473
+	cargo run -- allowlist --path $(CURDIR)/../../playground/example list 7c73fbbb-04b1-4a9a-9597-b6b83d891a8f
 allowlist_delete:
-	cargo run -- allowlist --path $(CURDIR)/../../playground/example delete 3c24e942-3109-4516-bd3b-6e2a904ef473 0x73d219B3881E481394DA6B5008A081d623992200
+	cargo run -- allowlist --path $(CURDIR)/../../playground/example delete 7c73fbbb-04b1-4a9a-9597-b6b83d891a8f 0x73d219B3881E481394DA6B5008A081d623992200
 
+# TODO: Save these signs in the database
 sign_text:
-	cargo run -- sign --path $(CURDIR)/../../playground/example text e0aa336b-d936-499d-8873-f7ff0d687702 "hello baby"
+	cargo run -- sign --path $(CURDIR)/../../playground/example text 7c73fbbb-04b1-4a9a-9597-b6b83d891a8f "hello baby"
+# TODO: Save these signs in the database
 sign_typed_data:
-	cargo run -- sign --path $(CURDIR)/../../playground/example typed-data e0aa336b-d936-499d-8873-f7ff0d687702 '{"types":{"EIP712Domain":[{"name":"name","type":"string"},{"name":"version","type":"string"},{"name":"chainId","type":"uint256"},{"name":"verifyingContract","type":"address"}],"Person":[{"name":"name","type":"string"},{"name":"wallet","type":"address"}],"Mail":[{"name":"from","type":"Person"},{"name":"to","type":"Person"},{"name":"contents","type":"string"}]},"primaryType":"Mail","domain":{"name":"Ether Mail","version":"1","chainId":1,"verifyingContract":"0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC"},"message":{"from":{"name":"Cow","wallet":"0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826"},"to":{"name":"Bob","wallet":"0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB"},"contents":"Hello, Bob!"}}'
+	cargo run -- sign --path $(CURDIR)/../../playground/example typed-data 7c73fbbb-04b1-4a9a-9597-b6b83d891a8f '{"types":{"EIP712Domain":[{"name":"name","type":"string"},{"name":"version","type":"string"},{"name":"chainId","type":"uint256"},{"name":"verifyingContract","type":"address"}],"Person":[{"name":"name","type":"string"},{"name":"wallet","type":"address"}],"Mail":[{"name":"from","type":"Person"},{"name":"to","type":"Person"},{"name":"contents","type":"string"}]},"primaryType":"Mail","domain":{"name":"Ether Mail","version":"1","chainId":1,"verifyingContract":"0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC"},"message":{"from":{"name":"Cow","wallet":"0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826"},"to":{"name":"Bob","wallet":"0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB"},"contents":"Hello, Bob!"}}'
 
+
+# TODO: TEST OUT ALL OF THIS LOGIC
 tx_queue:
 	cargo run -- tx --path $(CURDIR)/../../playground/example queue 3c24e942-3109-4516-bd3b-6e2a904ef473
 tx_get:
