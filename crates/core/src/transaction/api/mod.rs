@@ -37,7 +37,6 @@ use crate::{
 /// # Returns
 /// * `Ok(Json<Option<Transaction>>)` - The transaction if found, None if not found
 /// * `Err(StatusCode)` - INTERNAL_SERVER_ERROR if database query fails
-// TODO! GUARDS
 async fn get_transaction_by_id_api(
     State(state): State<Arc<AppState>>,
     Path(id): Path<TransactionId>,
@@ -70,7 +69,6 @@ pub struct RelayTransactionStatusResult {
 /// # Returns
 /// * `Ok(Json<RelayTransactionStatusResult>)` - Transaction status with hash and receipt
 /// * `Err(StatusCode)` - NOT_FOUND if transaction doesn't exist, INTERNAL_SERVER_ERROR on other failures
-// TODO! GUARDS
 async fn get_transaction_status(
     State(state): State<Arc<AppState>>,
     Path(id): Path<TransactionId>,

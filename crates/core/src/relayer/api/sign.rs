@@ -43,7 +43,6 @@ pub struct SignTextResult {
 /// * `Ok(Json<SignTextResult>)` - The original message and its signature
 /// * `Err(StatusCode::NOT_FOUND)` - If relayer doesn't exist or no provider found
 /// * `Err(StatusCode::INTERNAL_SERVER_ERROR)` - If signing operation fails
-// TODO: handle guard
 async fn sign_text(
     State(state): State<Arc<AppState>>,
     Path(relayer_id): Path<RelayerId>,
@@ -129,7 +128,6 @@ pub struct SignTypedDataResult {
 /// * `Ok(Json<SignTypedDataResult>)` - The signature of the typed data
 /// * `Err(StatusCode::NOT_FOUND)` - If relayer doesn't exist or no provider found
 /// * `Err(StatusCode::INTERNAL_SERVER_ERROR)` - If signing operation fails
-// TODO: handle guard
 async fn sign_typed_data(
     State(state): State<Arc<AppState>>,
     Path(relayer_id): Path<RelayerId>,
