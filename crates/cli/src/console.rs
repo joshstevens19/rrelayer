@@ -11,6 +11,14 @@ pub fn print_error_message(error_message: &str) {
     println!("{}", error_message.red());
 }
 
+/// Prints a success message to the console in green color.
+///
+/// # Arguments
+/// * `success_message` - The success message to display
+pub fn print_success_message(success_message: &str) {
+    println!("{}", success_message.green());
+}
+
 /// Prints a formatted table to the console with optional title and footer.
 ///
 /// Creates a nicely formatted table using prettytable with bold headers

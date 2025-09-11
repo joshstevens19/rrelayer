@@ -5,9 +5,7 @@ use rrelayer_core::{
 };
 use rrelayer_sdk::SDK;
 
-use crate::{
-    commands::error::AllowlistError, console::print_table,
-};
+use crate::{commands::error::AllowlistError, console::print_table};
 
 #[derive(Subcommand)]
 pub enum AllowlistCommand {

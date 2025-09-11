@@ -8,7 +8,7 @@ use rrelayer_core::{
 use serde_yaml;
 
 use crate::project_location::ProjectLocation;
-use crate::{commands::error::InitError, console::print_error_message};
+use crate::{commands::error::InitError, print_error_message, print_success_message};
 
 fn write_docker_compose(path: &Path) -> Result<(), WriteFileError> {
     write_file(&path.join("docker-compose.yml"), generate_docker_file())
@@ -96,10 +96,10 @@ pub async fn handle_init(path: &Path) -> Result<(), InitError> {
 
     write_gitignore(&project_path).map_err(InitError::ConfigWrite)?;
 
-    println!(
+    print_success_message(&format!(
         "\nProject '{}' initialized successfully! note we advise to not use the RAW_DANGEROUS_MNEMONIC in production and use one of the secure key management signing keys. Alongside replace RRELAYER_AUTH_USERNAME and RRELAYER_AUTH_PASSWORD in the .env",
         project_name
-    );
+    ));
 
     Ok(())
 }

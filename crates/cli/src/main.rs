@@ -10,7 +10,6 @@ use crate::project_location::ProjectLocation;
 use crate::{
     cli_interface::{Cli, Commands},
     commands::{allowlist, auth, balance, config, create, init, list, network, sign, start, tx},
-    console::print_error_message,
     error::CliError,
 };
 
@@ -18,6 +17,7 @@ mod authentication;
 mod cli_interface;
 mod commands;
 mod console;
+pub use console::{print_error_message, print_success_message};
 mod error;
 mod project_location;
 
