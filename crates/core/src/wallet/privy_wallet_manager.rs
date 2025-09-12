@@ -110,7 +110,7 @@ impl WalletManagerTrait for PrivyWalletManager {
     async fn create_wallet(
         &self,
         wallet_index: u32,
-        chain_id: &ChainId,
+        _chain_id: &ChainId,
     ) -> Result<EvmAddress, WalletError> {
         self.load_wallets().await?;
 
