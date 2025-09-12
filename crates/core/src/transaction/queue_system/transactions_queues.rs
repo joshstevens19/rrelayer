@@ -752,8 +752,8 @@ impl TransactionsQueues {
                                 self.invalidate_transaction_cache(&transaction.id).await;
 
                                 Err(ProcessPendingTransactionError::TransactionEstimateGasError(
-                                    alloy::transports::RpcError::Transport(
-                                        alloy::transports::TransportErrorKind::Custom(error.into()),
+                                    RpcError::Transport(
+                                        TransportErrorKind::Custom(error.into()),
                                     ),
                                 ))
                             }
