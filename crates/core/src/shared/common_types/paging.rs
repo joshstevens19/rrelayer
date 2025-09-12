@@ -58,8 +58,8 @@ impl PagingContext {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct PagingResult<TResult: Serialize> {
     pub items: Vec<TResult>,
-    next: Option<PagingContext>,
-    previous: Option<PagingContext>,
+    pub next: Option<PagingContext>,
+    pub previous: Option<PagingContext>,
 }
 
 impl<TResult: Serialize> PagingResult<TResult> {

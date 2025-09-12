@@ -1,19 +1,25 @@
-use std::sync::Arc;
-
-use alloy::{dyn_abi::TypedData, primitives::PrimitiveSignature};
+use alloy::dyn_abi::TypedData;
+use alloy::primitives::PrimitiveSignature;
+use axum::routing::post;
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
-    routing::post,
+    routing::get,
     Json, Router,
 };
-use serde::{Deserialize, Serialize};
-
+use google_secretmanager1::client::serde_with::serde_derive::Serialize;
+use serde::Deserialize;
+use std::sync::Arc;
+use tracing::error;
+use crate::relayer::get_relayer_provider_context_by_relayer_id;
+use crate::signing::db::read::{SignedTextHistory, SignedTypedDataHistory};
+use crate::signing::db::write::{RecordSignedTextRequest, RecordSignedTypedDataRequest};
+use crate::user_rate_limiting::UserRateLimitError;
 use crate::{
     app_state::AppState,
-    relayer::{get_relayer_provider_context_by_relayer_id, types::RelayerId},
+    relayer::types::RelayerId,
     rrelayer_error,
-    user_rate_limiting::UserRateLimitError,
+    shared::common_types::{PagingContext, PagingResult},
 };
 
 #[derive(Debug, Deserialize)]
@@ -105,6 +111,17 @@ async fn sign_text(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
+    let record_request = RecordSignedTextRequest {
+        relayer_id: relayer_id.into(),
+        message: sign.text.clone(),
+        signature: signature.into(),
+        chain_id: relayer_provider_context.provider.chain_id.into(),
+    };
+
+    if let Err(e) = state.db.record_signed_text(&record_request).await {
+        rrelayer_error!("Failed to record signed text: {}", e);
+    }
+
     Ok(Json(SignTextResult { message_signed: sign.text, signature }))
 }
 
@@ -133,9 +150,8 @@ async fn sign_typed_data(
     Path(relayer_id): Path<RelayerId>,
     Json(typed_data): Json<TypedData>,
 ) -> Result<Json<SignTypedDataResult>, StatusCode> {
-    // Apply rate limiting for signing operations (AWS KMS costs)
     if let Some(ref user_rate_limiter) = state.user_rate_limiter {
-        let user_identifier = format!("{:?}", relayer_id); // Use relayer ID as signing operations are relayer-specific
+        let user_identifier = format!("{:?}", relayer_id);
 
         match user_rate_limiter
             .check_rate_limit(&user_identifier, "signing_operations_per_minute", 1)
@@ -190,19 +206,105 @@ async fn sign_typed_data(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
+    // Record the signing activity in the database
+    let record_request = RecordSignedTypedDataRequest {
+        relayer_id: relayer_id.into(),
+        domain_data: serde_json::to_value(&typed_data.domain).unwrap_or_default(),
+        message_data: serde_json::to_value(&typed_data.message).unwrap_or_default(),
+        primary_type: typed_data.primary_type.clone(),
+        signature: signature.into(),
+        chain_id: relayer_provider_context.provider.chain_id.into(),
+    };
+
+    if let Err(e) = state.db.record_signed_typed_data(&record_request).await {
+        rrelayer_error!("Failed to record signed typed data: {}", e);
+    }
+
     Ok(Json(SignTypedDataResult { signature }))
 }
 
-/// Creates and configures the HTTP routes for relayer signing operations.
+#[derive(Debug, Deserialize)]
+struct GetSigningHistoryQuery {
+    limit: u32,
+    offset: u32,
+}
+
+/// Retrieves the history of signed text messages with optional filtering.
 ///
-/// This function sets up the REST API endpoints for signing operations using relayers,
-/// including text message signing and EIP-712 typed data signing.
+/// This endpoint allows querying signed text message history by relayer ID,
+/// signer address, and supports pagination.
+///
+/// # Query Parameters
+/// * `relayer_id` - Optional UUID to filter by specific relayer
+/// * `signer_address` - Optional Ethereum address to filter by signer
+/// * `limit` - Optional limit for number of results (default: 50)
+/// * `offset` - Optional offset for pagination (default: 0)
 ///
 /// # Returns
-/// * A configured Axum Router with signing endpoints
-pub fn create_sign_routes() -> Router<Arc<AppState>> {
+/// * `Ok(Json<SigningHistoryResponse<SignedTextHistory>>)` - List of signed text messages
+/// * `Err(StatusCode::BAD_REQUEST)` - If query parameters are invalid
+/// * `Err(StatusCode::INTERNAL_SERVER_ERROR)` - If database query fails
+async fn get_signed_text_history(
+    State(state): State<Arc<AppState>>,
+    Path(relayer_id): Path<RelayerId>,
+    Query(query): Query<GetSigningHistoryQuery>,
+) -> Result<Json<PagingResult<SignedTextHistory>>, StatusCode> {
+    let paging_context = PagingContext::new(query.limit, query.offset);
+
+    let result = state
+        .db
+        .get_signed_text_history(&relayer_id, &paging_context)
+        .await
+        .map_err(|e| {
+            error!("{}", e.to_string());
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    Ok(Json(result))
+}
+
+/// Retrieves the history of signed typed data messages with optional filtering.
+///
+/// This endpoint allows querying signed EIP-712 typed data history by relayer ID,
+/// signer address, and supports pagination.
+///
+/// # Query Parameters
+/// * `relayer_id` - Optional UUID to filter by specific relayer
+/// * `signer_address` - Optional Ethereum address to filter by signer
+/// * `limit` - Optional limit for number of results (default: 50)
+/// * `offset` - Optional offset for pagination (default: 0)
+///
+/// # Returns
+/// * `Ok(Json<SigningHistoryResponse<SignedTypedDataHistory>>)` - List of signed typed data messages
+/// * `Err(StatusCode::BAD_REQUEST)` - If query parameters are invalid
+/// * `Err(StatusCode::INTERNAL_SERVER_ERROR)` - If database query fails
+async fn get_signed_typed_data_history(
+    State(state): State<Arc<AppState>>,
+    Path(relayer_id): Path<RelayerId>,
+    Query(query): Query<GetSigningHistoryQuery>,
+) -> Result<Json<PagingResult<SignedTypedDataHistory>>, StatusCode> {
+    let paging_context = PagingContext::new(query.limit, query.offset);
+
+    let result = state
+        .db
+        .get_signed_typed_data_history(&relayer_id, &paging_context)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(Json(result))
+}
+
+/// Creates and configures the HTTP routes for signing history operations.
+///
+/// This function sets up the REST API endpoints for querying signing history,
+/// including both text message and typed data signing records.
+///
+/// # Returns
+/// * A configured Axum Router with signing history endpoints
+pub fn create_signing_history_routes() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/:relayer_id/sign/message", post(sign_text))
-        .route("/:relayer_id/sign/typed-data", post(sign_typed_data))
-    // .route_layer(from_fn(relayer_api_key_guard))
+        .route("/:relayer_id/message", post(sign_text))
+        .route("/:relayer_id/typed-data", post(sign_typed_data))
+        .route("/:relayer_id/text-history", get(get_signed_text_history))
+        .route("/:relayer_id/typed-data-history", get(get_signed_typed_data_history))
 }

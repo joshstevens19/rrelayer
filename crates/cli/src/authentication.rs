@@ -20,9 +20,7 @@ pub async fn check_authenticate(sdk: &SDK) -> Result<(), CliError> {
     check_api_running(sdk).await?;
 
     match sdk.test_auth().await {
-        Ok(_) => {
-            Ok(())
-        }
+        Ok(_) => Ok(()),
         Err(e) => {
             eprintln!("❌ Basic authentication failed: {}", e);
             eprintln!(

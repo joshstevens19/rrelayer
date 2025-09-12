@@ -12,3 +12,6 @@ pub use block_number::BlockNumber;
 
 mod wallet_or_provider_error;
 pub use wallet_or_provider_error::WalletOrProviderError;
+
+mod signature;
+pub use signature::Signature;

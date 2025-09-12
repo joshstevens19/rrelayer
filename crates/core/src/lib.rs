@@ -25,6 +25,7 @@ mod docker;
 mod environment;
 mod file;
 mod schema;
+pub mod signing;
 pub mod transaction;
 mod wallet;
 pub use wallet::{generate_seed_phrase, AwsKmsWalletManager, WalletError};

@@ -1,9 +1,8 @@
-pub mod sign;
 use std::sync::Arc;
 
 use axum::{
     extract::{Path, Query, State},
-    http::{StatusCode},
+    http::StatusCode,
     routing::{delete, get, post, put},
     Json, Router,
 };
@@ -17,7 +16,6 @@ use crate::{
     network::types::ChainId,
     provider::{chain_enabled, find_provider_for_chain_id},
     relayer::{
-        api::sign::create_sign_routes,
         cache::invalidate_relayer_cache,
         get_relayer,
         types::{Relayer, RelayerId},
@@ -554,5 +552,4 @@ pub fn create_relayer_routes() -> Router<Arc<AppState>> {
         .route("/:relayer_id/allowlists/:address", post(add_allowlist_address))
         .route("/:relayer_id/allowlists/:address", delete(delete_allowlist_address))
         .route("/:relayer_id/gas/eip1559/:enabled", put(update_relay_eip1559_status))
-        .nest("/", create_sign_routes())
 }

@@ -17,6 +17,8 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
         CREATE SCHEMA IF NOT EXISTS public;
         CREATE SCHEMA IF NOT EXISTS network;
         CREATE SCHEMA IF NOT EXISTS relayer;
+        CREATE SCHEMA IF NOT EXISTS signing;
+        CREATE SCHEMA IF NOT EXISTS rate_limit;
 
         CREATE TABLE IF NOT EXISTS network.record (
             chain_id BIGINT PRIMARY KEY NOT NULL,
@@ -148,10 +150,8 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
                    REFERENCES relayer.record (id)
         );
 
-        CREATE SCHEMA IF NOT EXISTS rate_limit;
-
         CREATE TABLE IF NOT EXISTS rate_limit.rules (
-            id SERIAL PRIMARY KEY,
+            id SERIAL PRIMARY KEY NOT NULL,
             user_identifier VARCHAR(255) NOT NULL, -- Address, relayer_id, or special identifier
             rule_type VARCHAR(50) NOT NULL, -- 'transactions_per_minute', 'gas_per_hour', etc.
             limit_value BIGINT NOT NULL,
@@ -163,7 +163,7 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
         );
 
         CREATE TABLE IF NOT EXISTS rate_limit.usage (
-            id SERIAL PRIMARY KEY,
+            id SERIAL PRIMARY KEY NOT NULL,
             user_identifier VARCHAR(255) NOT NULL,
             rule_type VARCHAR(50) NOT NULL,
             window_start TIMESTAMPTZ NOT NULL,
@@ -180,7 +180,7 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
         ON rate_limit.usage(window_start);
 
         CREATE TABLE IF NOT EXISTS rate_limit.transaction_metadata (
-            id SERIAL PRIMARY KEY,
+            id SERIAL PRIMARY KEY NOT NULL,
             transaction_hash VARCHAR(66),
             relayer_id UUID,
             end_user_address VARCHAR(42),
@@ -196,6 +196,38 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
 
         CREATE INDEX IF NOT EXISTS idx_transaction_metadata_relayer 
         ON rate_limit.transaction_metadata(relayer_id, created_at);
+
+        CREATE TABLE IF NOT EXISTS signing.text_history (
+            id SERIAL PRIMARY KEY NOT NULL,
+            relayer_id UUID NOT NULL,
+            message TEXT NOT NULL,
+            signature BYTEA NOT NULL,
+            chain_id BIGINT NOT NULL,
+            signed_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+            CONSTRAINT fk_signing_text_relayer_id
+                FOREIGN KEY (relayer_id) 
+                REFERENCES relayer.record (id)
+        );
+
+        CREATE TABLE IF NOT EXISTS signing.typed_data_history (
+            id SERIAL PRIMARY KEY NOT NULL,
+            relayer_id UUID NOT NULL,
+            domain_data JSONB NOT NULL,
+            message_data JSONB NOT NULL,
+            primary_type VARCHAR(100) NOT NULL,
+            signature BYTEA NOT NULL,
+            chain_id BIGINT NOT NULL,
+            signed_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+            CONSTRAINT fk_signing_typed_data_relayer_id
+                FOREIGN KEY (relayer_id)
+                REFERENCES relayer.record (id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_signing_text_relayer_time 
+        ON signing.text_history(relayer_id, signed_at DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_signing_typed_data_relayer_time 
+        ON signing.typed_data_history(relayer_id, signed_at DESC);
 
         CREATE OR REPLACE FUNCTION cleanup_old_rate_limit_usage()
         RETURNS void AS $$

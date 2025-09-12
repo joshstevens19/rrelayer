@@ -34,6 +34,7 @@ use crate::{
     schema::apply_schema,
     setup_info_logger,
     shared::cache::Cache,
+    signing::create_signing_history_routes,
     transaction::{
         api::create_transactions_routes,
         queue_system::{
@@ -252,6 +253,7 @@ async fn start_api(
         .nest("/networks", create_network_routes())
         .nest("/relayers", create_relayer_routes())
         .nest("/transactions", create_transactions_routes())
+        .nest("/signing", create_signing_history_routes())
         .route_layer(middleware::from_fn(basic_auth_guard))
         .layer(middleware::from_fn(activity_logger))
         .layer(cors)

@@ -1,5 +1,5 @@
 help:
-	cargo run -- --help
+	cargo run -- sign --help
 init:
 	cargo run -- init --path $(CURDIR)/../../playground
 start:
@@ -60,13 +60,14 @@ allowlist__list:
 allowlist_delete:
 	cargo run -- allowlist --path $(CURDIR)/../../playground/example delete 7c73fbbb-04b1-4a9a-9597-b6b83d891a8f 0x73d219B3881E481394DA6B5008A081d623992200
 
-# TODO: Save these signs in the database
 sign_text:
-	cargo run -- sign --path $(CURDIR)/../../playground/example text 7c73fbbb-04b1-4a9a-9597-b6b83d891a8f "hello baby"
-# TODO: Save these signs in the database
+	cargo run -- sign --path $(CURDIR)/../../playground/example text 7ed18611-1739-4a5f-99e3-e70356029984 "hello baby"
+sign_text_history:
+	cargo run -- sign --path $(CURDIR)/../../playground/example text-history 7ed18611-1739-4a5f-99e3-e70356029984
 sign_typed_data:
-	cargo run -- sign --path $(CURDIR)/../../playground/example typed-data 7c73fbbb-04b1-4a9a-9597-b6b83d891a8f '{"types":{"EIP712Domain":[{"name":"name","type":"string"},{"name":"version","type":"string"},{"name":"chainId","type":"uint256"},{"name":"verifyingContract","type":"address"}],"Person":[{"name":"name","type":"string"},{"name":"wallet","type":"address"}],"Mail":[{"name":"from","type":"Person"},{"name":"to","type":"Person"},{"name":"contents","type":"string"}]},"primaryType":"Mail","domain":{"name":"Ether Mail","version":"1","chainId":1,"verifyingContract":"0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC"},"message":{"from":{"name":"Cow","wallet":"0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826"},"to":{"name":"Bob","wallet":"0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB"},"contents":"Hello, Bob!"}}'
-
+	cargo run -- sign --path $(CURDIR)/../../playground/example typed-data 7ed18611-1739-4a5f-99e3-e70356029984 '{"types":{"EIP712Domain":[{"name":"name","type":"string"},{"name":"version","type":"string"},{"name":"chainId","type":"uint256"},{"name":"verifyingContract","type":"address"}],"Person":[{"name":"name","type":"string"},{"name":"wallet","type":"address"}],"Mail":[{"name":"from","type":"Person"},{"name":"to","type":"Person"},{"name":"contents","type":"string"}]},"primaryType":"Mail","domain":{"name":"Ether Mail","version":"1","chainId":1,"verifyingContract":"0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC"},"message":{"from":{"name":"Cow","wallet":"0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826"},"to":{"name":"Bob","wallet":"0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB"},"contents":"Hello, Bob!"}}'
+sign_typed_data_history:
+	cargo run -- sign --path $(CURDIR)/../../playground/example typed-data-history 7ed18611-1739-4a5f-99e3-e70356029984
 
 # TODO: TEST OUT ALL OF THIS LOGIC
 tx_queue:

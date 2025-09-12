@@ -4,10 +4,6 @@
 
 # TODO LIST
 
-- Save signing text in the database
-- Endpoint to bring back the list of signing text you did and when
-- Save signing typed data in the database
-- Endpoint to bring back the list of signing text you did and when
 - Testing sending all tx flows with
   - Raw signer
   - Aws key manager

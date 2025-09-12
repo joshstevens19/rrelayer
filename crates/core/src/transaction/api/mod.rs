@@ -394,7 +394,7 @@ async fn get_relayer_transactions(
 /// * `Ok(Json<usize>)` - The count of pending transactions
 async fn get_transactions_pending_count(
     State(state): State<Arc<AppState>>,
-    Path(relayer_id): Path<RelayerId>
+    Path(relayer_id): Path<RelayerId>,
 ) -> Result<Json<usize>, StatusCode> {
     let count =
         state.transactions_queues.lock().await.pending_transactions_count(&relayer_id).await;
