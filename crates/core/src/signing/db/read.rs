@@ -54,11 +54,7 @@ impl PostgresClient {
                     LIMIT $2
                     OFFSET $3;
                 ",
-                &[
-                    &relayer_id,
-                    &(paging_context.limit as i64),
-                    &(paging_context.offset as i64)
-                ],
+                &[&relayer_id, &(paging_context.limit as i64), &(paging_context.offset as i64)],
             )
             .await?;
 

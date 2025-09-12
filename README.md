@@ -13,6 +13,7 @@
 - Test webhooks
 - Test automatic top-ups
 - Test safe proxy
+- Test user rate limiting
 - Change the TS sdk to work with the changes in the playground (copy make files to allow them to be runnable)
 - Finish documentation
 - Create CLI (copy from rindexer)

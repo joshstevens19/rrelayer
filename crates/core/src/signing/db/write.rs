@@ -43,17 +43,11 @@ impl PostgresClient {
         "#;
 
         let conn = self.pool.get().await?;
-        conn
-            .execute(
-                query,
-                &[
-                    &request.relayer_id,
-                    &request.message,
-                    &request.signature,
-                    &request.chain_id,
-                ],
-            )
-            .await?;
+        conn.execute(
+            query,
+            &[&request.relayer_id, &request.message, &request.signature, &request.chain_id],
+        )
+        .await?;
 
         Ok(())
     }
@@ -76,19 +70,18 @@ impl PostgresClient {
         "#;
 
         let conn = self.pool.get().await?;
-        conn
-            .execute(
-                query,
-                &[
-                    &request.relayer_id,
-                    &request.domain_data,
-                    &request.message_data,
-                    &request.primary_type,
-                    &request.signature,
-                    &request.chain_id,
-                ],
-            )
-            .await?;
+        conn.execute(
+            query,
+            &[
+                &request.relayer_id,
+                &request.domain_data,
+                &request.message_data,
+                &request.primary_type,
+                &request.signature,
+                &request.chain_id,
+            ],
+        )
+        .await?;
 
         Ok(())
     }

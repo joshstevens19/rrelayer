@@ -30,6 +30,7 @@ use super::{
         TransactionsQueueSetup,
     },
 };
+use crate::transaction::api::send_transaction::RelayTransactionRequest;
 use crate::{
     gas::{blob_gas_oracle::BlobGasOracleCache, gas_oracle::GasOracleCache},
     postgres::{PostgresClient, PostgresConnectionError, PostgresError},
@@ -40,7 +41,6 @@ use crate::{
         common_types::{EvmAddress, WalletOrProviderError},
     },
     transaction::{
-        api::RelayTransactionRequest,
         cache::invalidate_transaction_no_state_cache,
         nonce_manager::NonceManager,
         queue_system::types::TransactionQueueSendTransactionError,

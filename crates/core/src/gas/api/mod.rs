@@ -1,38 +1,10 @@
 use std::sync::Arc;
 
-use axum::{
-    extract::{Path, State},
-    http::StatusCode,
-    routing::get,
-    Json, Router,
-};
+use axum::{routing::get, Router};
 
-use super::fee_estimator::base::GasEstimatorResult;
-use crate::{app_state::AppState, network::types::ChainId};
+use crate::app_state::AppState;
 
-/// Retrieves gas price estimates for a specific chain via HTTP API.
-///
-/// # Arguments
-/// * `state` - Application state containing the gas oracle cache
-/// * `chain_id` - Chain ID extracted from the URL path
-///
-/// # Returns
-/// * `Ok(Json<GasEstimatorResult>)` - Gas price estimates for all speeds if found
-/// * `Err(StatusCode::NOT_FOUND)` - If no gas prices are cached for this chain
-async fn get_gas_price(
-    State(state): State<Arc<AppState>>,
-    Path(chain_id): Path<ChainId>,
-) -> Result<Json<GasEstimatorResult>, StatusCode> {
-    let gas_oracle = state
-        .gas_oracle_cache
-        .lock()
-        .await
-        .get_gas_price(&chain_id)
-        .await
-        .ok_or(StatusCode::NOT_FOUND)?;
-
-    Ok(Json(gas_oracle))
-}
+pub mod get_gas_price;
 
 /// Creates and configures the gas-related HTTP routes.
 ///
@@ -42,5 +14,5 @@ async fn get_gas_price(
 /// # Returns
 /// * `Router<Arc<AppState>>` - Configured router with gas price endpoints
 pub fn create_gas_routes() -> Router<Arc<AppState>> {
-    Router::new().route("/price/:chain_id", get(get_gas_price))
+    Router::new().route("/price/:chain_id", get(get_gas_price::get_gas_price))
 }

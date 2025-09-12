@@ -3,12 +3,12 @@ use std::time::SystemTime;
 use alloy::primitives::U256;
 use clap::Subcommand;
 use rrelayer_core::common_types::PagingContext;
+use rrelayer_core::transaction::api::send_transaction::RelayTransactionRequest;
 use rrelayer_core::{
     common_types::EvmAddress,
     relayer::types::RelayerId,
-    transaction::{
-        api::RelayTransactionRequest,
-        types::{Transaction, TransactionData, TransactionId, TransactionSpeed, TransactionValue},
+    transaction::types::{
+        Transaction, TransactionData, TransactionId, TransactionSpeed, TransactionValue,
     },
 };
 use rrelayer_sdk::SDK;

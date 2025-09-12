@@ -1,14 +1,14 @@
+use crate::api::{http::HttpClient, types::ApiResult};
+use rrelayer_core::transaction::api::get_transaction_status::RelayTransactionStatusResult;
+use rrelayer_core::transaction::api::send_transaction::{
+    RelayTransactionRequest, SendTransactionResult,
+};
 use rrelayer_core::{
     common_types::{PagingContext, PagingResult},
     relayer::types::RelayerId,
-    transaction::{
-        api::{RelayTransactionRequest, RelayTransactionStatusResult, SendTransactionResult},
-        types::{Transaction, TransactionId},
-    },
+    transaction::types::{Transaction, TransactionId},
 };
 use std::sync::Arc;
-
-use crate::api::{http::HttpClient, types::ApiResult};
 
 pub struct TransactionApi {
     client: Arc<HttpClient>,
