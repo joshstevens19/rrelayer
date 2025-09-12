@@ -16,5 +16,5 @@
 - Test user rate limiting
 - Change the TS sdk to work with the changes in the playground (copy make files to allow them to be runnable)
 - Finish documentation
-- Create CLI (copy from rindexer)
+- Create CI (copy from rindexer)
 - Publish NPM packages and make repo public
