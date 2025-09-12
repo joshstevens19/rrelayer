@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use crate::common_types::EvmAddress;
 use crate::postgres::ToSql;
-use alloy::primitives::{Address, FixedBytes, U256};
+use alloy::primitives::{FixedBytes, U256};
 use alloy::{
     hex,
     primitives::{Bytes, PrimitiveSignature, B256},

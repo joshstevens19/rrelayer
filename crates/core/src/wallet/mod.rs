@@ -93,13 +93,6 @@ impl From<alloy::dyn_abi::Error> for WalletError {
     }
 }
 
-#[derive(Debug)]
-pub enum WalletSource {
-    Mnemonic(String),
-    Privy(PrivyWalletManager),
-    AwsKms(AwsKmsWalletManager),
-}
-
 #[async_trait]
 pub trait WalletManagerTrait: Send + Sync {
     /// Create a new wallet at the specified index for the given chain

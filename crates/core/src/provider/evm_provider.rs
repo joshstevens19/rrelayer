@@ -152,24 +152,6 @@ pub enum SendTransactionError {
 }
 
 #[derive(Error, Debug)]
-pub enum SignTextError {
-    #[error("Wallet error: {0}")]
-    WalletError(#[from] LocalSignerError),
-
-    #[error("Signing message failed: {0}")]
-    SignMessageError(#[from] alloy::signers::Error),
-}
-
-#[derive(Error, Debug)]
-pub enum SignTypedDataError {
-    #[error("Wallet error: {0}")]
-    WalletError(#[from] LocalSignerError),
-
-    #[error("Signing message failed: {0}")]
-    SignMessageError(#[from] alloy::signers::Error),
-}
-
-#[derive(Error, Debug)]
 pub enum EvmProviderNewError {
     #[error("http provider cant be created for {0}: {1}")]
     HttpProviderCantBeCreated(String, String),
@@ -576,7 +558,6 @@ impl EvmProvider {
         // Calculate fees with different multipliers for speeds
         let super_fast_multiplier = 1.5;
         let fast_multiplier = 1.2;
-        let medium_multiplier = 1.0;
         let slow_multiplier = 0.8;
 
         let super_fast_price = (base_fee_per_blob_gas as f64 * super_fast_multiplier) as u128;

@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
-use crate::common_types::{EvmAddress, Signature};
+use crate::common_types::Signature;
 use crate::network::types::ChainId;
 use crate::postgres::{PostgresClient, PostgresError};
 use crate::relayer::types::RelayerId;

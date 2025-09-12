@@ -72,7 +72,7 @@ pub struct Transaction {
 
     pub status: TransactionStatus,
 
-    #[serde(rename = "txHash", skip_serializing_if = "Option::is_none", default)]
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub blobs: Option<Vec<Blob>>,
 
     #[serde(rename = "txHash", skip_serializing_if = "Option::is_none", default)]

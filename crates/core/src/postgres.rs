@@ -11,7 +11,6 @@ use tokio::{task, time::timeout};
 pub use tokio_postgres::types::{ToSql, Type as PgType};
 use tokio_postgres::{
     config::SslMode, Config, CopyInSink, Error as PgError, Row, Statement, ToStatement,
-    Transaction as PgTransaction,
 };
 use tracing::error;
 
@@ -57,59 +56,6 @@ pub enum PostgresError {
 
     #[error("Connection pool error: {0}")]
     ConnectionPoolError(#[from] RunError<tokio_postgres::Error>),
-}
-
-/// Wrapper around a PostgreSQL transaction for safer handling.
-///
-/// Provides methods to execute queries, commit, and rollback transactions
-/// with proper error handling.
-pub struct PostgresTransaction<'a> {
-    pub transaction: PgTransaction<'a>,
-}
-impl<'a> PostgresTransaction<'a> {
-    /// Executes a query within this transaction.
-    ///
-    /// # Arguments
-    /// * `query` - The SQL query to execute
-    /// * `params` - Parameters to bind to the query
-    ///
-    /// # Returns
-    /// * `Ok(u64)` - Number of rows affected by the query
-    /// * `Err(PostgresError)` - If the query execution fails
-    pub async fn execute(
-        &mut self,
-        query: &str,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<u64, PostgresError> {
-        self.transaction.execute(query, params).await.map_err(PostgresError::PgError)
-    }
-
-    /// Commits this transaction.
-    ///
-    /// # Returns
-    /// * `Ok(())` - If the transaction was committed successfully
-    /// * `Err(PostgresError)` - If the commit fails
-    pub async fn commit(self) -> Result<(), PostgresError> {
-        self.transaction.commit().await.map_err(PostgresError::PgError)
-    }
-
-    /// Rolls back this transaction.
-    ///
-    /// # Returns
-    /// * `Ok(())` - If the transaction was rolled back successfully
-    /// * `Err(PostgresError)` - If the rollback fails
-    pub async fn rollback(self) -> Result<(), PostgresError> {
-        self.transaction.rollback().await.map_err(PostgresError::PgError)
-    }
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum BulkInsertPostgresError {
-    #[error("{0}")]
-    PostgresError(#[from] PostgresError),
-
-    #[error("{0}")]
-    CouldNotWriteDataToPostgres(#[from] tokio_postgres::Error),
 }
 
 /// PostgreSQL client with connection pooling and TLS support.

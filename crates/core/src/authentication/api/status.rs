@@ -1,9 +1,7 @@
-use std::sync::Arc;
-
 use axum::{http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
 
-use crate::{app_state::AppState, authentication::basic_auth::Authenticated};
+use crate::authentication::basic_auth::Authenticated;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StatusResponse {

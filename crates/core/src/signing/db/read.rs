@@ -1,4 +1,4 @@
-use crate::common_types::{EvmAddress, Signature};
+use crate::common_types::Signature;
 use crate::network::types::ChainId;
 use crate::{
     postgres::{PostgresClient, PostgresError},

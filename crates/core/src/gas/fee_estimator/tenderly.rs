@@ -475,7 +475,7 @@ impl TenderlyGasFeeEstimator {
     ) -> Result<TenderlyGasEstimatePriceResult, reqwest::Error> {
         let url = match self.build_suggested_gas_price_endpoint(chain_id) {
             Ok(url) => url,
-            Err(e) => {
+            Err(_) => {
                 // Create a request that will fail with a proper reqwest::Error
                 let client = reqwest::Client::new();
                 let result = client.get("http://").send().await;
