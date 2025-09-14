@@ -6,7 +6,7 @@
 
 - Testing sending all tx flows with
   - Raw signer
-  - Aws key manager
+  - AWS key manager
   - GCP key manager
   - KMS
   - Privy
