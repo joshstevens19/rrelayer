@@ -1,6 +1,5 @@
-use std::time::SystemTime;
-
 use alloy::primitives::U256;
+use chrono::{DateTime, Utc};
 use clap::Subcommand;
 use rrelayer_core::common_types::PagingContext;
 use rrelayer_core::transaction::api::send_transaction::RelayTransactionRequest;
@@ -379,26 +378,6 @@ fn log_transactions(transactions: Vec<Transaction>) -> Result<(), TransactionErr
     Ok(())
 }
 
-/// Formats a SystemTime as a human-readable UTC timestamp string.
-///
-/// Converts a SystemTime to a formatted string in "YYYY-MM-DD HH:MM:SS UTC" format.
-/// Returns "Invalid time" if the time cannot be formatted.
-///
-/// # Arguments
-/// * `time` - The SystemTime to format
-///
-/// # Returns
-/// * Formatted time string or "Invalid time" if formatting fails
-fn format_time(time: &SystemTime) -> String {
-    match time.duration_since(SystemTime::UNIX_EPOCH) {
-        Ok(duration) => {
-            let dt = chrono::DateTime::<chrono::Utc>::from_timestamp(
-                duration.as_secs() as i64,
-                duration.subsec_nanos(),
-            )
-            .unwrap_or_default();
-            dt.format("%Y-%m-%d %H:%M:%S UTC").to_string()
-        }
-        Err(_) => "Invalid time".to_string(),
-    }
+fn format_time(time: &DateTime<Utc>) -> String {
+    time.format("%Y-%m-%d %H:%M:%S UTC").to_string()
 }

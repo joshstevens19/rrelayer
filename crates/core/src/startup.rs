@@ -1,20 +1,5 @@
 use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Instant};
 
-use axum::{
-    body::{to_bytes, Body},
-    http::{HeaderValue, Request, StatusCode},
-    middleware,
-    middleware::Next,
-    response::{IntoResponse, Response},
-    routing::get,
-    Router,
-};
-use dotenv::dotenv;
-use thiserror::Error;
-use tokio::sync::Mutex;
-use tower_http::cors::{AllowOrigin, Any, CorsLayer};
-use tracing::error;
-use tracing::log::info;
 use crate::authentication::api::create_basic_auth_routes;
 use crate::background_tasks::run_background_tasks;
 use crate::yaml::ReadYamlError;
@@ -45,6 +30,21 @@ use crate::{
     user_rate_limiting::UserRateLimiter,
     ApiConfig, RateLimitConfig,
 };
+use axum::{
+    body::{to_bytes, Body},
+    http::{HeaderValue, Request, StatusCode},
+    middleware,
+    middleware::Next,
+    response::{IntoResponse, Response},
+    routing::get,
+    Router,
+};
+use dotenv::dotenv;
+use thiserror::Error;
+use tokio::sync::Mutex;
+use tower_http::cors::{AllowOrigin, Any, CorsLayer};
+use tracing::error;
+use tracing::log::info;
 
 #[derive(Error, Debug)]
 #[allow(clippy::enum_variant_names)]
@@ -251,7 +251,7 @@ async fn start_api(
         .nest("/transactions", create_transactions_routes())
         .nest("/signing", create_signing_history_routes())
         .layer(middleware::from_fn(basic_auth_guard));
-    
+
     let app = Router::new()
         .route("/health", get(health_check))
         .merge(protected_routes)

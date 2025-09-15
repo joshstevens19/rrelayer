@@ -43,7 +43,8 @@ pub async fn spawn_processing_tasks_for_relayer(
     let queue_clone_inmempool = transaction_queue.clone();
     let relayer_id_inmempool = *relayer_id;
     tokio::spawn(async move {
-        continuously_process_inmempool_transactions(queue_clone_inmempool, &relayer_id_inmempool).await;
+        continuously_process_inmempool_transactions(queue_clone_inmempool, &relayer_id_inmempool)
+            .await;
     });
 
     let queue_clone_mined = transaction_queue.clone();

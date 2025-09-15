@@ -41,7 +41,7 @@ impl TestRunner {
             .deploy_test_contract(deployer_private_key)
             .await
             .context("Failed to deploy test contract")?;
-        
+
         info!("✅ Test contract deployed at: {:?}", contract_address);
 
         Ok(Self { config, relayer_client, contract_interactor })
@@ -289,9 +289,8 @@ impl TestRunner {
         let relayer_id = RelayerId::from_str(relayer_id_str).context("Invalid relayer ID")?;
 
         // Get the deployed test contract address
-        let contract_address = self.contract_interactor
-            .contract_address()
-            .context("Test contract not deployed")?;
+        let contract_address =
+            self.contract_interactor.contract_address().context("Test contract not deployed")?;
 
         let contract_address_str = format!("{:?}", contract_address);
         info!("Sending contract interaction to deployed contract at {}", contract_address_str);

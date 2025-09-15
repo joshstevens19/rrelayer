@@ -1,5 +1,3 @@
-use alloy::network::AnyTransactionReceipt;
-
 use crate::{
     gas::{fee_estimator::base::GasPriceResult, types::GasLimit},
     postgres::{PostgresClient, PostgresError},
@@ -10,6 +8,8 @@ use crate::{
     },
     transaction::types::{Transaction, TransactionHash, TransactionId, TransactionStatus},
 };
+use alloy::network::AnyTransactionReceipt;
+use chrono::Utc;
 
 const TRANSACTION_TABLES: [&str; 2] = ["relayer.transaction", "relayer.transaction_audit_log"];
 
@@ -151,13 +151,14 @@ impl PostgresClient {
         for table_name in TRANSACTION_TABLES.iter() {
             trans.execute(
                 format!("
-                INSERT INTO {}(id, relayer_id, \"to\", nonce, chain_id, data, value, speed, status, expires_at, queued_at, failed_at, failed_reason, external_id)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), $13);
+                INSERT INTO {}(id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, speed, status, expires_at, queued_at, failed_at, failed_reason, external_id)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), $13, $14);
                 ", table_name).as_str(),
                 &[
                     &transaction.id,
                     &relayer_id,
                     &transaction.to,
+                    &transaction.from,
                     &transaction.nonce,
                     &transaction.chain_id,
                     &transaction.data,

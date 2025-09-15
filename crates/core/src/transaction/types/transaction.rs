@@ -11,6 +11,7 @@ use alloy_eips::eip4844::{
     builder::{SidecarBuilder, SimpleCoder},
     Blob,
 };
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -40,13 +41,7 @@ use crate::{
     },
     network::types::ChainId,
     relayer::types::RelayerId,
-    shared::{
-        common_types::EvmAddress,
-        serializers::{
-            deserialize_system_time, deserialize_system_time_option, serialize_system_time,
-            serialize_system_time_option,
-        },
-    },
+    shared::common_types::EvmAddress,
 };
 
 #[derive(Clone, Deserialize, Serialize, Debug)]
@@ -78,37 +73,17 @@ pub struct Transaction {
     #[serde(rename = "txHash", skip_serializing_if = "Option::is_none", default)]
     pub known_transaction_hash: Option<TransactionHash>,
 
-    #[serde(
-        rename = "queuedAt",
-        serialize_with = "serialize_system_time",
-        deserialize_with = "deserialize_system_time"
-    )]
-    pub queued_at: SystemTime,
+    #[serde(rename = "queuedAt")]
+    pub queued_at: DateTime<Utc>,
 
-    #[serde(
-        rename = "expiresAt",
-        serialize_with = "serialize_system_time",
-        deserialize_with = "deserialize_system_time"
-    )]
-    pub expires_at: SystemTime,
+    #[serde(rename = "expiresAt")]
+    pub expires_at: DateTime<Utc>,
 
-    #[serde(
-        rename = "sentAt",
-        skip_serializing_if = "Option::is_none",
-        serialize_with = "serialize_system_time_option",
-        deserialize_with = "deserialize_system_time_option",
-        default
-    )]
-    pub sent_at: Option<SystemTime>,
+    #[serde(rename = "sentAt", skip_serializing_if = "Option::is_none", default)]
+    pub sent_at: Option<DateTime<Utc>>,
 
-    #[serde(
-        rename = "confirmedAt",
-        skip_serializing_if = "Option::is_none",
-        serialize_with = "serialize_system_time_option",
-        deserialize_with = "deserialize_system_time_option",
-        default
-    )]
-    pub confirmed_at: Option<SystemTime>,
+    #[serde(rename = "confirmedAt", skip_serializing_if = "Option::is_none", default)]
+    pub confirmed_at: Option<DateTime<Utc>>,
 
     #[serde(rename = "sentWithGas", skip_serializing_if = "Option::is_none", default)]
     pub sent_with_gas: Option<GasPriceResult>,
@@ -116,14 +91,8 @@ pub struct Transaction {
     #[serde(rename = "sentWithBlobGas", skip_serializing_if = "Option::is_none", default)]
     pub sent_with_blob_gas: Option<BlobGasPriceResult>,
 
-    #[serde(
-        rename = "minedAt",
-        skip_serializing_if = "Option::is_none",
-        serialize_with = "serialize_system_time_option",
-        deserialize_with = "deserialize_system_time_option",
-        default
-    )]
-    pub mined_at: Option<SystemTime>,
+    #[serde(rename = "minedAt", skip_serializing_if = "Option::is_none", default)]
+    pub mined_at: Option<DateTime<Utc>>,
 
     pub speed: TransactionSpeed,
 
@@ -258,7 +227,11 @@ impl Transaction {
         override_gas_price: Option<&GasPriceResult>,
         override_blob_gas_price: Option<&BlobGasPriceResult>,
     ) -> Result<TypedTransaction, TransactionConversionError> {
-        self.to_blob_typed_transaction_with_gas_limit(override_gas_price, override_blob_gas_price, None)
+        self.to_blob_typed_transaction_with_gas_limit(
+            override_gas_price,
+            override_blob_gas_price,
+            None,
+        )
     }
 
     pub fn to_blob_typed_transaction_with_gas_limit(

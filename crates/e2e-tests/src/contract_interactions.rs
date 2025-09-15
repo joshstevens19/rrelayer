@@ -17,11 +17,11 @@ sol! {
     #[sol(rpc, bytecode="608060405234801561001057600080fd5b50610150806100206000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c8063209652551461003b5780635524107714610059575b600080fd5b610043610071565b60405161005091906100d1565b60405180910390f35b61006f600480360381019061006a91906100fd565b610077565b005b60005481565b8060008190555050565b6000819050919050565b61009481610081565b82525050565b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b60006100c58261009a565b9050919050565b6100d5816100ba565b82525050565b60006020820190506100f0600083018461008b565b92915050565b60006020828403121561010c5761010b61012a565b5b600061011a84828501610113565b91505092915050565b61012c81610081565b811461013757600080fd5b50565b60008135905061014981610123565b92915050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052602260045260246000fd5b600060028204905060018216806101a057607f821691505b6020821081036101b3576101b2610171565b5b5091905056fea2646970667358221220b29e4b69e5b1a9c4a9b8a9b8a9b8a9b8a9b8a9b8a9b8a9b8a9b8a9b8a9b8a9b864736f6c63430008110033")]
     contract TestContract {
         uint256 public value;
-        
+
         function setValue(uint256 newValue) public {
             value = newValue;
         }
-        
+
         function getValue() public view returns (uint256) {
             return value;
         }
@@ -43,11 +43,11 @@ impl ContractInteractor {
     /// Deploy the test contract using Alloy's sol! macro
     pub async fn deploy_test_contract(&mut self, deployer_private_key: &str) -> Result<Address> {
         // Create signer with the provided private key
-        let signer: PrivateKeySigner = deployer_private_key.parse()
-            .context("Invalid private key")?;
+        let signer: PrivateKeySigner =
+            deployer_private_key.parse().context("Invalid private key")?;
         let wallet = EthereumWallet::from(signer);
 
-        // Create provider with wallet for deployment  
+        // Create provider with wallet for deployment
         let provider_url_str = self.provider.client().transport().url();
         let deploy_provider = ProviderBuilder::new()
             .with_recommended_fillers()
@@ -59,7 +59,7 @@ impl ContractInteractor {
         // Start continuous mining in background to allow deployment to complete
         let mining_url = provider_url_str.to_string();
         let (tx, mut rx) = tokio::sync::mpsc::channel(1);
-        
+
         let mining_task = tokio::spawn(async move {
             let client = reqwest::Client::new();
             loop {
@@ -98,7 +98,7 @@ impl ContractInteractor {
 
         let contract_address = *contract.address();
         self.contract_address = Some(contract_address);
-        
+
         info!("✅ Test contract deployed to: {:?}", contract_address);
 
         Ok(contract_address)

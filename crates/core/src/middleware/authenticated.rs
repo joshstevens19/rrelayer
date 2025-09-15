@@ -32,16 +32,12 @@ where
     /// * `Ok(Authenticated)` - If the request has been authenticated
     /// * `Err(StatusCode::UNAUTHORIZED)` - If authentication marker is missing
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        parts
-            .extensions
-            .get::<Authenticated>()
-            .map(|_| Authenticated)
-            .ok_or_else(|| {
-               error!(
-                    "Authentication marker missing from request extensions for path: {}",
-                    parts.uri.path()
-                );
-                StatusCode::UNAUTHORIZED
-            })
+        parts.extensions.get::<Authenticated>().map(|_| Authenticated).ok_or_else(|| {
+            error!(
+                "Authentication marker missing from request extensions for path: {}",
+                parts.uri.path()
+            );
+            StatusCode::UNAUTHORIZED
+        })
     }
 }

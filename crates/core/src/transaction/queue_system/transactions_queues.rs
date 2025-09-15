@@ -8,6 +8,7 @@ use alloy::{
     consensus::TypedTransaction,
     transports::{RpcError, TransportErrorKind},
 };
+use chrono::{DateTime, Utc};
 use thiserror::Error;
 use tokio::sync::Mutex;
 
@@ -34,10 +35,10 @@ use super::{
 use crate::transaction::api::send_transaction::RelayTransactionRequest;
 use crate::{
     gas::{
-        blob_gas_oracle::{BlobGasOracleCache, BlobGasPriceResult}, 
+        blob_gas_oracle::{BlobGasOracleCache, BlobGasPriceResult},
         fee_estimator::base::GasPriceResult,
-        gas_oracle::GasOracleCache, 
-        types::GasLimit
+        gas_oracle::GasOracleCache,
+        types::GasLimit,
     },
     postgres::{PostgresClient, PostgresConnectionError, PostgresError},
     relayer::types::RelayerId,
@@ -269,10 +270,10 @@ impl TransactionsQueues {
     /// Transactions expire after 12 hours, after which they are converted to no-op transactions.
     ///
     /// # Returns
-    /// * `SystemTime` - The expiration time (12 hours from now)
-    fn expires_at(&self) -> SystemTime {
+    /// * `DateTime<Utc>` - The expiration time (12 hours from now)
+    fn expires_at(&self) -> DateTime<Utc> {
         // 12 hours we then send them to noop
-        SystemTime::now() + Duration::from_secs(12 * 60 * 60)
+        Utc::now() + chrono::Duration::hours(12)
     }
 
     /// Checks if a transaction has expired.
@@ -284,7 +285,7 @@ impl TransactionsQueues {
     /// * `true` - If the transaction has expired
     /// * `false` - If the transaction is still valid
     fn has_expired(&self, transaction: &Transaction) -> bool {
-        transaction.expires_at < SystemTime::now()
+        transaction.expires_at < Utc::now()
     }
 
     /// Converts a transaction to a no-op transaction.
@@ -508,7 +509,7 @@ impl TransactionsQueues {
         let queue_arc = self
             .get_transactions_queue(relayer_id)
             .ok_or(AddTransactionError::RelayerNotFound(*relayer_id))?;
-        
+
         let mut transactions_queue = queue_arc.lock().await;
 
         if transactions_queue.is_paused() {
@@ -540,7 +541,7 @@ impl TransactionsQueues {
             blobs: transaction_to_send.blobs.clone(),
             chain_id: transactions_queue.chain_id(),
             known_transaction_hash: None,
-            queued_at: SystemTime::now(),
+            queued_at: Utc::now(),
             expires_at,
             sent_at: None,
             mined_at: None,
@@ -573,7 +574,6 @@ impl TransactionsQueues {
         let estimated_gas_limit = match estimated_gas_limit {
             Ok(limit) => limit,
             Err(err) => {
-                // Save failed transaction to database
                 self.db
                     .transaction_failed_on_send(
                         relayer_id,
@@ -807,7 +807,7 @@ impl TransactionsQueues {
                             let sent_transaction = Transaction {
                                 status: TransactionStatus::Inmempool,
                                 known_transaction_hash: Some(transaction_sent.hash),
-                                sent_at: Some(SystemTime::now()),
+                                sent_at: Some(Utc::now()),
                                 ..transaction
                             };
                             webhook_manager.on_transaction_sent(&sent_transaction).await;
@@ -893,9 +893,7 @@ impl TransactionsQueues {
                                 self.invalidate_transaction_cache(&transaction.id).await;
 
                                 Err(ProcessPendingTransactionError::TransactionEstimateGasError(
-                                    RpcError::Transport(
-                                        TransportErrorKind::Custom(error.into()),
-                                    ),
+                                    RpcError::Transport(TransportErrorKind::Custom(error.into())),
                                 ))
                             }
                         };
@@ -954,7 +952,7 @@ impl TransactionsQueues {
                                         let webhook_manager = webhook_manager.lock().await;
                                         let mined_transaction = Transaction {
                                             status: TransactionStatus::Mined,
-                                            mined_at: Some(SystemTime::now()),
+                                            mined_at: Some(Utc::now()),
                                             ..transaction
                                         };
                                         webhook_manager
@@ -1001,34 +999,34 @@ impl TransactionsQueues {
                         }
                         Ok(None) => {
                             if let Some(sent_at) = transaction.sent_at {
-                                if let Ok(elapsed) = sent_at.elapsed() {
-                                    if transactions_queue
-                                        .should_bump_gas(elapsed.as_secs(), &transaction.speed)
-                                    {
-                                        let transaction_sent = transactions_queue
-                                    .send_transaction(&mut self.db, &mut transaction)
-                                    .await
-                                    .map_err(
-                                        ProcessInmempoolTransactionError::SendTransactionError,
-                                    )?;
+                                let elapsed = Utc::now() - sent_at;
+                                if transactions_queue.should_bump_gas(
+                                    elapsed.num_seconds() as u64,
+                                    &transaction.speed,
+                                ) {
+                                    let transaction_sent = transactions_queue
+                                        .send_transaction(&mut self.db, &mut transaction)
+                                        .await
+                                        .map_err(
+                                            ProcessInmempoolTransactionError::SendTransactionError,
+                                        )?;
 
-                                        transaction.known_transaction_hash =
-                                            Some(transaction_sent.hash);
-                                        transaction.sent_with_max_fee_per_gas =
-                                            Some(transaction_sent.sent_with_gas.max_fee);
-                                        transaction.sent_with_max_priority_fee_per_gas =
-                                            Some(transaction_sent.sent_with_gas.max_priority_fee);
-                                        transaction.sent_with_gas =
-                                            Some(transaction_sent.sent_with_gas.clone());
-                                        transaction.sent_at = Some(SystemTime::now());
+                                    transaction.known_transaction_hash =
+                                        Some(transaction_sent.hash);
+                                    transaction.sent_with_max_fee_per_gas =
+                                        Some(transaction_sent.sent_with_gas.max_fee);
+                                    transaction.sent_with_max_priority_fee_per_gas =
+                                        Some(transaction_sent.sent_with_gas.max_priority_fee);
+                                    transaction.sent_with_gas =
+                                        Some(transaction_sent.sent_with_gas.clone());
+                                    transaction.sent_at = Some(Utc::now());
 
-                                        self.invalidate_transaction_cache(&transaction.id).await;
+                                    self.invalidate_transaction_cache(&transaction.id).await;
 
-                                        return Ok(ProcessResult::<ProcessInmempoolStatus>::other(
-                                            ProcessInmempoolStatus::GasIncreased,
-                                            Default::default(),
-                                        ));
-                                    }
+                                    return Ok(ProcessResult::<ProcessInmempoolStatus>::other(
+                                        ProcessInmempoolStatus::GasIncreased,
+                                        Default::default(),
+                                    ));
                                 }
                             }
 
@@ -1084,77 +1082,71 @@ impl TransactionsQueues {
 
             if let Some(transaction) = transactions_queue.get_next_mined_transaction().await {
                 if let Some(mined_at) = transaction.mined_at {
-                    match mined_at.elapsed() {
-                        Ok(elapsed) => {
-                            if transactions_queue.in_confirmed_range(elapsed) {
-                                let receipt = if let Some(tx_hash) =
-                                    transaction.known_transaction_hash
-                                {
-                                    transactions_queue
-                                        .get_receipt(&tx_hash)
-                                        .await
-                                        .map_err(|e| {
-                                            ProcessMinedTransactionError::CouldNotGetTransactionReceipt(
-                                                *relayer_id,
-                                                transaction.clone(),
-                                                e,
-                                            )
-                                        })?
-                                        .ok_or(
-                                            ProcessMinedTransactionError::CouldNotGetTransactionReceipt(
-                                                *relayer_id,
-                                                transaction.clone(),
-                                                RpcError::Transport(TransportErrorKind::Custom(
-                                                    "No receipt".to_string().into(),
-                                                )),
-                                            ),
-                                        )?
-                                } else {
-                                    return Err(
-                                        ProcessMinedTransactionError::CouldNotGetTransactionReceipt(
-                                            *relayer_id,
-                                            transaction.clone(),
-                                            RpcError::Transport(TransportErrorKind::Custom(
-                                                "Transaction hash not found".to_string().into(),
-                                            )),
-                                        ),
-                                    );
-                                };
+                    let elapsed = Utc::now() - mined_at;
+                    if transactions_queue.in_confirmed_range(elapsed.num_seconds() as u64) {
+                        let receipt = if let Some(tx_hash) = transaction.known_transaction_hash {
+                            transactions_queue
+                                .get_receipt(&tx_hash)
+                                .await
+                                .map_err(|e| {
+                                    ProcessMinedTransactionError::CouldNotGetTransactionReceipt(
+                                        *relayer_id,
+                                        transaction.clone(),
+                                        e,
+                                    )
+                                })?
+                                .ok_or(
+                                    ProcessMinedTransactionError::CouldNotGetTransactionReceipt(
+                                        *relayer_id,
+                                        transaction.clone(),
+                                        RpcError::Transport(TransportErrorKind::Custom(
+                                            "No receipt".to_string().into(),
+                                        )),
+                                    ),
+                                )?
+                        } else {
+                            return Err(
+                                ProcessMinedTransactionError::CouldNotGetTransactionReceipt(
+                                    *relayer_id,
+                                    transaction.clone(),
+                                    RpcError::Transport(TransportErrorKind::Custom(
+                                        "Transaction hash not found".to_string().into(),
+                                    )),
+                                ),
+                            );
+                        };
 
-                                self.db
-                                    .transaction_confirmed(&transaction.id)
-                                    .await.map_err(|e| ProcessMinedTransactionError::TransactionConfirmedNotSaveToDatabase(*relayer_id, transaction.clone(), e))?;
+                        self.db.transaction_confirmed(&transaction.id).await.map_err(|e| {
+                            ProcessMinedTransactionError::TransactionConfirmedNotSaveToDatabase(
+                                *relayer_id,
+                                transaction.clone(),
+                                e,
+                            )
+                        })?;
 
-                                transactions_queue.move_mining_to_confirmed(&transaction.id).await;
+                        transactions_queue.move_mining_to_confirmed(&transaction.id).await;
 
-                                self.invalidate_transaction_cache(&transaction.id).await;
+                        self.invalidate_transaction_cache(&transaction.id).await;
 
-                                if let Some(webhook_manager) = &self.webhook_manager {
-                                    let webhook_manager = webhook_manager.lock().await;
-                                    let confirmed_transaction = Transaction {
-                                        status: TransactionStatus::Confirmed,
-                                        confirmed_at: Some(SystemTime::now()),
-                                        ..transaction
-                                    };
-                                    webhook_manager
-                                        .on_transaction_confirmed(&confirmed_transaction, &receipt)
-                                        .await;
-                                }
-
-                                return Ok(ProcessResult::<ProcessMinedStatus>::success());
-                            }
-
-                            Ok(ProcessResult::<ProcessMinedStatus>::other(
-                                ProcessMinedStatus::NotConfirmedYet,
-                                Default::default(),
-                            ))
+                        if let Some(webhook_manager) = &self.webhook_manager {
+                            let webhook_manager = webhook_manager.lock().await;
+                            let confirmed_transaction = Transaction {
+                                status: TransactionStatus::Confirmed,
+                                confirmed_at: Some(Utc::now()),
+                                ..transaction
+                            };
+                            webhook_manager
+                                .on_transaction_confirmed(&confirmed_transaction, &receipt)
+                                .await;
                         }
-                        Err(e) => Err(ProcessMinedTransactionError::MinedAtTimeError(
-                            *relayer_id,
-                            transaction.clone(),
-                            e,
-                        )),
+
+                        return Ok(ProcessResult::<ProcessMinedStatus>::success());
                     }
+
+                    Ok(ProcessResult::<ProcessMinedStatus>::other(
+                        ProcessMinedStatus::NotConfirmedYet,
+                        Default::default(),
+                    ))
                 } else {
                     Err(ProcessMinedTransactionError::NoMinedAt(*relayer_id, transaction.clone()))
                 }

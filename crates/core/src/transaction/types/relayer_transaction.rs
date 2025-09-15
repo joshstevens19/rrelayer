@@ -1,5 +1,4 @@
-use std::time::SystemTime;
-
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use super::{
@@ -9,10 +8,7 @@ use super::{
 use crate::{
     gas::types::{GasLimit, GasPrice, MaxFee, MaxPriorityFee},
     relayer::types::Relayer,
-    shared::{
-        common_types::{BlockHash, BlockNumber, EvmAddress},
-        serializers::{serialize_system_time, serialize_system_time_option},
-    },
+    shared::common_types::{BlockHash, BlockNumber, EvmAddress},
 };
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -69,46 +65,26 @@ pub struct RelayerTransaction {
     pub status: TransactionStatus,
 
     /// The time the transaction will expire
-    #[serde(rename = "expiresAt", serialize_with = "serialize_system_time")]
-    pub expires_at: SystemTime,
+    #[serde(rename = "expiresAt")]
+    pub expires_at: DateTime<Utc>,
 
     /// The time the transaction was queued
-    #[serde(rename = "queuedAt", serialize_with = "serialize_system_time")]
-    pub queued_at: SystemTime,
+    #[serde(rename = "queuedAt")]
+    pub queued_at: DateTime<Utc>,
 
     /// The time the transaction was mined
-    #[serde(
-        rename = "minedAt",
-        skip_serializing_if = "Option::is_none",
-        serialize_with = "serialize_system_time_option",
-        default
-    )]
-    pub mined_at: Option<SystemTime>,
+    #[serde(rename = "minedAt", skip_serializing_if = "Option::is_none", default)]
+    pub mined_at: Option<DateTime<Utc>>,
 
     /// The time the transaction was failed
-    #[serde(
-        rename = "failedAt",
-        skip_serializing_if = "Option::is_none",
-        serialize_with = "serialize_system_time_option",
-        default
-    )]
-    pub failed_at: Option<SystemTime>,
+    #[serde(rename = "failedAt", skip_serializing_if = "Option::is_none", default)]
+    pub failed_at: Option<DateTime<Utc>>,
 
     /// The time the transaction was sent
-    #[serde(
-        rename = "sentAt",
-        skip_serializing_if = "Option::is_none",
-        serialize_with = "serialize_system_time_option",
-        default
-    )]
-    pub sent_at: Option<SystemTime>,
+    #[serde(rename = "sentAt", skip_serializing_if = "Option::is_none", default)]
+    pub sent_at: Option<DateTime<Utc>>,
 
     /// The time the transaction was confirmed
-    #[serde(
-        rename = "confirmedAt",
-        skip_serializing_if = "Option::is_none",
-        serialize_with = "serialize_system_time_option",
-        default
-    )]
-    pub confirmed_at: Option<SystemTime>,
+    #[serde(rename = "confirmedAt", skip_serializing_if = "Option::is_none", default)]
+    pub confirmed_at: Option<DateTime<Utc>>,
 }

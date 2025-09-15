@@ -4,15 +4,6 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use alloy::network::{AnyTransactionReceipt, ReceiptResponse};
-use alloy::{
-    consensus::{SignableTransaction, TypedTransaction},
-    hex,
-    signers::local::LocalSignerError,
-    transports::{RpcError, TransportErrorKind},
-};
-use tokio::sync::Mutex;
-use tracing::log::info;
 use super::types::{
     EditableTransaction, MoveInmempoolTransactionToMinedError,
     MovePendingTransactionToInmempoolError, SendTransactionGasPriceError,
@@ -37,6 +28,16 @@ use crate::{
         types::{Transaction, TransactionHash, TransactionId, TransactionSpeed, TransactionStatus},
     },
 };
+use alloy::network::{AnyTransactionReceipt, ReceiptResponse};
+use alloy::{
+    consensus::{SignableTransaction, TypedTransaction},
+    hex,
+    signers::local::LocalSignerError,
+    transports::{RpcError, TransportErrorKind},
+};
+use chrono::Utc;
+use tokio::sync::Mutex;
+use tracing::log::info;
 
 /// Queue system for managing transactions in different states for a single relayer.
 ///
@@ -74,9 +75,7 @@ impl TransactionsQueue {
     ) -> Self {
         info!(
             "Creating new TransactionsQueue for relayer: {} (name: {}) on chain: {}",
-            setup.relayer.id,
-            setup.relayer.name,
-            setup.relayer.chain_id
+            setup.relayer.id, setup.relayer.name, setup.relayer.chain_id
         );
         let confirmations = setup.evm_provider.confirmations;
         Self {
@@ -139,8 +138,7 @@ impl TransactionsQueue {
     pub async fn add_pending_transaction(&mut self, transaction: Transaction) {
         info!(
             "Adding pending transaction {} to queue for relayer: {}",
-            transaction.id,
-            self.relayer.name
+            transaction.id, self.relayer.name
         );
         let mut transactions = self.pending_transactions.lock().await;
         transactions.push_back(transaction);
@@ -169,11 +167,7 @@ impl TransactionsQueue {
     pub async fn get_pending_transaction_count(&self) -> usize {
         let transactions = self.pending_transactions.lock().await;
         let count = transactions.len();
-        info!(
-            "Current pending transaction count for relayer {}: {}",
-            self.relayer.name,
-            count
-        );
+        info!("Current pending transaction count for relayer {}: {}", self.relayer.name, count);
         count
     }
 
@@ -192,11 +186,7 @@ impl TransactionsQueue {
         &self,
         id: &TransactionId,
     ) -> Option<EditableTransaction> {
-        info!(
-            "Looking for editable transaction {} for relayer: {}",
-            id,
-            self.relayer.name
-        );
+        info!("Looking for editable transaction {} for relayer: {}", id, self.relayer.name);
         let transactions = self.pending_transactions.lock().await;
 
         let pending = transactions.iter().find(|t| t.id == *id);
@@ -205,8 +195,7 @@ impl TransactionsQueue {
             Some(transaction) => {
                 info!(
                     "Found transaction {} in pending queue for relayer: {}",
-                    id,
-                    self.relayer.name
+                    id, self.relayer.name
                 );
                 Some(EditableTransaction::to_pending(transaction.clone()))
             }
@@ -220,14 +209,12 @@ impl TransactionsQueue {
                 if result.is_some() {
                     info!(
                         "Found transaction {} in inmempool queue for relayer: {}",
-                        id,
-                        self.relayer.name
+                        id, self.relayer.name
                     );
                 } else {
                     info!(
                         "Transaction {} not found in any queue for relayer: {}",
-                        id,
-                        self.relayer.name
+                        id, self.relayer.name
                     );
                 }
                 result
@@ -252,9 +239,7 @@ impl TransactionsQueue {
     ) -> Result<(), MovePendingTransactionToInmempoolError> {
         info!(
             "Moving transaction {} from pending to inmempool for relayer: {} with hash: {}",
-            transaction_sent.id,
-            self.relayer.name,
-            transaction_sent.hash
+            transaction_sent.id, self.relayer.name, transaction_sent.hash
         );
 
         let mut transactions = self.pending_transactions.lock().await;
@@ -271,7 +256,7 @@ impl TransactionsQueue {
                         transaction_sent.sent_with_gas.max_priority_fee,
                     ),
                     sent_with_gas: Some(transaction_sent.sent_with_gas.clone()),
-                    sent_at: Some(SystemTime::now()),
+                    sent_at: Some(Utc::now()),
                     ..transaction
                 });
 
@@ -307,8 +292,7 @@ impl TransactionsQueue {
         if let Some(tx) = transactions.front() {
             info!(
                 "Moving pending transaction {} to failed for relayer: {}",
-                tx.id,
-                self.relayer.name
+                tx.id, self.relayer.name
             );
         }
         transactions.pop_front();
@@ -340,11 +324,7 @@ impl TransactionsQueue {
     pub async fn get_inmempool_transaction_count(&self) -> usize {
         let transactions = self.inmempool_transactions.lock().await;
         let count = transactions.len();
-        info!(
-            "Current inmempool transaction count for relayer {}: {}",
-            self.relayer.name,
-            count
-        );
+        info!("Current inmempool transaction count for relayer {}: {}", self.relayer.name, count);
         count
     }
 
@@ -384,24 +364,18 @@ impl TransactionsQueue {
                         transaction_status = TransactionStatus::Expired;
                         info!(
                             "Transaction {} marked as expired (noop) for relayer: {}",
-                            id,
-                            self.relayer.name
+                            id, self.relayer.name
                         );
                     } else {
                         transaction_status = TransactionStatus::Mined;
                         info!(
                             "Transaction {} successfully mined for relayer: {}",
-                            id,
-                            self.relayer.name
+                            id, self.relayer.name
                         );
                     }
                 } else {
                     transaction_status = TransactionStatus::Failed;
-                    info!(
-                        "Transaction {} failed on-chain for relayer: {}",
-                        id,
-                        self.relayer.name
-                    );
+                    info!("Transaction {} failed on-chain for relayer: {}", id, self.relayer.name);
                 }
 
                 let mut mining_transactions = self.mined_transactions.lock().await;
@@ -409,7 +383,7 @@ impl TransactionsQueue {
                     transaction.id,
                     Transaction {
                         status: transaction_status.clone(),
-                        mined_at: Some(SystemTime::now()),
+                        mined_at: Some(Utc::now()),
                         ..transaction
                     },
                 );
@@ -431,8 +405,7 @@ impl TransactionsQueue {
         } else {
             info!(
                 "No inmempool transaction found to move to mined for relayer: {} (transaction: {})",
-                self.relayer.name,
-                id
+                self.relayer.name, id
             );
             Err(MoveInmempoolTransactionToMinedError::TransactionNotFound(self.relayer.id, *id))
         }
@@ -463,8 +436,7 @@ impl TransactionsQueue {
     pub async fn move_mining_to_confirmed(&mut self, id: &TransactionId) {
         info!(
             "Moving transaction {} from mined to confirmed for relayer: {}",
-            id,
-            self.relayer.name
+            id, self.relayer.name
         );
         let mut transactions = self.mined_transactions.lock().await;
         transactions.remove(id);
@@ -502,8 +474,7 @@ impl TransactionsQueue {
     pub fn set_is_legacy_transactions(&mut self, is_legacy_transactions: bool) {
         info!(
             "Setting legacy transactions to {} for relayer: {}",
-            is_legacy_transactions,
-            self.relayer.name
+            is_legacy_transactions, self.relayer.name
         );
         self.relayer.eip_1559_enabled = is_legacy_transactions;
     }
@@ -525,8 +496,7 @@ impl TransactionsQueue {
     pub fn set_is_allowlisted_only(&mut self, is_allowlisted_only: bool) {
         info!(
             "Setting allowlisted only to {} for relayer: {}",
-            is_allowlisted_only,
-            self.relayer.name
+            is_allowlisted_only, self.relayer.name
         );
         self.relayer.allowlisted_only = is_allowlisted_only;
     }
@@ -580,11 +550,7 @@ impl TransactionsQueue {
     /// # Arguments
     /// * `max_gas_price` - The new maximum gas price, or None for no limit
     pub fn set_max_gas_price(&mut self, max_gas_price: Option<GasPrice>) {
-        info!(
-            "Setting max gas price to {:?} for relayer: {}",
-            max_gas_price,
-            self.relayer.name
-        );
+        info!("Setting max gas price to {:?} for relayer: {}", max_gas_price, self.relayer.name);
         self.relayer.max_gas_price = max_gas_price;
     }
 
@@ -649,19 +615,17 @@ impl TransactionsQueue {
     /// if sufficient time has elapsed for confidence in transaction finality.
     ///
     /// # Arguments
-    /// * `elapsed` - Time since the transaction was mined
+    /// * `elapsed` - Time since the transaction was mined in seconds
     ///
     /// # Returns
     /// * `bool` - True if enough time has passed for confirmation
-    pub fn in_confirmed_range(&self, elapsed: Duration) -> bool {
+    pub fn in_confirmed_range(&self, elapsed: u64) -> bool {
         let threshold = self.blocks_every_ms() * self.confirmations;
-        let in_range = elapsed.as_secs() > threshold;
+        let in_range = elapsed > threshold;
         if in_range {
             info!(
                 "Transaction in confirmed range for relayer: {} - elapsed: {}s, threshold: {}s",
-                self.relayer.name,
-                elapsed.as_secs(),
-                threshold
+                self.relayer.name, elapsed, threshold
             );
         }
         in_range
@@ -687,8 +651,7 @@ impl TransactionsQueue {
     ) -> Result<GasPriceResult, SendTransactionGasPriceError> {
         info!(
             "Computing gas price for transaction with speed {:?} for relayer: {}",
-            transaction_speed,
-            self.relayer.name
+            transaction_speed, self.relayer.name
         );
 
         let gas_oracle = self.gas_oracle_cache.lock().await;
@@ -754,8 +717,7 @@ impl TransactionsQueue {
     ) -> Result<BlobGasPriceResult, SendTransactionGasPriceError> {
         info!(
             "Computing blob gas price for transaction with speed {:?} for relayer: {}",
-            transaction_speed,
-            self.relayer.name
+            transaction_speed, self.relayer.name
         );
 
         let blob_gas_oracle = self.blob_oracle_cache.lock().await;
@@ -787,9 +749,7 @@ impl TransactionsQueue {
 
         info!(
             "Final blob gas price for relayer: {} - blob_gas_price: {}, total_fee: {}",
-            self.relayer.name,
-            blob_gas_price.blob_gas_price,
-            blob_gas_price.total_fee_for_blob
+            self.relayer.name, blob_gas_price.blob_gas_price, blob_gas_price.total_fee_for_blob
         );
 
         Ok(blob_gas_price)
@@ -886,8 +846,7 @@ impl TransactionsQueue {
     ) -> Result<GasLimit, RpcError<TransportErrorKind>> {
         info!(
             "Estimating gas for transaction (noop: {}) for relayer: {}",
-            is_noop,
-            self.relayer.name
+            is_noop, self.relayer.name
         );
 
         let estimated_gas_result = self.evm_provider.estimate_gas(transaction_request).await?;
@@ -930,9 +889,7 @@ impl TransactionsQueue {
     ) -> Result<TransactionSentWithRelayer, TransactionQueueSendTransactionError> {
         info!(
             "Preparing to send transaction {} for relayer: {} with speed {:?}",
-            transaction.id,
-            self.relayer.name,
-            transaction.speed
+            transaction.id, self.relayer.name, transaction.speed
         );
 
         let gas_price = self
@@ -946,8 +903,7 @@ impl TransactionsQueue {
         if !self.within_gas_price_bounds(&gas_price) {
             info!(
                 "Transaction {} rejected - gas price too high for relayer: {}",
-                transaction.id,
-                self.relayer.name
+                transaction.id, self.relayer.name
             );
             return Err(TransactionQueueSendTransactionError::GasPriceTooHigh);
         }
@@ -959,9 +915,7 @@ impl TransactionsQueue {
             {
                 info!(
                     "Routing transaction {} through safe proxy {} for relayer: {}",
-                    transaction.id,
-                    safe_address,
-                    self.relayer.name
+                    transaction.id, safe_address, self.relayer.name
                 );
 
                 // Get the safe's current nonce (this would need to be implemented)
@@ -1045,9 +999,12 @@ impl TransactionsQueue {
 
         // First, estimate gas limit by creating a temporary transaction with a high gas limit
         let temp_gas_limit = GasLimit::new(10_000_000); // High temporary limit for estimation
-        
+
         let temp_transaction_request = if working_transaction.is_blob_transaction() {
-            info!("Creating blob transaction for gas estimation for relayer: {}", self.relayer.name);
+            info!(
+                "Creating blob transaction for gas estimation for relayer: {}",
+                self.relayer.name
+            );
             let blob_gas_price = self
                 .compute_blob_gas_price_for_transaction(
                     &working_transaction.speed,
@@ -1055,20 +1012,34 @@ impl TransactionsQueue {
                 )
                 .await?;
             working_transaction
-                .to_blob_typed_transaction_with_gas_limit(Some(&gas_price), Some(&blob_gas_price), Some(temp_gas_limit))
+                .to_blob_typed_transaction_with_gas_limit(
+                    Some(&gas_price),
+                    Some(&blob_gas_price),
+                    Some(temp_gas_limit),
+                )
                 .map_err(|e| {
-                TransactionQueueSendTransactionError::TransactionConversionError(e.to_string())
-            })?
+                    TransactionQueueSendTransactionError::TransactionConversionError(e.to_string())
+                })?
         } else if self.is_legacy_transactions() {
-            info!("Creating legacy transaction for gas estimation for relayer: {}", self.relayer.name);
-            working_transaction.to_legacy_typed_transaction_with_gas_limit(Some(&gas_price), Some(temp_gas_limit)).map_err(|e| {
-                TransactionQueueSendTransactionError::TransactionConversionError(e.to_string())
-            })?
+            info!(
+                "Creating legacy transaction for gas estimation for relayer: {}",
+                self.relayer.name
+            );
+            working_transaction
+                .to_legacy_typed_transaction_with_gas_limit(Some(&gas_price), Some(temp_gas_limit))
+                .map_err(|e| {
+                    TransactionQueueSendTransactionError::TransactionConversionError(e.to_string())
+                })?
         } else {
-            info!("Creating EIP-1559 transaction for gas estimation for relayer: {}", self.relayer.name);
-            working_transaction.to_eip1559_typed_transaction_with_gas_limit(Some(&gas_price), Some(temp_gas_limit)).map_err(|e| {
-                TransactionQueueSendTransactionError::TransactionConversionError(e.to_string())
-            })?
+            info!(
+                "Creating EIP-1559 transaction for gas estimation for relayer: {}",
+                self.relayer.name
+            );
+            working_transaction
+                .to_eip1559_typed_transaction_with_gas_limit(Some(&gas_price), Some(temp_gas_limit))
+                .map_err(|e| {
+                    TransactionQueueSendTransactionError::TransactionConversionError(e.to_string())
+                })?
         };
 
         let estimated_gas_limit = self
@@ -1090,20 +1061,34 @@ impl TransactionsQueue {
                 )
                 .await?;
             working_transaction
-                .to_blob_typed_transaction_with_gas_limit(Some(&gas_price), Some(&blob_gas_price), Some(estimated_gas_limit))
+                .to_blob_typed_transaction_with_gas_limit(
+                    Some(&gas_price),
+                    Some(&blob_gas_price),
+                    Some(estimated_gas_limit),
+                )
                 .map_err(|e| {
-                TransactionQueueSendTransactionError::TransactionConversionError(e.to_string())
-            })?
+                    TransactionQueueSendTransactionError::TransactionConversionError(e.to_string())
+                })?
         } else if self.is_legacy_transactions() {
             info!("Creating final legacy transaction for relayer: {}", self.relayer.name);
-            working_transaction.to_legacy_typed_transaction_with_gas_limit(Some(&gas_price), Some(estimated_gas_limit)).map_err(|e| {
-                TransactionQueueSendTransactionError::TransactionConversionError(e.to_string())
-            })?
+            working_transaction
+                .to_legacy_typed_transaction_with_gas_limit(
+                    Some(&gas_price),
+                    Some(estimated_gas_limit),
+                )
+                .map_err(|e| {
+                    TransactionQueueSendTransactionError::TransactionConversionError(e.to_string())
+                })?
         } else {
             info!("Creating final EIP-1559 transaction for relayer: {}", self.relayer.name);
-            working_transaction.to_eip1559_typed_transaction_with_gas_limit(Some(&gas_price), Some(estimated_gas_limit)).map_err(|e| {
-                TransactionQueueSendTransactionError::TransactionConversionError(e.to_string())
-            })?
+            working_transaction
+                .to_eip1559_typed_transaction_with_gas_limit(
+                    Some(&gas_price),
+                    Some(estimated_gas_limit),
+                )
+                .map_err(|e| {
+                    TransactionQueueSendTransactionError::TransactionConversionError(e.to_string())
+                })?
         };
         info!(
             "Set gas limit {} for transaction {} on relayer: {}",
@@ -1114,8 +1099,7 @@ impl TransactionsQueue {
 
         info!(
             "Sending transaction {:?} to network for relayer: {}",
-            transaction_request,
-            self.relayer.name
+            transaction_request, self.relayer.name
         );
         let transaction_hash = self
             .evm_provider
@@ -1131,15 +1115,12 @@ impl TransactionsQueue {
 
         info!(
             "Transaction {} sent successfully with hash {} for relayer: {}",
-            transaction_sent.id,
-            transaction_sent.hash,
-            self.relayer.name
+            transaction_sent.id, transaction_sent.hash, self.relayer.name
         );
 
         info!(
             "Updating database for sent transaction {} on relayer: {}",
-            transaction.id,
-            self.relayer.name
+            transaction.id, self.relayer.name
         );
         db.transaction_sent(
             &transaction_sent.id,
@@ -1152,8 +1133,7 @@ impl TransactionsQueue {
 
         info!(
             "Successfully processed transaction {} for relayer: {}",
-            transaction.id,
-            self.relayer.name
+            transaction.id, self.relayer.name
         );
         Ok(transaction_sent)
     }
@@ -1176,22 +1156,19 @@ impl TransactionsQueue {
     ) -> Result<Option<AnyTransactionReceipt>, RpcError<TransportErrorKind>> {
         info!(
             "Getting receipt for transaction hash {} on relayer: {}",
-            transaction_hash,
-            self.relayer.name
+            transaction_hash, self.relayer.name
         );
         let receipt = self.evm_provider.get_receipt(transaction_hash).await?;
 
         if receipt.is_some() {
             info!(
                 "Receipt found for transaction hash {} on relayer: {}",
-                transaction_hash,
-                self.relayer.name
+                transaction_hash, self.relayer.name
             );
         } else {
             info!(
                 "No receipt found for transaction hash {} on relayer: {}",
-                transaction_hash,
-                self.relayer.name
+                transaction_hash, self.relayer.name
             );
         }
 

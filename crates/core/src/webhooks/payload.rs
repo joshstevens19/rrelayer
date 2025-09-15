@@ -1,7 +1,3 @@
-use alloy::network::AnyTransactionReceipt;
-use serde::{Deserialize, Serialize};
-use std::time::SystemTime;
-
 use crate::{
     network::types::ChainId,
     relayer::types::RelayerId,
@@ -11,6 +7,9 @@ use crate::{
         TransactionValue,
     },
 };
+use alloy::network::AnyTransactionReceipt;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 use super::types::WebhookEventType;
 
@@ -21,11 +20,7 @@ pub struct WebhookPayload {
     /// Transaction information
     pub transaction: WebhookTransactionData,
     /// Timestamp when the event occurred
-    #[serde(
-        serialize_with = "crate::shared::serializers::serialize_system_time",
-        deserialize_with = "crate::shared::serializers::deserialize_system_time"
-    )]
-    pub timestamp: SystemTime,
+    pub timestamp: DateTime<Utc>,
     /// API version for payload compatibility
     pub api_version: String,
     /// Original transaction data (for replacement events)
@@ -61,35 +56,17 @@ pub struct WebhookTransactionData {
     #[serde(rename = "txHash", skip_serializing_if = "Option::is_none")]
     pub transaction_hash: Option<TransactionHash>,
     /// When transaction was queued
-    #[serde(
-        rename = "queuedAt",
-        serialize_with = "crate::shared::serializers::serialize_system_time",
-        deserialize_with = "crate::shared::serializers::deserialize_system_time"
-    )]
-    pub queued_at: SystemTime,
+    #[serde(rename = "queuedAt")]
+    pub queued_at: DateTime<Utc>,
     /// When transaction was sent (if applicable)
-    #[serde(
-        rename = "sentAt",
-        skip_serializing_if = "Option::is_none",
-        serialize_with = "crate::shared::serializers::serialize_system_time_option",
-        deserialize_with = "crate::shared::serializers::deserialize_system_time_option"
-    )]
-    pub sent_at: Option<SystemTime>,
+    #[serde(rename = "sentAt", skip_serializing_if = "Option::is_none")]
+    pub sent_at: Option<DateTime<Utc>>,
     /// When transaction was confirmed (if applicable)
-    #[serde(
-        rename = "confirmedAt",
-        skip_serializing_if = "Option::is_none",
-        serialize_with = "crate::shared::serializers::serialize_system_time_option",
-        deserialize_with = "crate::shared::serializers::deserialize_system_time_option"
-    )]
-    pub confirmed_at: Option<SystemTime>,
+    #[serde(rename = "confirmedAt", skip_serializing_if = "Option::is_none")]
+    pub confirmed_at: Option<DateTime<Utc>>,
     /// Transaction expiration time
-    #[serde(
-        rename = "expiresAt",
-        serialize_with = "crate::shared::serializers::serialize_system_time",
-        deserialize_with = "crate::shared::serializers::deserialize_system_time"
-    )]
-    pub expires_at: SystemTime,
+    #[serde(rename = "expiresAt")]
+    pub expires_at: DateTime<Utc>,
 }
 
 impl From<&Transaction> for WebhookTransactionData {
@@ -118,7 +95,7 @@ impl WebhookPayload {
         Self {
             event_type,
             transaction: WebhookTransactionData::from(transaction),
-            timestamp: SystemTime::now(),
+            timestamp: Utc::now(),
             api_version: "1.0".to_string(),
             original_transaction: None,
             receipt: None,
@@ -134,7 +111,7 @@ impl WebhookPayload {
         Self {
             event_type,
             transaction: WebhookTransactionData::from(transaction),
-            timestamp: SystemTime::now(),
+            timestamp: Utc::now(),
             api_version: "1.0".to_string(),
             original_transaction: Some(WebhookTransactionData::from(original_transaction)),
             receipt: None,
@@ -150,7 +127,7 @@ impl WebhookPayload {
         Self {
             event_type,
             transaction: WebhookTransactionData::from(transaction),
-            timestamp: SystemTime::now(),
+            timestamp: Utc::now(),
             api_version: "1.0".to_string(),
             original_transaction: None,
             receipt: Some(receipt.clone()),
