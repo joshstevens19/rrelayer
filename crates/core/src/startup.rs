@@ -14,7 +14,7 @@ use thiserror::Error;
 use tokio::sync::Mutex;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 use tracing::error;
-
+use tracing::log::info;
 use crate::authentication::api::create_basic_auth_routes;
 use crate::background_tasks::run_background_tasks;
 use crate::yaml::ReadYamlError;
@@ -62,11 +62,8 @@ pub enum StartApiError {
 /// Health check endpoint that returns HTTP 200 OK.
 ///
 /// Used by load balancers and monitoring systems to verify the service is running.
-///
-/// # Returns
-/// * `StatusCode::OK` - Always returns HTTP 200
 async fn health_check() -> impl IntoResponse {
-    StatusCode::OK
+    "healthy"
 }
 
 /// Middleware that logs all HTTP requests and responses with timing information.
@@ -246,15 +243,18 @@ async fn start_api(
         .allow_methods(Any)
         .allow_headers(Any);
 
-    let app = Router::new()
-        .route("/health", get(health_check))
+    let protected_routes = Router::new()
         .nest("/auth", create_basic_auth_routes())
         .nest("/gas", create_gas_routes())
         .nest("/networks", create_network_routes())
         .nest("/relayers", create_relayer_routes())
         .nest("/transactions", create_transactions_routes())
         .nest("/signing", create_signing_history_routes())
-        .route_layer(middleware::from_fn(basic_auth_guard))
+        .layer(middleware::from_fn(basic_auth_guard));
+    
+    let app = Router::new()
+        .route("/health", get(health_check))
+        .merge(protected_routes)
         .layer(middleware::from_fn(activity_logger))
         .layer(cors)
         .with_state(app_state)
@@ -263,7 +263,7 @@ async fn start_api(
     let address = format!("localhost:{}", api_config.port);
 
     let listener = tokio::net::TcpListener::bind(&address).await?;
-    rrelayer_info!("listening on http://{}", address);
+    info!("listening on http://{}", address);
     axum::serve(listener, app).await.map_err(StartApiError::ApiStartupError)?;
 
     Ok(())
@@ -337,7 +337,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
     setup_info_logger();
     dotenv().ok();
 
-    rrelayer_info!("Starting up the server");
+    info!("Starting up the server");
 
     let yaml_path = project_path.join("rrelayer.yaml");
     if !yaml_path.exists() {
@@ -348,7 +348,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
     let postgres = PostgresClient::new().await?;
 
     apply_schema(&postgres).await?;
-    rrelayer_info!("Applied database schema");
+    info!("Applied database schema");
 
     let config = read(&yaml_path, false)?;
 

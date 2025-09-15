@@ -17,9 +17,6 @@ signing_key:
 #  privy:
 #    app_id: "cmeim2cey01hal40bvtk2ji3z"
 #    app_secret: "2jwEdV9rURx2Fhy8qGHWYVoWFQTyHDjM3ZeEXhmRHZFsNvVX71DZPAvnWTeA6uFce93E8a7e16ybzYbXs9vB6SN4"
-admins:
-  - "0xa4635F69E5A64CD48da3FbC999aCed87B00756F6"
-  # - account1
 networks:
   #    - name: sepolia_ethereum
   #      provider_urls:

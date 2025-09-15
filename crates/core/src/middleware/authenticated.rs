@@ -3,6 +3,7 @@ use axum::{
     extract::FromRequestParts,
     http::{request::Parts, StatusCode},
 };
+use tracing::log::error;
 
 /// Marker type indicating that a request has been authenticated.
 ///
@@ -35,6 +36,12 @@ where
             .extensions
             .get::<Authenticated>()
             .map(|_| Authenticated)
-            .ok_or(StatusCode::UNAUTHORIZED)
+            .ok_or_else(|| {
+               error!(
+                    "Authentication marker missing from request extensions for path: {}",
+                    parts.uri.path()
+                );
+                StatusCode::UNAUTHORIZED
+            })
     }
 }

@@ -10,6 +10,7 @@ use alloy::{
 };
 use thiserror::Error;
 use tokio::sync::Mutex;
+use tracing::info;
 
 /// Error types for transaction queues operations.
 #[derive(Error, Debug)]
@@ -21,6 +22,7 @@ pub enum TransactionsQueuesError {
 }
 
 use super::{
+    start::spawn_processing_tasks_for_relayer,
     transactions_queue::TransactionsQueue,
     types::{
         AddTransactionError, CancelTransactionError, EditableTransactionType,
@@ -32,7 +34,7 @@ use super::{
 };
 use crate::transaction::api::send_transaction::RelayTransactionRequest;
 use crate::{
-    gas::{blob_gas_oracle::BlobGasOracleCache, gas_oracle::GasOracleCache},
+    gas::{blob_gas_oracle::BlobGasOracleCache, gas_oracle::GasOracleCache, types::GasLimit},
     postgres::{PostgresClient, PostgresConnectionError, PostgresError},
     relayer::types::RelayerId,
     safe_proxy::SafeProxyManager,
@@ -218,9 +220,11 @@ impl TransactionsQueues {
     ///
     /// Creates a new transaction queue for the relayer with fresh state (empty queues).
     /// The current nonce is fetched from the provider to ensure proper initialization.
+    /// Spawns the processing tasks for the new relayer.
     ///
     /// # Arguments
     /// * `setup` - The configuration for the new relayer's transaction queue
+    /// * `queues_arc` - Arc reference to the TransactionsQueues for spawning processing tasks
     ///
     /// # Returns
     /// * `Ok(())` - If the relayer was added successfully
@@ -228,11 +232,13 @@ impl TransactionsQueues {
     pub async fn add_new_relayer(
         &mut self,
         setup: TransactionsQueueSetup,
+        queues_arc: Arc<Mutex<TransactionsQueues>>,
     ) -> Result<(), WalletOrProviderError> {
         let current_nonce = setup.evm_provider.get_nonce(&setup.relayer.wallet_index).await?;
+        let relayer_id = setup.relayer.id;
 
         self.queues.insert(
-            setup.relayer.id,
+            relayer_id,
             Arc::new(Mutex::new(TransactionsQueue::new(
                 TransactionsQueueSetup::new(
                     setup.relayer,
@@ -247,6 +253,9 @@ impl TransactionsQueues {
                 self.blob_gas_oracle_cache.clone(),
             ))),
         );
+
+        // Spawn processing tasks for the new relayer
+        spawn_processing_tasks_for_relayer(queues_arc, &relayer_id).await;
 
         Ok(())
     }
@@ -406,13 +415,16 @@ impl TransactionsQueues {
                 .await
                 .map_err(AddTransactionError::TransactionGasPriceError)?;
 
-            let transaction_request: TypedTransaction = if transaction.is_blob_transaction() {
+            // First, estimate gas limit by creating a temporary transaction with a high gas limit
+            let temp_gas_limit = GasLimit::new(10_000_000); // High temporary limit for estimation
+            
+            let temp_transaction_request = if transaction.is_blob_transaction() {
                 let blob_gas_price = transactions_queue
                     .compute_blob_gas_price_for_transaction(&transaction_to_send.speed, &None)
                     .await
                     .map_err(AddTransactionError::TransactionGasPriceError)?;
                 transaction
-                    .to_blob_typed_transaction(Some(&gas_price), Some(&blob_gas_price))
+                    .to_blob_typed_transaction_with_gas_limit(Some(&gas_price), Some(&blob_gas_price), Some(temp_gas_limit))
                     .map_err(|e| {
                         AddTransactionError::InternalError(format!(
                             "Transaction conversion error: {}",
@@ -420,14 +432,51 @@ impl TransactionsQueues {
                         ))
                     })?
             } else if transactions_queue.is_legacy_transactions() {
-                transaction.to_legacy_typed_transaction(Some(&gas_price)).map_err(|e| {
+                transaction.to_legacy_typed_transaction_with_gas_limit(Some(&gas_price), Some(temp_gas_limit)).map_err(|e| {
                     AddTransactionError::InternalError(format!(
                         "Transaction conversion error: {}",
                         e
                     ))
                 })?
             } else {
-                transaction.to_eip1559_typed_transaction(Some(&gas_price)).map_err(|e| {
+                transaction.to_eip1559_typed_transaction_with_gas_limit(Some(&gas_price), Some(temp_gas_limit)).map_err(|e| {
+                    AddTransactionError::InternalError(format!(
+                        "Transaction conversion error: {}",
+                        e
+                    ))
+                })?
+            };
+
+            let estimated_gas_limit = transactions_queue
+                .estimate_gas(&temp_transaction_request, transaction.is_noop)
+                .await
+                .map_err(|e| AddTransactionError::TransactionEstimateGasError(*relayer_id, e))?;
+
+            transaction.gas_limit = Some(estimated_gas_limit);
+
+            // Now create the final transaction with the estimated gas limit
+            let transaction_request: TypedTransaction = if transaction.is_blob_transaction() {
+                let blob_gas_price = transactions_queue
+                    .compute_blob_gas_price_for_transaction(&transaction_to_send.speed, &None)
+                    .await
+                    .map_err(AddTransactionError::TransactionGasPriceError)?;
+                transaction
+                    .to_blob_typed_transaction_with_gas_limit(Some(&gas_price), Some(&blob_gas_price), Some(estimated_gas_limit))
+                    .map_err(|e| {
+                        AddTransactionError::InternalError(format!(
+                            "Transaction conversion error: {}",
+                            e
+                        ))
+                    })?
+            } else if transactions_queue.is_legacy_transactions() {
+                transaction.to_legacy_typed_transaction_with_gas_limit(Some(&gas_price), Some(estimated_gas_limit)).map_err(|e| {
+                    AddTransactionError::InternalError(format!(
+                        "Transaction conversion error: {}",
+                        e
+                    ))
+                })?
+            } else {
+                transaction.to_eip1559_typed_transaction_with_gas_limit(Some(&gas_price), Some(estimated_gas_limit)).map_err(|e| {
                     AddTransactionError::InternalError(format!(
                         "Transaction conversion error: {}",
                         e

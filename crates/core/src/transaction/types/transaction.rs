@@ -165,6 +165,7 @@ impl Transaction {
     ///
     /// # Arguments
     /// * `override_gas_price` - Optional gas price to override stored values
+    /// * `override_gas_limit` - Optional gas limit to override stored values
     ///
     /// # Returns
     /// * `Ok(TypedTransaction)` - EIP-1559 typed transaction
@@ -173,18 +174,40 @@ impl Transaction {
         &self,
         override_gas_price: Option<&GasPriceResult>,
     ) -> Result<TypedTransaction, TransactionConversionError> {
+        self.to_eip1559_typed_transaction_with_gas_limit(override_gas_price, None)
+    }
+
+    /// Converts this transaction to an EIP-1559 typed transaction with optional gas limit override.
+    ///
+    /// Creates an EIP-1559 transaction with max priority fee and max fee per gas.
+    ///
+    /// # Arguments
+    /// * `override_gas_price` - Optional gas price to override stored values
+    /// * `override_gas_limit` - Optional gas limit to override stored values
+    ///
+    /// # Returns
+    /// * `Ok(TypedTransaction)` - EIP-1559 typed transaction
+    /// * `Err(TransactionConversionError)` - If gas price or gas limit information is missing
+    pub fn to_eip1559_typed_transaction_with_gas_limit(
+        &self,
+        override_gas_price: Option<&GasPriceResult>,
+        override_gas_limit: Option<GasLimit>,
+    ) -> Result<TypedTransaction, TransactionConversionError> {
         let gas_price_result = match override_gas_price {
             Some(gas_price) => gas_price,
             None => self.sent_with_gas.as_ref().ok_or(TransactionConversionError::NoGasPrice)?,
+        };
+
+        let gas_limit = match override_gas_limit {
+            Some(limit) => limit,
+            None => self.gas_limit.ok_or(TransactionConversionError::NoGasLimit)?,
         };
 
         Ok(TypedTransaction::Eip1559(TxEip1559 {
             to: TxKind::Call(self.to.into()),
             value: self.value.clone().into(),
             input: self.data.clone().into(),
-            // TODO: fix
-            // gas_limit: self.gas_limit.unwrap().into(),
-            gas_limit: 210000,
+            gas_limit: gas_limit.into(),
             nonce: self.nonce.into(),
             max_priority_fee_per_gas: gas_price_result.max_priority_fee.clone().into(),
             max_fee_per_gas: gas_price_result.max_fee.into(),
@@ -197,6 +220,14 @@ impl Transaction {
         &self,
         override_gas_price: Option<&GasPriceResult>,
     ) -> Result<TypedTransaction, TransactionConversionError> {
+        self.to_legacy_typed_transaction_with_gas_limit(override_gas_price, None)
+    }
+
+    pub fn to_legacy_typed_transaction_with_gas_limit(
+        &self,
+        override_gas_price: Option<&GasPriceResult>,
+        override_gas_limit: Option<GasLimit>,
+    ) -> Result<TypedTransaction, TransactionConversionError> {
         let gas_price_result = match override_gas_price {
             Some(gas_price) => gas_price.legacy_gas_price(),
             None => self
@@ -206,7 +237,10 @@ impl Transaction {
                 .legacy_gas_price(),
         };
 
-        let gas_limit = self.gas_limit.ok_or(TransactionConversionError::NoGasLimit)?;
+        let gas_limit = match override_gas_limit {
+            Some(limit) => limit,
+            None => self.gas_limit.ok_or(TransactionConversionError::NoGasLimit)?,
+        };
 
         Ok(TypedTransaction::Legacy(TxLegacy {
             to: TxKind::Call(self.to.into()),
@@ -223,6 +257,15 @@ impl Transaction {
         &self,
         override_gas_price: Option<&GasPriceResult>,
         override_blob_gas_price: Option<&BlobGasPriceResult>,
+    ) -> Result<TypedTransaction, TransactionConversionError> {
+        self.to_blob_typed_transaction_with_gas_limit(override_gas_price, override_blob_gas_price, None)
+    }
+
+    pub fn to_blob_typed_transaction_with_gas_limit(
+        &self,
+        override_gas_price: Option<&GasPriceResult>,
+        override_blob_gas_price: Option<&BlobGasPriceResult>,
+        override_gas_limit: Option<GasLimit>,
     ) -> Result<TypedTransaction, TransactionConversionError> {
         let gas_price_result = match override_gas_price {
             Some(gas_price) => gas_price,
@@ -247,6 +290,10 @@ impl Transaction {
             .build()
             .map_err(|e| TransactionConversionError::BlobSidecarBuild(e.to_string()))?;
 
+        let gas_limit = match override_gas_limit {
+            Some(limit) => limit,
+            None => self.gas_limit.ok_or(TransactionConversionError::NoGasLimit)?,
+        };
         let blob_versioned_hashes = sidecar.versioned_hashes().collect::<Vec<_>>();
 
         let tx = TxEip4844 {
@@ -254,9 +301,7 @@ impl Transaction {
             nonce: self.nonce.into(),
             max_priority_fee_per_gas: gas_price_result.max_priority_fee.into(),
             max_fee_per_gas: gas_price_result.max_fee.into(),
-            // TODO: fix
-            // gas_limit: self.gas_limit.unwrap().into(),
-            gas_limit: 210000,
+            gas_limit: gas_limit.into(),
             to: self.to.into(),
             value: self.value.clone().into(),
             access_list: Default::default(),

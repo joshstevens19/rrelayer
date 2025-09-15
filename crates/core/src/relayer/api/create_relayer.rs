@@ -68,15 +68,18 @@ pub async fn create_relayer(
         .transactions_queues
         .lock()
         .await
-        .add_new_relayer(TransactionsQueueSetup::new(
-            relayer,
-            provider.clone(),
-            NonceManager::new(current_nonce),
-            Default::default(),
-            Default::default(),
-            Default::default(),
-            None, // Safe proxy manager not available for dynamically added relayers
-        ))
+        .add_new_relayer(
+            TransactionsQueueSetup::new(
+                relayer,
+                provider.clone(),
+                NonceManager::new(current_nonce),
+                Default::default(),
+                Default::default(),
+                Default::default(),
+                None, // Safe proxy manager not available for dynamically added relayers
+            ),
+            state.transactions_queues.clone(),
+        )
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 

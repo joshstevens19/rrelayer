@@ -4,6 +4,7 @@ members = [
     "crates/cli",
     "crates/core",
     "crates/sdk",
+    "crates/e2e-tests",
 ]
 
 [workspace.dependencies]

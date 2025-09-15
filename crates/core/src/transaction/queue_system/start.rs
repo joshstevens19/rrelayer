@@ -2,7 +2,7 @@ use std::{collections::VecDeque, sync::Arc};
 
 use thiserror::Error;
 use tokio::sync::Mutex;
-use tracing::warn;
+use tracing::{info, warn};
 
 use super::{transactions_queues::TransactionsQueues, types::TransactionRelayerSetup};
 use crate::{
@@ -20,6 +20,39 @@ use crate::{
     transaction::types::{Transaction, TransactionStatus},
 };
 
+/// Spawns processing tasks for a single relayer.
+///
+/// Creates three concurrent processing tasks for the specified relayer:
+/// - Pending transactions processing
+/// - In-mempool transactions processing  
+/// - Mined transactions processing
+///
+/// # Arguments
+/// * `transaction_queue` - The shared transaction queues container
+/// * `relayer_id` - The ID of the relayer to spawn tasks for
+pub async fn spawn_processing_tasks_for_relayer(
+    transaction_queue: Arc<Mutex<TransactionsQueues>>,
+    relayer_id: &RelayerId,
+) {
+    let queue_clone_pending = transaction_queue.clone();
+    let relayer_id_pending = *relayer_id;
+    tokio::spawn(async move {
+        continuously_process_pending_transactions(queue_clone_pending, &relayer_id_pending).await;
+    });
+
+    let queue_clone_inmempool = transaction_queue.clone();
+    let relayer_id_inmempool = *relayer_id;
+    tokio::spawn(async move {
+        continuously_process_inmempool_transactions(queue_clone_inmempool, &relayer_id_inmempool).await;
+    });
+
+    let queue_clone_mined = transaction_queue.clone();
+    let relayer_id_mined = *relayer_id;
+    tokio::spawn(async move {
+        continuously_process_mined_transactions(queue_clone_mined, &relayer_id_mined).await;
+    });
+}
+
 /// Spawns background processing tasks for all transaction queues.
 ///
 /// Creates three concurrent processing tasks for each relayer:
@@ -34,20 +67,7 @@ async fn spawn_processing_tasks(transaction_queue: Arc<Mutex<TransactionsQueues>
         { transaction_queue.lock().await.queues.keys().cloned().collect() };
 
     for relayer_id in relay_ids {
-        let queue_clone_pending = transaction_queue.clone();
-        tokio::spawn(async move {
-            continuously_process_pending_transactions(queue_clone_pending, &relayer_id).await;
-        });
-
-        let queue_clone_inmempool = transaction_queue.clone();
-        tokio::spawn(async move {
-            continuously_process_inmempool_transactions(queue_clone_inmempool, &relayer_id).await;
-        });
-
-        let queue_clone_mined = transaction_queue.clone();
-        tokio::spawn(async move {
-            continuously_process_mined_transactions(queue_clone_mined, &relayer_id).await;
-        });
+        spawn_processing_tasks_for_relayer(transaction_queue.clone(), &relayer_id).await;
     }
 }
 
@@ -79,7 +99,7 @@ async fn continuously_process_pending_transactions(
 
         match result {
             Ok(result) => {
-                // rrelayer_info!("PENDING: {:?}", result);
+                // info!("PENDING: {:?}", result);
                 processes_next_break(&result.process_again_after).await;
             }
             Err(e) => rrelayer_error!("PENDING ERROR: {}", e),

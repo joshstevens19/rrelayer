@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use alloy::network::AnyRpcBlock;
+use alloy::network::{AnyRpcBlock, TransactionResponse};
 use alloy::{
     consensus::Transaction,
     eips::{BlockId, BlockNumberOrTag},
@@ -117,29 +117,67 @@ fn calculate_percentile(prices: &mut [u128], percentile: f64) -> u128 {
 impl BaseGasFeeEstimator for FallbackGasFeeEstimator {
     async fn get_gas_prices(
         &self,
-        _chain_id: &ChainId,
+        chain_id: &ChainId,
     ) -> Result<GasEstimatorResult, GasEstimatorError> {
-        let num_blocks_to_check = 5u64;
+        // println!("=== STARTING GAS ESTIMATION for chain {} ===", chain_id.u64());
         let latest_block = self
             .provider
             .get_block_number()
             .await
             .map_err(|e| GasEstimatorError::CustomError(e.to_string()))?;
 
-        // Get safe block range to avoid underflow
-        let block_numbers = self.get_safe_block_range(latest_block, num_blocks_to_check);
+        // println!("=== GAS ESTIMATION DEBUG ===");
+        // println!("Latest block: {}", latest_block);
+        
+        // Smart block selection: look for blocks with transactions
+        let mut block_numbers = Vec::new();
+        let max_lookback = 50u64; // Don't go back more than 50 blocks
+        
+        for i in 0..max_lookback {
+            let block_num = latest_block.saturating_sub(i);
+            if block_num == 0 {
+                break;
+            }
+            
+            // Quick check if this block has transactions by looking at gas used
+            if let Ok(Some(block)) = self.provider.get_block(
+                BlockId::Number(BlockNumberOrTag::Number(block_num.into())), 
+                BlockTransactionsKind::Full  // We need Full to get transaction details
+            ).await {
+                if block.header.gas_used > 0 {
+                    block_numbers.push(block_num);
+                    // println!("Found block with transactions: {} (gas_used: {})", block_num, block.header.gas_used);
+                    if block_numbers.len() >= 10 {  // Collect up to 10 blocks with transactions
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // println!("Selected blocks with transactions: {:?}", block_numbers);
+        // println!("============================");
 
         if block_numbers.is_empty() {
             return Err(GasEstimatorError::CustomError(
-                "No blocks available for gas estimation".to_string(),
+                "No blocks with transactions found for gas estimation".to_string(),
             ));
         }
 
         let block_futures =
             block_numbers.iter().map(|&block_number| self.get_block_with_txs(block_number.into()));
 
-        let blocks = join_all(block_futures)
-            .await
+        let block_results = join_all(block_futures).await;
+        
+        // println!("Block fetch results: {} requests made", block_results.len());
+        // for (i, result) in block_results.iter().enumerate() {
+        //     match result {
+        //         Ok(Some(block)) => println!("Block {}: OK, number={:?}", i, block.header.number),
+        //         Ok(None) => println!("Block {}: No block found", i),
+        //         Err(e) => println!("Block {}: Error - {}", i, e),
+        //     }
+        // }
+        
+        let blocks = block_results
             .into_iter()
             .filter_map(Result::ok)
             .flatten()
@@ -156,12 +194,54 @@ impl BaseGasFeeEstimator for FallbackGasFeeEstimator {
         let mut legacy_gas_prices: Vec<u128> = Vec::new();
 
         for block in blocks {
+            // println!("=== BLOCK DEBUG ===");
+            // println!("Block number: {:?}", block.header.number);
+            // println!("Block hash: {:?}", block.header.hash);
+            // println!("Block transactions count (header): {:?}", block.header.transactions_root);
+            // println!("Block gas used: {:?}", block.header.gas_used);
+            // println!("Block transactions type: {:?}", std::mem::discriminant(&block.transactions));
+            
+            // Let's also manually check what anvil returns for this block
+            let block_num = block.header.number;
+            // println!("*** MANUAL RPC CHECK for block {} ***", block_num);
+            
+            // Make a direct RPC call to double-check
+            if let Ok(direct_block) = self.provider.get_block(
+                BlockId::Number(BlockNumberOrTag::Number(block_num.into())), 
+                BlockTransactionsKind::Full
+            ).await {
+                if let Some(direct_block) = direct_block {
+                    // println!("DIRECT RPC: Block {} gas_used={:?}", block_num, direct_block.header.gas_used);
+                    if let Some(direct_txs) = direct_block.transactions.as_transactions() {
+                        // println!("DIRECT RPC: {} transactions found", direct_txs.len());
+                    } else {
+                        // println!("DIRECT RPC: transaction hashes only");
+                    }
+                } else {
+                    // println!("DIRECT RPC: Block {} not found", block_num);
+                }
+            } else {
+                // println!("DIRECT RPC: Error fetching block {}", block_num);
+            }
+            
+            if let Some(txs) = block.transactions.as_transactions() {
+                // println!("Full transactions: {} found", txs.len());
+                for (i, tx) in txs.iter().enumerate() {
+                    // println!("  Tx {}: hash={:?}, gas_price={:?}", i, tx.tx_hash(), Transaction::gas_price(&tx.inner).unwrap_or_default());
+                }
+            } else {
+                // println!("Transaction hashes only (no details available)");
+            }
+            // println!("==================");
+
             let txs = block.transactions.as_transactions().ok_or_else(|| {
                 GasEstimatorError::CustomError("Failed to get transactions".to_string())
-            })?;
+            })?.to_vec(); // Clone the transactions
+
+            // println!("Extracted {} transactions from block", txs.len());
 
             for tx in txs {
-                match (tx.max_priority_fee_per_gas(), tx.max_fee_per_gas(), tx.gas_price()) {
+                match (tx.max_priority_fee_per_gas(), Transaction::max_fee_per_gas(&tx), Transaction::gas_price(&tx)) {
                     // EIP-1559 transaction with all fields
                     (Some(priority_fee), max_fee, _) => {
                         priority_fees.push(priority_fee);
