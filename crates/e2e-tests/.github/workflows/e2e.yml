@@ -1,0 +1,104 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  e2e-tests:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: password
+          POSTGRES_USER: rrelayer
+          POSTGRES_DB: rrelayer_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: stable
+
+    - name: Install Foundry
+      uses: foundry-rs/foundry-toolchain@v1
+      with:
+        version: nightly
+
+    - name: Cache Cargo dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Build RRelayer
+      run: |
+        cd crates/core
+        cargo build --release
+
+    - name: Setup test database
+      run: |
+        # Run database migrations
+        export DATABASE_URL="postgresql://rrelayer:password@localhost:5432/rrelayer_test"
+        # Add your migration commands here
+        echo "Database setup complete"
+
+    - name: Start RRelayer in background
+      run: |
+        cd crates/core
+        export DATABASE_URL="postgresql://rrelayer:password@localhost:5432/rrelayer_test"
+        export RUST_LOG=info
+        cargo run --release &
+        echo $! > rrelayer.pid
+        
+        # Wait for RRelayer to start
+        sleep 10
+        
+        # Verify RRelayer is responding
+        curl -f http://localhost:3000/health || exit 1
+      
+    - name: Run E2E Tests
+      run: |
+        cd crates/e2e-tests
+        export RUST_LOG=info
+        export RRELAYER_BASE_URL="http://localhost:3000"
+        export TEST_TIMEOUT_SECONDS=60
+        cargo run --bin e2e-runner
+      timeout-minutes: 10
+
+    - name: Stop RRelayer
+      if: always()
+      run: |
+        if [ -f crates/core/rrelayer.pid ]; then
+          kill $(cat crates/core/rrelayer.pid) || true
+        fi
+
+    - name: Collect logs on failure
+      if: failure()
+      run: |
+        echo "=== RRelayer logs ==="
+        # Add log collection if you have file logging
+        echo "=== Anvil status ==="
+        ps aux | grep anvil || true

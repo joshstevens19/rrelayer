@@ -1,0 +1,49 @@
+[package]
+name = "rrelayer_e2e_tests"
+version = "0.1.0"
+resolver = "2"
+edition = "2021"
+
+[[bin]]
+name = "e2e-runner"
+path = "src/main.rs"
+
+[dependencies]
+# Core dependencies
+tokio = { version = "1.0", features = ["full"] }
+anyhow = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+alloy = { workspace = true, features = ["full", "signer-mnemonic", "eips", "eip712", "signer-keystore", "signer-aws"] }
+alloy-rlp = { workspace = true }
+alloy-eips = { workspace = true }
+
+# HTTP client
+reqwest = { version = "0.11", features = ["json"] }
+
+# Database client for schema reset
+tokio-postgres = "0.7"
+
+# Test framework
+assert_matches = "1.5"
+
+# Core rrelayer dependencies
+rrelayer_core = { path = "../core" }
+rrelayer_sdk = { path = "../sdk" }
+
+# Process management for Anvil
+# tokio-process = "0.2"  # Not needed, using tokio::process
+
+# Time utilities
+chrono = { version = "0.4", features = ["serde"] }
+dotenv = "0.15"
+
+# Temporary files
+tempfile = "3.8"
+# Simple HTTP server for gas API
+warp = "0.3"
+
+[dev-dependencies]
