@@ -95,7 +95,8 @@ impl TestRunner {
             ("simple_eth_transfer", self.test_simple_eth_transfer().await),
             ("contract_interaction", self.test_contract_interaction().await),
             ("transaction_status_tracking", self.test_transaction_status_tracking().await),
-            ("failed_transaction_handling", self.test_failed_transaction_handling().await),
+            ("failed_transaction_handling_not_enough_funds", self.test_failed_transaction_handling_not_enough_funds().await),
+            ("failed_transaction_handling_revert_execution", self.test_failed_transaction_handling_revert_execution().await),
             ("gas_estimation", self.test_gas_estimation().await),
             ("transaction_replacement", self.test_transaction_replacement().await),
             ("batch_transactions", self.test_batch_transactions().await),
@@ -131,7 +132,8 @@ impl TestRunner {
             "simple_eth_transfer" => self.test_simple_eth_transfer().await,
             "contract_interaction" => self.test_contract_interaction().await,
             "transaction_status_tracking" => self.test_transaction_status_tracking().await,
-            "failed_transaction_handling" => self.test_failed_transaction_handling().await,
+            "failed_transaction_handling_not_enough_funds" => self.test_failed_transaction_handling_not_enough_funds().await,
+            "failed_transaction_handling_revert_execution" => self.test_failed_transaction_handling_revert_execution().await,
             "gas_estimation" => self.test_gas_estimation().await,
             "transaction_replacement" => self.test_transaction_replacement().await,
             "batch_transactions" => self.test_batch_transactions().await,
@@ -288,14 +290,12 @@ impl TestRunner {
         let relayer_id_str = relayer["id"].as_str().context("Missing relayer ID")?;
         let relayer_id = RelayerId::from_str(relayer_id_str).context("Invalid relayer ID")?;
 
-        // Get the deployed test contract address
         let contract_address =
             self.contract_interactor.contract_address().context("Test contract not deployed")?;
 
         let contract_address_str = format!("0x{:x}", contract_address);
         info!("Sending contract interaction to deployed contract at {}", contract_address_str);
 
-        // Verify contract is actually deployed and has code
         let is_deployed = self.contract_interactor.verify_contract_deployed().await?;
         if !is_deployed {
             return Err(anyhow::anyhow!("Contract verification failed - no code at address"));
@@ -366,20 +366,20 @@ impl TestRunner {
         Ok(())
     }
 
-    /// Test 5: Failed transaction handling
-    async fn test_failed_transaction_handling(&self) -> Result<()> {
-        let relayer = self.create_and_fund_relayer("failure-test-relayer").await?;
+    /// Test 5a: Failed transaction handling - insufficient funds
+    async fn test_failed_transaction_handling_not_enough_funds(&self) -> Result<()> {
+        let relayer = self.create_and_fund_relayer("failure-test-relayer-funds").await?;
 
         let relayer_id_str = relayer["id"].as_str().context("Missing relayer ID")?;
         let relayer_id = RelayerId::from_str(relayer_id_str).context("Invalid relayer ID")?;
 
-        // Send transaction to invalid address (should fail)
+        // Try to send more ETH than the relayer has (should fail at gas estimation)
         let result = self
             .relayer_client
             .send_transaction(
                 &relayer_id,
-                "0x0000000000000000000000000000000000000000", // Burn address
-                Some("1000000000000000000000"),               // Very large amount (should fail)
+                "0x0000000000000000000000000000000000000000",
+                Some("1000000000000000000000"), // 1000 ETH - way more than funded
                 None,
             )
             .await;
@@ -392,8 +392,44 @@ impl TestRunner {
                 debug!("Failure test result: {:?}", final_status);
             }
             Err(e) => {
-                debug!("Transaction rejected as expected: {}", e);
-                // This is also a valid outcome
+                info!("Transaction rejected as expected (insufficient funds): {}", e);
+                // This is the expected outcome for insufficient funds
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Test 5b: Failed transaction handling - contract execution revert
+    async fn test_failed_transaction_handling_revert_execution(&self) -> Result<()> {
+        let relayer = self.create_and_fund_relayer("failure-test-relayer-revert").await?;
+
+        let relayer_id_str = relayer["id"].as_str().context("Missing relayer ID")?;
+        let relayer_id = RelayerId::from_str(relayer_id_str).context("Invalid relayer ID")?;
+
+        let contract_address =
+            self.contract_interactor.contract_address().context("Test contract not deployed")?;
+
+        let contract_address_str = format!("0x{:x}", contract_address);
+
+        // Send transaction with invalid function selector that will revert
+        let result = self.relayer_client.send_transaction(
+            &relayer_id,
+            &contract_address_str,  // Valid contract
+            None,
+            Some("0xdeadbeef"), // Invalid function selector - will revert
+        ).await;
+
+        match result {
+            Ok(tx_response) => {
+                debug!("Contract revert transaction sent: {:?}", tx_response);
+                // Even if sent, it should fail during execution
+                let final_status = self.wait_for_transaction_completion(&tx_response.id).await;
+                debug!("Contract revert test result: {:?}", final_status);
+            }
+            Err(e) => {
+                info!("Transaction rejected as expected (contract revert): {}", e);
+                // This is also a valid outcome if gas estimation catches the revert
             }
         }
 
@@ -527,7 +563,6 @@ impl TestRunner {
                         "Transaction {} still pending, mining a block and waiting...",
                         transaction_id
                     );
-                    // Mine a block to help the transaction get processed
                     self.mine_and_wait().await?;
                     tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
                 }

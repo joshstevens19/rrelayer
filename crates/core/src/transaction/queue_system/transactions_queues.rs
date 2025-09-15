@@ -472,18 +472,24 @@ impl TransactionsQueues {
             .await
             .map_err(|e| AddTransactionError::TransactionEstimateGasError(transaction.relayer_id, e))?;
 
-        let final_transaction_request = Self::create_typed_transaction(
-            transactions_queue,
-            transaction,
-            gas_price,
-            blob_gas_price,
-            estimated_gas_limit,
-        )?;
-
-        transactions_queue
-            .simulate_transaction(&final_transaction_request)
-            .await
+        let relayer_balance = transactions_queue.get_balance().await
             .map_err(|e| AddTransactionError::TransactionEstimateGasError(transaction.relayer_id, e))?;
+            
+        let gas_cost = estimated_gas_limit.into_inner() as u128 * gas_price.legacy_gas_price().into_u128();
+        let total_required = transaction.value.into_inner() + alloy::primitives::U256::from(gas_cost);
+        
+        if relayer_balance < total_required {
+            tracing::error!("Insufficient balance for relayer {}: has {}, needs {}", 
+                transaction.relayer_id, relayer_balance, total_required);
+            return Err(AddTransactionError::TransactionEstimateGasError(
+                transaction.relayer_id, 
+                RpcError::Transport(
+                    TransportErrorKind::Custom(
+                        "Insufficient funds for gas * price + value".to_string().into()
+                    )
+                )
+            ));
+        }
 
         Ok(estimated_gas_limit)
     }
@@ -569,6 +575,8 @@ impl TransactionsQueues {
             blob_gas_price.as_ref()
         )
         .await;
+
+        info!("estimated_gas_limit {:?}", estimated_gas_limit);
 
         let estimated_gas_limit = match estimated_gas_limit {
             Ok(limit) => limit,

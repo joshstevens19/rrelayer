@@ -815,27 +815,6 @@ impl TransactionsQueue {
         Ok(tx_hash)
     }
 
-    /// Simulates a transaction to verify it would execute successfully.
-    ///
-    /// Performs a gas estimation call which simulates transaction execution
-    /// without actually submitting it, allowing validation before sending.
-    ///
-    /// # Arguments
-    /// * `transaction_request` - The transaction to simulate
-    ///
-    /// # Returns
-    /// * `Ok(())` - If simulation succeeds
-    /// * `Err(RpcError)` - If simulation fails or transaction would revert
-    pub async fn simulate_transaction(
-        &self,
-        transaction_request: &TypedTransaction,
-    ) -> Result<(), RpcError<TransportErrorKind>> {
-        info!("Simulating transaction for relayer: {}", self.relayer.name);
-        self.estimate_gas(transaction_request, Default::default()).await?;
-        info!("Transaction simulation successful for relayer: {}", self.relayer.name);
-        Ok(())
-    }
-
     /// Estimates the gas limit required for a transaction.
     ///
     /// Calls the network to estimate gas usage and applies a 20% buffer
@@ -1189,5 +1168,10 @@ impl TransactionsQueue {
         }
 
         Ok(receipt)
+    }
+
+    pub async fn get_balance(&self) -> Result<alloy::primitives::U256, RpcError<TransportErrorKind>> {
+        let address = self.relay_address();
+        self.evm_provider.get_balance(&address).await
     }
 }

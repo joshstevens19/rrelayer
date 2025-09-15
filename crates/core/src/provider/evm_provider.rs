@@ -519,6 +519,24 @@ impl EvmProvider {
         self.gas_estimator.get_gas_prices(&self.chain_id).await
     }
 
+    /// Retrieves the ETH balance for a given address.
+    ///
+    /// Queries the blockchain for the current ETH balance of the specified address.
+    ///
+    /// # Arguments
+    /// * `address` - The Ethereum address to check the balance for
+    ///
+    /// # Returns
+    /// * `Ok(alloy::primitives::U256)` - The balance in wei
+    /// * `Err(RpcError<TransportErrorKind>)` - RPC error during balance query
+    pub async fn get_balance(
+        &self,
+        address: &EvmAddress,
+    ) -> Result<alloy::primitives::U256, RpcError<TransportErrorKind>> {
+        let balance = self.rpc_client().get_balance(address.into_address()).await?;
+        Ok(balance)
+    }
+
     /// Checks if the current network supports blob transactions (EIP-4844).
     ///
     /// Blob transactions are a feature introduced in Ethereum's Dencun upgrade

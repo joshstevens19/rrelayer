@@ -157,10 +157,20 @@ test-transaction-status-tracking: ## Run transaction status tracking test
 	@make reset-db
 	@RUST_LOG=info,rrelayer_core=info RRELAYER_TEST_FILTER=transaction_status_tracking cargo run --bin e2e-runner
 
-test-failed-transaction-handling: ## Run failed transaction handling test
-	@echo "Running failed transaction handling test..."
+test-failed-transaction-handling-not-enough-funds:
+	@echo "Running failed transaction handling test (insufficient funds)..."
 	@make reset-db
-	@RUST_LOG=info,rrelayer_core=info RRELAYER_TEST_FILTER=failed_transaction_handling cargo run --bin e2e-runner
+	@RUST_LOG=info,rrelayer_core=info RRELAYER_TEST_FILTER=failed_transaction_handling_not_enough_funds cargo run --bin e2e-runner
+
+test-failed-transaction-handling-revert-execution:
+	@echo "Running failed transaction handling test (contract revert)..."
+	@make reset-db
+	@RUST_LOG=info,rrelayer_core=info RRELAYER_TEST_FILTER=failed_transaction_handling_revert_execution cargo run --bin e2e-runner
+
+test-failed-transaction-handling:
+	@echo "Running all failed transaction handling tests..."
+	@make test-failed-transaction-handling-not-enough-funds
+	@make test-failed-transaction-handling-revert-execution
 
 test-gas-estimation: ## Run gas estimation test
 	@echo "Running gas estimation test..."
