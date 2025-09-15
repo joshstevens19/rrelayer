@@ -104,10 +104,10 @@ impl From<&Transaction> for WebhookTransactionData {
             chain_id: transaction.chain_id,
             status: transaction.status,
             transaction_hash: transaction.known_transaction_hash.clone(),
-            queued_at: transaction.queued_at,
-            sent_at: transaction.sent_at,
-            confirmed_at: transaction.confirmed_at,
-            expires_at: transaction.expires_at,
+            queued_at: transaction.queued_at.into(),
+            sent_at: transaction.sent_at.map(|dt| dt.into()),
+            confirmed_at: transaction.confirmed_at.map(|dt| dt.into()),
+            expires_at: transaction.expires_at.into(),
         }
     }
 }

@@ -357,6 +357,35 @@ impl AnvilManager {
         info!("✅ Successfully mined {} blocks with gas price history (transactions in recent blocks)", num_blocks);
         Ok(())
     }
+
+    /// Mine a single block to confirm pending transactions
+    pub async fn mine_block(&self) -> Result<()> {
+        use reqwest::Client;
+
+        let client = Client::new();
+        let url = format!("http://127.0.0.1:{}", self.port);
+
+        let mine_request = serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "anvil_mine",
+            "params": [1],
+            "id": 9999
+        });
+
+        let response = client
+            .post(&url)
+            .header("Content-Type", "application/json")
+            .json(&mine_request)
+            .send()
+            .await
+            .context("Failed to mine block")?;
+
+        if !response.status().is_success() {
+            anyhow::bail!("Failed to mine block: {}", response.status());
+        }
+
+        Ok(())
+    }
 }
 
 impl Drop for AnvilManager {

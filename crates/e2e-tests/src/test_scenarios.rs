@@ -33,7 +33,16 @@ impl TestRunner {
         let relayer_client = RelayerClient::new(&config);
 
         let anvil_url = format!("http://127.0.0.1:{}", config.anvil_port);
-        let contract_interactor = ContractInteractor::new(&anvil_url).await?;
+        let mut contract_interactor = ContractInteractor::new(&anvil_url).await?;
+
+        // Deploy the test contract using the first Anvil private key
+        let deployer_private_key = &config.anvil_private_keys[0];
+        let contract_address = contract_interactor
+            .deploy_test_contract(deployer_private_key)
+            .await
+            .context("Failed to deploy test contract")?;
+        
+        info!("✅ Test contract deployed at: {:?}", contract_address);
 
         Ok(Self { config, relayer_client, contract_interactor })
     }
@@ -279,25 +288,28 @@ impl TestRunner {
         let relayer_id_str = relayer["id"].as_str().context("Missing relayer ID")?;
         let relayer_id = RelayerId::from_str(relayer_id_str).context("Invalid relayer ID")?;
 
-        // For testing purposes, we'll interact with a simple contract
-        // In practice, you'd deploy your test contract first
-        let contract_address = "0x5FbDB2315678afecb367f032d93F642f64180aa3"; // Placeholder
+        // Get the deployed test contract address
+        let contract_address = self.contract_interactor
+            .contract_address()
+            .context("Test contract not deployed")?;
 
-        debug!("Sending contract interaction to {}", contract_address);
+        let contract_address_str = format!("{:?}", contract_address);
+        info!("Sending contract interaction to deployed contract at {}", contract_address_str);
 
-        // Generate some simple calldata using our contract interactor
+        // Generate calldata for setValue(42) function
         let calldata = self.contract_interactor.encode_simple_call(42)?;
 
         let tx_response = self
             .relayer_client
-            .send_transaction(&relayer_id, contract_address, None, Some(&calldata))
+            .send_transaction(&relayer_id, &contract_address_str, None, Some(&calldata))
             .await
             .context("Failed to send contract interaction")?;
 
-        debug!("Contract interaction sent: {:?}", tx_response);
+        info!("Contract interaction sent: {:?}", tx_response);
 
         self.wait_for_transaction_completion(&tx_response.id).await?;
 
+        info!("✅ Contract interaction completed successfully");
         Ok(())
     }
 
