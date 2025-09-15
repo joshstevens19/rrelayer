@@ -85,12 +85,6 @@ networks:
   - name: "anvil-testnet" 
     provider_urls:
       - "http://127.0.0.1:{}"
-    gas_provider: "custom"
-
-gas_providers:
-  custom:
-    endpoint: "http://127.0.0.1:3001/gas"
-    supported_chains: [31337]
 
 api_config:
   port: 3000

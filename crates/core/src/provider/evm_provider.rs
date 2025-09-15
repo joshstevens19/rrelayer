@@ -494,8 +494,11 @@ impl EvmProvider {
     pub async fn estimate_gas(
         &self,
         transaction: &TypedTransaction,
+        from: &EvmAddress,
     ) -> Result<GasLimit, RpcError<TransportErrorKind>> {
-        let request: TransactionRequest = transaction.clone().into();
+        let mut request: TransactionRequest = transaction.clone().into();
+        // need from here else it will fail gas estimating
+        request.from = Some(from.into_address());
 
         let request_with_other = WithOtherFields::new(request);
 

@@ -11,6 +11,7 @@ use alloy::{
 use chrono::{DateTime, Utc};
 use thiserror::Error;
 use tokio::sync::Mutex;
+use tracing::info;
 
 /// Error types for transaction queues operations.
 #[derive(Error, Debug)]
@@ -453,10 +454,9 @@ impl TransactionsQueues {
         transaction: &Transaction,
         gas_price: &GasPriceResult,
         blob_gas_price: Option<&BlobGasPriceResult>,
-        relayer_id: &RelayerId,
     ) -> Result<GasLimit, AddTransactionError> {
-        // Use a high temporary limit for gas estimation
-        const TEMP_GAS_LIMIT: u128 = 10_000_000;
+        // Use a reasonable temporary limit for gas estimation
+        const TEMP_GAS_LIMIT: u128 = 1_000_000;
         let temp_gas_limit = GasLimit::new(TEMP_GAS_LIMIT);
 
         let temp_transaction_request = Self::create_typed_transaction(
@@ -470,7 +470,7 @@ impl TransactionsQueues {
         let estimated_gas_limit = transactions_queue
             .estimate_gas(&temp_transaction_request, transaction.is_noop)
             .await
-            .map_err(|e| AddTransactionError::TransactionEstimateGasError(*relayer_id, e))?;
+            .map_err(|e| AddTransactionError::TransactionEstimateGasError(transaction.relayer_id, e))?;
 
         let final_transaction_request = Self::create_typed_transaction(
             transactions_queue,
@@ -483,7 +483,7 @@ impl TransactionsQueues {
         transactions_queue
             .simulate_transaction(&final_transaction_request)
             .await
-            .map_err(|e| AddTransactionError::TransactionEstimateGasError(*relayer_id, e))?;
+            .map_err(|e| AddTransactionError::TransactionEstimateGasError(transaction.relayer_id, e))?;
 
         Ok(estimated_gas_limit)
     }
@@ -566,8 +566,7 @@ impl TransactionsQueues {
             &mut transactions_queue,
             &transaction,
             &gas_price,
-            blob_gas_price.as_ref(),
-            relayer_id,
+            blob_gas_price.as_ref()
         )
         .await;
 

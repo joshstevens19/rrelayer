@@ -1,3 +1,4 @@
+use alloy::sol_types::SolCall;
 use alloy::{
     network::EthereumWallet,
     primitives::{Address, FixedBytes, U256},
@@ -8,10 +9,9 @@ use alloy::{
     transports::http::{Client, Http},
 };
 use anyhow::{Context, Result};
-use std::str::FromStr;
-use alloy::sol_types::SolCall;
-use tracing::info;
 use rand;
+use std::str::FromStr;
+use tracing::info;
 
 // Define a simple test contract using the sol! macro
 sol! {
@@ -19,11 +19,11 @@ sol! {
     #[sol(rpc, bytecode="6080806040523460135760df908160198239f35b600080fdfe6080806040526004361015601257600080fd5b60003560e01c9081633fb5c1cb1460925781638381f58a146079575063d09de08a14603c57600080fd5b3460745760003660031901126074576000546000198114605e57600101600055005b634e487b7160e01b600052601160045260246000fd5b600080fd5b3460745760003660031901126074576020906000548152f35b34607457602036600319011260745760043560005500fea2646970667358221220e978270883b7baed10810c4079c941512e93a7ba1cd1108c781d4bc738d9090564736f6c634300081a0033")]
     contract TestContract {
         uint256 public number;
-        
+
         function setNumber(uint256 newNumber) public {
             number = newNumber;
         }
-        
+
         function increment() public {
             number++;
         }
@@ -101,15 +101,12 @@ impl ContractInteractor {
         // Set a random initial value to test the contract works
         let random_value = rand::random::<u32>() % 1000;
         info!("Setting initial random value: {}", random_value);
-        
+
         // Create contract instance at the deployed address
         let deployed_contract = TestContract::new(contract_address, &deploy_provider);
         let set_value_call = deployed_contract.setNumber(U256::from(random_value));
-        let pending_tx = set_value_call
-            .send()
-            .await
-            .context("Failed to set initial value")?;
-        
+        let pending_tx = set_value_call.send().await.context("Failed to set initial value")?;
+
         let tx_hash = *pending_tx.tx_hash();
         info!("Initial setValue transaction sent: {:?}", tx_hash);
 
@@ -174,6 +171,16 @@ impl ContractInteractor {
         let addr = Address::from_str(address).context("Invalid address")?;
         let balance = self.provider.get_balance(addr).await?;
         Ok(balance)
+    }
+
+    /// Verify contract is deployed by checking if it has code
+    pub async fn verify_contract_deployed(&self) -> Result<bool> {
+        if let Some(address) = self.contract_address {
+            let code = self.provider.get_code_at(address).await?;
+            Ok(!code.is_empty())
+        } else {
+            Ok(false)
+        }
     }
 
     /// Mine a single block to confirm pending transactions

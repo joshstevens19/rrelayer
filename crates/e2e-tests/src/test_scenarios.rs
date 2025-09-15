@@ -292,10 +292,25 @@ impl TestRunner {
         let contract_address =
             self.contract_interactor.contract_address().context("Test contract not deployed")?;
 
-        let contract_address_str = format!("{:?}", contract_address);
+        let contract_address_str = format!("0x{:x}", contract_address);
         info!("Sending contract interaction to deployed contract at {}", contract_address_str);
 
-        // Generate calldata for setValue(42) function
+        // Verify contract is actually deployed and has code
+        let is_deployed = self.contract_interactor.verify_contract_deployed().await?;
+        if !is_deployed {
+            return Err(anyhow::anyhow!("Contract verification failed - no code at address"));
+        }
+        info!("✅ Contract verified as deployed with code at {}", contract_address_str);
+
+        // Check relayer balance before sending transaction
+        let relayer_balance =
+            self.contract_interactor.get_eth_balance(&relayer["address"].as_str().unwrap()).await?;
+        info!(
+            "Relayer balance before transaction: {} ETH",
+            alloy::primitives::utils::format_ether(relayer_balance)
+        );
+
+        // Generate calldata for setNumber(42) function
         let calldata = self.contract_interactor.encode_simple_call(42)?;
 
         let tx_response = self

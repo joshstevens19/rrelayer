@@ -38,6 +38,7 @@ use alloy::{
 use chrono::Utc;
 use tokio::sync::Mutex;
 use tracing::log::info;
+use crate::relayer::types::RelayerId;
 
 /// Queue system for managing transactions in different states for a single relayer.
 ///
@@ -456,6 +457,14 @@ impl TransactionsQueue {
         self.relayer.address
     }
 
+    /// Returns the relayer's ID.
+    ///
+    /// # Returns
+    /// * `RelayerId` - The relayer id
+    pub fn relay_id(&self) -> RelayerId {
+        self.relayer.id
+    }
+
     /// Checks if the relayer uses legacy transaction types.
     ///
     /// # Returns
@@ -849,7 +858,14 @@ impl TransactionsQueue {
             is_noop, self.relayer.name
         );
 
-        let estimated_gas_result = self.evm_provider.estimate_gas(transaction_request).await?;
+        let estimated_gas_result = self
+            .evm_provider
+            .estimate_gas(transaction_request, &self.relayer.address)
+            .await
+            .map_err(|e| {
+                tracing::error!("Gas estimation failed for relayer {}: {:?}", self.relayer.name, e);
+                e
+            })?;
 
         if !is_noop {
             let estimated_gas = estimated_gas_result * 12 / 10;
