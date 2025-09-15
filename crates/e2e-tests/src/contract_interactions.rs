@@ -9,21 +9,23 @@ use alloy::{
 };
 use anyhow::{Context, Result};
 use std::str::FromStr;
+use alloy::sol_types::SolCall;
 use tracing::info;
+use rand;
 
 // Define a simple test contract using the sol! macro
 sol! {
     #[allow(missing_docs)]
-    #[sol(rpc, bytecode="608060405234801561001057600080fd5b50610150806100206000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c8063209652551461003b5780635524107714610059575b600080fd5b610043610071565b60405161005091906100d1565b60405180910390f35b61006f600480360381019061006a91906100fd565b610077565b005b60005481565b8060008190555050565b6000819050919050565b61009481610081565b82525050565b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b60006100c58261009a565b9050919050565b6100d5816100ba565b82525050565b60006020820190506100f0600083018461008b565b92915050565b60006020828403121561010c5761010b61012a565b5b600061011a84828501610113565b91505092915050565b61012c81610081565b811461013757600080fd5b50565b60008135905061014981610123565b92915050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052602260045260246000fd5b600060028204905060018216806101a057607f821691505b6020821081036101b3576101b2610171565b5b5091905056fea2646970667358221220b29e4b69e5b1a9c4a9b8a9b8a9b8a9b8a9b8a9b8a9b8a9b8a9b8a9b8a9b8a9b864736f6c63430008110033")]
+    #[sol(rpc, bytecode="6080806040523460135760df908160198239f35b600080fdfe6080806040526004361015601257600080fd5b60003560e01c9081633fb5c1cb1460925781638381f58a146079575063d09de08a14603c57600080fd5b3460745760003660031901126074576000546000198114605e57600101600055005b634e487b7160e01b600052601160045260246000fd5b600080fd5b3460745760003660031901126074576020906000548152f35b34607457602036600319011260745760043560005500fea2646970667358221220e978270883b7baed10810c4079c941512e93a7ba1cd1108c781d4bc738d9090564736f6c634300081a0033")]
     contract TestContract {
-        uint256 public value;
-
-        function setValue(uint256 newValue) public {
-            value = newValue;
+        uint256 public number;
+        
+        function setNumber(uint256 newNumber) public {
+            number = newNumber;
         }
-
-        function getValue() public view returns (uint256) {
-            return value;
+        
+        function increment() public {
+            number++;
         }
     }
 }
@@ -92,23 +94,39 @@ impl ContractInteractor {
             .await
             .context("Failed to deploy test contract")?;
 
+        let contract_address = *contract.address();
+        self.contract_address = Some(contract_address);
+        info!("Test contract deployed to: {:?}", contract_address);
+
+        // Set a random initial value to test the contract works
+        let random_value = rand::random::<u32>() % 1000;
+        info!("Setting initial random value: {}", random_value);
+        
+        // Create contract instance at the deployed address
+        let deployed_contract = TestContract::new(contract_address, &deploy_provider);
+        let set_value_call = deployed_contract.setNumber(U256::from(random_value));
+        let pending_tx = set_value_call
+            .send()
+            .await
+            .context("Failed to set initial value")?;
+        
+        let tx_hash = *pending_tx.tx_hash();
+        info!("Initial setValue transaction sent: {:?}", tx_hash);
+
         // Stop mining task
         let _ = tx.send(()).await;
         mining_task.abort();
-
-        let contract_address = *contract.address();
-        self.contract_address = Some(contract_address);
 
         info!("✅ Test contract deployed to: {:?}", contract_address);
 
         Ok(contract_address)
     }
 
-    /// Generate calldata for a simple function call (e.g., setValue)
+    /// Generate calldata for a simple function call (e.g., setNumber)
     pub fn encode_simple_call(&self, value: u32) -> Result<String> {
-        // Simple function selector + encoded value for testing
-        // This is setValue(uint256) function selector + padded value
-        Ok(format!("0x55241077{:064x}", value))
+        let call = TestContract::setNumberCall { newNumber: U256::from(value) };
+        let encoded = call.abi_encode();
+        Ok(format!("0x{}", alloy::hex::encode(encoded)))
     }
 
     /// Generate calldata for a function that always reverts
