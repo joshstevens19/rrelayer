@@ -10,7 +10,6 @@ use alloy::{
 };
 use thiserror::Error;
 use tokio::sync::Mutex;
-use tracing::info;
 
 /// Error types for transaction queues operations.
 #[derive(Error, Debug)]
@@ -34,7 +33,12 @@ use super::{
 };
 use crate::transaction::api::send_transaction::RelayTransactionRequest;
 use crate::{
-    gas::{blob_gas_oracle::BlobGasOracleCache, gas_oracle::GasOracleCache, types::GasLimit},
+    gas::{
+        blob_gas_oracle::{BlobGasOracleCache, BlobGasPriceResult}, 
+        fee_estimator::base::GasPriceResult,
+        gas_oracle::GasOracleCache, 
+        types::GasLimit
+    },
     postgres::{PostgresClient, PostgresConnectionError, PostgresError},
     relayer::types::RelayerId,
     safe_proxy::SafeProxyManager,
@@ -345,6 +349,144 @@ impl TransactionsQueues {
         Ok(relayer)
     }
 
+    /// Computes gas prices for a transaction based on its type.
+    ///
+    /// # Arguments
+    /// * `transactions_queue` - The transaction queue containing gas oracles
+    /// * `transaction` - The transaction to compute gas prices for
+    /// * `speed` - The speed tier for gas pricing
+    ///
+    /// # Returns
+    /// * `Ok((gas_price, blob_gas_price))` - Gas prices for the transaction
+    /// * `Err(AddTransactionError)` - If gas price computation fails
+    async fn compute_transaction_gas_prices(
+        transactions_queue: &TransactionsQueue,
+        transaction: &Transaction,
+        speed: &crate::transaction::types::TransactionSpeed,
+    ) -> Result<(GasPriceResult, Option<BlobGasPriceResult>), AddTransactionError> {
+        let gas_price = transactions_queue
+            .compute_gas_price_for_transaction(speed, None)
+            .await
+            .map_err(AddTransactionError::TransactionGasPriceError)?;
+
+        let blob_gas_price = if transaction.is_blob_transaction() {
+            Some(
+                transactions_queue
+                    .compute_blob_gas_price_for_transaction(speed, &None)
+                    .await
+                    .map_err(AddTransactionError::TransactionGasPriceError)?,
+            )
+        } else {
+            None
+        };
+
+        Ok((gas_price, blob_gas_price))
+    }
+
+    /// Creates a typed transaction request for gas estimation or sending.
+    ///
+    /// # Arguments
+    /// * `transactions_queue` - The transaction queue with provider details
+    /// * `transaction` - The transaction to convert
+    /// * `gas_price` - The computed gas price
+    /// * `blob_gas_price` - The blob gas price (if applicable)
+    /// * `gas_limit` - The gas limit to use
+    ///
+    /// # Returns
+    /// * `Ok(TypedTransaction)` - The typed transaction request
+    /// * `Err(AddTransactionError)` - If transaction conversion fails
+    fn create_typed_transaction(
+        transactions_queue: &TransactionsQueue,
+        transaction: &Transaction,
+        gas_price: &GasPriceResult,
+        blob_gas_price: Option<&BlobGasPriceResult>,
+        gas_limit: GasLimit,
+    ) -> Result<TypedTransaction, AddTransactionError> {
+        if transaction.is_blob_transaction() {
+            transaction
+                .to_blob_typed_transaction_with_gas_limit(
+                    Some(gas_price),
+                    blob_gas_price,
+                    Some(gas_limit),
+                )
+                .map_err(|e| {
+                    AddTransactionError::InternalError(format!(
+                        "Transaction conversion error: {}",
+                        e
+                    ))
+                })
+        } else if transactions_queue.is_legacy_transactions() {
+            transaction
+                .to_legacy_typed_transaction_with_gas_limit(Some(gas_price), Some(gas_limit))
+                .map_err(|e| {
+                    AddTransactionError::InternalError(format!(
+                        "Transaction conversion error: {}",
+                        e
+                    ))
+                })
+        } else {
+            transaction
+                .to_eip1559_typed_transaction_with_gas_limit(Some(gas_price), Some(gas_limit))
+                .map_err(|e| {
+                    AddTransactionError::InternalError(format!(
+                        "Transaction conversion error: {}",
+                        e
+                    ))
+                })
+        }
+    }
+
+    /// Estimates gas limit for a transaction and validates it via simulation.
+    ///
+    /// # Arguments
+    /// * `transactions_queue` - The transaction queue with provider access
+    /// * `transaction` - The transaction to estimate gas for
+    /// * `gas_price` - The computed gas price
+    /// * `blob_gas_price` - The blob gas price (if applicable)
+    ///
+    /// # Returns
+    /// * `Ok(GasLimit)` - The estimated gas limit
+    /// * `Err(AddTransactionError)` - If estimation or simulation fails
+    async fn estimate_and_validate_gas(
+        transactions_queue: &mut TransactionsQueue,
+        transaction: &Transaction,
+        gas_price: &GasPriceResult,
+        blob_gas_price: Option<&BlobGasPriceResult>,
+        relayer_id: &RelayerId,
+    ) -> Result<GasLimit, AddTransactionError> {
+        // Use a high temporary limit for gas estimation
+        const TEMP_GAS_LIMIT: u128 = 10_000_000;
+        let temp_gas_limit = GasLimit::new(TEMP_GAS_LIMIT);
+
+        let temp_transaction_request = Self::create_typed_transaction(
+            transactions_queue,
+            transaction,
+            gas_price,
+            blob_gas_price,
+            temp_gas_limit,
+        )?;
+
+        let estimated_gas_limit = transactions_queue
+            .estimate_gas(&temp_transaction_request, transaction.is_noop)
+            .await
+            .map_err(|e| AddTransactionError::TransactionEstimateGasError(*relayer_id, e))?;
+
+        let final_transaction_request = Self::create_typed_transaction(
+            transactions_queue,
+            transaction,
+            gas_price,
+            blob_gas_price,
+            estimated_gas_limit,
+        )?;
+
+        transactions_queue
+            .simulate_transaction(&final_transaction_request)
+            .await
+            .map_err(|e| AddTransactionError::TransactionEstimateGasError(*relayer_id, e))?;
+
+        Ok(estimated_gas_limit)
+    }
+
     /// Adds a new transaction to the specified relayer's queue.
     ///
     /// Validates relayer permissions, creates the transaction, and adds it to the pending queue.
@@ -363,133 +505,75 @@ impl TransactionsQueues {
     ) -> Result<Transaction, AddTransactionError> {
         let expires_at = self.expires_at();
 
-        if let Some(queue_arc) = self.get_transactions_queue(relayer_id) {
-            let mut transactions_queue = queue_arc.lock().await;
+        let queue_arc = self
+            .get_transactions_queue(relayer_id)
+            .ok_or(AddTransactionError::RelayerNotFound(*relayer_id))?;
+        
+        let mut transactions_queue = queue_arc.lock().await;
 
-            if transactions_queue.is_paused() {
-                return Err(AddTransactionError::RelayerIsPaused(*relayer_id));
-            }
+        if transactions_queue.is_paused() {
+            return Err(AddTransactionError::RelayerIsPaused(*relayer_id));
+        }
 
-            if transactions_queue.is_allowlisted_only()
-                && !self
-                    .relayer_allowed_to_send_transaction_to(relayer_id, &transaction_to_send.to)
-                    .await
-                    .map_err(AddTransactionError::CouldNotReadAllowlistsFromDb)?
-            {
-                return Err(AddTransactionError::RelayerNotAllowedToSendTransactionTo(
-                    *relayer_id,
-                    transaction_to_send.to,
-                ));
-            }
-
-            let mut transaction = Transaction {
-                id: transaction_to_send.id,
-                relayer_id: *relayer_id,
-                to: transaction_to_send.to,
-                from: transactions_queue.relay_address(),
-                value: transaction_to_send.value,
-                data: transaction_to_send.data.clone(),
-                // TODO: need to handle the edge case of this failing and keeping the nonce
-                nonce: transactions_queue.nonce_manager.current(),
-                gas_limit: None,
-                status: TransactionStatus::Pending,
-                blobs: transaction_to_send.blobs.clone(),
-                chain_id: transactions_queue.chain_id(),
-                known_transaction_hash: None,
-                queued_at: SystemTime::now(),
-                expires_at,
-                sent_at: None,
-                mined_at: None,
-                confirmed_at: None,
-                speed: transaction_to_send.speed.clone(),
-                sent_with_max_priority_fee_per_gas: None,
-                sent_with_max_fee_per_gas: None,
-                is_noop: false,
-                sent_with_gas: None,
-                sent_with_blob_gas: None,
-                external_id: transaction_to_send.external_id.clone(),
-            };
-
-            let gas_price = transactions_queue
-                .compute_gas_price_for_transaction(&transaction_to_send.speed, None)
+        if transactions_queue.is_allowlisted_only()
+            && !self
+                .relayer_allowed_to_send_transaction_to(relayer_id, &transaction_to_send.to)
                 .await
-                .map_err(AddTransactionError::TransactionGasPriceError)?;
+                .map_err(AddTransactionError::CouldNotReadAllowlistsFromDb)?
+        {
+            return Err(AddTransactionError::RelayerNotAllowedToSendTransactionTo(
+                *relayer_id,
+                transaction_to_send.to,
+            ));
+        }
 
-            // First, estimate gas limit by creating a temporary transaction with a high gas limit
-            let temp_gas_limit = GasLimit::new(10_000_000); // High temporary limit for estimation
-            
-            let temp_transaction_request = if transaction.is_blob_transaction() {
-                let blob_gas_price = transactions_queue
-                    .compute_blob_gas_price_for_transaction(&transaction_to_send.speed, &None)
-                    .await
-                    .map_err(AddTransactionError::TransactionGasPriceError)?;
-                transaction
-                    .to_blob_typed_transaction_with_gas_limit(Some(&gas_price), Some(&blob_gas_price), Some(temp_gas_limit))
-                    .map_err(|e| {
-                        AddTransactionError::InternalError(format!(
-                            "Transaction conversion error: {}",
-                            e
-                        ))
-                    })?
-            } else if transactions_queue.is_legacy_transactions() {
-                transaction.to_legacy_typed_transaction_with_gas_limit(Some(&gas_price), Some(temp_gas_limit)).map_err(|e| {
-                    AddTransactionError::InternalError(format!(
-                        "Transaction conversion error: {}",
-                        e
-                    ))
-                })?
-            } else {
-                transaction.to_eip1559_typed_transaction_with_gas_limit(Some(&gas_price), Some(temp_gas_limit)).map_err(|e| {
-                    AddTransactionError::InternalError(format!(
-                        "Transaction conversion error: {}",
-                        e
-                    ))
-                })?
-            };
+        let mut transaction = Transaction {
+            id: transaction_to_send.id,
+            relayer_id: *relayer_id,
+            to: transaction_to_send.to,
+            from: transactions_queue.relay_address(),
+            value: transaction_to_send.value,
+            data: transaction_to_send.data.clone(),
+            nonce: transactions_queue.nonce_manager.current(),
+            gas_limit: None,
+            status: TransactionStatus::Pending,
+            blobs: transaction_to_send.blobs.clone(),
+            chain_id: transactions_queue.chain_id(),
+            known_transaction_hash: None,
+            queued_at: SystemTime::now(),
+            expires_at,
+            sent_at: None,
+            mined_at: None,
+            confirmed_at: None,
+            speed: transaction_to_send.speed.clone(),
+            sent_with_max_priority_fee_per_gas: None,
+            sent_with_max_fee_per_gas: None,
+            is_noop: false,
+            sent_with_gas: None,
+            sent_with_blob_gas: None,
+            external_id: transaction_to_send.external_id.clone(),
+        };
 
-            let estimated_gas_limit = transactions_queue
-                .estimate_gas(&temp_transaction_request, transaction.is_noop)
-                .await
-                .map_err(|e| AddTransactionError::TransactionEstimateGasError(*relayer_id, e))?;
+        let (gas_price, blob_gas_price) = Self::compute_transaction_gas_prices(
+            &transactions_queue,
+            &transaction,
+            &transaction_to_send.speed,
+        )
+        .await?;
 
-            transaction.gas_limit = Some(estimated_gas_limit);
+        let estimated_gas_limit = Self::estimate_and_validate_gas(
+            &mut transactions_queue,
+            &transaction,
+            &gas_price,
+            blob_gas_price.as_ref(),
+            relayer_id,
+        )
+        .await;
 
-            // Now create the final transaction with the estimated gas limit
-            let transaction_request: TypedTransaction = if transaction.is_blob_transaction() {
-                let blob_gas_price = transactions_queue
-                    .compute_blob_gas_price_for_transaction(&transaction_to_send.speed, &None)
-                    .await
-                    .map_err(AddTransactionError::TransactionGasPriceError)?;
-                transaction
-                    .to_blob_typed_transaction_with_gas_limit(Some(&gas_price), Some(&blob_gas_price), Some(estimated_gas_limit))
-                    .map_err(|e| {
-                        AddTransactionError::InternalError(format!(
-                            "Transaction conversion error: {}",
-                            e
-                        ))
-                    })?
-            } else if transactions_queue.is_legacy_transactions() {
-                transaction.to_legacy_typed_transaction_with_gas_limit(Some(&gas_price), Some(estimated_gas_limit)).map_err(|e| {
-                    AddTransactionError::InternalError(format!(
-                        "Transaction conversion error: {}",
-                        e
-                    ))
-                })?
-            } else {
-                transaction.to_eip1559_typed_transaction_with_gas_limit(Some(&gas_price), Some(estimated_gas_limit)).map_err(|e| {
-                    AddTransactionError::InternalError(format!(
-                        "Transaction conversion error: {}",
-                        e
-                    ))
-                })?
-            };
-
-            let simulated = transactions_queue
-                .simulate_transaction(&transaction_request)
-                .await
-                .map_err(|e| AddTransactionError::TransactionEstimateGasError(*relayer_id, e));
-
-            if let Err(err) = simulated {
+        let estimated_gas_limit = match estimated_gas_limit {
+            Ok(limit) => limit,
+            Err(err) => {
+                // Save failed transaction to database
                 self.db
                     .transaction_failed_on_send(
                         relayer_id,
@@ -502,32 +586,40 @@ impl TransactionsQueues {
                 self.invalidate_transaction_cache(&transaction.id).await;
                 return Err(err);
             }
+        };
 
-            transaction.known_transaction_hash = Some(
-                transactions_queue
-                    .compute_tx_hash(&transaction_request)
-                    .await
-                    .map_err(AddTransactionError::ComputeTransactionHashError)?,
-            );
+        transaction.gas_limit = Some(estimated_gas_limit);
 
-            self.db
-                .save_transaction(relayer_id, &transaction)
+        let transaction_request = Self::create_typed_transaction(
+            &transactions_queue,
+            &transaction,
+            &gas_price,
+            blob_gas_price.as_ref(),
+            estimated_gas_limit,
+        )?;
+
+        transaction.known_transaction_hash = Some(
+            transactions_queue
+                .compute_tx_hash(&transaction_request)
                 .await
-                .map_err(AddTransactionError::CouldNotSaveTransactionDb)?;
+                .map_err(AddTransactionError::ComputeTransactionHashError)?,
+        );
 
-            transactions_queue.add_pending_transaction(transaction.clone()).await;
-            transactions_queue.nonce_manager.increase().await;
-            self.invalidate_transaction_cache(&transaction.id).await;
+        self.db
+            .save_transaction(relayer_id, &transaction)
+            .await
+            .map_err(AddTransactionError::CouldNotSaveTransactionDb)?;
 
-            if let Some(webhook_manager) = &self.webhook_manager {
-                let webhook_manager = webhook_manager.lock().await;
-                webhook_manager.on_transaction_queued(&transaction).await;
-            }
+        transactions_queue.add_pending_transaction(transaction.clone()).await;
+        transactions_queue.nonce_manager.increase().await;
+        self.invalidate_transaction_cache(&transaction.id).await;
 
-            Ok(transaction)
-        } else {
-            Err(AddTransactionError::RelayerNotFound(*relayer_id))
+        if let Some(webhook_manager) = &self.webhook_manager {
+            let webhook_manager = webhook_manager.lock().await;
+            webhook_manager.on_transaction_queued(&transaction).await;
         }
+
+        Ok(transaction)
     }
 
     /// Cancels an existing transaction by converting it to a no-op.
