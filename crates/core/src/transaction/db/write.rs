@@ -1,4 +1,5 @@
 use crate::{
+    common_types::EvmAddress,
     gas::{fee_estimator::base::GasPriceResult, types::GasLimit},
     postgres::{PostgresClient, PostgresError},
     relayer::types::RelayerId,
@@ -6,7 +7,7 @@ use crate::{
         common_types::{BlockHash, BlockNumber},
         utils::option_if,
     },
-    transaction::types::{Transaction, TransactionHash, TransactionId, TransactionStatus},
+    transaction::types::{Transaction, TransactionData, TransactionHash, TransactionId, TransactionStatus, TransactionValue},
 };
 use alloy::network::AnyTransactionReceipt;
 use chrono::Utc;
@@ -180,6 +181,52 @@ impl PostgresClient {
         Ok(())
     }
 
+    // TODO: need to handle audit log vs making sure this doesnt update to early
+    /// Updates a transaction's content when converted to a no-op during cancellation.
+    ///
+    /// # Arguments
+    /// * `transaction_id` - The unique identifier of the transaction
+    /// * `to` - The new recipient address (usually the relayer's own address)
+    /// * `value` - The new value (usually zero for no-op)
+    /// * `data` - The new transaction data (usually empty for no-op)
+    ///
+    /// # Returns
+    /// * `Ok(())` - If the update was successful
+    /// * `Err(PostgresError)` - If a database error occurs
+    pub async fn update_transaction_noop(
+        &mut self,
+        transaction_id: &TransactionId,
+        to: &EvmAddress
+    ) -> Result<(), PostgresError> {
+        let mut conn = self.pool.get().await?;
+        let trans = conn.transaction().await.map_err(PostgresError::PgError)?;
+
+        for table_name in TRANSACTION_TABLES.iter() {
+            trans
+                .execute(
+                    format!(
+                        "
+                            UPDATE {}
+                            SET \"to\" = $2,
+                                value = $3,
+                                data = $4
+                            WHERE id = $1;
+                        ",
+                        table_name
+                    )
+                    .as_str(),
+                    &[&transaction_id, &to, &TransactionValue::zero(), &TransactionData::empty()],
+                )
+                .await
+                .map_err(PostgresError::PgError)?;
+        }
+
+        trans.commit().await.map_err(PostgresError::PgError)?;
+
+        Ok(())
+    }
+
+    // TODO: need to handle audit log
     /// Updates an existing transaction's status to 'Failed'.
     ///
     /// Sets the transaction status to failed, records the failure timestamp and reason.
@@ -228,6 +275,7 @@ impl PostgresClient {
         Ok(())
     }
 
+    // TODO: need to handle audit log
     /// Updates a transaction's status to 'Mined' after it has been included in a block.
     ///
     /// Records block information, gas usage, and the timestamp when the transaction
@@ -280,6 +328,7 @@ impl PostgresClient {
         Ok(())
     }
 
+    // TODO: need to handle audit log
     /// Updates a transaction's status to 'Confirmed' after sufficient block confirmations.
     ///
     /// Records the timestamp when the transaction reached the required number of
@@ -321,6 +370,7 @@ impl PostgresClient {
         Ok(())
     }
 
+    // TODO: need to handle audit log
     /// Updates a transaction's status to 'Expired' when it has timed out.
     ///
     /// Records the timestamp when the transaction was marked as expired,
