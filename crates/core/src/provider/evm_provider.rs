@@ -52,7 +52,7 @@ pub struct EvmProvider {
     pub chain_id: ChainId,
     pub name: String,
     pub provider_urls: Vec<String>,
-    /// this is in seconds
+    /// this is in milliseconds (min 250ms)
     pub blocks_every: u64,
     pub confirmations: u64,
 }
@@ -67,19 +67,19 @@ pub struct EvmProvider {
 /// * `provider` - The RPC provider to query blockchain data
 ///
 /// # Returns
-/// * `Ok(u64)` - Average block time in seconds
+/// * `Ok(u64)` - Average block time in milliseconds (max 250ms)
 /// * `Err(RpcError<TransportErrorKind>)` - RPC error if unable to fetch block data
 pub async fn calculate_block_time_difference(
     provider: &RelayerProvider,
 ) -> Result<u64, RpcError<TransportErrorKind>> {
     let latest_block_number = provider.get_block_number().await?;
 
-    // Ensure there's no underflow if not enough blocks to check set to 2 seconds
+    // Ensure there's no underflow if not enough blocks to check set to 250ms (max limit)
     if latest_block_number <= 13 {
         rrelayer_info!(
-            "Not enough blocks to calculate block time difference, setting to 2 seconds"
+            "Not enough blocks to calculate block time difference, setting to 250ms"
         );
-        return Ok(2);
+        return Ok(250);
     }
 
     let latest = provider
@@ -102,7 +102,17 @@ pub async fn calculate_block_time_difference(
         "Earliest block none".to_string().into(),
     )))?;
 
-    Ok(latest.header.timestamp - earliest.header.timestamp)
+    let block_time_seconds = latest.header.timestamp - earliest.header.timestamp;
+    let block_time_ms = block_time_seconds * 1000;
+
+    let limited_block_time_ms = std::cmp::max(block_time_ms, 250);
+
+    rrelayer_info!(
+        "Calculated block time: {}s ({}ms), limited to {}ms", 
+        block_time_seconds, block_time_ms, limited_block_time_ms
+    );
+    
+    Ok(limited_block_time_ms)
 }
 
 #[derive(Error, Debug)]

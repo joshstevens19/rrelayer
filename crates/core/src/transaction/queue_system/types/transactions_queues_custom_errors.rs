@@ -69,6 +69,9 @@ pub enum CancelTransactionError {
     #[error("Send transaction error: {0}")]
     SendTransactionError(TransactionQueueSendTransactionError),
 
+    #[error("Could not update transaction in database: {0}")]
+    CouldNotUpdateTransactionDb(PostgresError),
+
     #[error("Relayer could not be found: {0}")]
     RelayerNotFound(RelayerId),
 

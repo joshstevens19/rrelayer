@@ -11,7 +11,7 @@ use rrelayer_sdk::SDK;
 use serde_json::Value;
 use std::str::FromStr;
 use tracing::info;
-
+use rrelayer_core::transaction::types::Transaction;
 use crate::test_config::E2ETestConfig;
 
 pub struct RelayerClient {
@@ -140,6 +140,26 @@ impl RelayerClient {
 
         let transactions: Value = serde_json::to_value(result)?;
         Ok(transactions)
+    }
+
+    pub async fn get_transaction(
+        &self,
+        transaction_id: &TransactionId,
+    ) -> Result<Transaction> {
+        info!("Getting transaction status for: {}", transaction_id);
+
+        let result = self
+            .sdk
+            .transaction
+            .get_transaction(&transaction_id)
+            .await
+            .context("Failed to get transaction status")?;
+
+        let tx = result.context("Transaction not found")?;
+
+        info!("Transaction: {:?}", tx);
+
+        Ok(tx)
     }
 
     /// Get pending transaction count for a relayer

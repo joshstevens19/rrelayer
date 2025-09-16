@@ -11,7 +11,7 @@ use alloy::{
 use chrono::{DateTime, Utc};
 use thiserror::Error;
 use tokio::sync::Mutex;
-use tracing::info;
+use tracing::{error, info};
 
 /// Error types for transaction queues operations.
 #[derive(Error, Debug)]
@@ -56,6 +56,7 @@ use crate::{
     },
     webhooks::WebhookManager,
 };
+use crate::transaction::types::TransactionSpeed;
 
 /// Container for managing multiple transaction queues across different relayers.
 ///
@@ -307,6 +308,7 @@ impl TransactionsQueues {
         transaction.data = TransactionData::empty();
         transaction.gas_limit = None;
         transaction.is_noop = true;
+        transaction.speed = TransactionSpeed::Fast;
     }
 
     /// Replaces the content of an existing transaction with new parameters.
@@ -534,6 +536,9 @@ impl TransactionsQueues {
             ));
         }
 
+        // Atomically get nonce and increment to prevent race conditions
+        let assigned_nonce = transactions_queue.nonce_manager.get_and_increment().await;
+
         let mut transaction = Transaction {
             id: transaction_to_send.id,
             relayer_id: *relayer_id,
@@ -541,7 +546,7 @@ impl TransactionsQueues {
             from: transactions_queue.relay_address(),
             value: transaction_to_send.value,
             data: transaction_to_send.data.clone(),
-            nonce: transactions_queue.nonce_manager.current(),
+            nonce: assigned_nonce,
             gas_limit: None,
             status: TransactionStatus::Pending,
             blobs: transaction_to_send.blobs.clone(),
@@ -618,7 +623,7 @@ impl TransactionsQueues {
             .map_err(AddTransactionError::CouldNotSaveTransactionDb)?;
 
         transactions_queue.add_pending_transaction(transaction.clone()).await;
-        transactions_queue.nonce_manager.increase().await;
+        // Nonce already incremented atomically above - no need for separate increase call
         self.invalidate_transaction_cache(&transaction.id).await;
 
         if let Some(webhook_manager) = &self.webhook_manager {
@@ -657,18 +662,27 @@ impl TransactionsQueues {
             {
                 match result.type_name {
                     EditableTransactionType::Pending => {
+                        info!("cancel_transaction: converting to noop - pending");
                         self.transaction_to_noop(&mut transactions_queue, &mut result.transaction);
                         self.invalidate_transaction_cache(&transaction.id).await;
 
                         Ok(true)
                     }
                     EditableTransactionType::Inmempool => {
+                        info!("cancel_transaction: converting to noop - inmempool");
                         self.transaction_to_noop(&mut transactions_queue, &mut result.transaction);
+                        info!("cancel_transaction: sending noop - inmempool {:?}", result.transaction);
 
                         let transaction_sent = transactions_queue
                             .send_transaction(&mut self.db, &mut result.transaction)
                             .await
                             .map_err(CancelTransactionError::SendTransactionError)?;
+
+                        // Update the actual inmempool transaction with no-op details and new hash
+                        transactions_queue.update_inmempool_transaction_noop(&transaction.id, &transaction_sent).await;
+                        
+                        result.transaction.known_transaction_hash = Some(transaction_sent.hash);
+                        println!("update known_transaction_hash {:?}", transaction_sent.hash);
 
                         self.invalidate_transaction_cache(&transaction.id).await;
 
@@ -942,6 +956,7 @@ impl TransactionsQueues {
             if let Some(mut transaction) = transactions_queue.get_next_inmempool_transaction().await
             {
                 if let Some(known_transaction_hash) = transaction.known_transaction_hash {
+                    println!("known_transaction_hash {:?}", known_transaction_hash);
                     match transactions_queue.get_receipt(&known_transaction_hash).await {
                         Ok(Some(receipt)) => {
                             let status = transactions_queue
@@ -1008,7 +1023,7 @@ impl TransactionsQueues {
                             if let Some(sent_at) = transaction.sent_at {
                                 let elapsed = Utc::now() - sent_at;
                                 if transactions_queue.should_bump_gas(
-                                    elapsed.num_seconds() as u64,
+                                    elapsed.num_milliseconds() as u64,
                                     &transaction.speed,
                                 ) {
                                     let transaction_sent = transactions_queue
@@ -1018,14 +1033,14 @@ impl TransactionsQueues {
                                             ProcessInmempoolTransactionError::SendTransactionError,
                                         )?;
 
-                                    transaction.known_transaction_hash =
-                                        Some(transaction_sent.hash);
-                                    transaction.sent_with_max_fee_per_gas =
-                                        Some(transaction_sent.sent_with_gas.max_fee);
-                                    transaction.sent_with_max_priority_fee_per_gas =
-                                        Some(transaction_sent.sent_with_gas.max_priority_fee);
-                                    transaction.sent_with_gas =
-                                        Some(transaction_sent.sent_with_gas.clone());
+                                    // Update the actual transaction in the inmempool queue
+                                    transactions_queue.update_inmempool_transaction_gas(&transaction_sent).await;
+                                    
+                                    // Update the local transaction with the new gas values so subsequent bumps work correctly
+                                    transaction.known_transaction_hash = Some(transaction_sent.hash);
+                                    transaction.sent_with_max_fee_per_gas = Some(transaction_sent.sent_with_gas.max_fee);
+                                    transaction.sent_with_max_priority_fee_per_gas = Some(transaction_sent.sent_with_gas.max_priority_fee);
+                                    transaction.sent_with_gas = Some(transaction_sent.sent_with_gas.clone());
                                     transaction.sent_at = Some(Utc::now());
 
                                     self.invalidate_transaction_cache(&transaction.id).await;
@@ -1090,7 +1105,7 @@ impl TransactionsQueues {
             if let Some(transaction) = transactions_queue.get_next_mined_transaction().await {
                 if let Some(mined_at) = transaction.mined_at {
                     let elapsed = Utc::now() - mined_at;
-                    if transactions_queue.in_confirmed_range(elapsed.num_seconds() as u64) {
+                    if transactions_queue.in_confirmed_range(elapsed.num_milliseconds() as u64) {
                         let receipt = if let Some(tx_hash) = transaction.known_transaction_hash {
                             transactions_queue
                                 .get_receipt(&tx_hash)

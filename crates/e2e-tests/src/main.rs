@@ -14,7 +14,7 @@ mod test_scenarios;
 use anvil_manager::AnvilManager;
 use embedded_rrelayer::EmbeddedRRelayerServer;
 use test_config::E2ETestConfig;
-use test_scenarios::TestRunner;
+use test_scenarios::{TestRunner, TestSuite};
 
 async fn is_rrelayer_ready() -> bool {
     reqwest::get("http://localhost:3000/health").await.is_ok()
@@ -60,13 +60,16 @@ async fn main() -> Result<()> {
     rrelayer_server.start().await?;
 
     // Run the test suite
-    let test_runner = TestRunner::new(config).await?;
+    let mut test_runner = TestRunner::new(config, anvil_manager).await?;
 
-    let results = if let Some(filter) = test_filter {
+    let test_suite = if let Some(filter) = test_filter {
         test_runner.run_filtered_test(&filter).await
     } else {
         test_runner.run_all_tests().await
     };
+
+    // Extract AnvilManager back from TestRunner
+    let mut anvil_manager = test_runner.into_anvil_manager();
 
     // Stop the embedded RRelayer server
     rrelayer_server.stop().await?;
@@ -76,29 +79,11 @@ async fn main() -> Result<()> {
     anvil_manager.stop().await?;
     info!("✅ Anvil stopped");
 
-    // Print results
-    let mut passed = 0;
-    let mut failed = 0;
-
-    for (test_name, result) in results {
-        match result {
-            Ok(_) => {
-                info!("✅ {}: PASSED", test_name);
-                passed += 1;
-            }
-            Err(e) => {
-                warn!("❌ {}: FAILED - {}", test_name, e);
-                failed += 1;
-            }
-        }
-    }
-
-    info!("📊 Test Results: {} passed, {} failed", passed, failed);
-
-    if failed > 0 {
+    // Exit with appropriate code based on test results
+    let failed_count = test_suite.failed_count() + test_suite.timeout_count();
+    if failed_count > 0 {
         std::process::exit(1);
     }
 
-    info!("🎉 All tests passed!");
     Ok(())
 }

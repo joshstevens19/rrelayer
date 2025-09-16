@@ -7,8 +7,7 @@ use crate::transaction::types::TransactionNonce;
 /// The NonceManager ensures that nonce values are incremented atomically
 /// to prevent race conditions when multiple threads are creating transactions.
 pub struct NonceManager {
-    nonce: TransactionNonce,
-    lock: Mutex<()>,
+    nonce: Mutex<TransactionNonce>,
 }
 
 impl NonceManager {
@@ -20,23 +19,21 @@ impl NonceManager {
     /// # Returns
     /// * `NonceManager` - A new instance with the specified starting nonce
     pub fn new(current_nonce: TransactionNonce) -> Self {
-        NonceManager { nonce: current_nonce, lock: Mutex::new(()) }
+        NonceManager { nonce: Mutex::new(current_nonce) }
     }
 
-    /// Increments the nonce value by 1 in a thread-safe manner.
+    /// Gets the current nonce value and increments it atomically.
     ///
-    /// This method acquires a lock to ensure that nonce increments are atomic,
-    /// preventing race conditions when multiple threads are incrementing the nonce.
-    pub async fn increase(&mut self) {
-        let _lock = self.lock.lock().await;
-        self.nonce = self.nonce + 1;
-    }
-
-    /// Returns the current nonce value.
+    /// This method ensures that nonce allocation is atomic - the returned nonce
+    /// value is guaranteed to be unique and the internal counter is incremented
+    /// in a single locked operation, preventing race conditions.
     ///
     /// # Returns
-    /// * `TransactionNonce` - The current nonce value
-    pub fn current(&self) -> TransactionNonce {
-        self.nonce
+    /// * `TransactionNonce` - The nonce value to use for the transaction
+    pub async fn get_and_increment(&self) -> TransactionNonce {
+        let mut nonce_guard = self.nonce.lock().await;
+        let current_nonce = *nonce_guard;
+        *nonce_guard = current_nonce + 1;
+        current_nonce
     }
 }

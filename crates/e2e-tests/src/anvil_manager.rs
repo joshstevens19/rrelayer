@@ -134,6 +134,20 @@ impl AnvilManager {
         self.kill_existing_process_on_port().await
     }
 
+    /// Restarts Anvil with a completely fresh state
+    pub async fn restart(&mut self) -> Result<()> {
+        info!("Restarting Anvil to ensure clean state");
+        self.stop().await.context("Failed to stop Anvil during restart")?;
+        
+        // Add a small delay to ensure the process is fully stopped and port is released
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+        
+        self.start().await.context("Failed to start Anvil during restart")?;
+        
+        info!("Anvil restarted successfully with fresh state");
+        Ok(())
+    }
+
     async fn verify_anvil_ready(&self) -> Result<()> {
         use reqwest::Client;
 

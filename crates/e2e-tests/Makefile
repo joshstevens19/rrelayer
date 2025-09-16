@@ -1,16 +1,41 @@
 # RRelayer E2E Tests Makefile
 
-.PHONY: help install-deps start-postgres stop-postgres reset-db start-anvil stop-anvil start-rrelayer stop-rrelayer run-tests clean
+.PHONY: help install-deps clean build \
+        start-postgres stop-postgres reset-db \
+        start-anvil stop-anvil \
+        start-rrelayer start-rrelayer-debug stop-rrelayer \
+        test-full test-quick run-tests run-tests-debug \
+        test-core test-comprehensive test-status-states test-allowlist test-config test-edge-cases \
+        run-test run-test-debug \
+        test-basic test-basic-debug test-transfer test-transfer-debug \
+        test-contract test-contract-debug test-failed test-failed-debug \
+        logs logs-live logs-rrelayer logs-anvil logs-clear check-services
 
 help: ## Show this help message
-	@echo "RRelayer E2E Tests"
+	@echo "🚀 RRelayer E2E Tests"
 	@echo "Available targets:"
-	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-25s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+# =============================================================================
+# SETUP & DEPENDENCIES
+# =============================================================================
 
 install-deps: ## Install required dependencies (Foundry)
 	@echo "Installing Foundry..."
 	@curl -L https://foundry.paradigm.xyz | bash
 	@foundryup
+
+build: ## Build the E2E test binary
+	@cargo build --bin e2e-runner
+
+clean: stop-postgres stop-anvil stop-rrelayer ## Clean up all running processes and files
+	@rm -f *.pid *.log
+	@cargo clean
+	@echo "Cleanup complete"
+
+# =============================================================================
+# DATABASE MANAGEMENT
+# =============================================================================
 
 start-postgres: ## Start PostgreSQL database
 	@echo "Starting PostgreSQL database..."
@@ -42,6 +67,10 @@ reset-db: ## Reset database (drop all schemas and recreate)
 	@PGPASSWORD=rrelayer psql -h localhost -p 5447 -U postgres -d postgres -c "DROP SCHEMA IF EXISTS webhooks CASCADE;" >/dev/null 2>&1 || true
 	@echo "Database reset complete"
 
+# =============================================================================
+# ANVIL BLOCKCHAIN
+# =============================================================================
+
 start-anvil: ## Start Anvil blockchain
 	@echo "Starting Anvil..."
 	@anvil --host 0.0.0.0 --port 8545 --accounts 10 \
@@ -58,9 +87,29 @@ stop-anvil: ## Stop Anvil blockchain
 		rm -f anvil.pid anvil.log; \
 	fi
 
-start-rrelayer: ## Start RRelayer service
-	@echo "Starting RRelayer..."
-	@cd ../cli && RUST_LOG=info,rrelayer_core=info RUST_BACKTRACE=1 cargo run -- start --path $(CURDIR) > $(CURDIR)/rrelayer.log 2>&1 &
+# =============================================================================
+# RRELAYER SERVICE
+# =============================================================================
+
+start-rrelayer: ## Start RRelayer service (logs to file)
+	@echo "Starting RRelayer (logs: rrelayer.log)..."
+	@cd ../cli && RUST_LOG=warn,rrelayer_core=warn RUST_BACKTRACE=1 cargo run -- start --path $(CURDIR) > $(CURDIR)/rrelayer.log 2>&1 &
+	@echo $$! > rrelayer.pid
+	@sleep 5
+	@echo "RRelayer started (PID: $$(cat rrelayer.pid))"
+	@echo "Waiting for RRelayer to be ready..."
+	@for i in $$(seq 1 10); do \
+		if curl -s -f http://localhost:3000/health >/dev/null 2>&1; then \
+			echo "RRelayer is ready!"; \
+			break; \
+		fi; \
+		echo "Attempt $$i/10 - RRelayer not ready yet..."; \
+		sleep 2; \
+	done
+
+start-rrelayer-debug: ## Start RRelayer with debug logs (logs to file)
+	@echo "Starting RRelayer with debug logging (logs: rrelayer.log)..."
+	@cd ../cli && RUST_LOG=debug,rrelayer_core=debug RUST_BACKTRACE=1 cargo run -- start --path $(CURDIR) > $(CURDIR)/rrelayer.log 2>&1 &
 	@echo $$! > rrelayer.pid
 	@sleep 5
 	@echo "RRelayer started (PID: $$(cat rrelayer.pid))"
@@ -81,182 +130,170 @@ stop-rrelayer: ## Stop RRelayer service
 		rm -f rrelayer.pid rrelayer.log; \
 	fi
 
-run-tests: ## Run E2E tests
-	@echo "Running E2E tests..."
-	@make reset-db
-	@RUST_LOG=info,rrelayer_core=info cargo run --bin e2e-runner
+# =============================================================================
+# TEST RUNNERS - MAIN TARGETS
+# =============================================================================
 
-test-full: start-postgres start-anvil start-rrelayer run-tests stop-rrelayer stop-anvil stop-postgres ## Run complete test suite
+test-full: start-postgres start-anvil start-rrelayer run-tests stop-rrelayer stop-anvil stop-postgres ## Run complete test suite with all services
 
 test-quick: ## Run tests assuming services are already running
 	@echo "Running E2E tests (assuming services are running)..."
 	@RUST_LOG=info,rrelayer_core=info cargo run --bin e2e-runner
 
-build: ## Build the E2E test binary
-	@cargo build --bin e2e-runner
-
-# Individual Test Scenarios
-test-basic-relayer: ## Run basic relayer creation test
-	@echo "Running basic relayer creation test..."
+run-tests: ## Run all E2E tests with clean Jest-like output
+	@echo "Running E2E tests with clean output..."
 	@make reset-db
-	@RUST_LOG=info,rrelayer_core=info RRELAYER_TEST_FILTER=basic_relayer_creation cargo run --bin e2e-runner
+	@RUST_LOG=error cargo run --bin e2e-runner
 
-test-gas-price: ## Run gas price API test
-	@echo "Running gas price API test..."
-	@make reset-db
-	@RUST_LOG=info,rrelayer_core=info RRELAYER_TEST_FILTER=gas_price_api cargo run --bin e2e-runner
+run-tests-debug: ## Run all E2E tests with debug output
+	@echo "Running E2E tests with debug output..."
+	@make reset-db  
+	@RUST_LOG=info cargo run --bin e2e-runner
 
-test-network-mgmt: ## Run network management test
-	@echo "Running network management test..."
-	@make reset-db
-	@RUST_LOG=info,rrelayer_core=info RRELAYER_TEST_FILTER=network_management cargo run --bin e2e-runner
+# =============================================================================
+# TEST CATEGORIES - GROUPED BY FUNCTIONALITY
+# =============================================================================
 
-test-allowlist-mgmt: ## Run allowlist management test
-	@echo "Running allowlist management test..."
-	@make reset-db
-	@RUST_LOG=info,rrelayer_core=info RRELAYER_TEST_FILTER=allowlist_management cargo run --bin e2e-runner
+test-core: ## Run core functionality tests
+	@echo "Running core functionality tests..."
+	@make run-test TEST=basic_relayer_creation
+	@make run-test TEST=simple_eth_transfer
+	@make run-test TEST=contract_interaction
+	@make run-test TEST=gas_estimation
+	@make run-test TEST=transaction_replacement
 
-test-signing-text: ## Run text signing test
-	@echo "Running text signing test..."
-	@make reset-db
-	@RUST_LOG=info,rrelayer_core=info RRELAYER_TEST_FILTER=signing_text cargo run --bin e2e-runner
+test-status-states: ## Run all transaction status state tests
+	@echo "Running all transaction status state tests..."
+	@make run-test TEST=transaction_status_pending
+	@make run-test TEST=transaction_status_inmempool
+	@make run-test TEST=transaction_status_mined
+	@make run-test TEST=transaction_status_confirmed
+	@make run-test TEST=transaction_status_failed
+	@make run-test TEST=transaction_status_expired
 
-test-signing-typed: ## Run typed data signing test
-	@echo "Running typed data signing test..."
-	@make reset-db
-	@RUST_LOG=info,rrelayer_core=info RRELAYER_TEST_FILTER=signing_typed_data cargo run --bin e2e-runner
+test-allowlist: ## Run all allowlist tests
+	@echo "Running all allowlist tests..."
+	@make run-test TEST=allowlist_restrictions
+	@make run-test TEST=allowlist_edge_cases
+	@make run-test TEST=allowlist_management
 
-test-transaction-ops: ## Run transaction operations test
-	@echo "Running transaction operations test..."
-	@make reset-db
-	@RUST_LOG=info,rrelayer_core=info RRELAYER_TEST_FILTER=transaction_operations cargo run --bin e2e-runner
+test-config: ## Run all relayer configuration tests
+	@echo "Running all relayer configuration tests..."
+	@make run-test TEST=relayer_pause_unpause
+	@make run-test TEST=relayer_gas_configuration
+	@make run-test TEST=relayer_allowlist_toggle
 
-test-transaction-status: ## Run transaction status test
-	@echo "Running transaction status test..."
-	@make reset-db
-	@RUST_LOG=info,rrelayer_core=info RRELAYER_TEST_FILTER=transaction_status_operations cargo run --bin e2e-runner
+test-edge-cases: ## Run all API edge cases and comprehensive tests
+	@echo "Running all API edge cases..."
+	@make run-test TEST=transaction_nonce_management
+	@make run-test TEST=gas_price_bumping
+	@make run-test TEST=concurrent_transactions
+	@make run-test TEST=rate_limiting_enforcement
+	@make run-test TEST=webhook_delivery_testing
+	@make run-test TEST=blob_transaction_handling
+	@make run-test TEST=balance_edge_cases
 
-test-transaction-counts: ## Run transaction counts test
-	@echo "Running transaction counts test..."
-	@make reset-db
-	@RUST_LOG=info,rrelayer_core=info RRELAYER_TEST_FILTER=transaction_counts cargo run --bin e2e-runner
+test-comprehensive: ## Run all comprehensive tests (status + allowlist + config + edge cases)
+	@echo "Running comprehensive test suite..."
+	@make test-status-states
+	@make test-allowlist
+	@make test-config
+	@make test-edge-cases
 
-# Missing test targets
-test-simple-eth-transfer: ## Run simple ETH transfer test
-	@echo "Running simple ETH transfer test..."
-	@make reset-db
-	RUST_LOG=info,rrelayer_core=info RRELAYER_TEST_FILTER=simple_eth_transfer cargo run --bin e2e-runner
+# =============================================================================
+# INDIVIDUAL TEST RUNNER - HELPER TARGET
+# =============================================================================
 
-test-contract-interaction: ## Run contract interaction test
-	@echo "Running contract interaction test..."
-	@make reset-db
-	@RUST_LOG=info,rrelayer_core=info RRELAYER_TEST_FILTER=contract_interaction cargo run --bin e2e-runner
-
-test-transaction-status-tracking: ## Run transaction status tracking test
-	@echo "Running transaction status tracking test..."
-	@make reset-db
-	@RUST_LOG=info,rrelayer_core=info RRELAYER_TEST_FILTER=transaction_status_tracking cargo run --bin e2e-runner
-
-test-failed-transaction-handling-not-enough-funds:
-	@echo "Running failed transaction handling test (insufficient funds)..."
-	@make reset-db
-	@RUST_LOG=info,rrelayer_core=info RRELAYER_TEST_FILTER=failed_transaction_handling_not_enough_funds cargo run --bin e2e-runner
-
-test-failed-transaction-handling-revert-execution:
-	@echo "Running failed transaction handling test (contract revert)..."
-	@make reset-db
-	@RUST_LOG=info,rrelayer_core=info RRELAYER_TEST_FILTER=failed_transaction_handling_revert_execution cargo run --bin e2e-runner
-
-test-failed-transaction-handling:
-	@echo "Running all failed transaction handling tests..."
-	@make test-failed-transaction-handling-not-enough-funds
-	@make test-failed-transaction-handling-revert-execution
-
-test-gas-estimation: ## Run gas estimation test
-	@echo "Running gas estimation test..."
-	@make reset-db
-	@RUST_LOG=info,rrelayer_core=info RRELAYER_TEST_FILTER=gas_estimation cargo run --bin e2e-runner
-
-test-transaction-replacement: ## Run transaction replacement test
-	@echo "Running transaction replacement test..."
-	@make reset-db
-	@RUST_LOG=info,rrelayer_core=info RRELAYER_TEST_FILTER=transaction_replacement cargo run --bin e2e-runner
-
-test-batch-transactions: ## Run batch transactions test
-	@echo "Running batch transactions test..."
-	@make reset-db
-	@RUST_LOG=info,rrelayer_core=info RRELAYER_TEST_FILTER=batch_transactions cargo run --bin e2e-runner
-
-test-relayer-limits: ## Run relayer limits test
-	@echo "Running relayer limits test..."
-	@make reset-db
-	@RUST_LOG=info,rrelayer_core=info RRELAYER_TEST_FILTER=relayer_limits cargo run --bin e2e-runner
-
-clean: stop-postgres stop-anvil stop-rrelayer ## Clean up all running processes and files
-	@rm -f *.pid *.log
-	@cargo clean
-	@echo "Cleanup complete"
-
-status: ## Show status of services
-	@echo "=== Service Status ==="
-	@if PGPASSWORD=rrelayer psql -h localhost -p 5447 -U postgres -d postgres -c "SELECT 1;" >/dev/null 2>&1; then \
-		echo "✅ PostgreSQL running"; \
-	else \
-		echo "❌ PostgreSQL not running"; \
+run-test: start-postgres ## Internal target to run a single test with clean output (use TEST=test_name)
+	@if [ -z "$(TEST)" ]; then \
+		echo "❌ Error: TEST variable must be set. Usage: make run-test TEST=test_name"; \
+		exit 1; \
 	fi
+	@echo "🧪 Running single test: $(TEST) (clean output)..."
+	@make reset-db
+	@RUST_LOG=error, RRELAYER_TEST_FILTER=$(TEST) cargo run --bin e2e-runner
+	@make stop-postgres
+
+run-test-debug: start-postgres ## Internal target to run a single test with debug output (use TEST=test_name)
+	@if [ -z "$(TEST)" ]; then \
+		echo "❌ Error: TEST variable must be set. Usage: make run-test-debug TEST=test_name"; \
+		exit 1; \
+	fi
+	@echo "🧪 Running single test: $(TEST) (debug output)..."
+	@make reset-db
+	@RUST_LOG=info, RRELAYER_TEST_FILTER=$(TEST) cargo run --bin e2e-runner
+	@make stop-postgres
+
+# =============================================================================
+# CONVENIENCE TARGETS FOR COMMON INDIVIDUAL TESTS
+# =============================================================================
+
+test-basic: ## Run basic relayer creation test (clean output)
+	@make run-test TEST=basic_relayer_creation
+
+test-basic-debug: ## Run basic relayer creation test (debug output)
+	@make run-test-debug TEST=basic_relayer_creation
+
+test-transfer: ## Run simple ETH transfer test (clean output)
+	@make run-test TEST=simple_eth_transfer
+
+test-transfer-debug: ## Run simple ETH transfer test (debug output)
+	@make run-test-debug TEST=simple_eth_transfer
+
+test-contract: ## Run smart contract interaction test (clean output)
+	@make run-test TEST=contract_interaction
+
+test-contract-debug: ## Run smart contract interaction test (debug output)
+	@make run-test-debug TEST=contract_interaction
+
+test-failed: ## Run failed transaction tests (clean output)
+	@make run-test TEST=failed_transaction_handling_not_enough_funds
+	@make run-test TEST=failed_transaction_handling_revert_execution
+
+test-failed-debug: ## Run failed transaction tests (debug output)
+	@make run-test-debug TEST=failed_transaction_handling_not_enough_funds
+	@make run-test-debug TEST=failed_transaction_handling_revert_execution
+
+# =============================================================================
+# DEBUG AND DEVELOPMENT TARGETS
+# =============================================================================
+
+logs: ## Show recent logs from all services
+	@echo "=== Recent Anvil Logs ==="
+	@tail -n 20 anvil.log 2>/dev/null || echo "No anvil.log found"
+	@echo ""
+	@echo "=== Recent RRelayer Logs ==="
+	@tail -n 20 rrelayer.log 2>/dev/null || echo "No rrelayer.log found"
+
+logs-live: ## Follow live logs from all services
+	@echo "Following live logs (Ctrl+C to stop)..."
+	@echo "=== Live RRelayer Logs ==="
+	@tail -f rrelayer.log 2>/dev/null || echo "No rrelayer.log found"
+
+logs-rrelayer: ## Show recent RRelayer logs only
+	@tail -n 50 rrelayer.log 2>/dev/null || echo "No rrelayer.log found"
+
+logs-anvil: ## Show recent Anvil logs only  
+	@tail -n 50 anvil.log 2>/dev/null || echo "No anvil.log found"
+
+logs-clear: ## Clear all log files
+	@rm -f *.log
+	@echo "All log files cleared"
+
+check-services: ## Check if all services are running
+	@echo "Checking service status..."
 	@if [ -f anvil.pid ] && kill -0 $$(cat anvil.pid) 2>/dev/null; then \
-		echo "✅ Anvil running (PID: $$(cat anvil.pid))"; \
+		echo "✅ Anvil is running (PID: $$(cat anvil.pid))"; \
 	else \
-		echo "❌ Anvil not running"; \
+		echo "❌ Anvil is not running"; \
 	fi
 	@if [ -f rrelayer.pid ] && kill -0 $$(cat rrelayer.pid) 2>/dev/null; then \
-		echo "✅ RRelayer running (PID: $$(cat rrelayer.pid))"; \
+		echo "✅ RRelayer is running (PID: $$(cat rrelayer.pid))"; \
 	else \
-		echo "❌ RRelayer not running"; \
+		echo "❌ RRelayer is not running"; \
 	fi
-	@if curl -s -f http://localhost:3000/health >/dev/null 2>&1; then \
-		echo "✅ RRelayer API responding"; \
+	@if PGPASSWORD=rrelayer psql -h localhost -p 5447 -U postgres -d postgres -c "SELECT 1;" >/dev/null 2>&1; then \
+		echo "✅ PostgreSQL is running"; \
 	else \
-		echo "❌ RRelayer API not responding"; \
+		echo "❌ PostgreSQL is not running"; \
 	fi
-
-logs: ## Show logs from services
-	@echo "=== Anvil Logs ==="
-	@if [ -f anvil.log ]; then tail -n 20 anvil.log; else echo "No anvil logs"; fi
-	@echo ""
-	@echo "=== RRelayer Logs ==="
-	@if [ -f rrelayer.log ]; then tail -n 20 rrelayer.log; else echo "No rrelayer logs"; fi
-
-logs-follow: ## Follow logs from services in real-time
-	@echo "Following RRelayer logs (Ctrl+C to exit)..."
-	@if [ -f rrelayer.log ]; then tail -f rrelayer.log; else echo "No rrelayer logs"; fi
-
-test-with-logs: ## Run tests and show both e2e and rrelayer logs
-	@echo "Running E2E tests with combined logging..."
-	@make reset-db
-	@(tail -f rrelayer.log 2>/dev/null | sed 's/^/[RRELAYER] /' &) ; \
-	RUST_LOG=info,rrelayer_core=info cargo run --bin e2e-runner
-
-test-embedded: ## Run E2E tests with embedded RRelayer server (unified logs)
-	@echo "Running E2E tests with embedded RRelayer server..."
-	@make reset-db
-	@RUST_LOG=info,rrelayer_core=info cargo run --bin e2e-runner
-
-test-full-embedded: start-postgres start-anvil test-embedded stop-anvil stop-postgres ## Run complete test suite with embedded RRelayer
-
-test-quick-embedded: ## Run embedded tests assuming Anvil and PostgreSQL are running
-	@echo "Running E2E tests with embedded RRelayer (assuming services are running)..."
-	@RUST_LOG=info,rrelayer_core=info cargo run --bin e2e-runner
-
-# Development targets
-dev-setup: install-deps build ## Setup development environment
-
-dev-start: start-postgres start-anvil start-rrelayer ## Start all services for development
-
-dev-test: ## Run tests in development mode with detailed logging
-	@RUST_LOG=info,rrelayer_core=info cargo run --bin e2e-runner
-
-# CI targets  
-ci-test: ## Run tests in CI mode
-	@echo "Running CI E2E tests..."
-	@timeout 300 make test-full || (make clean && exit 1)

@@ -37,8 +37,10 @@ use alloy::{
 };
 use chrono::Utc;
 use tokio::sync::Mutex;
+use tracing::error;
 use tracing::log::info;
 use crate::relayer::types::RelayerId;
+use crate::transaction::types::TransactionValue;
 
 /// Queue system for managing transactions in different states for a single relayer.
 ///
@@ -329,6 +331,51 @@ impl TransactionsQueue {
         count
     }
 
+    /// Updates the first inmempool transaction with new gas values after a gas bump.
+    ///
+    /// # Arguments
+    /// * `transaction_sent` - The transaction details with updated gas values
+    pub async fn update_inmempool_transaction_gas(&mut self, transaction_sent: &TransactionSentWithRelayer) {
+        let mut transactions = self.inmempool_transactions.lock().await;
+        if let Some(transaction) = transactions.front_mut() {
+            if transaction.id == transaction_sent.id {
+                info!(
+                    "Updating inmempool transaction {} with new gas values for relayer: {}",
+                    transaction_sent.id, self.relayer.name
+                );
+                transaction.known_transaction_hash = Some(transaction_sent.hash);
+                transaction.sent_with_max_fee_per_gas = Some(transaction_sent.sent_with_gas.max_fee);
+                transaction.sent_with_max_priority_fee_per_gas = Some(transaction_sent.sent_with_gas.max_priority_fee);
+                transaction.sent_with_gas = Some(transaction_sent.sent_with_gas.clone());
+                transaction.sent_at = Some(Utc::now());
+            }
+        }
+    }
+
+    /// Updates the inmempool transaction with no-op details after cancellation.
+    ///
+    /// # Arguments
+    /// * `transaction_id` - The ID of the transaction to update
+    /// * `transaction_sent` - The transaction details with new hash and no-op data
+    pub async fn update_inmempool_transaction_noop(&mut self, transaction_id: &TransactionId, transaction_sent: &TransactionSentWithRelayer) {
+        let mut transactions = self.inmempool_transactions.lock().await;
+        if let Some(transaction) = transactions.front_mut() {
+            if transaction.id == *transaction_id {
+                info!(
+                    "Updating inmempool transaction {} with no-op details for relayer: {}",
+                    transaction_id, self.relayer.name
+                );
+                transaction.known_transaction_hash = Some(transaction_sent.hash);
+                transaction.to = self.relay_address();
+                transaction.value = TransactionValue::zero();
+                transaction.data = TransactionData::empty();
+                transaction.is_noop = true;
+                transaction.speed = TransactionSpeed::Fast;
+                transaction.sent_at = Some(Utc::now());
+            }
+        }
+    }
+
     /// Moves a transaction from inmempool to mined queue after receiving a block receipt.
     ///
     /// Analyzes the transaction receipt to determine final status (Mined, Failed, or Expired)
@@ -361,19 +408,10 @@ impl TransactionsQueue {
                 let transaction_status: TransactionStatus;
 
                 if receipt.status() {
-                    if transaction.is_noop {
-                        transaction_status = TransactionStatus::Expired;
-                        info!(
-                            "Transaction {} marked as expired (noop) for relayer: {}",
-                            id, self.relayer.name
-                        );
-                    } else {
-                        transaction_status = TransactionStatus::Mined;
-                        info!(
-                            "Transaction {} successfully mined for relayer: {}",
-                            id, self.relayer.name
-                        );
-                    }
+                    transaction_status = TransactionStatus::Mined;
+                    info!(
+                      "Transaction {} successfully mined for relayer: {}", id, self.relayer.name
+                    );
                 } else {
                     transaction_status = TransactionStatus::Failed;
                     info!("Transaction {} failed on-chain for relayer: {}", id, self.relayer.name);
@@ -613,7 +651,7 @@ impl TransactionsQueue {
     /// Used for timing calculations like confirmation waits and gas price bumping.
     ///
     /// # Returns
-    /// * `u64` - Block time in milliseconds
+    /// * `u64` - Block time in milliseconds (already stored in ms)
     pub fn blocks_every_ms(&self) -> u64 {
         self.evm_provider.blocks_every
     }
@@ -624,7 +662,7 @@ impl TransactionsQueue {
     /// if sufficient time has elapsed for confidence in transaction finality.
     ///
     /// # Arguments
-    /// * `elapsed` - Time since the transaction was mined in seconds
+    /// * `elapsed` - Time since the transaction was mined in milliseconds
     ///
     /// # Returns
     /// * `bool` - True if enough time has passed for confirmation
@@ -633,7 +671,7 @@ impl TransactionsQueue {
         let in_range = elapsed > threshold;
         if in_range {
             info!(
-                "Transaction in confirmed range for relayer: {} - elapsed: {}s, threshold: {}s",
+                "Transaction in confirmed range for relayer: {} - elapsed: {}ms, threshold: {}ms",
                 self.relayer.name, elapsed, threshold
             );
         }
@@ -673,7 +711,7 @@ impl TransactionsQueue {
             info!("Adjusting gas price based on previous attempt for relayer: {}. Previous max_fee: {}, max_priority_fee: {}",
                 self.relayer.name, sent_gas.max_fee.into_u128(), sent_gas.max_priority_fee.into_u128());
 
-            if gas_price.max_fee < sent_gas.max_fee {
+            if gas_price.max_fee <= sent_gas.max_fee {
                 let old_max_fee = gas_price.max_fee;
                 gas_price.max_fee = sent_gas.max_fee + (sent_gas.max_fee / 10);
                 info!(
@@ -684,7 +722,7 @@ impl TransactionsQueue {
                 );
             }
 
-            if gas_price.max_priority_fee < sent_gas.max_priority_fee {
+            if gas_price.max_priority_fee <= sent_gas.max_priority_fee {
                 let old_priority_fee = gas_price.max_priority_fee;
                 gas_price.max_priority_fee =
                     sent_gas.max_priority_fee + (sent_gas.max_priority_fee / 10);
@@ -886,6 +924,8 @@ impl TransactionsQueue {
             "Preparing to send transaction {} for relayer: {} with speed {:?}",
             transaction.id, self.relayer.name, transaction.speed
         );
+
+        info!("Sending transaction {:?} for relayer: {}", transaction, self.relayer.name);
 
         let gas_price = self
             .compute_gas_price_for_transaction(
@@ -1113,18 +1153,29 @@ impl TransactionsQueue {
             transaction_sent.id, transaction_sent.hash, self.relayer.name
         );
 
-        info!(
-            "Updating database for sent transaction {} on relayer: {}",
-            transaction.id, self.relayer.name
-        );
-        db.transaction_sent(
-            &transaction_sent.id,
-            &transaction_sent.hash,
-            &transaction_sent.sent_with_gas,
-            self.is_legacy_transactions(),
-        )
-        .await
-        .map_err(TransactionQueueSendTransactionError::CouldNotUpdateTransactionDb)?;
+        if transaction.sent_with_gas.is_none() || transaction.is_noop {
+            info!(
+                "Updating database for sent transaction {} on relayer: {}",
+                transaction.id, self.relayer.name
+            );
+            if transaction.sent_with_gas.is_none() {
+                db.transaction_sent(
+                    &transaction_sent.id,
+                    &transaction_sent.hash,
+                    &transaction_sent.sent_with_gas,
+                    self.is_legacy_transactions(),
+                )
+                    .await
+                    .map_err(TransactionQueueSendTransactionError::CouldNotUpdateTransactionDb)?;
+            } else if transaction.is_noop {
+                db.update_transaction_noop(&transaction.id, &transaction.to).await.map_err(TransactionQueueSendTransactionError::CouldNotUpdateTransactionDb)?;
+            }
+        } else {
+            info!(
+                "Skipping DB update for gas bump transaction {} on relayer: {}",
+                transaction.id, self.relayer.name
+            );
+        }
 
         info!(
             "Successfully processed transaction {} for relayer: {}",

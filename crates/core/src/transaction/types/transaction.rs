@@ -102,7 +102,6 @@ pub struct Transaction {
     #[serde(rename = "maxFee", skip_serializing_if = "Option::is_none", default)]
     pub sent_with_max_fee_per_gas: Option<MaxFee>,
 
-    #[serde(skip_serializing, skip_deserializing, default)]
     pub is_noop: bool,
 
     pub external_id: Option<String>,
