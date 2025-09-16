@@ -90,7 +90,7 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
             "from" BYTEA NOT NULL,
             nonce BIGINT NOT NULL,
             data BYTEA NULL,
-            value NUMERIC(80) NULL,
+            value NUMERIC(80) NOT NULL,
             chain_id BIGINT NOT NULL,
             gas_price NUMERIC NULL,
             sent_max_priority_fee_per_gas NUMERIC(80) NULL,
