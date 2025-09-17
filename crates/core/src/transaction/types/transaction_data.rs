@@ -3,8 +3,9 @@ use std::{
     hash::{Hash, Hasher},
     str::FromStr,
 };
-
+use std::fmt::Display;
 use alloy::{hex, primitives::Bytes};
+use alloy::hex::FromHex;
 use bytes::BytesMut;
 use serde::{Deserialize, Serialize};
 use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
@@ -32,6 +33,33 @@ impl TransactionData {
     pub fn hex(&self) -> String {
         hex::encode(&self.0)
     }
+
+    pub fn raw_hex(s: &str) -> Result<Self, String> {
+        if s.is_empty() {
+            return Err("TransactionData string is empty".to_string());
+        }
+
+        if !s.starts_with("0x") {
+            return Err("TransactionData must start with '0x'".to_string());
+        }
+
+        let hex_part = &s[2..];
+        if !hex_part.chars().all(|c| c.is_ascii_hexdigit()) {
+            return Err("TransactionData must contain only valid hexadecimal digits".to_string());
+        }
+
+        let bytes = Vec::from_hex(hex_part).map_err(|e| format!("Invalid hex string: {e}"))?;
+
+        Ok(Self(Bytes::from(bytes)))
+    }
+}
+
+impl FromStr for TransactionData {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        TransactionData::raw_hex(s)
+    }
 }
 
 impl Default for TransactionData {
@@ -49,6 +77,12 @@ impl Hash for TransactionData {
 impl PartialEq for TransactionData {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
+    }
+}
+
+impl Display for TransactionData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", hex::encode(&self.0))
     }
 }
 
@@ -91,14 +125,6 @@ impl ToSql for TransactionData {
     }
 
     tokio_postgres::types::to_sql_checked!();
-}
-
-impl FromStr for TransactionData {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        hex::decode(s).map(Bytes::from).map(TransactionData).map_err(|e| e.to_string())
-    }
 }
 
 impl From<Bytes> for TransactionData {

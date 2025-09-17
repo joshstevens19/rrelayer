@@ -10,6 +10,7 @@ use alloy::{
 };
 use anyhow::{Context, Result};
 use rand;
+use rrelayer_core::common_types::EvmAddress;
 use std::str::FromStr;
 use tracing::info;
 
@@ -32,7 +33,7 @@ sol! {
 
 pub struct ContractInteractor {
     provider: RootProvider<Http<Client>>,
-    contract_address: Option<Address>,
+    contract_address: Option<EvmAddress>,
 }
 
 impl ContractInteractor {
@@ -95,7 +96,7 @@ impl ContractInteractor {
             .context("Failed to deploy test contract")?;
 
         let contract_address = *contract.address();
-        self.contract_address = Some(contract_address);
+        self.contract_address = Some(contract_address.into());
         info!("Test contract deployed to: {:?}", contract_address);
 
         // Set a random initial value to test the contract works
@@ -139,7 +140,7 @@ impl ContractInteractor {
     }
 
     /// Get the contract address
-    pub fn contract_address(&self) -> Option<Address> {
+    pub fn contract_address(&self) -> Option<EvmAddress> {
         self.contract_address
     }
 
@@ -160,23 +161,19 @@ impl ContractInteractor {
         Ok(None)
     }
 
-    /// Get current block number
     pub async fn get_block_number(&self) -> Result<u64> {
         let block_number = self.provider.get_block_number().await?;
         Ok(block_number)
     }
 
-    /// Get ETH balance for an address
-    pub async fn get_eth_balance(&self, address: &str) -> Result<U256> {
-        let addr = Address::from_str(address).context("Invalid address")?;
-        let balance = self.provider.get_balance(addr).await?;
+    pub async fn get_eth_balance(&self, address: &EvmAddress) -> Result<U256> {
+        let balance = self.provider.get_balance(address.into_address()).await?;
         Ok(balance)
     }
 
-    /// Verify contract is deployed by checking if it has code
     pub async fn verify_contract_deployed(&self) -> Result<bool> {
         if let Some(address) = self.contract_address {
-            let code = self.provider.get_code_at(address).await?;
+            let code = self.provider.get_code_at(address.into_address()).await?;
             Ok(!code.is_empty())
         } else {
             Ok(false)

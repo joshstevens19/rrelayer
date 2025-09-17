@@ -35,6 +35,15 @@ impl EvmAddress {
     pub fn into_address(self) -> Address {
         self.0
     }
+
+    pub fn dead() -> Self {
+        Self::zero()
+    }
+
+    // Just a less scary alias for `dead` address.
+    pub fn zero() -> Self {
+        Self(Address::ZERO)
+    }
 }
 
 impl Display for EvmAddress {

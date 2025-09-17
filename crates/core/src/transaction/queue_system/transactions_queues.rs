@@ -678,11 +678,10 @@ impl TransactionsQueues {
                             .await
                             .map_err(CancelTransactionError::SendTransactionError)?;
 
-                        // Update the actual inmempool transaction with no-op details and new hash
                         transactions_queue.update_inmempool_transaction_noop(&transaction.id, &transaction_sent).await;
-                        
+
+                        // TODO: not sure we need?
                         result.transaction.known_transaction_hash = Some(transaction_sent.hash);
-                        println!("update known_transaction_hash {:?}", transaction_sent.hash);
 
                         self.invalidate_transaction_cache(&transaction.id).await;
 

@@ -4,6 +4,7 @@ use alloy::primitives::Address;
 use axum::http::HeaderMap;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
+use anyhow::Context;
 use thiserror::Error;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -92,8 +93,7 @@ impl UserDetector {
             .and_then(|v| v.to_str().ok())
             .ok_or_else(|| UserDetectionError::HeaderError("Header not found".to_string()))?;
 
-        let user_address = EvmAddress::from_str(header_value)
-            .map_err(|e| UserDetectionError::InvalidAddress(e.to_string()))?;
+        let user_address = EvmAddress::from_str(header_value).context("Could not parse evm address").unwrap();
 
         // Check for transaction type header
         let transaction_type = headers

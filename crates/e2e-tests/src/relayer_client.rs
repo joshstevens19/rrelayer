@@ -1,4 +1,10 @@
-use anyhow::{Context, Result};
+use crate::test_config::E2ETestConfig;
+use alloy::network::AnyTransactionReceipt;
+use alloy::primitives::U256;
+use anyhow::{anyhow, Context, Result};
+use rrelayer_core::common_types::PagingResult;
+use rrelayer_core::relayer::api::CreateRelayerResult;
+use rrelayer_core::transaction::types::Transaction;
 use rrelayer_core::{
     common_types::{EvmAddress, PagingContext},
     relayer::types::RelayerId,
@@ -11,8 +17,6 @@ use rrelayer_sdk::SDK;
 use serde_json::Value;
 use std::str::FromStr;
 use tracing::info;
-use rrelayer_core::transaction::types::Transaction;
-use crate::test_config::E2ETestConfig;
 
 pub struct RelayerClient {
     pub sdk: SDK,
@@ -33,7 +37,7 @@ impl RelayerClient {
     }
 
     /// Create a new relayer for the test chain
-    pub async fn create_relayer(&self, name: &str, chain_id: u64) -> Result<Value> {
+    pub async fn create_relayer(&self, name: &str, chain_id: u64) -> Result<CreateRelayerResult> {
         info!("Creating relayer: {} on chain {}", name, chain_id);
 
         let result =
@@ -41,41 +45,68 @@ impl RelayerClient {
 
         info!("Created relayer: {:?}", result);
 
-        // Convert to serde_json::Value for compatibility
-        let relayer: Value = serde_json::to_value(result)?;
-        Ok(relayer)
+        Ok(result)
+    }
+
+    pub fn sent_transaction_compare(
+        &self,
+        sent: RelayTransactionRequest,
+        transaction: Transaction,
+        // _receipt: AnyTransactionReceipt, // TODO: add tests on the receipt as well
+    ) -> Result<()> {
+        // if transaction.is_noop {
+        //     return Err(anyhow!("Transaction should not be an noop"));
+        // }
+
+        if transaction.to != sent.to {
+            return Err(anyhow!(
+                "Transaction to should be {} but it got sent to {}",
+                transaction.to,
+                sent.to
+            ));
+        }
+
+        if transaction.value != sent.value {
+            return Err(anyhow!(
+                "Transaction value mismatch - expected {} but got {}",
+                sent.value,
+                transaction.value
+            ));
+        }
+
+        if transaction.data != sent.data {
+            return Err(anyhow!(
+                "Transaction data mismatch - expected {} but got {}",
+                sent.data,
+                transaction.data
+            ));
+        }
+
+        if transaction.external_id != sent.external_id {
+            return Err(anyhow!(
+                "Transaction external ids do not match expected {} but got {}",
+                sent.external_id.expect("Should always be defined"),
+                transaction.external_id.expect("Should always be defined"),
+            ));
+        }
+
+        Ok(())
     }
 
     /// Send a transaction through the relayer
     pub async fn send_transaction(
         &self,
         relayer_id: &RelayerId,
-        to: &str,
-        value: Option<&str>,
-        data: Option<&str>,
-    ) -> Result<SendTransactionResult> {
+        to: &EvmAddress,
+        value: TransactionValue,
+        data: TransactionData,
+    ) -> Result<(SendTransactionResult, RelayTransactionRequest)> {
         info!("Sending transaction to: {} via relayer: {}", to, relayer_id);
 
-        // Parse the inputs to the proper types
-        let to_address = EvmAddress::from_str(to).context("Invalid to address")?;
-
-        let transaction_value = match value {
-            Some(v) => TransactionValue::from_str(v)
-                .map_err(|e| anyhow::anyhow!("Invalid value: {}", e))?,
-            None => TransactionValue::default(),
-        };
-
-        let transaction_data = match data {
-            Some(d) => {
-                TransactionData::from_str(d).map_err(|e| anyhow::anyhow!("Invalid data: {}", e))?
-            }
-            None => TransactionData::default(),
-        };
-
         let request = RelayTransactionRequest {
-            to: to_address,
-            value: transaction_value,
-            data: transaction_data,
+            to: to.clone(),
+            value,
+            data,
             speed: Some(TransactionSpeed::Fast),
             external_id: None,
             blobs: None,
@@ -92,7 +123,7 @@ impl RelayerClient {
 
         info!("Transaction response: {:?}", result);
 
-        Ok(result)
+        Ok((result, request))
     }
 
     /// Get transaction status
@@ -122,30 +153,26 @@ impl RelayerClient {
         relayer_id: &RelayerId,
         limit: u32,
         offset: u32,
-    ) -> Result<Value> {
+    ) -> Result<PagingResult<Transaction>> {
         info!(
             "Getting relayer transactions for: {} (limit: {}, offset: {})",
             relayer_id, limit, offset
         );
         let paging = PagingContext { limit, offset };
 
-        let result = self
+        let results = self
             .sdk
             .transaction
             .get_transactions(&relayer_id, &paging)
             .await
             .context("Failed to get relayer transactions")?;
 
-        info!("Relayer transactions: {:?}", result);
+        info!("Relayer transactions: {:?}", results);
 
-        let transactions: Value = serde_json::to_value(result)?;
-        Ok(transactions)
+        Ok(results)
     }
 
-    pub async fn get_transaction(
-        &self,
-        transaction_id: &TransactionId,
-    ) -> Result<Transaction> {
+    pub async fn get_transaction(&self, transaction_id: &TransactionId) -> Result<Transaction> {
         info!("Getting transaction status for: {}", transaction_id);
 
         let result = self
@@ -160,21 +187,5 @@ impl RelayerClient {
         info!("Transaction: {:?}", tx);
 
         Ok(tx)
-    }
-
-    /// Get pending transaction count for a relayer
-    pub async fn get_pending_count(&self, relayer_id: &RelayerId) -> Result<u64> {
-        info!("Getting pending count for relayer: {}", relayer_id);
-
-        let count = self
-            .sdk
-            .transaction
-            .get_transactions_pending_count(&relayer_id)
-            .await
-            .context("Failed to get pending count")?;
-
-        info!("Pending count: {}", count);
-
-        Ok(count as u64)
     }
 }

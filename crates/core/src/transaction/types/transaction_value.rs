@@ -1,5 +1,5 @@
 use std::{error::Error, str::FromStr};
-
+use std::fmt::Display;
 use alloy::primitives::U256;
 use bytes::BytesMut;
 use serde::{Deserialize, Serialize};
@@ -31,6 +31,12 @@ impl Default for TransactionValue {
 impl PartialEq for TransactionValue {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
+    }
+}
+
+impl Display for TransactionValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
