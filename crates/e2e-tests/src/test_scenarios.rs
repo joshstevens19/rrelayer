@@ -1242,7 +1242,8 @@ impl TestRunner {
                         blobs: None,
                     },
                 )
-                .await.context("Failed to send transaction to allowed address")?;
+                .await
+                .context("Failed to send transaction to allowed address")?;
         }
 
         debug!("✅ Allowlist list operation works correctly");
