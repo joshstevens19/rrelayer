@@ -1,13 +1,13 @@
+use alloy::hex::FromHex;
+use alloy::{hex, primitives::Bytes};
+use bytes::BytesMut;
+use serde::{Deserialize, Serialize};
+use std::fmt::Display;
 use std::{
     error::Error,
     hash::{Hash, Hasher},
     str::FromStr,
 };
-use std::fmt::Display;
-use alloy::{hex, primitives::Bytes};
-use alloy::hex::FromHex;
-use bytes::BytesMut;
-use serde::{Deserialize, Serialize};
 use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq)]

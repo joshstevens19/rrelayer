@@ -1575,6 +1575,7 @@ impl TestRunner {
         self.anvil_manager.mine_block().await?;
 
         let transaction = self.relayer_client.get_transaction(&send_result.id).await?;
+        println!("transaction {}", transaction);
         self.relayer_client.sent_transaction_compare(replacement_request, transaction)?;
 
         debug!("✅ Transaction replacement result: {}", replace_result);

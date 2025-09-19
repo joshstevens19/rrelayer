@@ -32,6 +32,9 @@ pub enum ReplaceTransactionError {
 
     #[error("Relayer {0} is paused")]
     RelayerIsPaused(RelayerId),
+
+    #[error("Relayer could not update the transaction in the db {0}")]
+    CouldNotUpdateTransactionInDb(#[from] PostgresError),
 }
 
 #[derive(Error, Debug)]

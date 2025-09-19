@@ -76,9 +76,7 @@ pub async fn calculate_block_time_difference(
 
     // Ensure there's no underflow if not enough blocks to check set to 250ms (max limit)
     if latest_block_number <= 13 {
-        rrelayer_info!(
-            "Not enough blocks to calculate block time difference, setting to 250ms"
-        );
+        rrelayer_info!("Not enough blocks to calculate block time difference, setting to 250ms");
         return Ok(250);
     }
 
@@ -108,10 +106,12 @@ pub async fn calculate_block_time_difference(
     let limited_block_time_ms = std::cmp::max(block_time_ms, 250);
 
     rrelayer_info!(
-        "Calculated block time: {}s ({}ms), limited to {}ms", 
-        block_time_seconds, block_time_ms, limited_block_time_ms
+        "Calculated block time: {}s ({}ms), limited to {}ms",
+        block_time_seconds,
+        block_time_ms,
+        limited_block_time_ms
     );
-    
+
     Ok(limited_block_time_ms)
 }
 

@@ -1,8 +1,8 @@
-use std::{error::Error, str::FromStr};
-use std::fmt::Display;
 use alloy::primitives::U256;
 use bytes::BytesMut;
 use serde::{Deserialize, Serialize};
+use std::fmt::Display;
+use std::{error::Error, str::FromStr};
 use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq)]

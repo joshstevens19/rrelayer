@@ -34,6 +34,7 @@ use super::{
     },
 };
 use crate::transaction::api::send_transaction::RelayTransactionRequest;
+use crate::transaction::types::TransactionSpeed;
 use crate::{
     gas::{
         blob_gas_oracle::{BlobGasOracleCache, BlobGasPriceResult},
@@ -56,7 +57,6 @@ use crate::{
     },
     webhooks::WebhookManager,
 };
-use crate::transaction::types::TransactionSpeed;
 
 /// Container for managing multiple transaction queues across different relayers.
 ///
@@ -82,7 +82,7 @@ impl TransactionsQueues {
     /// # Arguments
     /// * `setups` - Configuration for each relayer's transaction queue
     /// * `gas_oracle_cache` - Shared cache for gas price information
-    /// * `blob_gas_oracle_cache` - Shared cache for blob gas price information  
+    /// * `blob_gas_oracle_cache` - Shared cache for blob gas price information
     /// * `cache` - General application cache
     /// * `webhook_manager` - Optional manager for webhook notifications
     /// * `safe_proxy_manager` - Optional Safe proxy manager for multisig operations
@@ -324,11 +324,13 @@ impl TransactionsQueues {
         current_transaction: &mut Transaction,
         replace_with: &RelayTransactionRequest,
     ) {
+        // TODO: blobs
         current_transaction.to = replace_with.to;
         current_transaction.data = replace_with.data.clone();
         current_transaction.value = replace_with.value;
         current_transaction.is_noop = current_transaction.from == current_transaction.to;
         current_transaction.gas_limit = None;
+        current_transaction.external_id = replace_with.external_id.clone();
     }
 
     /// Checks if a relayer is allowed to send transactions to a specific address.
@@ -472,24 +474,31 @@ impl TransactionsQueues {
         let estimated_gas_limit = transactions_queue
             .estimate_gas(&temp_transaction_request, transaction.is_noop)
             .await
-            .map_err(|e| AddTransactionError::TransactionEstimateGasError(transaction.relayer_id, e))?;
+            .map_err(|e| {
+                AddTransactionError::TransactionEstimateGasError(transaction.relayer_id, e)
+            })?;
 
-        let relayer_balance = transactions_queue.get_balance().await
-            .map_err(|e| AddTransactionError::TransactionEstimateGasError(transaction.relayer_id, e))?;
-            
-        let gas_cost = estimated_gas_limit.into_inner() as u128 * gas_price.legacy_gas_price().into_u128();
-        let total_required = transaction.value.into_inner() + alloy::primitives::U256::from(gas_cost);
-        
+        let relayer_balance = transactions_queue.get_balance().await.map_err(|e| {
+            AddTransactionError::TransactionEstimateGasError(transaction.relayer_id, e)
+        })?;
+
+        let gas_cost =
+            estimated_gas_limit.into_inner() as u128 * gas_price.legacy_gas_price().into_u128();
+        let total_required =
+            transaction.value.into_inner() + alloy::primitives::U256::from(gas_cost);
+
         if relayer_balance < total_required {
-            tracing::error!("Insufficient balance for relayer {}: has {}, needs {}", 
-                transaction.relayer_id, relayer_balance, total_required);
+            tracing::error!(
+                "Insufficient balance for relayer {}: has {}, needs {}",
+                transaction.relayer_id,
+                relayer_balance,
+                total_required
+            );
             return Err(AddTransactionError::TransactionEstimateGasError(
-                transaction.relayer_id, 
-                RpcError::Transport(
-                    TransportErrorKind::Custom(
-                        "Insufficient funds for gas * price + value".to_string().into()
-                    )
-                )
+                transaction.relayer_id,
+                RpcError::Transport(TransportErrorKind::Custom(
+                    "Insufficient funds for gas * price + value".to_string().into(),
+                )),
             ));
         }
 
@@ -577,7 +586,7 @@ impl TransactionsQueues {
             &mut transactions_queue,
             &transaction,
             &gas_price,
-            blob_gas_price.as_ref()
+            blob_gas_price.as_ref(),
         )
         .await;
 
@@ -671,14 +680,19 @@ impl TransactionsQueues {
                     EditableTransactionType::Inmempool => {
                         info!("cancel_transaction: converting to noop - inmempool");
                         self.transaction_to_noop(&mut transactions_queue, &mut result.transaction);
-                        info!("cancel_transaction: sending noop - inmempool {:?}", result.transaction);
+                        info!(
+                            "cancel_transaction: sending noop - inmempool {:?}",
+                            result.transaction
+                        );
 
                         let transaction_sent = transactions_queue
                             .send_transaction(&mut self.db, &mut result.transaction)
                             .await
                             .map_err(CancelTransactionError::SendTransactionError)?;
 
-                        transactions_queue.update_inmempool_transaction_noop(&transaction.id, &transaction_sent).await;
+                        transactions_queue
+                            .update_inmempool_transaction_noop(&transaction.id, &transaction_sent)
+                            .await;
 
                         // TODO: not sure we need?
                         result.transaction.known_transaction_hash = Some(transaction_sent.hash);
@@ -755,11 +769,20 @@ impl TransactionsQueues {
                         let original_transaction = result.transaction.clone();
                         self.transaction_replace(&mut result.transaction, replace_with);
 
-                        // TODO: look at this
                         let transaction_sent = transactions_queue
                             .send_transaction(&mut self.db, &mut result.transaction)
                             .await
                             .map_err(ReplaceTransactionError::SendTransactionError)?;
+
+                        transactions_queue
+                            .update_inmempool_transaction_replaced(
+                                &transaction.id,
+                                &transaction_sent,
+                                &result.transaction,
+                            )
+                            .await;
+
+                        self.db.transaction_update(&result.transaction).await?;
 
                         self.invalidate_transaction_cache(&transaction.id).await;
 
@@ -955,7 +978,6 @@ impl TransactionsQueues {
             if let Some(mut transaction) = transactions_queue.get_next_inmempool_transaction().await
             {
                 if let Some(known_transaction_hash) = transaction.known_transaction_hash {
-                    println!("known_transaction_hash {:?}", known_transaction_hash);
                     match transactions_queue.get_receipt(&known_transaction_hash).await {
                         Ok(Some(receipt)) => {
                             let status = transactions_queue
@@ -965,7 +987,7 @@ impl TransactionsQueues {
                             match status {
                                 TransactionStatus::Mined => {
                                     self.db
-                                        .transaction_mined(&transaction.id, &receipt)
+                                        .transaction_mined(&transaction, &receipt)
                                         .await.map_err(|e| ProcessInmempoolTransactionError::CouldNotUpdateTransactionStatusInTheDatabase(*relayer_id, transaction.clone(), TransactionStatus::Mined, e))?;
                                     self.invalidate_transaction_cache(&transaction.id).await;
 
@@ -1033,13 +1055,19 @@ impl TransactionsQueues {
                                         )?;
 
                                     // Update the actual transaction in the inmempool queue
-                                    transactions_queue.update_inmempool_transaction_gas(&transaction_sent).await;
-                                    
+                                    transactions_queue
+                                        .update_inmempool_transaction_gas(&transaction_sent)
+                                        .await;
+
                                     // Update the local transaction with the new gas values so subsequent bumps work correctly
-                                    transaction.known_transaction_hash = Some(transaction_sent.hash);
-                                    transaction.sent_with_max_fee_per_gas = Some(transaction_sent.sent_with_gas.max_fee);
-                                    transaction.sent_with_max_priority_fee_per_gas = Some(transaction_sent.sent_with_gas.max_priority_fee);
-                                    transaction.sent_with_gas = Some(transaction_sent.sent_with_gas.clone());
+                                    transaction.known_transaction_hash =
+                                        Some(transaction_sent.hash);
+                                    transaction.sent_with_max_fee_per_gas =
+                                        Some(transaction_sent.sent_with_gas.max_fee);
+                                    transaction.sent_with_max_priority_fee_per_gas =
+                                        Some(transaction_sent.sent_with_gas.max_priority_fee);
+                                    transaction.sent_with_gas =
+                                        Some(transaction_sent.sent_with_gas.clone());
                                     transaction.sent_at = Some(Utc::now());
 
                                     self.invalidate_transaction_cache(&transaction.id).await;

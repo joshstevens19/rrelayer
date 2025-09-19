@@ -7,7 +7,10 @@ use crate::{
         common_types::{BlockHash, BlockNumber},
         utils::option_if,
     },
-    transaction::types::{Transaction, TransactionData, TransactionHash, TransactionId, TransactionStatus, TransactionValue},
+    transaction::types::{
+        Transaction, TransactionData, TransactionHash, TransactionId, TransactionStatus,
+        TransactionValue,
+    },
 };
 use alloy::network::AnyTransactionReceipt;
 use chrono::Utc;
@@ -196,7 +199,7 @@ impl PostgresClient {
     pub async fn update_transaction_noop(
         &mut self,
         transaction_id: &TransactionId,
-        to: &EvmAddress
+        to: &EvmAddress,
     ) -> Result<(), PostgresError> {
         let mut conn = self.pool.get().await?;
         let trans = conn.transaction().await.map_err(PostgresError::PgError)?;
@@ -290,7 +293,7 @@ impl PostgresClient {
     /// * `Err(PostgresError)` - If a database error occurs
     pub async fn transaction_mined(
         &mut self,
-        transaction_id: &TransactionId,
+        transaction: &Transaction,
         transaction_receipt: &AnyTransactionReceipt,
     ) -> Result<(), PostgresError> {
         let mut conn = self.pool.get().await?;
@@ -301,30 +304,51 @@ impl PostgresClient {
                 .execute(
                     format!(
                         "
-                            UPDATE {}
-                            SET status = $2,
-                                gas_limit = $3,
-                                block_hash = $4,
-                                block_number = $5,
-                                mined_at = NOW()
-                            WHERE id = $1;
-                        ",
+                        UPDATE {}
+                        SET status = $2,
+                            \"to\" = $3,
+                            \"from\" = $4,
+                            value = $5,
+                            data = $6,
+                            nonce = $7,
+                            chain_id = $8,
+                            gas_limit = $9,
+                            block_hash = $10,
+                            block_number = $11,
+                            speed = $12,
+                            hash = $13,
+                            sent_max_fee_per_gas = $14,
+                            sent_max_priority_fee_per_gas = $15,
+                            external_id = $16,
+                            mined_at = NOW()
+                        WHERE id = $1;
+                    ",
                         table_name
                     )
                     .as_str(),
                     &[
-                        &transaction_id,
+                        &transaction.id,
                         &TransactionStatus::Mined,
+                        &transaction.to,
+                        &transaction.from,
+                        &transaction.value,
+                        &transaction.data,
+                        &transaction.nonce,
+                        &transaction.chain_id,
                         &GasLimit::from(transaction_receipt.gas_used),
                         &transaction_receipt.block_hash.map(|h| BlockHash::new(h)),
                         &transaction_receipt.block_number.map(|n| BlockNumber::new(n)),
+                        &transaction.speed,
+                        &transaction.known_transaction_hash,
+                        &transaction.sent_with_max_fee_per_gas,
+                        &transaction.sent_with_max_priority_fee_per_gas,
+                        &transaction.external_id,
                     ],
                 )
                 .await?;
         }
 
         trans.commit().await?;
-
         Ok(())
     }
 
@@ -409,6 +433,82 @@ impl PostgresClient {
 
         trans.commit().await?;
 
+        Ok(())
+    }
+
+    /// Updates an existing transaction with new data.
+    ///
+    /// Updates the transaction in both transaction tables with the current state.
+    /// This is useful for recording changes like replacements, gas bumps, or other modifications.
+    ///
+    /// # Arguments
+    /// * `transaction` - The transaction with updated data
+    ///
+    /// # Returns
+    /// * `Ok(())` - If the update was successful
+    /// * `Err(PostgresError)` - If a database error occurs
+    pub async fn transaction_update(&self, transaction: &Transaction) -> Result<(), PostgresError> {
+        let mut conn = self.pool.get().await?;
+        let trans = conn.transaction().await.map_err(PostgresError::PgError)?;
+
+        for table_name in TRANSACTION_TABLES.iter() {
+            trans
+                .execute(
+                    format!(
+                        "
+                            UPDATE {}
+                            SET relayer_id = $2,
+                                \"to\" = $3,
+                                \"from\" = $4,
+                                nonce = $5,
+                                chain_id = $6,
+                                data = $7,
+                                value = $8,
+                                speed = $9,
+                                status = $10,
+                                expires_at = $11,
+                                queued_at = $12,
+                                sent_at = $13,
+                                mined_at = $14,
+                                confirmed_at = $15,
+                                gas_limit = $16,
+                                hash = $17,
+                                sent_max_fee_per_gas = $18,
+                                sent_max_priority_fee_per_gas = $19,
+                                external_id = $20
+                            WHERE id = $1
+                        ",
+                        table_name
+                    )
+                    .as_str(),
+                    &[
+                        &transaction.id,
+                        &transaction.relayer_id,
+                        &transaction.to,
+                        &transaction.from,
+                        &transaction.nonce,
+                        &transaction.chain_id,
+                        &transaction.data,
+                        &transaction.value,
+                        &transaction.speed,
+                        &transaction.status,
+                        &transaction.expires_at,
+                        &transaction.queued_at,
+                        &transaction.sent_at,
+                        &transaction.mined_at,
+                        &transaction.confirmed_at,
+                        &transaction.gas_limit,
+                        &transaction.known_transaction_hash,
+                        &transaction.sent_with_max_fee_per_gas,
+                        &transaction.sent_with_max_priority_fee_per_gas,
+                        &transaction.external_id,
+                    ],
+                )
+                .await
+                .map_err(PostgresError::PgError)?;
+        }
+
+        trans.commit().await.map_err(PostgresError::PgError)?;
         Ok(())
     }
 }
