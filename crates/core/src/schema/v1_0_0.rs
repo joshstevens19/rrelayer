@@ -47,7 +47,7 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
             max_gas_price_cap NUMERIC(80) NULL,
             paused BOOLEAN DEFAULT FALSE NOT NULL,
             allowlisted_addresses_only BOOLEAN DEFAULT FALSE NOT NULL,
-            eip_1559_enabled BOOLEAN DEFAULT FALSE NOT NULL,
+            eip_1559_enabled BOOLEAN DEFAULT TRUE NOT NULL,
             deleted BOOLEAN DEFAULT FALSE NOT NULL,
             updated_on TIMESTAMPTZ DEFAULT NOW() NOT NULL,
             created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,

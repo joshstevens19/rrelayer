@@ -1,5 +1,5 @@
 use alloy::dyn_abi::TypedData;
-use alloy::network::{AnyTransactionReceipt, EthereumWallet};
+use alloy::network::{AnyTransactionReceipt, EthereumWallet, ReceiptResponse};
 use alloy::primitives::{Address, U256};
 use alloy::providers::{Provider, ProviderBuilder};
 use alloy::rpc::types::TransactionRequest;
@@ -23,6 +23,7 @@ use std::thread::sleep;
 use std::time::{Duration, Instant};
 use tokio::time::timeout;
 use tracing::{debug, error, info, warn};
+use rrelayer_core::gas::types::GasPrice;
 
 #[derive(Debug, Clone)]
 pub enum TestResult {
@@ -526,7 +527,7 @@ impl TestRunner {
     /// run single with:
     /// make run-test-debug TEST=basic_relayer_creation
     async fn test_basic_relayer_creation(&self) -> Result<()> {
-        debug!("Creating test relayer...");
+        info!("Creating test relayer...");
 
         let created_relayer = self
             .relayer_client
@@ -534,7 +535,7 @@ impl TestRunner {
             .await
             .context("Failed to create relayer")?;
 
-        debug!("Created relayer: {:?}", created_relayer);
+        info!("Created relayer: {:?}", created_relayer);
 
         let relayer = self
             .relayer_client
@@ -545,7 +546,7 @@ impl TestRunner {
             .context("Failed to fetch relayer")?
             .relayer;
 
-        debug!("Fetched relayer {:?}", relayer);
+        info!("Fetched relayer {:?}", relayer);
 
         if relayer.paused {
             return Err(anyhow!("Relayer should not be paused"));
@@ -571,8 +572,8 @@ impl TestRunner {
             return Err(anyhow!("Relayer should have a max gas price"));
         }
 
-        if relayer.eip_1559_enabled {
-            return Err(anyhow!("Relayer should not be have eip 1559 enabled"));
+        if !relayer.eip_1559_enabled {
+            return Err(anyhow!("Relayer should have eip 1559 enabled"));
         }
 
         Ok(())
@@ -581,13 +582,13 @@ impl TestRunner {
     /// run single with:
     /// make run-test-debug TEST=simple_eth_transfer
     async fn test_simple_eth_transfer(&self) -> Result<()> {
-        debug!("Testing simple eth transfer...");
+        info!("Testing simple eth transfer...");
 
         let relayer = self.create_and_fund_relayer("eth-transfer-relayer").await?;
-        debug!("Created relayer: {:?}", relayer);
+        info!("Created relayer: {:?}", relayer);
 
         let recipient = &self.config.anvil_accounts[1];
-        debug!("Sending ETH transfer to {}", recipient);
+        info!("Sending ETH transfer to {}", recipient);
 
         let tx_response = self
             .relayer_client
@@ -600,7 +601,7 @@ impl TestRunner {
             .await
             .context("Failed to send ETH transfer")?;
 
-        debug!("ETH transfer sent: {:?}", tx_response);
+        info!("ETH transfer sent: {:?}", tx_response);
 
         let result = self.wait_for_transaction_completion(&tx_response.0.id).await?;
 
@@ -612,21 +613,21 @@ impl TestRunner {
     /// run single with:
     /// make run-test-debug TEST=contract_interaction
     async fn test_contract_interaction(&self) -> Result<()> {
-        debug!("Testing contract interaction...");
+        info!("Testing contract interaction...");
 
         let relayer = self.create_and_fund_relayer("contract-relayer").await?;
-        debug!("Created relayer: {:?}", relayer);
+        info!("Created relayer: {:?}", relayer);
 
         let contract_address =
             self.contract_interactor.contract_address().context("Test contract not deployed")?;
 
-        debug!("Sending contract interaction to deployed contract at {}", contract_address);
+        info!("Sending contract interaction to deployed contract at {}", contract_address);
 
         let is_deployed = self.contract_interactor.verify_contract_deployed().await?;
         if !is_deployed {
             return Err(anyhow::anyhow!("Contract verification failed - no code at address"));
         }
-        debug!("✅ Contract verified as deployed with code at {}", contract_address);
+        info!("✅ Contract verified as deployed with code at {}", contract_address);
 
         let relayer_balance = self.contract_interactor.get_eth_balance(&relayer.address).await?;
         info!(
@@ -656,10 +657,10 @@ impl TestRunner {
     /// run single with:
     /// make run-test-debug TEST=failed_transaction_handling_not_enough_funds
     async fn test_failed_transaction_handling_not_enough_funds(&self) -> Result<()> {
-        debug!("Testing failed transaction handling not enough funds...");
+        info!("Testing failed transaction handling not enough funds...");
 
         let relayer = self.create_and_fund_relayer("failure-test-relayer-funds").await?;
-        debug!("Created relayer: {:?}", relayer);
+        info!("Created relayer: {:?}", relayer);
 
         let result = self
             .relayer_client
@@ -673,16 +674,16 @@ impl TestRunner {
 
         match result {
             Ok(tx_response) => {
-                debug!("Potentially failing transaction sent: {:?}", tx_response);
+                info!("Potentially failing transaction sent: {:?}", tx_response);
                 // Even if sent, it might fail during execution
                 let final_status = self.wait_for_transaction_completion(&tx_response.0.id).await;
                 if final_status.is_ok() {
                     return Err(anyhow!("Did not fail the transaction something went wrong..."));
                 }
-                debug!("Failure test result: {:?}", final_status);
+                info!("Failure test result: {:?}", final_status);
             }
             Err(e) => {
-                debug!("Transaction rejected as expected (insufficient funds): {}", e);
+                info!("Transaction rejected as expected (insufficient funds): {}", e);
                 // This is the expected outcome for insufficient funds
             }
         }
@@ -693,10 +694,10 @@ impl TestRunner {
     /// run single with:
     /// make run-test-debug TEST=failed_transaction_handling_revert_execution
     async fn test_failed_transaction_handling_revert_execution(&self) -> Result<()> {
-        debug!("Testing failed transaction handling revert execution...");
+        info!("Testing failed transaction handling revert execution...");
 
         let relayer = self.create_and_fund_relayer("failure-test-relayer-revert").await?;
-        debug!("Created relayer: {:?}", relayer);
+        info!("Created relayer: {:?}", relayer);
 
         let contract_address =
             self.contract_interactor.contract_address().context("Test contract not deployed")?;
@@ -713,17 +714,17 @@ impl TestRunner {
 
         match result {
             Ok(tx_response) => {
-                debug!("Contract revert transaction sent: {:?}", tx_response);
+                info!("Contract revert transaction sent: {:?}", tx_response);
                 // Even if sent, it should fail during execution
                 let final_status = self.wait_for_transaction_completion(&tx_response.0.id).await;
                 if final_status.is_ok() {
                     return Err(anyhow!("Did not fail the transaction something went wrong..."));
                 }
 
-                debug!("Contract revert test result: {:?}", final_status);
+                info!("Contract revert test result: {:?}", final_status);
             }
             Err(e) => {
-                debug!("Transaction rejected as expected (contract revert): {}", e);
+                info!("Transaction rejected as expected (contract revert): {}", e);
                 // This is also a valid outcome if gas estimation catches the revert
             }
         }
@@ -735,9 +736,9 @@ impl TestRunner {
     /// run single with:
     /// make run-test-debug TEST=gas_estimation
     async fn test_gas_estimation(&self) -> Result<()> {
-        debug!("Testing gas estimation...");
+        info!("Testing gas estimation...");
         let relayer = self.create_and_fund_relayer("gas-test-relayer").await?;
-        debug!("Created relayer: {:?}", relayer);
+        info!("Created relayer: {:?}", relayer);
 
         // Send a simple transaction and verify it uses reasonable gas
         let tx_response = self
@@ -750,7 +751,7 @@ impl TestRunner {
             )
             .await?;
 
-        debug!("Gas estimation test transaction: {:?}", tx_response);
+        info!("Gas estimation test transaction: {:?}", tx_response);
 
         let result = self.wait_for_transaction_completion(&tx_response.0.id).await?;
 
@@ -760,21 +761,21 @@ impl TestRunner {
     /// run single with:
     /// make run-test-debug TEST=batch_transactions
     async fn test_batch_transactions(&self) -> Result<()> {
-        debug!("Testing batch transactions...");
+        info!("Testing batch transactions...");
 
         for i in 0..3 {
-            debug!("Mining cleanup block {} before batch test...", i + 1);
+            info!("Mining cleanup block {} before batch test...", i + 1);
             self.mine_and_wait().await?;
         }
 
         let relayer = self.create_and_fund_relayer("batch-test-relayer").await?;
 
-        debug!("Created batch test relayer with ID: {}", relayer.id);
+        info!("Created batch test relayer with ID: {}", relayer.id);
 
         let mut tx_ids: Vec<TransactionId> = Vec::new();
 
         for i in 0..3 {
-            debug!("Preparing to send batch transaction {}/3", i + 1);
+            info!("Preparing to send batch transaction {}/3", i + 1);
 
             let tx_response = self
                 .relayer_client
@@ -786,31 +787,31 @@ impl TestRunner {
                 )
                 .await?;
 
-            debug!("✅ Sent batch transaction {}: {:?}", i + 1, tx_response);
+            info!("✅ Sent batch transaction {}: {:?}", i + 1, tx_response);
             tx_ids.push(tx_response.0.id);
 
             self.mine_and_wait().await?;
         }
 
-        debug!("All {} batch transactions sent, waiting for completion...", tx_ids.len());
+        info!("All {} batch transactions sent, waiting for completion...", tx_ids.len());
 
         for (i, tx_id) in tx_ids.iter().enumerate() {
-            debug!("Waiting for batch transaction {} to complete...", i + 1);
+            info!("Waiting for batch transaction {} to complete...", i + 1);
             self.wait_for_transaction_completion(tx_id).await?;
-            debug!("✅ Batch transaction {} completed", i + 1);
+            info!("✅ Batch transaction {} completed", i + 1);
         }
 
-        debug!("✅ All batch transactions completed successfully");
+        info!("✅ All batch transactions completed successfully");
         Ok(())
     }
 
     /// run single with:
     /// make run-test-debug TEST=transaction_count
     async fn test_transaction_count(&self) -> Result<()> {
-        debug!("Testing pending count...");
+        info!("Testing pending count...");
 
         let relayer = self.create_and_fund_relayer("limits-test-relayer").await?;
-        debug!("Created relayer: {:?}", relayer);
+        info!("Created relayer: {:?}", relayer);
 
         let pending_count = self
             .relayer_client
@@ -849,7 +850,7 @@ impl TestRunner {
                 )
                 .await?;
 
-            debug!("✅ Sent transaction {}: {:?}", i + 1, tx_response);
+            info!("✅ Sent transaction {}: {:?}", i + 1, tx_response);
         }
 
         let pending_count = self
@@ -922,7 +923,7 @@ impl TestRunner {
     /// run single with:
     /// make run-test-debug TEST=gas_price_api
     async fn test_gas_price_api(&self) -> Result<()> {
-        debug!("Testing gas price API...");
+        info!("Testing gas price API...");
 
         let gas_prices = self
             .relayer_client
@@ -932,7 +933,7 @@ impl TestRunner {
             .await
             .context("Failed to get gas prices")?;
 
-        debug!("Gas prices for chain {}: {:?}", self.config.chain_id, gas_prices);
+        info!("Gas prices for chain {}: {:?}", self.config.chain_id, gas_prices);
 
         if gas_prices.is_none() {
             return Err(anyhow!("Gas prices not found for the chain"));
@@ -945,7 +946,7 @@ impl TestRunner {
     /// run single with:
     /// make run-test-debug TEST=network_management
     async fn test_network_management(&self) -> Result<()> {
-        debug!("Testing network management APIs...");
+        info!("Testing network management APIs...");
 
         let all_networks = self
             .relayer_client
@@ -954,7 +955,7 @@ impl TestRunner {
             .get_all_networks()
             .await
             .context("Failed to get all networks")?;
-        debug!("All networks: {} found", all_networks.len());
+        info!("All networks: {} found", all_networks.len());
 
         if all_networks.len() != 1 {
             return Err(anyhow!("Should only bring back 1 network"));
@@ -991,7 +992,7 @@ impl TestRunner {
             .get_enabled_networks()
             .await
             .context("Failed to get enabled networks")?;
-        debug!("Enabled networks: {} found", enabled_networks.len());
+        info!("Enabled networks: {} found", enabled_networks.len());
 
         if enabled_networks.len() != 1 {
             return Err(anyhow!("Should only bring back 1 enabled network"));
@@ -1025,7 +1026,7 @@ impl TestRunner {
             .get_disabled_networks()
             .await
             .context("Failed to get disabled networks")?;
-        debug!("Disabled networks: {} found", disabled_networks.len());
+        info!("Disabled networks: {} found", disabled_networks.len());
 
         if disabled_networks.len() != 0 {
             return Err(anyhow!("Should only bring back 0 disabled network"));
@@ -1079,7 +1080,7 @@ impl TestRunner {
         }
 
         let relayer = self.create_and_fund_relayer("network-management").await?;
-        debug!("Created relayer: {:?}", relayer);
+        info!("Created relayer: {:?}", relayer);
 
         let tx_response = self
             .relayer_client
@@ -1145,17 +1146,17 @@ impl TestRunner {
             return Err(anyhow!("Should only bring back 0 disabled network"));
         }
 
-        debug!("✅ Network management APIs work correctly");
+        info!("✅ Network management APIs work correctly");
         Ok(())
     }
 
     /// run single with:
     /// make run-test-debug TEST=allowlist_add
     async fn test_allowlist_add(&self) -> Result<()> {
-        debug!("Testing allowlist list operation...");
+        info!("Testing allowlist list operation...");
 
         let relayer = self.create_and_fund_relayer("allowlist-list-relayer").await?;
-        debug!("Created relayer: {:?}", relayer);
+        info!("Created relayer: {:?}", relayer);
 
         for i in 0..3 {
             let test_address = self.config.anvil_accounts[i];
@@ -1178,7 +1179,7 @@ impl TestRunner {
             .await
             .context("Failed to get allowlist")?;
 
-        debug!("✅ Allowlist has {} addresses", allowlist.items.len());
+        info!("✅ Allowlist has {} addresses", allowlist.items.len());
 
         if allowlist.items.len() != 3 {
             return Err(anyhow::anyhow!(
@@ -1246,17 +1247,17 @@ impl TestRunner {
                 .context("Failed to send transaction to allowed address")?;
         }
 
-        debug!("✅ Allowlist list operation works correctly");
+        info!("✅ Allowlist list operation works correctly");
         Ok(())
     }
 
     /// run single with:
     /// make run-test-debug TEST=allowlist_remove
     async fn test_allowlist_remove(&self) -> Result<()> {
-        debug!("Testing allowlist remove operation...");
+        info!("Testing allowlist remove operation...");
 
         let relayer = self.create_and_fund_relayer("allowlist-remove-relayer").await?;
-        debug!("Created relayer: {:?}", relayer);
+        info!("Created relayer: {:?}", relayer);
 
         let test_address = self.config.anvil_accounts[2];
         self.relayer_client
@@ -1275,7 +1276,7 @@ impl TestRunner {
             .await
             .context("Failed to remove address from allowlist")?;
 
-        debug!("✅ Removed {} from allowlist", test_address.hex());
+        info!("✅ Removed {} from allowlist", test_address.hex());
 
         let paging = PagingContext { limit: 10, offset: 0 };
         let updated_allowlist = self
@@ -1301,10 +1302,10 @@ impl TestRunner {
     /// run single with:
     /// make run-test-debug TEST=signing_text
     async fn test_signing_text(&self) -> Result<()> {
-        debug!("Testing text signing...");
+        info!("Testing text signing...");
 
         let relayer = self.create_and_fund_relayer("signing-text-relayer").await?;
-        debug!("Created relayer: {:?}", relayer);
+        info!("Created relayer: {:?}", relayer);
 
         let test_message = "Hello, RRelayer E2E Test!";
 
@@ -1316,9 +1317,9 @@ impl TestRunner {
             .await
             .context("Failed to sign text message")?;
 
-        debug!("Signed message. Signature: {}", sign_result.signature);
+        info!("Signed message. Signature: {}", sign_result.signature);
 
-        debug!("✅ Got signature: {:?}", sign_result.signature);
+        info!("✅ Got signature: {:?}", sign_result.signature);
 
         let paging = PagingContext { limit: 10, offset: 0 };
         let history = self
@@ -1329,28 +1330,28 @@ impl TestRunner {
             .await
             .context("Failed to get text signing history")?;
 
-        debug!("Text signing history has {} entries", history.items.len());
+        info!("Text signing history has {} entries", history.items.len());
 
         let signed_message = history.items.iter().find(|entry| entry.message == test_message);
 
         if let Some(entry) = signed_message {
-            debug!("✅ Found signed message in history: {}", entry.message);
-            debug!("   Signature: {}", entry.signature);
+            info!("✅ Found signed message in history: {}", entry.message);
+            info!("   Signature: {}", entry.signature);
         } else {
             return Err(anyhow::anyhow!("Signed message not found in history"));
         }
 
-        debug!("✅ Text signing works correctly");
+        info!("✅ Text signing works correctly");
         Ok(())
     }
 
     /// run single with:
     /// make run-test-debug TEST=signing_typed_data
     async fn test_signing_typed_data(&self) -> Result<()> {
-        debug!("Testing typed data signing...");
+        info!("Testing typed data signing...");
 
         let relayer = self.create_and_fund_relayer("signing-typed-data-relayer").await?;
-        debug!("Created relayer: {:?}", relayer);
+        info!("Created relayer: {:?}", relayer);
 
         let typed_data_json = serde_json::json!({
             "types": {
@@ -1401,9 +1402,9 @@ impl TestRunner {
             .await
             .context("Failed to sign typed data")?;
 
-        debug!("Signed typed data. Signature: {}", sign_result.signature);
+        info!("Signed typed data. Signature: {}", sign_result.signature);
 
-        debug!("✅ Got typed data signature: {:?}", sign_result.signature);
+        info!("✅ Got typed data signature: {:?}", sign_result.signature);
 
         let paging = PagingContext { limit: 10, offset: 0 };
         let history = self
@@ -1414,7 +1415,7 @@ impl TestRunner {
             .await
             .context("Failed to get typed data signing history")?;
 
-        debug!("Typed data signing history has {} entries", history.items.len());
+        info!("Typed data signing history has {} entries", history.items.len());
 
         let signed_entry = history.items.iter().find(|entry| {
             if let Some(domain) = entry.domain_data.get("name") {
@@ -1425,23 +1426,23 @@ impl TestRunner {
         });
 
         if let Some(entry) = signed_entry {
-            debug!("✅ Found signed typed data in history: {:?}", entry.domain_data);
-            debug!("   Signature: {}", entry.signature);
+            info!("✅ Found signed typed data in history: {:?}", entry.domain_data);
+            info!("   Signature: {}", entry.signature);
         } else {
             return Err(anyhow::anyhow!("Signed typed data not found in history"));
         }
 
-        debug!("✅ Typed data signing works correctly");
+        info!("✅ Typed data signing works correctly");
         Ok(())
     }
 
     /// run single with:
     /// make run-test-debug TEST=transaction_get
     async fn test_transaction_get(&self) -> Result<()> {
-        debug!("Testing transaction get operation...");
+        info!("Testing transaction get operation...");
 
         let relayer = self.create_and_fund_relayer("tx-get-relayer").await?;
-        debug!("Created relayer: {:?}", relayer);
+        info!("Created relayer: {:?}", relayer);
 
         let tx_request = RelayTransactionRequest {
             to: self.config.anvil_accounts[1],
@@ -1476,7 +1477,7 @@ impl TestRunner {
             return Err(anyhow::anyhow!("Transaction not found"));
         }
 
-        debug!("✅ Transaction get works correctly");
+        info!("✅ Transaction get works correctly");
 
         Ok(())
     }
@@ -1484,10 +1485,10 @@ impl TestRunner {
     /// run single with:
     /// make run-test-debug TEST=transaction_list
     async fn test_transaction_list(&self) -> Result<()> {
-        debug!("Testing transaction list operation...");
+        info!("Testing transaction list operation...");
 
         let relayer = self.create_and_fund_relayer("tx-list-relayer").await?;
-        debug!("Created relayer: {:?}", relayer);
+        info!("Created relayer: {:?}", relayer);
 
         for i in 1..=3 {
             let tx_request = RelayTransactionRequest {
@@ -1517,7 +1518,7 @@ impl TestRunner {
             .await
             .context("Failed to get relayer transactions")?;
 
-        debug!("✅ Found {} transactions for relayer", relayer_transactions.items.len());
+        info!("✅ Found {} transactions for relayer", relayer_transactions.items.len());
 
         if relayer_transactions.items.len() != 3 {
             return Err(anyhow::anyhow!(
@@ -1526,17 +1527,17 @@ impl TestRunner {
             ));
         }
 
-        debug!("✅ Transaction list operation works correctly");
+        info!("✅ Transaction list operation works correctly");
         Ok(())
     }
 
     /// run single with:
     /// make run-test-debug TEST=transaction_replace
     async fn test_transaction_replace(&self) -> Result<()> {
-        debug!("Testing transaction replace operation...");
+        info!("Testing transaction replace operation...");
 
         let relayer = self.create_and_fund_relayer("tx-replace-relayer").await?;
-        debug!("Created relayer: {:?}", relayer);
+        info!("Created relayer: {:?}", relayer);
 
         let tx_request = RelayTransactionRequest {
             to: self.config.anvil_accounts[1],
@@ -1573,7 +1574,7 @@ impl TestRunner {
             .replace_transaction(transaction_id, &replacement_request)
             .await
             .context("Failed to replace transaction")?;
-        debug!("✅ Transaction replacement result: {}", replace_result);
+        info!("✅ Transaction replacement result: {}", replace_result);
 
         if !replace_result {
             return Err(anyhow::anyhow!("Replace transaction failed"));
@@ -1584,17 +1585,17 @@ impl TestRunner {
         let transaction = self.relayer_client.get_transaction(&send_result.id).await?;
         self.relayer_client.sent_transaction_compare(replacement_request, transaction)?;
 
-        debug!("✅ Transaction replace operation works correctly");
+        info!("✅ Transaction replace operation works correctly");
         Ok(())
     }
 
     /// run single with:
     /// make run-test-debug TEST=transaction_cancel
     async fn test_transaction_cancel(&self) -> Result<()> {
-        debug!("Testing transaction cancel operation...");
+        info!("Testing transaction cancel operation...");
 
         let relayer = self.create_and_fund_relayer("tx-cancel-relayer").await?;
-        debug!("Created relayer: {:?}", relayer);
+        info!("Created relayer: {:?}", relayer);
 
         let tx_request = RelayTransactionRequest {
             to: self.config.anvil_accounts[1],
@@ -1645,10 +1646,10 @@ impl TestRunner {
     /// run single with:
     /// make run-test-debug TEST=transaction_status_operations
     async fn test_transaction_status_operations(&self) -> Result<()> {
-        debug!("Testing transaction status operations...");
+        info!("Testing transaction status operations...");
 
         let relayer = self.create_and_fund_relayer("tx-status-relayer").await?;
-        debug!("Created relayer: {:?}", relayer);
+        info!("Created relayer: {:?}", relayer);
 
         let tx_request = RelayTransactionRequest {
             to: self.config.anvil_accounts[1],
@@ -1668,7 +1669,7 @@ impl TestRunner {
             .context("Failed to send transaction")?;
 
         let transaction_id = &send_result.id;
-        debug!("Sent transaction for status testing: {}", transaction_id);
+        info!("Sent transaction for status testing: {}", transaction_id);
 
         let status_result = self
             .relayer_client
@@ -1715,10 +1716,10 @@ impl TestRunner {
     /// run single with:
     /// make run-test-debug TEST=transaction_counts
     async fn test_transaction_counts(&self) -> Result<()> {
-        debug!("Testing transaction count operations...");
+        info!("Testing transaction count operations...");
 
         let relayer = self.create_and_fund_relayer("tx-counts-relayer").await?;
-        debug!("Created relayer: {:?}", relayer);
+        info!("Created relayer: {:?}", relayer);
 
         let initial_pending = self
             .relayer_client
@@ -1736,7 +1737,7 @@ impl TestRunner {
             .await
             .context("Failed to get initial inmempool count")?;
 
-        debug!("Initial counts - Pending: {}, InMempool: {}", initial_pending, initial_inmempool);
+        info!("Initial counts - Pending: {}, InMempool: {}", initial_pending, initial_inmempool);
 
         let mut transaction_ids = Vec::new();
         for i in 0..3 {
@@ -1758,7 +1759,7 @@ impl TestRunner {
                 .context(format!("Failed to send transaction {}", i))?;
 
             transaction_ids.push(send_result.id.clone());
-            debug!("Sent transaction {}: {}", i, send_result.id);
+            info!("Sent transaction {}: {}", i, send_result.id);
 
             self.mine_and_wait().await?;
         }
@@ -1779,14 +1780,14 @@ impl TestRunner {
             .await
             .context("Failed to get final inmempool count")?;
 
-        debug!("Final counts - Pending: {}, InMempool: {}", final_pending, final_inmempool);
+        info!("Final counts - Pending: {}, InMempool: {}", final_pending, final_inmempool);
 
         // Verify counts make sense (should have increased)
         let total_final = final_pending + final_inmempool;
         let total_initial = initial_pending + initial_inmempool;
 
         if total_final >= total_initial {
-            debug!("✅ Transaction counts increased as expected");
+            info!("✅ Transaction counts increased as expected");
         } else {
             return Err(anyhow!(
                 "Transaction counts may have decreased (transactions completed quickly)"
@@ -1800,10 +1801,10 @@ impl TestRunner {
     /// run single with:
     /// make run-test-debug TEST=transaction_status_pending
     async fn test_transaction_status_pending(&self) -> Result<()> {
-        debug!("Testing transaction pending state...");
+        info!("Testing transaction pending state...");
 
         let relayer = self.create_and_fund_relayer("pending-status-relayer").await?;
-        debug!("Created relayer: {:?}", relayer);
+        info!("Created relayer: {:?}", relayer);
 
         let tx_request = RelayTransactionRequest {
             to: self.config.anvil_accounts[1],
@@ -1852,10 +1853,10 @@ impl TestRunner {
     /// run single with:
     /// make run-test-debug TEST=transaction_status_inmempool
     async fn test_transaction_status_inmempool(&self) -> Result<()> {
-        debug!("Testing transaction inmempool state...");
+        info!("Testing transaction inmempool state...");
 
         let relayer = self.create_and_fund_relayer("inmempool-status-relayer").await?;
-        debug!("Created relayer: {:?}", relayer);
+        info!("Created relayer: {:?}", relayer);
 
         let tx_request = RelayTransactionRequest {
             to: self.config.anvil_accounts[1],
@@ -1902,10 +1903,10 @@ impl TestRunner {
     /// run single with:
     /// make run-test-debug TEST=transaction_status_mined
     async fn test_transaction_status_mined(&self) -> Result<()> {
-        debug!("Testing transaction mined state...");
+        info!("Testing transaction mined state...");
 
         let relayer = self.create_and_fund_relayer("mined-status-relayer").await?;
-        debug!("Created relayer: {:?}", relayer);
+        info!("Created relayer: {:?}", relayer);
 
         let tx_request = RelayTransactionRequest {
             to: self.config.anvil_accounts[1],
@@ -1955,7 +1956,7 @@ impl TestRunner {
                     return Err(anyhow::anyhow!("Mined transaction should have receipt"));
                 }
                 let receipt = status.receipt.unwrap();
-                debug!("Transaction receipt: {:?}", receipt);
+                info!("Transaction receipt: {:?}", receipt);
                 if !receipt.inner.inner.status() {
                     return Err(anyhow::anyhow!("Mined transaction should have a success as true"));
                 }
@@ -1974,10 +1975,10 @@ impl TestRunner {
     /// run single with:
     /// make run-test-debug TEST=transaction_status_confirmed
     async fn test_transaction_status_confirmed(&self) -> Result<()> {
-        debug!("Testing transaction confirmed state...");
+        info!("Testing transaction confirmed state...");
 
         let relayer = self.create_and_fund_relayer("confirmed-status-relayer").await?;
-        debug!("Created relayer: {:?}", relayer);
+        info!("Created relayer: {:?}", relayer);
 
         let tx_request = RelayTransactionRequest {
             to: self.config.anvil_accounts[1],
@@ -2040,10 +2041,10 @@ impl TestRunner {
     /// run single with:
     /// make run-test-debug TEST=transaction_status_failed
     async fn test_transaction_status_failed(&self) -> Result<()> {
-        debug!("Testing transaction failed state...");
+        info!("Testing transaction failed state...");
 
         let relayer = self.create_and_fund_relayer("failed-status-relayer").await?;
-        debug!("Created relayer: {:?}", relayer);
+        info!("Created relayer: {:?}", relayer);
 
         let contract_address =
             self.contract_interactor.contract_address().context("Test contract not deployed")?;
@@ -2070,7 +2071,7 @@ impl TestRunner {
                 ));
             }
             Err(_) => {
-                debug!(
+                info!(
                     "✅ Transaction was rejected at gas estimation (also valid failure scenario)"
                 );
                 Ok(())
@@ -2082,7 +2083,7 @@ impl TestRunner {
     /// run single with:
     /// make run-test-debug TEST=transaction_status_expired
     async fn test_transaction_status_expired(&self) -> Result<()> {
-        debug!("Testing transaction expired state...");
+        info!("Testing transaction expired state...");
 
         error!("NEED TO WRITE THIS TEST");
         Ok(())
@@ -2090,20 +2091,17 @@ impl TestRunner {
 
     // TODO: JOSH GOT HERE
 
-    /// Test allowlist restrictions - add address then try to send to non-allowlisted address
+    /// run single with:
+    /// make run-test-debug TEST=allowlist_restrictions
     async fn test_allowlist_restrictions(&self) -> Result<()> {
-        debug!("Testing allowlist restrictions...");
+        info!("Testing allowlist restrictions...");
 
         let relayer = self.create_and_fund_relayer("allowlist-restriction-relayer").await?;
+        info!("Created relayer: {:?}", relayer);
 
-        // Enable allowlist mode - using placeholder since config API doesn't exist
-        // In real implementation, would be: self.relayer_client.sdk.relayer.set_allowlist_enabled(&relayer.id, true).await?;
-
-        // Add one address to allowlist
         let allowed_address = self.config.anvil_accounts[1];
         self.relayer_client.sdk.relayer.allowlist.add(&relayer.id, &allowed_address).await?;
 
-        // Try to send to allowed address - should succeed
         let allowed_tx_result = self
             .relayer_client
             .send_transaction(
@@ -2121,7 +2119,6 @@ impl TestRunner {
             ));
         }
 
-        // Try to send to non-allowed address - should fail
         let forbidden_tx_result = self
             .relayer_client
             .send_transaction(
@@ -2142,33 +2139,14 @@ impl TestRunner {
         Ok(())
     }
 
-    /// Test allowlist edge cases - empty allowlist, duplicate adds, etc.
+    /// run single with:
+    /// make run-test-debug TEST=allowlist_edge_cases
     async fn test_allowlist_edge_cases(&self) -> Result<()> {
-        debug!("Testing allowlist edge cases...");
+        info!("Testing allowlist edge cases...");
 
         let relayer = self.create_and_fund_relayer("allowlist-edge-relayer").await?;
+        info!("Created relayer: {:?}", relayer);
 
-        // Test 1: Enable allowlist with empty list - all transactions should fail
-        // Placeholder for allowlist enable - API may not exist yet
-        // self.relayer_client.sdk.relayer.set_allowlist_enabled(&relayer.id, true).await?;
-
-        let empty_allowlist_result = self
-            .relayer_client
-            .send_transaction(
-                &relayer.id,
-                &self.config.anvil_accounts[1],
-                alloy::primitives::utils::parse_ether("0.5")?.into(),
-                TransactionData::empty(),
-            )
-            .await;
-
-        if empty_allowlist_result.is_ok() {
-            return Err(anyhow::anyhow!(
-                "Transaction with empty allowlist should fail, but succeeded"
-            ));
-        }
-
-        // Test 2: Add same address twice
         let test_address = self.config.anvil_accounts[1];
 
         self.relayer_client.sdk.relayer.allowlist.add(&relayer.id, &test_address).await?;
@@ -2178,56 +2156,48 @@ impl TestRunner {
         // Should handle duplicate gracefully
         // Duplicate add should be handled gracefully - both success and error are acceptable
         match duplicate_result {
-            Ok(_) => debug!("Duplicate address add succeeded (graceful handling)"),
-            Err(_) => debug!("Duplicate address add failed (graceful handling)"),
+            Ok(_) => info!("Duplicate address add succeeded (graceful handling)"),
+            Err(_) => return Err(anyhow::anyhow!("Duplicate address add failed (graceful handling)")),
         }
 
-        // Test 3: Remove non-existent address
-        let non_existent = self.config.anvil_accounts[9];
+        let non_existent = self.config.anvil_accounts[4];
         let remove_result =
             self.relayer_client.sdk.relayer.allowlist.delete(&relayer.id, &non_existent).await;
 
         // Should handle gracefully
         // Remove non-existent should be handled gracefully - both success and error are acceptable
         match remove_result {
-            Ok(_) => debug!("Remove non-existent succeeded (graceful handling)"),
-            Err(_) => debug!("Remove non-existent failed (graceful handling)"),
+            Ok(_) => info!("Remove non-existent succeeded (graceful handling)"),
+            Err(_) => return Err(anyhow::anyhow!("Remove non-existent failed (graceful handling)")),
         }
 
-        // Test 4: Disable allowlist - should allow all transactions again
-        // Placeholder for allowlist disable
-        // self.relayer_client.sdk.relayer.set_allowlist_enabled(&relayer.id, false).await?;
-
-        let disabled_allowlist_result = self
+        let allowlist = self
             .relayer_client
-            .send_transaction(
-                &relayer.id,
-                &self.config.anvil_accounts[2], // Address not in allowlist
-                alloy::primitives::utils::parse_ether("0.5")?.into(),
-                TransactionData::empty(),
-            )
-            .await;
+            .sdk
+            .relayer.allowlist
+            .get_all(&relayer.id, &PagingContext::new(50, 0))
+            .await?;
 
-        if disabled_allowlist_result.is_err() {
-            return Err(anyhow::anyhow!(
-                "Transaction should succeed when allowlist disabled, but got error: {:?}",
-                disabled_allowlist_result.err()
-            ));
+        if allowlist.items.len() != 1 {
+            return Err(anyhow::anyhow!("Allowlist should have 1 item, but got: {:?}", allowlist.items.len()));
+        }
+
+        if allowlist.items[0] != test_address {
+            return Err(anyhow::anyhow!("Allowlist should have first item be test address, but got: {:?}", allowlist.items[0]));
         }
 
         info!("✅ Allowlist edge cases handled correctly");
         Ok(())
     }
 
-    // =================== RELAYER CONFIGURATION TESTS ===================
-
-    /// Test relayer pause/unpause functionality
+    /// run single with:
+    /// make run-test-debug TEST=relayer_pause_unpause
     async fn test_relayer_pause_unpause(&self) -> Result<()> {
-        debug!("Testing relayer pause/unpause...");
+        info!("Testing relayer pause/unpause...");
 
         let relayer = self.create_and_fund_relayer("pause-test-relayer").await?;
+        info!("Created relayer: {:?}", relayer);
 
-        // Test 1: Normal operation should work
         let normal_result = self
             .relayer_client
             .send_transaction(
@@ -2245,17 +2215,15 @@ impl TestRunner {
             ));
         }
 
-        // Test 2: Pause relayer
         self.relayer_client.sdk.relayer.pause(&relayer.id).await?;
 
-        // Verify relayer is paused
         let paused_config = self.relayer_client.sdk.relayer.get(&relayer.id).await?;
         if let Some(config) = paused_config {
-            // assert!(config.is_paused, "Relayer should be paused");
-            debug!("Relayer config after pause: {:?}", config);
+            if !config.relayer.paused {
+                return Err(anyhow::anyhow!("Relayer should be paused, but is not"));
+            }
         }
 
-        // Test 3: Try to send transaction while paused - should fail
         let paused_result = self
             .relayer_client
             .send_transaction(
@@ -2272,16 +2240,15 @@ impl TestRunner {
             ));
         }
 
-        // Test 4: Unpause relayer
         self.relayer_client.sdk.relayer.unpause(&relayer.id).await?;
 
-        // Verify relayer is unpaused
         let unpaused_config = self.relayer_client.sdk.relayer.get(&relayer.id).await?;
         if let Some(config) = unpaused_config {
-            debug!("Relayer config after unpause: {:?}", config);
+            if config.relayer.paused {
+                return Err(anyhow::anyhow!("Relayer should not be paused, but is"));
+            }
         }
 
-        // Test 5: Transaction should work again
         let unpaused_result = self
             .relayer_client
             .send_transaction(
@@ -2303,37 +2270,49 @@ impl TestRunner {
         Ok(())
     }
 
-    /// Test relayer gas configuration changes
+    /// run single with:
+    /// make run-test-debug TEST=relayer_gas_configuration
     async fn test_relayer_gas_configuration(&self) -> Result<()> {
-        debug!("Testing relayer gas configuration...");
+        info!("Testing relayer gas configuration...");
 
         let relayer = self.create_and_fund_relayer("gas-config-relayer").await?;
+        info!("Created relayer: {:?}", relayer);
 
-        // Test 1: Set gas price policy to legacy
         self.relayer_client.sdk.relayer.update_eip1559_status(&relayer.id, false).await?;
 
         let config_after_legacy = self.relayer_client.sdk.relayer.get(&relayer.id).await?;
-        debug!("Relayer config after legacy setting: {:?}", config_after_legacy);
+        if let Some(config) = config_after_legacy {
+            if config.relayer.eip_1559_enabled {
+                return Err(anyhow::anyhow!("Relayer should not be using EIP1559 but it is enabled"));
+            }
+        }
 
-        // Test 2: Set gas price policy to latest (EIP-1559)
         self.relayer_client.sdk.relayer.update_eip1559_status(&relayer.id, true).await?;
 
         let config_after_latest = self.relayer_client.sdk.relayer.get(&relayer.id).await?;
-        debug!("Relayer config after EIP-1559 setting: {:?}", config_after_latest);
+        if let Some(config) = config_after_latest {
+            if !config.relayer.eip_1559_enabled {
+                return Err(anyhow::anyhow!("Relayer should be using EIP1559 but it is not enabled"));
+            }
+        } else {
+            return Err(anyhow::anyhow!("Relayer should have a config"));
+        }
 
-        // Test 3: Set maximum gas price limit
         self.relayer_client.sdk.relayer.update_max_gas_price(&relayer.id, 1000000).await?;
 
         let config_after_max = self.relayer_client.sdk.relayer.get(&relayer.id).await?;
-        debug!("Relayer config after max gas price: {:?}", config_after_max);
+        if let Some(config) = config_after_max {
+            if let Some(max) = config.relayer.max_gas_price {
+                if max != GasPrice::new(1000000) {
+                    return Err(anyhow::anyhow!("Relayer should have max gas price of 1000000, but got: {:?}", max));
+                }
+            } else {
+                return Err(anyhow::anyhow!("Relayer should have a max gas price"));
+            }
+        } else {
+            return Err(anyhow::anyhow!("Relayer should have a config"));
+        }
 
-        // Test 4: Remove maximum gas price limit - placeholder
-        // API may not support removing limits directly
-
-        let config_after_none = self.relayer_client.sdk.relayer.get(&relayer.id).await?;
-        debug!("Relayer config final: {:?}", config_after_none);
-
-        // Test 5: Send transaction to verify gas configuration is applied
         let tx_result = self
             .relayer_client
             .send_transaction(
@@ -2351,21 +2330,38 @@ impl TestRunner {
             ));
         }
 
+        self.relayer_client.sdk.relayer.remove_max_gas_price(&relayer.id).await?;
+
+        let config_after_none = self.relayer_client.sdk.relayer.get(&relayer.id).await?;
+        if let Some(config) = config_after_none {
+            if config.relayer.max_gas_price.is_some() {
+               return Err(anyhow::anyhow!("Relayer should not have a max gas price"));
+            }
+        } else {
+            return Err(anyhow::anyhow!("Relayer should have a config"));
+        }
+
         info!("✅ Gas configuration changes working correctly");
         Ok(())
     }
 
-    /// Test relayer allowlist toggle functionality
+    /// run single with:
+    /// make run-test-debug TEST=relayer_allowlist_toggle
     async fn test_relayer_allowlist_toggle(&self) -> Result<()> {
-        debug!("Testing relayer allowlist toggle...");
+        info!("Testing relayer allowlist toggle...");
 
         let relayer = self.create_and_fund_relayer("allowlist-toggle-relayer").await?;
+        info!("Created relayer: {:?}", relayer);
 
-        // Test 1: Initially allowlist should be disabled
         let initial_config = self.relayer_client.sdk.relayer.get(&relayer.id).await?;
-        debug!("Initial relayer config: {:?}", initial_config);
+        if let Some(config) = initial_config {
+            if config.relayer.allowlisted_only {
+                return Err(anyhow::anyhow!("Relayer should not be allowlisted only"));
+            }
+        } else {
+            return Err(anyhow::anyhow!("Relayer should have a config"));
+        }
 
-        // Test 2: Transaction should work without allowlist
         let no_allowlist_result = self
             .relayer_client
             .send_transaction(
@@ -2383,18 +2379,24 @@ impl TestRunner {
             ));
         }
 
-        // Test 3: Enable allowlist - placeholder
-        // self.relayer_client.sdk.relayer.set_allowlist_enabled(&relayer.id, true).await?;
+        let allowed_address = &self.config.anvil_accounts[1];
+        self.relayer_client.sdk.relayer.allowlist.add(&relayer.id, &allowed_address).await?;
 
         let enabled_config = self.relayer_client.sdk.relayer.get(&relayer.id).await?;
-        debug!("Relayer config after enable attempt: {:?}", enabled_config);
+        info!("Relayer config after enable attempt: {:?}", enabled_config);
+        if let Some(config) = enabled_config {
+            if !config.relayer.allowlisted_only {
+                return Err(anyhow::anyhow!("Relayer should be allowlisted only"));
+            }
+        } else {
+            return Err(anyhow::anyhow!("Relayer should have a config"));
+        }
 
-        // Test 4: Transaction should fail with empty allowlist
         let empty_allowlist_result = self
             .relayer_client
             .send_transaction(
                 &relayer.id,
-                &self.config.anvil_accounts[1],
+                &self.config.anvil_accounts[3],
                 alloy::primitives::utils::parse_ether("0.5")?.into(),
                 TransactionData::empty(),
             )
@@ -2402,20 +2404,15 @@ impl TestRunner {
 
         if empty_allowlist_result.is_ok() {
             return Err(anyhow::anyhow!(
-                "Transaction should fail with empty allowlist, but succeeded"
+                "Transaction should fail with unknown allowlist, but succeeded"
             ));
         }
 
-        // Test 5: Add address to allowlist
-        let allowed_address = &self.config.anvil_accounts[1];
-        self.relayer_client.sdk.relayer.allowlist.add(&relayer.id, &allowed_address).await?;
-
-        // Test 6: Transaction should now work
         let with_allowlist_result = self
             .relayer_client
             .send_transaction(
                 &relayer.id,
-                &self.config.anvil_accounts[1],
+                &allowed_address,
                 alloy::primitives::utils::parse_ether("0.5")?.into(),
                 TransactionData::empty(),
             )
@@ -2428,31 +2425,36 @@ impl TestRunner {
             ));
         }
 
-        // Test 7: Disable allowlist again - placeholder
-        // self.relayer_client.sdk.relayer.set_allowlist_enabled(&relayer.id, false).await?;
+        self.relayer_client.sdk.relayer.allowlist.delete(&relayer.id, &allowed_address).await?;
 
         let disabled_config = self.relayer_client.sdk.relayer.get(&relayer.id).await?;
-        debug!("Final relayer config: {:?}", disabled_config);
+        info!("Final relayer config: {:?}", disabled_config);
+        if let Some(config) = disabled_config {
+            if config.relayer.allowlisted_only {
+                return Err(anyhow::anyhow!("Relayer should not be allowlisted only"));
+            }
+        } else {
+            return Err(anyhow::anyhow!("Relayer should have a config"));
+        }
 
         info!("✅ Allowlist toggle functionality working correctly");
         Ok(())
     }
 
-    // =================== API EDGE CASES AND COMPREHENSIVE COVERAGE ===================
-
-    /// Test transaction nonce management across multiple transactions
+    /// run single with:
+    /// make run-test-debug TEST=transaction_nonce_management
     async fn test_transaction_nonce_management(&self) -> Result<()> {
-        debug!("Testing transaction nonce management...");
+        info!("Testing transaction nonce management...");
 
         let relayer = self.create_and_fund_relayer("nonce-test-relayer").await?;
+        info!("Created relayer: {:?}", relayer);
 
         let mut transaction_ids = Vec::new();
 
-        // Send multiple transactions rapidly
-        for i in 0..5 {
+        for i in 0..50 {
             let tx_request = RelayTransactionRequest {
                 to: self.config.anvil_accounts[1],
-                value: TransactionValue::new(U256::from(10000000000000000u128 * (i + 1))), // 0.01, 0.02, etc.
+                value: alloy::primitives::utils::parse_ether("0.000000005")?.into(),
                 data: TransactionData::empty(),
                 speed: Some(TransactionSpeed::Fast),
                 external_id: Some(format!("nonce-test-{}", i)),
@@ -2467,12 +2469,8 @@ impl TestRunner {
                 .await?;
 
             transaction_ids.push(send_result.id);
-
-            // Small delay to ensure proper ordering
-            tokio::time::sleep(Duration::from_millis(100)).await;
         }
 
-        // Check that all transactions have sequential nonces
         let mut nonces = Vec::new();
         for tx_id in &transaction_ids {
             if let Some(tx) = self.relayer_client.sdk.transaction.get_transaction(tx_id).await? {
@@ -2482,7 +2480,6 @@ impl TestRunner {
 
         nonces.sort();
 
-        // Verify nonces are sequential
         for i in 1..nonces.len() {
             if nonces[i] != nonces[i - 1] + 1 {
                 return Err(anyhow::anyhow!(
@@ -2495,22 +2492,57 @@ impl TestRunner {
             }
         }
 
+        self.mine_and_wait().await?;
+
+        info!("Waiting for all transactions to reach mempool...");
+        let timeout = Duration::from_secs(30);
+        let start = Instant::now();
+
+        loop {
+            if start.elapsed() > timeout {
+                return Err(anyhow::anyhow!("Timeout waiting for transactions to reach mempool"));
+            }
+
+            let mut all_in_mempool = true;
+            for tx_id in &transaction_ids {
+                if let Some(tx) = self.relayer_client.sdk.transaction.get_transaction(tx_id).await? {
+                    if tx.status != TransactionStatus::Mined {
+                        info!("Transaction {} not in mempool - status {}", tx_id, tx.status);
+                        all_in_mempool = false;
+                        break;
+                    }
+                } else {
+                    info!("Transaction {} not in mempool - status", tx_id);
+                    all_in_mempool = false;
+                    break;
+                }
+            }
+
+            if all_in_mempool {
+                info!("All {} transactions are now in mempool", transaction_ids.len());
+                break;
+            }
+
+            self.mine_and_wait().await?;
+        }
+
         info!("✅ Nonce management working correctly with sequential assignment");
         Ok(())
     }
 
-    /// Test gas price bumping mechanism
+    /// run single with:
+    /// make run-test-debug TEST=gas_price_bumping
     async fn test_gas_price_bumping(&self) -> Result<()> {
-        debug!("Testing gas price bumping...");
+        info!("Testing gas price bumping...");
 
         let relayer = self.create_and_fund_relayer("gas-bump-relayer").await?;
+        info!("Created relayer: {:?}", relayer);
 
-        // Send transaction with slow speed to trigger potential bumping
         let tx_request = RelayTransactionRequest {
             to: self.config.anvil_accounts[1],
-            value: TransactionValue::new(U256::from(100000000000000000u128)), // 0.1 ETH
+            value: alloy::primitives::utils::parse_ether("0.5")?.into(),
             data: TransactionData::empty(),
-            speed: Some(TransactionSpeed::Slow), // Will take longer to mine
+            speed: Some(TransactionSpeed::Slow),
             external_id: Some("gas-bump-test".to_string()),
             blobs: None,
         };
@@ -2518,10 +2550,9 @@ impl TestRunner {
         let send_result =
             self.relayer_client.sdk.transaction.send_transaction(&relayer.id, &tx_request).await?;
 
-        // Wait for transaction to reach InMempool
         let mut attempts = 0;
         loop {
-            tokio::time::sleep(Duration::from_millis(500)).await;
+            tokio::time::sleep(Duration::from_millis(100)).await;
             let status = self
                 .relayer_client
                 .sdk
@@ -2531,7 +2562,7 @@ impl TestRunner {
                 .context("Transaction status not found")?;
 
             if status.status == TransactionStatus::Inmempool {
-                debug!("Transaction reached InMempool with hash: {:?}", status.hash);
+                info!("Transaction reached InMempool with hash: {:?}", status.hash);
                 break;
             }
 
@@ -2541,17 +2572,47 @@ impl TestRunner {
             }
         }
 
-        // The gas bumping logic would normally kick in after several blocks
-        // For testing, we'll just verify the transaction eventually gets mined
-        self.mine_blocks(5).await?;
+        let transaction_before = self.relayer_client.sdk.transaction.get_transaction(&send_result.id).await?.context("Transaction not found")?;
+        let max_fee_per_gas_before = transaction_before.sent_with_max_fee_per_gas.context("transaction_before did not have sent_with_max_fee_per_gas")?;
+        let sent_with_max_priority_before = transaction_before.sent_with_max_priority_fee_per_gas.context("transaction_before did not have sent_with_max_priority_fee_per_gas")?;
+
+        // wait 10 seconds as gas bumping happens based on time
+        tokio::time::sleep(Duration::from_secs(10)).await;
+
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+
+        let transaction_after = self.relayer_client.sdk.transaction.get_transaction(&send_result.id).await?.context("Transaction not found")?;
+        let max_fee_per_gas_after = transaction_after.sent_with_max_fee_per_gas.context("transaction_after did not have sent_with_max_fee_per_gas")?;
+        let sent_with_max_priority_after = transaction_after.sent_with_max_priority_fee_per_gas.context("transaction_after did not have sent_with_max_priority_fee_per_gas")?;
+
+        if max_fee_per_gas_before == max_fee_per_gas_after {
+            return Err(anyhow::anyhow!("Gas price did not bump max_fee"));
+        }
+
+        if sent_with_max_priority_before == sent_with_max_priority_after {
+            return Err(anyhow::anyhow!("Gas price did not bump max_priority_fee"));
+        }
+
+        let transaction_status = self.relayer_client.sdk.transaction.get_transaction_status(&send_result.id).await?.context("Transaction status not found")?.receipt.context("Transaction status did not have receipt")?;
+        if !transaction_status.status() {
+            return Err(anyhow::anyhow!("Transaction failed after gas bumping"));
+        }
 
         info!("✅ Gas price bumping mechanism verified");
         Ok(())
     }
 
-    /// Test transaction replacement edge cases
+    /// run single with:
+    /// make run-test-debug TEST=transaction_replacement_edge_cases
     async fn test_transaction_replacement_edge_cases(&self) -> Result<()> {
-        debug!("Testing transaction replacement edge cases...");
+        info!("Testing transaction replacement edge cases...");
 
         let relayer = self.create_and_fund_relayer("replacement-edge-relayer").await?;
 
@@ -2598,11 +2659,11 @@ impl TestRunner {
                     .await?;
 
                 if let Some(status) = original_status {
-                    debug!("Original transaction status after replacement: {:?}", status.status);
+                    info!("Original transaction status after replacement: {:?}", status.status);
                 }
             }
             Err(e) => {
-                debug!("Transaction replacement failed (may be expected): {}", e);
+                info!("Transaction replacement failed (may be expected): {}", e);
                 // This might be expected if the transaction already moved to InMempool
             }
         }
@@ -2628,7 +2689,7 @@ impl TestRunner {
 
     /// Test webhook delivery mechanism
     async fn test_webhook_delivery(&self) -> Result<()> {
-        debug!("Testing webhook delivery...");
+        info!("Testing webhook delivery...");
 
         // Note: This test would require setting up webhook endpoints
         // For now, we'll test that webhooks are configured and transaction events trigger them
@@ -2660,7 +2721,7 @@ impl TestRunner {
 
     /// Test rate limiting enforcement
     async fn test_rate_limiting(&self) -> Result<()> {
-        debug!("Testing rate limiting enforcement...");
+        info!("Testing rate limiting enforcement...");
 
         // Note: Rate limiting depends on configuration and would need specific setup
         // This test verifies the basic mechanism exists
@@ -2690,10 +2751,10 @@ impl TestRunner {
                         || e.to_string().contains("too many requests")
                     {
                         rate_limited = true;
-                        debug!("Rate limiting triggered at transaction {}", i);
+                        info!("Rate limiting triggered at transaction {}", i);
                         break;
                     } else {
-                        debug!("Transaction {} failed with error: {}", i, e);
+                        info!("Transaction {} failed with error: {}", i, e);
                     }
                 }
             }
@@ -2702,7 +2763,7 @@ impl TestRunner {
             tokio::time::sleep(Duration::from_millis(50)).await;
         }
 
-        debug!("Successful transactions before rate limit: {}", successful_transactions);
+        info!("Successful transactions before rate limit: {}", successful_transactions);
 
         info!("✅ Rate limiting mechanism verified (may not trigger with default config)");
         Ok(())
@@ -2710,7 +2771,7 @@ impl TestRunner {
 
     /// Test concurrent transactions from same relayer
     async fn test_concurrent_transactions(&self) -> Result<()> {
-        debug!("Testing concurrent transactions...");
+        info!("Testing concurrent transactions...");
 
         let relayer = self.create_and_fund_relayer("concurrent-relayer").await?;
 
@@ -2739,7 +2800,7 @@ impl TestRunner {
             tokio::time::sleep(Duration::from_millis(10)).await;
         }
 
-        debug!("Rapid transactions - Successful: {}, Failed: {}", successful, failed);
+        info!("Rapid transactions - Successful: {}, Failed: {}", successful, failed);
 
         // At least some should succeed
         if successful == 0 {
@@ -2755,7 +2816,7 @@ impl TestRunner {
 
     /// Test network configuration edge cases
     async fn test_network_edge_cases(&self) -> Result<()> {
-        debug!("Testing network configuration edge cases...");
+        info!("Testing network configuration edge cases...");
 
         // Test network API endpoints
         let all_networks = self.relayer_client.sdk.network.get_all_networks().await?;
@@ -2768,7 +2829,7 @@ impl TestRunner {
         let enabled_networks = self.relayer_client.sdk.network.get_enabled_networks().await?;
         let disabled_networks = self.relayer_client.sdk.network.get_disabled_networks().await?;
 
-        debug!(
+        info!(
             "Networks - Total: {}, Enabled: {}, Disabled: {}",
             all_networks.len(),
             enabled_networks.len(),
@@ -2799,11 +2860,11 @@ impl TestRunner {
 
     /// Test authentication edge cases
     async fn test_authentication_edge_cases(&self) -> Result<()> {
-        debug!("Testing authentication edge cases...");
+        info!("Testing authentication edge cases...");
 
         // Test basic auth status
         let auth_status = self.relayer_client.sdk.auth.test_auth().await?;
-        debug!("Authentication status: {:?}", auth_status);
+        info!("Authentication status: {:?}", auth_status);
 
         // In a more comprehensive test, we would test:
         // - Invalid credentials
@@ -2817,7 +2878,7 @@ impl TestRunner {
 
     /// Test blob transaction handling (EIP-4844)
     async fn test_blob_transactions(&self) -> Result<()> {
-        debug!("Testing blob transaction handling...");
+        info!("Testing blob transaction handling...");
 
         let relayer = self.create_and_fund_relayer("blob-test-relayer").await?;
 
@@ -2842,7 +2903,7 @@ impl TestRunner {
                 info!("✅ Blob transaction accepted (network supports EIP-4844)");
             }
             Err(e) => {
-                debug!("Blob transaction rejected (expected on test network): {}", e);
+                info!("Blob transaction rejected (expected on test network): {}", e);
                 info!("✅ Blob transaction properly rejected on unsupported network");
             }
         }
@@ -2852,7 +2913,7 @@ impl TestRunner {
 
     /// Test transaction data validation
     async fn test_transaction_data_validation(&self) -> Result<()> {
-        debug!("Testing transaction data validation...");
+        info!("Testing transaction data validation...");
 
         let relayer = self.create_and_fund_relayer("data-validation-relayer").await?;
 
@@ -2909,7 +2970,7 @@ impl TestRunner {
 
     /// Test balance edge cases
     async fn test_balance_edge_cases(&self) -> Result<()> {
-        debug!("Testing balance edge cases...");
+        info!("Testing balance edge cases...");
 
         let relayer = self.create_and_fund_relayer("balance-edge-relayer").await?;
 
@@ -2919,7 +2980,7 @@ impl TestRunner {
             Err(anyhow::anyhow!("Balance API not implemented"));
         match balance_result {
             Ok(balance) => {
-                debug!("Relayer balance: {} ETH", alloy::primitives::utils::format_ether(balance));
+                info!("Relayer balance: {} ETH", alloy::primitives::utils::format_ether(balance));
                 if balance == U256::ZERO {
                     return Err(anyhow::anyhow!(
                         "Funded relayer should have positive balance, but got zero balance"
@@ -2927,7 +2988,7 @@ impl TestRunner {
                 }
             }
             Err(e) => {
-                debug!("Balance query failed: {}", e);
+                info!("Balance query failed: {}", e);
                 // This might be expected depending on API implementation
             }
         }
@@ -2961,7 +3022,7 @@ impl TestRunner {
             .await;
 
         // This should succeed or fail based on gas costs
-        debug!("Small amount transaction result: {:?}", small_result);
+        info!("Small amount transaction result: {:?}", small_result);
 
         info!("✅ Balance edge cases handled correctly");
         Ok(())

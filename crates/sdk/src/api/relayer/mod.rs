@@ -97,4 +97,8 @@ impl RelayerApi {
     pub async fn update_max_gas_price<T: ToString>(&self, id: &RelayerId, cap: T) -> ApiResult<()> {
         self.client.put_status(&format!("relayers/{}/gas/max/{}", id, cap.to_string()), &()).await
     }
+
+    pub async fn remove_max_gas_price(&self, id: &RelayerId) -> ApiResult<()> {
+        self.client.put_status(&format!("relayers/{}/gas/max/0", id), &()).await
+    }
 }

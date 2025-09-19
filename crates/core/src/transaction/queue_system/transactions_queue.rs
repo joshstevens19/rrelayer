@@ -1134,10 +1134,13 @@ impl TransactionsQueue {
                 })?
         };
 
-        let estimated_gas_limit = self
-            .estimate_gas(&temp_transaction_request, working_transaction.is_noop)
-            .await
-            .map_err(TransactionQueueSendTransactionError::TransactionEstimateGasError)?;
+        // TODO: look at this for replacement and cancels
+        let estimated_gas_limit = if let Some(gas_limit) = transaction.gas_limit { gas_limit } else {
+            self
+                .estimate_gas(&temp_transaction_request, working_transaction.is_noop)
+                .await
+                .map_err(TransactionQueueSendTransactionError::TransactionEstimateGasError)?
+        };
 
         working_transaction.gas_limit = Some(estimated_gas_limit);
         // Also update the original transaction for database storage

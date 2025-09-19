@@ -6,6 +6,7 @@ use axum::{
 };
 
 use crate::{app_state::AppState, relayer::types::RelayerId};
+use crate::relayer::cache::invalidate_relayer_cache;
 
 /// Updates the EIP-1559 transaction status for a relayer.
 ///
@@ -29,6 +30,7 @@ pub async fn update_relay_eip1559_status(
 ) -> StatusCode {
     match state.db.update_relayer_eip_1559_status(&relayer_id, &enabled).await {
         Ok(_) => {
+            invalidate_relayer_cache(&state.cache, &relayer_id).await;
             if let Ok(queue) =
                 state.transactions_queues.lock().await.get_transactions_queue_unsafe(&relayer_id)
             {

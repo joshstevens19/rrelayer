@@ -10,6 +10,7 @@ use crate::{
     relayer::{get_relayer, types::RelayerId},
     shared::common_types::EvmAddress,
 };
+use crate::relayer::cache::invalidate_relayer_cache;
 
 /// Adds an address to the relayer's allowlist.
 ///
@@ -34,6 +35,7 @@ pub async fn add_allowlist_address(
     match get_relayer(&state.db, &state.cache, &relayer_id).await {
         Ok(Some(_)) => match state.db.relayer_add_allowlist_address(&relayer_id, &address).await {
             Ok(_) => {
+                invalidate_relayer_cache(&state.cache, &relayer_id).await;
                 if let Ok(queue) = state
                     .transactions_queues
                     .lock()
