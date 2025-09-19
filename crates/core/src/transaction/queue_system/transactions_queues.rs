@@ -565,6 +565,7 @@ impl TransactionsQueues {
             expires_at,
             sent_at: None,
             mined_at: None,
+            mined_at_block_number: None,
             confirmed_at: None,
             speed: transaction_to_send.speed.clone(),
             sent_with_max_priority_fee_per_gas: None,

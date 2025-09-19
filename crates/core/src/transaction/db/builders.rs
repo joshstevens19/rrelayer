@@ -39,6 +39,7 @@ pub fn build_transaction_from_transaction_view(row: &Row) -> Transaction {
         // TODO! load from db
         sent_with_blob_gas: None,
         mined_at: row.get("mined_at"),
+        mined_at_block_number: row.get("block_number"),
         speed: row.get("speed"),
         sent_with_max_priority_fee_per_gas: row.get("sent_max_priority_fee_per_gas"),
         sent_with_max_fee_per_gas: row.get("sent_max_fee_per_gas"),

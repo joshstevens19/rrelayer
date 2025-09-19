@@ -33,6 +33,7 @@ use super::{
     TransactionData, TransactionHash, TransactionId, TransactionNonce, TransactionSpeed,
     TransactionStatus, TransactionValue,
 };
+use crate::common_types::BlockNumber;
 use crate::{
     gas::{
         blob_gas_oracle::BlobGasPriceResult,
@@ -93,6 +94,9 @@ pub struct Transaction {
 
     #[serde(rename = "minedAt", skip_serializing_if = "Option::is_none", default)]
     pub mined_at: Option<DateTime<Utc>>,
+
+    #[serde(rename = "minedAtBlockNumber", skip_serializing_if = "Option::is_none", default)]
+    pub mined_at_block_number: Option<BlockNumber>,
 
     pub speed: TransactionSpeed,
 
