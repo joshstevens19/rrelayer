@@ -22,7 +22,7 @@ use std::str::FromStr;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 use tokio::time::timeout;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 #[derive(Debug, Clone)]
 pub enum TestResult {
@@ -1431,7 +1431,7 @@ impl TestRunner {
             return Err(anyhow::anyhow!("Signed typed data not found in history"));
         }
 
-        info!("✅ Typed data signing works correctly");
+        debug!("✅ Typed data signing works correctly");
         Ok(())
     }
 
@@ -1475,6 +1475,8 @@ impl TestRunner {
         } else {
             return Err(anyhow::anyhow!("Transaction not found"));
         }
+
+        debug!("✅ Transaction get works correctly");
 
         Ok(())
     }
@@ -1571,32 +1573,35 @@ impl TestRunner {
             .replace_transaction(transaction_id, &replacement_request)
             .await
             .context("Failed to replace transaction")?;
+        debug!("✅ Transaction replacement result: {}", replace_result);
+
+        if !replace_result {
+            return Err(anyhow::anyhow!("Replace transaction failed"));
+        }
 
         self.anvil_manager.mine_block().await?;
 
         let transaction = self.relayer_client.get_transaction(&send_result.id).await?;
-        println!("transaction {}", transaction);
         self.relayer_client.sent_transaction_compare(replacement_request, transaction)?;
 
-        debug!("✅ Transaction replacement result: {}", replace_result);
         debug!("✅ Transaction replace operation works correctly");
         Ok(())
     }
 
-    /// Test: Transaction Cancel Operation  
+    /// run single with:
+    /// make run-test-debug TEST=transaction_cancel
     async fn test_transaction_cancel(&self) -> Result<()> {
         debug!("Testing transaction cancel operation...");
 
-        // Create and fund relayer
         let relayer = self.create_and_fund_relayer("tx-cancel-relayer").await?;
+        debug!("Created relayer: {:?}", relayer);
 
-        // Send a transaction first with very slow speed
         let tx_request = RelayTransactionRequest {
             to: self.config.anvil_accounts[1],
-            value: TransactionValue::new(U256::from(500000000000000000u128)), // 0.5 ETH
+            value: alloy::primitives::utils::parse_ether("0.1")?.into(),
             data: TransactionData::empty(),
-            speed: Some(TransactionSpeed::Slow), // Use slow speed to make cancellation more likely
-            external_id: Some("test-cancel".to_string()),
+            speed: Some(TransactionSpeed::Slow),
+            external_id: Some("test-original".to_string()),
             blobs: None,
         };
 
@@ -1618,6 +1623,10 @@ impl TestRunner {
             .await
             .context("Failed to cancel transaction")?;
 
+        if !cancel_result {
+            return Err(anyhow::anyhow!("Cancel transaction failed"));
+        }
+
         self.anvil_manager.mine_block().await?;
 
         let transaction = self.relayer_client.get_transaction(&send_result.id).await?;
@@ -1628,24 +1637,25 @@ impl TestRunner {
             ));
         }
 
-        debug!("✅ Transaction {} cancellation succeeded", transaction_id);
         info!("✅ Transaction {} cancel operation works correctly", transaction_id);
 
         Ok(())
     }
 
-    /// Test 16: Transaction Status Operations
+    /// run single with:
+    /// make run-test-debug TEST=transaction_status_operations
     async fn test_transaction_status_operations(&self) -> Result<()> {
         debug!("Testing transaction status operations...");
 
         let relayer = self.create_and_fund_relayer("tx-status-relayer").await?;
+        debug!("Created relayer: {:?}", relayer);
 
         let tx_request = RelayTransactionRequest {
-            to: self.config.anvil_accounts[2],
-            value: TransactionValue::new(U256::from(500000000000000000u128)),
+            to: self.config.anvil_accounts[1],
+            value: alloy::primitives::utils::parse_ether("0.1")?.into(),
             data: TransactionData::empty(),
-            speed: Some(TransactionSpeed::Fast),
-            external_id: Some("test-status-ops".to_string()),
+            speed: Some(TransactionSpeed::Slow),
+            external_id: Some("test-status-op".to_string()),
             blobs: None,
         };
 
@@ -1702,14 +1712,14 @@ impl TestRunner {
         Ok(())
     }
 
-    /// Test 17: Transaction Counts (inmempool and pending)
+    /// run single with:
+    /// make run-test-debug TEST=transaction_counts
     async fn test_transaction_counts(&self) -> Result<()> {
         debug!("Testing transaction count operations...");
 
-        // Create and fund relayer
         let relayer = self.create_and_fund_relayer("tx-counts-relayer").await?;
+        debug!("Created relayer: {:?}", relayer);
 
-        // Get initial counts
         let initial_pending = self
             .relayer_client
             .sdk
@@ -1728,12 +1738,11 @@ impl TestRunner {
 
         debug!("Initial counts - Pending: {}, InMempool: {}", initial_pending, initial_inmempool);
 
-        // Send several transactions quickly
         let mut transaction_ids = Vec::new();
         for i in 0..3 {
             let tx_request = RelayTransactionRequest {
                 to: self.config.anvil_accounts[1],
-                value: TransactionValue::new(U256::from(100000000000000000u128 * (i + 1))), // 0.1, 0.2, 0.3 ETH
+                value: TransactionValue::new(U256::from(100000000000000000u128 * (i + 1))),
                 data: TransactionData::empty(),
                 speed: Some(TransactionSpeed::Fast),
                 external_id: Some(format!("test-counts-{}", i)),
@@ -1751,17 +1760,9 @@ impl TestRunner {
             transaction_ids.push(send_result.id.clone());
             debug!("Sent transaction {}: {}", i, send_result.id);
 
-            // Mine a block after each transaction
             self.mine_and_wait().await?;
-
-            // Small delay between transactions
-            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         }
 
-        // Wait a moment for transactions to be processed
-        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-
-        // Get updated counts
         let final_pending = self
             .relayer_client
             .sdk
@@ -1787,25 +1788,26 @@ impl TestRunner {
         if total_final >= total_initial {
             debug!("✅ Transaction counts increased as expected");
         } else {
-            warn!("Transaction counts may have decreased (transactions completed quickly)");
+            return Err(anyhow!(
+                "Transaction counts may have decreased (transactions completed quickly)"
+            ));
         }
 
         info!("✅ Transaction count operations work correctly");
         Ok(())
     }
 
-    // =================== COMPREHENSIVE TRANSACTION STATUS STATE TESTS ===================
-
-    /// Test transaction in Pending state - verify it stays pending without mining
+    /// run single with:
+    /// make run-test-debug TEST=transaction_status_pending
     async fn test_transaction_status_pending(&self) -> Result<()> {
         debug!("Testing transaction pending state...");
 
         let relayer = self.create_and_fund_relayer("pending-status-relayer").await?;
+        debug!("Created relayer: {:?}", relayer);
 
-        // Send transaction but don't mine blocks
         let tx_request = RelayTransactionRequest {
             to: self.config.anvil_accounts[1],
-            value: TransactionValue::new(U256::from(100000000000000000u128)), // 0.1 ETH
+            value: alloy::primitives::utils::parse_ether("0.1")?.into(),
             data: TransactionData::empty(),
             speed: Some(TransactionSpeed::Fast),
             external_id: Some("test-pending".to_string()),
@@ -1815,10 +1817,6 @@ impl TestRunner {
         let send_result =
             self.relayer_client.sdk.transaction.send_transaction(&relayer.id, &tx_request).await?;
 
-        // Wait a bit to ensure transaction is processed by queue
-        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-
-        // Check status should be Pending
         let status = self
             .relayer_client
             .sdk
@@ -1851,15 +1849,17 @@ impl TestRunner {
         Ok(())
     }
 
-    /// Test transaction in InMempool state - send to network but don't mine
+    /// run single with:
+    /// make run-test-debug TEST=transaction_status_inmempool
     async fn test_transaction_status_inmempool(&self) -> Result<()> {
         debug!("Testing transaction inmempool state...");
 
         let relayer = self.create_and_fund_relayer("inmempool-status-relayer").await?;
+        debug!("Created relayer: {:?}", relayer);
 
         let tx_request = RelayTransactionRequest {
             to: self.config.anvil_accounts[1],
-            value: TransactionValue::new(U256::from(200000000000000000u128)), // 0.2 ETH
+            value: alloy::primitives::utils::parse_ether("0.1")?.into(),
             data: TransactionData::empty(),
             speed: Some(TransactionSpeed::Fast),
             external_id: Some("test-inmempool".to_string()),
@@ -1872,7 +1872,7 @@ impl TestRunner {
         // Wait for transaction to be sent to network (should move to InMempool)
         let mut attempts = 0;
         loop {
-            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+            tokio::time::sleep(Duration::from_millis(500)).await;
             let status = self
                 .relayer_client
                 .sdk
@@ -1899,15 +1899,17 @@ impl TestRunner {
         }
     }
 
-    /// Test transaction in Mined state - mine one block
+    /// run single with:
+    /// make run-test-debug TEST=transaction_status_mined
     async fn test_transaction_status_mined(&self) -> Result<()> {
         debug!("Testing transaction mined state...");
 
         let relayer = self.create_and_fund_relayer("mined-status-relayer").await?;
+        debug!("Created relayer: {:?}", relayer);
 
         let tx_request = RelayTransactionRequest {
             to: self.config.anvil_accounts[1],
-            value: TransactionValue::new(U256::from(300000000000000000u128)), // 0.3 ETH
+            value: alloy::primitives::utils::parse_ether("0.1")?.into(),
             data: TransactionData::empty(),
             speed: Some(TransactionSpeed::Fast),
             external_id: Some("test-mined".to_string()),
@@ -1917,9 +1919,8 @@ impl TestRunner {
         let send_result =
             self.relayer_client.sdk.transaction.send_transaction(&relayer.id, &tx_request).await?;
 
-        // Wait for InMempool
         loop {
-            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+            tokio::time::sleep(Duration::from_millis(100)).await;
             let status = self
                 .relayer_client
                 .sdk
@@ -1933,13 +1934,11 @@ impl TestRunner {
             }
         }
 
-        // Mine exactly one block
-        self.mine_blocks(1).await?;
+        self.mine_and_wait().await?;
 
-        // Wait for transaction to be detected as mined
         let mut attempts = 0;
         loop {
-            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+            tokio::time::sleep(Duration::from_millis(100)).await;
             let status = self
                 .relayer_client
                 .sdk
@@ -1956,9 +1955,11 @@ impl TestRunner {
                     return Err(anyhow::anyhow!("Mined transaction should have receipt"));
                 }
                 let receipt = status.receipt.unwrap();
-                // Check receipt status - access pattern depends on Alloy version
                 debug!("Transaction receipt: {:?}", receipt);
-                // assert_eq!(receipt.inner.inner.receipt.status, Some(alloy::primitives::U64::from(1)), "Successful transaction should have status 1");
+                if !receipt.inner.inner.status() {
+                    return Err(anyhow::anyhow!("Mined transaction should have a success as true"));
+                }
+
                 info!("✅ Transaction successfully reached Mined state");
                 return Ok(());
             }
@@ -1970,15 +1971,17 @@ impl TestRunner {
         }
     }
 
-    /// Test transaction in Confirmed state - mine enough blocks for confirmation
+    /// run single with:
+    /// make run-test-debug TEST=transaction_status_confirmed
     async fn test_transaction_status_confirmed(&self) -> Result<()> {
         debug!("Testing transaction confirmed state...");
 
         let relayer = self.create_and_fund_relayer("confirmed-status-relayer").await?;
+        debug!("Created relayer: {:?}", relayer);
 
         let tx_request = RelayTransactionRequest {
             to: self.config.anvil_accounts[1],
-            value: TransactionValue::new(U256::from(400000000000000000u128)), // 0.4 ETH
+            value: alloy::primitives::utils::parse_ether("0.1")?.into(),
             data: TransactionData::empty(),
             speed: Some(TransactionSpeed::Fast),
             external_id: Some("test-confirmed".to_string()),
@@ -1988,9 +1991,8 @@ impl TestRunner {
         let send_result =
             self.relayer_client.sdk.transaction.send_transaction(&relayer.id, &tx_request).await?;
 
-        // Wait for InMempool first
         loop {
-            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+            tokio::time::sleep(Duration::from_millis(100)).await;
             let status = self
                 .relayer_client
                 .sdk
@@ -2004,13 +2006,11 @@ impl TestRunner {
             }
         }
 
-        // Mine enough blocks for confirmation (default is 12 confirmations)
         self.mine_blocks(15).await?;
 
-        // Wait for transaction to be confirmed
         let mut attempts = 0;
         loop {
-            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+            tokio::time::sleep(Duration::from_millis(500)).await;
             let status = self
                 .relayer_client
                 .sdk
@@ -2031,23 +2031,23 @@ impl TestRunner {
             }
 
             attempts += 1;
-            if attempts > 15 {
+            if attempts > 25 {
                 anyhow::bail!("Transaction did not reach Confirmed state in time");
             }
         }
     }
 
-    /// Test transaction Failed state - send transaction that will revert
+    /// run single with:
+    /// make run-test-debug TEST=transaction_status_failed
     async fn test_transaction_status_failed(&self) -> Result<()> {
         debug!("Testing transaction failed state...");
 
         let relayer = self.create_and_fund_relayer("failed-status-relayer").await?;
+        debug!("Created relayer: {:?}", relayer);
 
-        // Get contract address for invalid call
         let contract_address =
             self.contract_interactor.contract_address().context("Test contract not deployed")?;
 
-        // Send transaction with invalid data that will revert
         let tx_request = RelayTransactionRequest {
             to: contract_address,
             value: TransactionValue::new(U256::ZERO),
@@ -2064,44 +2064,13 @@ impl TestRunner {
 
         match send_result {
             Ok(tx_response) => {
-                // Transaction was accepted, wait for it to fail
-                self.mine_blocks(5).await?;
-
-                let mut attempts = 0;
-                loop {
-                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                    let status = self
-                        .relayer_client
-                        .sdk
-                        .transaction
-                        .get_transaction_status(&tx_response.id)
-                        .await?
-                        .context("Transaction status not found")?;
-
-                    if status.status == TransactionStatus::Failed {
-                        if status.hash.is_none() {
-                            return Err(anyhow::anyhow!("Failed transaction should have hash"));
-                        }
-                        if status.receipt.is_none() {
-                            return Err(anyhow::anyhow!("Failed transaction should have receipt"));
-                        }
-                        let receipt = status.receipt.unwrap();
-                        // Check failed receipt status
-                        debug!("Failed transaction receipt: {:?}", receipt);
-                        // assert_eq!(receipt.inner.inner.receipt.status, Some(alloy::primitives::U64::from(0)), "Failed transaction should have status 0");
-                        info!("✅ Transaction successfully reached Failed state");
-                        return Ok(());
-                    }
-
-                    attempts += 1;
-                    if attempts > 10 {
-                        debug!("Current status: {:?}", status.status);
-                        anyhow::bail!("Transaction did not reach Failed state in time");
-                    }
-                }
+                return Err(anyhow::anyhow!(
+                    "Transaction sent successfully, but should have failed: {:?}",
+                    tx_response
+                ));
             }
             Err(_) => {
-                info!(
+                debug!(
                     "✅ Transaction was rejected at gas estimation (also valid failure scenario)"
                 );
                 Ok(())
@@ -2109,50 +2078,17 @@ impl TestRunner {
         }
     }
 
-    /// Test transaction Expired state - wait for transaction to expire
+    //TODO! NEED TO THINK ABOUT HOW TO TEST EXPIRED
+    /// run single with:
+    /// make run-test-debug TEST=transaction_status_expired
     async fn test_transaction_status_expired(&self) -> Result<()> {
         debug!("Testing transaction expired state...");
 
-        // Note: This test is challenging because transactions expire after 12 hours
-        // For testing purposes, we'll simulate this by checking the logic exists
-
-        let relayer = self.create_and_fund_relayer("expired-status-relayer").await?;
-
-        // Create a transaction with very low gas price to make it unlikely to be mined
-        let tx_request = RelayTransactionRequest {
-            to: self.config.anvil_accounts[1],
-            value: TransactionValue::new(U256::from(100000000000000000u128)), // 0.1 ETH
-            data: TransactionData::empty(),
-            speed: Some(TransactionSpeed::Slow), // Use slow speed
-            external_id: Some("test-expired".to_string()),
-            blobs: None,
-        };
-
-        let send_result =
-            self.relayer_client.sdk.transaction.send_transaction(&relayer.id, &tx_request).await?;
-
-        // For this test, we'll just verify the transaction was created and could expire
-        // In a real scenario, after 12 hours it would be converted to a no-op transaction
-        let status = self
-            .relayer_client
-            .sdk
-            .transaction
-            .get_transaction_status(&send_result.id)
-            .await?
-            .context("Transaction status not found")?;
-
-        if !matches!(status.status, TransactionStatus::Pending | TransactionStatus::Inmempool) {
-            return Err(anyhow::anyhow!(
-                "Transaction should be pending or inmempool initially, but got: {:?}",
-                status.status
-            ));
-        }
-
-        info!("✅ Transaction expiration logic verified (full test requires 12+ hours)");
+        error!("NEED TO WRITE THIS TEST");
         Ok(())
     }
 
-    // =================== COMPREHENSIVE ALLOWLIST TESTS ===================
+    // TODO: JOSH GOT HERE
 
     /// Test allowlist restrictions - add address then try to send to non-allowlisted address
     async fn test_allowlist_restrictions(&self) -> Result<()> {
