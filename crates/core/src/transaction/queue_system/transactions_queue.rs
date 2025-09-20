@@ -10,7 +10,7 @@ use super::types::{
     TransactionQueueSendTransactionError, TransactionSentWithRelayer, TransactionsQueueSetup,
 };
 use crate::relayer::types::RelayerId;
-use crate::transaction::types::TransactionValue;
+use crate::transaction::types::{TransactionNonce, TransactionValue};
 use crate::{
     gas::{
         blob_gas_oracle::{BlobGasOracleCache, BlobGasPriceResult, BLOB_GAS_PER_BLOB},
@@ -37,6 +37,7 @@ use alloy::{
     signers::local::LocalSignerError,
     transports::{RpcError, TransportErrorKind},
 };
+use alloy_eips::{BlockId, BlockNumberOrTag};
 use chrono::Utc;
 use tokio::sync::Mutex;
 use tracing::error;
@@ -937,7 +938,7 @@ impl TransactionsQueue {
             .estimate_gas(transaction_request, &self.relayer.address)
             .await
             .map_err(|e| {
-                tracing::error!("Gas estimation failed for relayer {}: {:?}", self.relayer.name, e);
+                error!("Gas estimation failed for relayer {}: {:?}", self.relayer.name, e);
                 e
             })?;
 
@@ -1135,9 +1136,10 @@ impl TransactionsQueue {
         };
 
         // TODO: look at this for replacement and cancels
-        let estimated_gas_limit = if let Some(gas_limit) = transaction.gas_limit { gas_limit } else {
-            self
-                .estimate_gas(&temp_transaction_request, working_transaction.is_noop)
+        let estimated_gas_limit = if let Some(gas_limit) = transaction.gas_limit {
+            gas_limit
+        } else {
+            self.estimate_gas(&temp_transaction_request, working_transaction.is_noop)
                 .await
                 .map_err(TransactionQueueSendTransactionError::TransactionEstimateGasError)?
         };
@@ -1281,6 +1283,12 @@ impl TransactionsQueue {
         }
 
         Ok(receipt)
+    }
+
+    pub async fn get_nonce(&self) -> Result<TransactionNonce, RpcError<TransportErrorKind>> {
+        let nonce = self.evm_provider.get_nonce_from_address(&self.relay_address()).await?;
+
+        Ok(nonce)
     }
 
     pub async fn get_balance(

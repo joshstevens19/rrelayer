@@ -463,9 +463,16 @@ impl TransactionsQueues {
         const TEMP_GAS_LIMIT: u128 = 1_000_000;
         let temp_gas_limit = GasLimit::new(TEMP_GAS_LIMIT);
 
+        let current_onchain_nonce = transactions_queue.get_nonce().await.map_err(|e| {
+            AddTransactionError::CouldNotGetCurrentOnChainNonce(transaction.relayer_id, e)
+        })?;
+
+        let mut estimation_transaction = transaction.clone();
+        estimation_transaction.nonce = current_onchain_nonce;
+
         let temp_transaction_request = Self::create_typed_transaction(
             transactions_queue,
-            transaction,
+            &estimation_transaction,
             gas_price,
             blob_gas_price,
             temp_gas_limit,
@@ -488,11 +495,9 @@ impl TransactionsQueues {
             transaction.value.into_inner() + alloy::primitives::U256::from(gas_cost);
 
         if relayer_balance < total_required {
-            tracing::error!(
+            error!(
                 "Insufficient balance for relayer {}: has {}, needs {}",
-                transaction.relayer_id,
-                relayer_balance,
-                total_required
+                transaction.relayer_id, relayer_balance, total_required
             );
             return Err(AddTransactionError::TransactionEstimateGasError(
                 transaction.relayer_id,

@@ -10,6 +10,7 @@ pub mod types;
 use std::sync::Arc;
 pub use types::{ApiResult, ApiSdkError};
 
+#[derive(Clone)]
 pub struct HealthApi {
     client: Arc<HttpClient>,
 }

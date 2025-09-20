@@ -5,7 +5,7 @@ use tokio::{
     sync::Mutex,
     time::{self, Duration},
 };
-
+use tracing::info;
 use crate::{
     network::types::ChainId, provider::EvmProvider, rrelayer_error, rrelayer_info,
     transaction::types::TransactionSpeed,
@@ -91,6 +91,7 @@ impl BlobGasOracleCache {
         speed: &TransactionSpeed,
     ) -> Option<BlobGasPriceResult> {
         let blob_gas_prices = self.get_blob_gas_price(chain_id).await?;
+        info!("Blob gas prices: {:?}", blob_gas_prices);
 
         match speed {
             TransactionSpeed::Super => Some(blob_gas_prices.super_fast),

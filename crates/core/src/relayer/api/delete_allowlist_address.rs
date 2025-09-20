@@ -5,8 +5,8 @@ use axum::{
     http::StatusCode,
 };
 
-use crate::{app_state::AppState, relayer::types::RelayerId, shared::common_types::EvmAddress};
 use crate::relayer::cache::invalidate_relayer_cache;
+use crate::{app_state::AppState, relayer::types::RelayerId, shared::common_types::EvmAddress};
 
 /// Removes an address from the relayer's allowlist.
 ///
@@ -29,7 +29,8 @@ pub async fn delete_allowlist_address(
     Path((relayer_id, address)): Path<(RelayerId, EvmAddress)>,
 ) -> StatusCode {
     match state.db.relayer_delete_allowlist_address(&relayer_id, &address).await {
-        Ok(_) => match state.db.get_relayer(&relayer_id).await { // TODO: revise this
+        Ok(_) => match state.db.get_relayer(&relayer_id).await {
+            // TODO: revise this
             Ok(Some(relayer)) => {
                 invalidate_relayer_cache(&state.cache, &relayer_id).await;
                 if !relayer.allowlisted_only {

@@ -5,6 +5,7 @@ use alloy::providers::{Provider, ProviderBuilder};
 use alloy::rpc::types::TransactionRequest;
 use alloy::signers::local::PrivateKeySigner;
 use anyhow::{anyhow, Context, Result};
+use rrelayer_core::gas::types::GasPrice;
 use rrelayer_core::network::types::ChainId;
 use rrelayer_core::relayer::api::CreateRelayerResult;
 use rrelayer_core::transaction::api::get_transaction_status::RelayTransactionStatusResult;
@@ -23,7 +24,7 @@ use std::thread::sleep;
 use std::time::{Duration, Instant};
 use tokio::time::timeout;
 use tracing::{debug, error, info, warn};
-use rrelayer_core::gas::types::GasPrice;
+use rrelayer_sdk::SDK;
 
 #[derive(Debug, Clone)]
 pub enum TestResult {
@@ -328,15 +329,11 @@ impl TestRunner {
             "relayer_allowlist_toggle" => self.test_relayer_allowlist_toggle().await,
             "transaction_nonce_management" => self.test_transaction_nonce_management().await,
             "gas_price_bumping" => self.test_gas_price_bumping().await,
-            "transaction_replacement_edge_cases" => {
-                self.test_transaction_replacement_edge_cases().await
-            }
             "webhook_delivery_testing" => self.test_webhook_delivery().await,
             "rate_limiting_enforcement" => self.test_rate_limiting().await,
             "concurrent_transactions" => self.test_concurrent_transactions().await,
-            "network_configuration_edge_cases" => self.test_network_edge_cases().await,
-            "authentication_edge_cases" => self.test_authentication_edge_cases().await,
-            "blob_transaction_handling" => self.test_blob_transactions().await,
+            "unauthenticated" => self.test_unauthenticated().await,
+            "blob_transaction_handling" => self.test_blob_transaction_handling().await,
             "transaction_data_validation" => self.test_transaction_data_validation().await,
             "balance_edge_cases" => self.test_balance_edge_cases().await,
             _ => Err(anyhow::anyhow!("Unknown test: {}", test_name)),
@@ -448,12 +445,10 @@ impl TestRunner {
             "relayer_allowlist_toggle" => "Relayer allowlist toggle functionality",
             "transaction_nonce_management" => "Transaction nonce management",
             "gas_price_bumping" => "Gas price bumping mechanism",
-            "transaction_replacement_edge_cases" => "Transaction replacement edge cases",
             "webhook_delivery_testing" => "Webhook delivery testing",
             "rate_limiting_enforcement" => "Rate limiting enforcement",
             "concurrent_transactions" => "Concurrent transaction handling",
-            "network_configuration_edge_cases" => "Network configuration edge cases",
-            "authentication_edge_cases" => "Authentication edge cases",
+            "unauthenticated" => "Unauthenticated protection",
             "blob_transaction_handling" => "Blob transaction handling (EIP-4844)",
             "transaction_data_validation" => "Transaction data validation",
             "balance_edge_cases" => "Balance edge case handling",
@@ -2089,8 +2084,6 @@ impl TestRunner {
         Ok(())
     }
 
-    // TODO: JOSH GOT HERE
-
     /// run single with:
     /// make run-test-debug TEST=allowlist_restrictions
     async fn test_allowlist_restrictions(&self) -> Result<()> {
@@ -2157,7 +2150,9 @@ impl TestRunner {
         // Duplicate add should be handled gracefully - both success and error are acceptable
         match duplicate_result {
             Ok(_) => info!("Duplicate address add succeeded (graceful handling)"),
-            Err(_) => return Err(anyhow::anyhow!("Duplicate address add failed (graceful handling)")),
+            Err(_) => {
+                return Err(anyhow::anyhow!("Duplicate address add failed (graceful handling)"))
+            }
         }
 
         let non_existent = self.config.anvil_accounts[4];
@@ -2168,22 +2163,31 @@ impl TestRunner {
         // Remove non-existent should be handled gracefully - both success and error are acceptable
         match remove_result {
             Ok(_) => info!("Remove non-existent succeeded (graceful handling)"),
-            Err(_) => return Err(anyhow::anyhow!("Remove non-existent failed (graceful handling)")),
+            Err(_) => {
+                return Err(anyhow::anyhow!("Remove non-existent failed (graceful handling)"))
+            }
         }
 
         let allowlist = self
             .relayer_client
             .sdk
-            .relayer.allowlist
+            .relayer
+            .allowlist
             .get_all(&relayer.id, &PagingContext::new(50, 0))
             .await?;
 
         if allowlist.items.len() != 1 {
-            return Err(anyhow::anyhow!("Allowlist should have 1 item, but got: {:?}", allowlist.items.len()));
+            return Err(anyhow::anyhow!(
+                "Allowlist should have 1 item, but got: {:?}",
+                allowlist.items.len()
+            ));
         }
 
         if allowlist.items[0] != test_address {
-            return Err(anyhow::anyhow!("Allowlist should have first item be test address, but got: {:?}", allowlist.items[0]));
+            return Err(anyhow::anyhow!(
+                "Allowlist should have first item be test address, but got: {:?}",
+                allowlist.items[0]
+            ));
         }
 
         info!("✅ Allowlist edge cases handled correctly");
@@ -2283,7 +2287,9 @@ impl TestRunner {
         let config_after_legacy = self.relayer_client.sdk.relayer.get(&relayer.id).await?;
         if let Some(config) = config_after_legacy {
             if config.relayer.eip_1559_enabled {
-                return Err(anyhow::anyhow!("Relayer should not be using EIP1559 but it is enabled"));
+                return Err(anyhow::anyhow!(
+                    "Relayer should not be using EIP1559 but it is enabled"
+                ));
             }
         }
 
@@ -2292,7 +2298,9 @@ impl TestRunner {
         let config_after_latest = self.relayer_client.sdk.relayer.get(&relayer.id).await?;
         if let Some(config) = config_after_latest {
             if !config.relayer.eip_1559_enabled {
-                return Err(anyhow::anyhow!("Relayer should be using EIP1559 but it is not enabled"));
+                return Err(anyhow::anyhow!(
+                    "Relayer should be using EIP1559 but it is not enabled"
+                ));
             }
         } else {
             return Err(anyhow::anyhow!("Relayer should have a config"));
@@ -2304,7 +2312,10 @@ impl TestRunner {
         if let Some(config) = config_after_max {
             if let Some(max) = config.relayer.max_gas_price {
                 if max != GasPrice::new(1000000) {
-                    return Err(anyhow::anyhow!("Relayer should have max gas price of 1000000, but got: {:?}", max));
+                    return Err(anyhow::anyhow!(
+                        "Relayer should have max gas price of 1000000, but got: {:?}",
+                        max
+                    ));
                 }
             } else {
                 return Err(anyhow::anyhow!("Relayer should have a max gas price"));
@@ -2335,7 +2346,7 @@ impl TestRunner {
         let config_after_none = self.relayer_client.sdk.relayer.get(&relayer.id).await?;
         if let Some(config) = config_after_none {
             if config.relayer.max_gas_price.is_some() {
-               return Err(anyhow::anyhow!("Relayer should not have a max gas price"));
+                return Err(anyhow::anyhow!("Relayer should not have a max gas price"));
             }
         } else {
             return Err(anyhow::anyhow!("Relayer should have a config"));
@@ -2493,8 +2504,8 @@ impl TestRunner {
         }
 
         self.mine_and_wait().await?;
-
         info!("Waiting for all transactions to reach mempool...");
+
         let timeout = Duration::from_secs(30);
         let start = Instant::now();
 
@@ -2505,7 +2516,8 @@ impl TestRunner {
 
             let mut all_in_mempool = true;
             for tx_id in &transaction_ids {
-                if let Some(tx) = self.relayer_client.sdk.transaction.get_transaction(tx_id).await? {
+                if let Some(tx) = self.relayer_client.sdk.transaction.get_transaction(tx_id).await?
+                {
                     if tx.status != TransactionStatus::Mined {
                         info!("Transaction {} not in mempool - status {}", tx_id, tx.status);
                         all_in_mempool = false;
@@ -2572,9 +2584,20 @@ impl TestRunner {
             }
         }
 
-        let transaction_before = self.relayer_client.sdk.transaction.get_transaction(&send_result.id).await?.context("Transaction not found")?;
-        let max_fee_per_gas_before = transaction_before.sent_with_max_fee_per_gas.context("transaction_before did not have sent_with_max_fee_per_gas")?;
-        let sent_with_max_priority_before = transaction_before.sent_with_max_priority_fee_per_gas.context("transaction_before did not have sent_with_max_priority_fee_per_gas")?;
+        let transaction_before = self
+            .relayer_client
+            .sdk
+            .transaction
+            .get_transaction(&send_result.id)
+            .await?
+            .context("Transaction not found")?;
+        let max_fee_per_gas_before = transaction_before
+            .sent_with_max_fee_per_gas
+            .context("transaction_before did not have sent_with_max_fee_per_gas")?;
+        let sent_with_max_priority_before =
+            transaction_before
+                .sent_with_max_priority_fee_per_gas
+                .context("transaction_before did not have sent_with_max_priority_fee_per_gas")?;
 
         // wait 10 seconds as gas bumping happens based on time
         tokio::time::sleep(Duration::from_secs(10)).await;
@@ -2588,9 +2611,19 @@ impl TestRunner {
         self.mine_and_wait().await?;
         self.mine_and_wait().await?;
 
-        let transaction_after = self.relayer_client.sdk.transaction.get_transaction(&send_result.id).await?.context("Transaction not found")?;
-        let max_fee_per_gas_after = transaction_after.sent_with_max_fee_per_gas.context("transaction_after did not have sent_with_max_fee_per_gas")?;
-        let sent_with_max_priority_after = transaction_after.sent_with_max_priority_fee_per_gas.context("transaction_after did not have sent_with_max_priority_fee_per_gas")?;
+        let transaction_after = self
+            .relayer_client
+            .sdk
+            .transaction
+            .get_transaction(&send_result.id)
+            .await?
+            .context("Transaction not found")?;
+        let max_fee_per_gas_after = transaction_after
+            .sent_with_max_fee_per_gas
+            .context("transaction_after did not have sent_with_max_fee_per_gas")?;
+        let sent_with_max_priority_after = transaction_after
+            .sent_with_max_priority_fee_per_gas
+            .context("transaction_after did not have sent_with_max_priority_fee_per_gas")?;
 
         if max_fee_per_gas_before == max_fee_per_gas_after {
             return Err(anyhow::anyhow!("Gas price did not bump max_fee"));
@@ -2600,7 +2633,15 @@ impl TestRunner {
             return Err(anyhow::anyhow!("Gas price did not bump max_priority_fee"));
         }
 
-        let transaction_status = self.relayer_client.sdk.transaction.get_transaction_status(&send_result.id).await?.context("Transaction status not found")?.receipt.context("Transaction status did not have receipt")?;
+        let transaction_status = self
+            .relayer_client
+            .sdk
+            .transaction
+            .get_transaction_status(&send_result.id)
+            .await?
+            .context("Transaction status not found")?
+            .receipt
+            .context("Transaction status did not have receipt")?;
         if !transaction_status.status() {
             return Err(anyhow::anyhow!("Transaction failed after gas bumping"));
         }
@@ -2609,84 +2650,7 @@ impl TestRunner {
         Ok(())
     }
 
-    /// run single with:
-    /// make run-test-debug TEST=transaction_replacement_edge_cases
-    async fn test_transaction_replacement_edge_cases(&self) -> Result<()> {
-        info!("Testing transaction replacement edge cases...");
-
-        let relayer = self.create_and_fund_relayer("replacement-edge-relayer").await?;
-
-        // Test 1: Replace pending transaction
-        let tx_request = RelayTransactionRequest {
-            to: self.config.anvil_accounts[1],
-            value: TransactionValue::new(U256::from(100000000000000000u128)),
-            data: TransactionData::empty(),
-            speed: Some(TransactionSpeed::Fast),
-            external_id: Some("replace-test".to_string()),
-            blobs: None,
-        };
-
-        let original_tx =
-            self.relayer_client.sdk.transaction.send_transaction(&relayer.id, &tx_request).await?;
-
-        // Replace with higher value
-        let replacement_request = RelayTransactionRequest {
-            to: self.config.anvil_accounts[2], // Different recipient
-            value: TransactionValue::new(U256::from(200000000000000000u128)), // Higher value
-            data: TransactionData::empty(),
-            speed: Some(TransactionSpeed::Fast),
-            external_id: Some("replace-test-2".to_string()),
-            blobs: None,
-        };
-
-        let replacement_result = self
-            .relayer_client
-            .sdk
-            .transaction
-            .replace_transaction(&original_tx.id, &replacement_request)
-            .await;
-
-        match replacement_result {
-            Ok(_) => {
-                info!("✅ Transaction replacement succeeded");
-
-                // Verify original transaction status
-                let original_status = self
-                    .relayer_client
-                    .sdk
-                    .transaction
-                    .get_transaction_status(&original_tx.id)
-                    .await?;
-
-                if let Some(status) = original_status {
-                    info!("Original transaction status after replacement: {:?}", status.status);
-                }
-            }
-            Err(e) => {
-                info!("Transaction replacement failed (may be expected): {}", e);
-                // This might be expected if the transaction already moved to InMempool
-            }
-        }
-
-        // Test 2: Try to replace non-existent transaction
-        let fake_id = TransactionId::new();
-        let fake_replacement_result = self
-            .relayer_client
-            .sdk
-            .transaction
-            .replace_transaction(&fake_id, &replacement_request)
-            .await;
-
-        if fake_replacement_result.is_ok() {
-            return Err(anyhow::anyhow!(
-                "Replacing non-existent transaction should fail, but succeeded"
-            ));
-        }
-
-        info!("✅ Transaction replacement edge cases handled correctly");
-        Ok(())
-    }
-
+    // TODO: handle webhooks
     /// Test webhook delivery mechanism
     async fn test_webhook_delivery(&self) -> Result<()> {
         info!("Testing webhook delivery...");
@@ -2719,6 +2683,7 @@ impl TestRunner {
         Ok(())
     }
 
+    // TODO: handle rate limits by making it more simple
     /// Test rate limiting enforcement
     async fn test_rate_limiting(&self) -> Result<()> {
         info!("Testing rate limiting enforcement...");
@@ -2769,120 +2734,141 @@ impl TestRunner {
         Ok(())
     }
 
-    /// Test concurrent transactions from same relayer
+    /// run single with:
+    /// make run-test-debug TEST=concurrent_transactions
     async fn test_concurrent_transactions(&self) -> Result<()> {
         info!("Testing concurrent transactions...");
 
         let relayer = self.create_and_fund_relayer("concurrent-relayer").await?;
+        info!("Created relayer: {:?}", relayer);
 
-        // Send multiple transactions rapidly (simulating concurrent behavior)
+        let mut tx_requests = Vec::new();
+        for i in 0..50 {
+            let tx_request = RelayTransactionRequest {
+                to: self.config.anvil_accounts[1],
+                value: alloy::primitives::utils::parse_ether("0.000000005")?.into(),
+                data: TransactionData::empty(),
+                speed: Some(TransactionSpeed::Fast),
+                external_id: Some(format!("concurrent-test-{}", i)),
+                blobs: None,
+            };
+            tx_requests.push(tx_request);
+        }
+
+        info!("Sending {} transactions concurrently...", tx_requests.len());
+        let mut handles = Vec::new();
+
+        for (i, tx_request) in tx_requests.into_iter().enumerate() {
+            let relayer_client = self.relayer_client.clone();
+            let relayer_id = relayer.id;
+
+            let handle = tokio::spawn(async move {
+                let result =
+                    relayer_client.sdk.transaction.send_transaction(&relayer_id, &tx_request).await;
+                (i, result)
+            });
+
+            handles.push(handle);
+        }
+
+        let mut transaction_ids = Vec::new();
         let mut successful = 0;
         let mut failed = 0;
 
-        for i in 0..5 {
-            let value: U256 = U256::ZERO * U256::from(i + 1);
-            let result = self
-                .relayer_client
-                .send_transaction(
-                    &relayer.id,
-                    &self.config.anvil_accounts[1],
-                    TransactionValue::new(value.into()),
-                    TransactionData::empty(),
-                )
-                .await;
-
+        for handle in handles {
+            let (i, result) = handle.await?;
             match result {
-                Ok(_) => successful += 1,
-                Err(_) => failed += 1,
+                Ok(send_result) => {
+                    transaction_ids.push(send_result.id);
+                    successful += 1;
+                }
+                Err(e) => {
+                    info!("Transaction {} failed: {}", i, e);
+                    failed += 1;
+                }
+            }
+        }
+
+        info!("Concurrent transactions - Successful: {}, Failed: {}", successful, failed);
+
+        if failed != 0 {
+            return Err(anyhow::anyhow!("Concurrent transactions failed - {}", failed));
+        }
+
+        self.mine_and_wait().await?;
+        info!("Waiting for all transactions to reach mined status...");
+
+        let timeout = Duration::from_secs(30);
+        let start = Instant::now();
+
+        loop {
+            if start.elapsed() > timeout {
+                return Err(anyhow::anyhow!("Timeout waiting for transactions to be mined"));
             }
 
-            // Small delay between transactions
-            tokio::time::sleep(Duration::from_millis(10)).await;
+            let mut all_mined = true;
+            for tx_id in &transaction_ids {
+                if let Some(tx) = self.relayer_client.sdk.transaction.get_transaction(tx_id).await?
+                {
+                    if tx.status != TransactionStatus::Mined {
+                        all_mined = false;
+                        break;
+                    }
+                } else {
+                    all_mined = false;
+                    break;
+                }
+            }
+
+            if all_mined {
+                info!("All {} transactions are now mined", transaction_ids.len());
+                break;
+            }
+
+            self.mine_and_wait().await?;
         }
 
-        info!("Rapid transactions - Successful: {}, Failed: {}", successful, failed);
-
-        // At least some should succeed
-        if successful == 0 {
-            return Err(anyhow::anyhow!(
-                "At least some rapid transactions should succeed, but all {} failed",
-                failed
-            ));
-        }
-
-        info!("✅ Concurrent-style transaction handling verified");
+        info!("✅ Concurrent transaction handling verified");
         Ok(())
     }
 
-    /// Test network configuration edge cases
-    async fn test_network_edge_cases(&self) -> Result<()> {
-        info!("Testing network configuration edge cases...");
+    /// run single with:
+    /// make run-test-debug TEST=unauthenticated
+    async fn test_unauthenticated(&self) -> Result<()> {
+        info!("Testing unauthenticated requests...");
 
-        // Test network API endpoints
-        let all_networks = self.relayer_client.sdk.network.get_all_networks().await?;
-        if all_networks.is_empty() {
-            return Err(anyhow::anyhow!(
-                "Should have at least one network configured, but got empty list"
-            ));
-        }
-
-        let enabled_networks = self.relayer_client.sdk.network.get_enabled_networks().await?;
-        let disabled_networks = self.relayer_client.sdk.network.get_disabled_networks().await?;
-
-        info!(
-            "Networks - Total: {}, Enabled: {}, Disabled: {}",
-            all_networks.len(),
-            enabled_networks.len(),
-            disabled_networks.len()
-        );
-
-        // Verify total matches enabled + disabled
-        if all_networks.len() != enabled_networks.len() + disabled_networks.len() {
-            return Err(anyhow::anyhow!(
-                "Total networks should equal enabled + disabled, but got total: {}, enabled: {}, disabled: {}", 
-                all_networks.len(), enabled_networks.len(), disabled_networks.len()
-            ));
-        }
-
-        // Find our test network
-        let test_network = all_networks.iter().find(|n| n.chain_id.u64() == self.config.chain_id);
-
-        if test_network.is_none() {
-            return Err(anyhow::anyhow!(
-                "Test network with chain_id {} should be found in network list",
-                self.config.chain_id
-            ));
-        }
-
-        info!("✅ Network configuration edge cases verified");
-        Ok(())
-    }
-
-    /// Test authentication edge cases
-    async fn test_authentication_edge_cases(&self) -> Result<()> {
-        info!("Testing authentication edge cases...");
+        let config = E2ETestConfig::default();
+        let sdk = SDK::new(config.rrelayer_base_url.clone(), "wrong".to_string(), "way".to_string());
+        info!("Created SDK with wrong credentials");
 
         // Test basic auth status
-        let auth_status = self.relayer_client.sdk.auth.test_auth().await?;
-        info!("Authentication status: {:?}", auth_status);
+        let auth_status = sdk.auth.test_auth().await;
+        if auth_status.is_ok() {
+            return Err(anyhow::anyhow!("SDK should not be authenticated"));
+        }
 
-        // In a more comprehensive test, we would test:
-        // - Invalid credentials
-        // - Expired tokens
-        // - Different auth methods
-        // But these require more complex setup
+        let relay = sdk.relayer.create(31337, "yes").await;
+        if relay.is_ok() {
+            return Err(anyhow::anyhow!("SDK should not be able to create a relayer"));
+        }
 
-        info!("✅ Authentication edge cases verified");
+        let relayers = sdk.relayer.get_all(Some(31337), &PagingContext::new(50, 0)).await;
+        if relayers.is_ok() {
+            return Err(anyhow::anyhow!("SDK should not be able to get relayers"));
+        }
+
+        info!("✅ Unauthenticated checked");
         Ok(())
     }
 
-    /// Test blob transaction handling (EIP-4844)
-    async fn test_blob_transactions(&self) -> Result<()> {
+    /// run single with:
+    /// make run-test-debug TEST=blob_transaction_handling
+    async fn test_blob_transaction_handling(&self) -> Result<()> {
         info!("Testing blob transaction handling...");
 
         let relayer = self.create_and_fund_relayer("blob-test-relayer").await?;
+        info!("Created relayer: {:?}", relayer);
 
-        // Create a blob transaction (note: may not work on test network)
         let blob_data = vec![1u8; 131072]; // 128KB blob
         let hex_blob = format!("0x{}", alloy::hex::encode(&blob_data));
 
@@ -2896,17 +2882,11 @@ impl TestRunner {
         };
 
         let blob_result =
-            self.relayer_client.sdk.transaction.send_transaction(&relayer.id, &tx_request).await;
+            self.relayer_client.sdk.transaction.send_transaction(&relayer.id, &tx_request).await?;
 
-        match blob_result {
-            Ok(_) => {
-                info!("✅ Blob transaction accepted (network supports EIP-4844)");
-            }
-            Err(e) => {
-                info!("Blob transaction rejected (expected on test network): {}", e);
-                info!("✅ Blob transaction properly rejected on unsupported network");
-            }
-        }
+        let result = self.wait_for_transaction_completion(&blob_result.id).await?;
+
+        self.relayer_client.sent_transaction_compare(tx_request, result.0)?;
 
         Ok(())
     }

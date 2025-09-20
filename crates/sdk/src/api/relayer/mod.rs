@@ -15,6 +15,7 @@ use crate::api::{
     types::{ApiResult, ApiSdkError},
 };
 
+#[derive(Clone)]
 pub struct RelayerApi {
     client: Arc<HttpClient>,
     pub allowlist: RelayerAllowlist,

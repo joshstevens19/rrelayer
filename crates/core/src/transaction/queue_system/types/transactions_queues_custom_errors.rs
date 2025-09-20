@@ -65,6 +65,9 @@ pub enum AddTransactionError {
 
     #[error("Internal error: {0}")]
     InternalError(String),
+
+    #[error("Could not get current on chain nonce for relayer {0} - {1}")]
+    CouldNotGetCurrentOnChainNonce(RelayerId, RpcError<TransportErrorKind>),
 }
 
 #[derive(Error, Debug)]

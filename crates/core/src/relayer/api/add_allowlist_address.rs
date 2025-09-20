@@ -5,12 +5,12 @@ use axum::{
     http::StatusCode,
 };
 
+use crate::relayer::cache::invalidate_relayer_cache;
 use crate::{
     app_state::AppState,
     relayer::{get_relayer, types::RelayerId},
     shared::common_types::EvmAddress,
 };
-use crate::relayer::cache::invalidate_relayer_cache;
 
 /// Adds an address to the relayer's allowlist.
 ///

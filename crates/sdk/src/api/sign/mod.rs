@@ -5,6 +5,7 @@ use rrelayer_core::signing::api::{SignTextResult, SignTypedDataResult};
 use rrelayer_core::signing::db::read::{SignedTextHistory, SignedTypedDataHistory};
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct SignApi {
     client: Arc<HttpClient>,
 }

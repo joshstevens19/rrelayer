@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use crate::api::{ApiResult, HealthApi, http::HttpClient, types::ApiBaseConfig};
 
+#[derive(Clone)]
 pub struct SDK {
     pub auth: Authentication,
     pub gas: GasApi,

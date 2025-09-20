@@ -384,10 +384,23 @@ impl EvmProvider {
 
         let nonce = self
             .rpc_client()
-            .get_transaction_count(address.into())
+            .get_transaction_count(address.into_address())
             .block_id(BlockId::Number(BlockNumberOrTag::Pending))
             .await
             .map_err(WalletOrProviderError::ProviderError)?;
+
+        Ok(TransactionNonce::new(nonce))
+    }
+
+    pub async fn get_nonce_from_address(
+        &self,
+        address: &EvmAddress,
+    ) -> Result<TransactionNonce, RpcError<TransportErrorKind>> {
+        let nonce = self
+            .rpc_client()
+            .get_transaction_count(address.into_address())
+            .block_id(BlockId::Number(BlockNumberOrTag::Pending))
+            .await?;
 
         Ok(TransactionNonce::new(nonce))
     }

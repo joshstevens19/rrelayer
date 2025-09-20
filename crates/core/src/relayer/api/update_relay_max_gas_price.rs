@@ -34,25 +34,27 @@ pub async fn update_relay_max_gas_price(
 ) -> StatusCode {
     let max_gas_price = if cap.into_u128() > 0 { Some(cap) } else { None };
     match get_relayer(&state.db, &state.cache, &relayer_id).await {
-        Ok(Some(_)) => match state.db.update_relayer_max_gas_price(&relayer_id, max_gas_price).await {
-            Ok(_) => {
-                invalidate_relayer_cache(&state.cache, &relayer_id).await;
-                if let Ok(queue) = state
-                    .transactions_queues
-                    .lock()
-                    .await
-                    .get_transactions_queue_unsafe(&relayer_id)
-                {
-                    queue.lock().await.set_max_gas_price(max_gas_price);
-                }
+        Ok(Some(_)) => {
+            match state.db.update_relayer_max_gas_price(&relayer_id, max_gas_price).await {
+                Ok(_) => {
+                    invalidate_relayer_cache(&state.cache, &relayer_id).await;
+                    if let Ok(queue) = state
+                        .transactions_queues
+                        .lock()
+                        .await
+                        .get_transactions_queue_unsafe(&relayer_id)
+                    {
+                        queue.lock().await.set_max_gas_price(max_gas_price);
+                    }
 
-                StatusCode::NO_CONTENT
+                    StatusCode::NO_CONTENT
+                }
+                Err(e) => {
+                    rrelayer_error!("{}", e);
+                    StatusCode::INTERNAL_SERVER_ERROR
+                }
             }
-            Err(e) => {
-                rrelayer_error!("{}", e);
-                StatusCode::INTERNAL_SERVER_ERROR
-            }
-        },
+        }
         Ok(None) => StatusCode::NOT_FOUND,
         Err(e) => {
             rrelayer_error!("{}", e);

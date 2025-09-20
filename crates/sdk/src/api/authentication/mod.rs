@@ -9,6 +9,7 @@ pub struct StatusResponse {
     pub message: String,
 }
 
+#[derive(Clone)]
 pub struct Authentication {
     client: Arc<HttpClient>,
 }

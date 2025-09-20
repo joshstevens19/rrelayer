@@ -4,7 +4,7 @@ use tokio::{
     sync::Mutex,
     time::{self, Duration},
 };
-
+use tracing::info;
 use super::fee_estimator::base::{GasEstimatorResult, GasPriceResult};
 use crate::{
     network::types::ChainId, provider::EvmProvider, rrelayer_error, rrelayer_info,
@@ -92,7 +92,7 @@ pub async fn gas_oracle(
     let mut initial_tasks = Vec::new();
 
     for provider in providers.iter() {
-        rrelayer_info!("Getting initial gas price for provider: {}", provider.name);
+        info!("Getting initial gas price for provider: {}", provider.name);
         let cache = Arc::clone(&gas_oracle_cache);
         let provider = provider.clone();
 

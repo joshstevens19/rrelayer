@@ -18,6 +18,7 @@ use serde_json::Value;
 use std::str::FromStr;
 use tracing::info;
 
+#[derive(Clone)]
 pub struct RelayerClient {
     pub sdk: SDK,
 }
@@ -87,6 +88,17 @@ impl RelayerClient {
                 "Transaction external ids do not match expected {} but got {}",
                 sent.external_id.expect("Should always be defined"),
                 transaction.external_id.expect("Should always be defined"),
+            ));
+        }
+
+        let transaction_blobs = transaction.blobs
+            .as_ref()
+            .map(|blobs| blobs.iter().map(|blob| blob.to_string()).collect::<Vec<String>>());
+
+
+        if transaction_blobs != sent.blobs {
+            return Err(anyhow!(
+                "Transaction blobs do not match expected",
             ));
         }
 

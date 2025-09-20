@@ -5,8 +5,8 @@ use axum::{
     http::StatusCode,
 };
 
-use crate::{app_state::AppState, relayer::types::RelayerId};
 use crate::relayer::cache::invalidate_relayer_cache;
+use crate::{app_state::AppState, relayer::types::RelayerId};
 
 /// Updates the EIP-1559 transaction status for a relayer.
 ///

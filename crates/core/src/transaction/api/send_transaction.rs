@@ -1,12 +1,3 @@
-use axum::{
-    extract::{Path, State},
-    http::{HeaderMap, StatusCode},
-    Json,
-};
-use serde::{Deserialize, Serialize};
-use std::str::FromStr;
-use std::sync::Arc;
-
 use super::types::TransactionSpeed;
 use crate::shared::utils::convert_blob_strings_to_blobs;
 use crate::{
@@ -20,6 +11,15 @@ use crate::{
     },
     user_rate_limiting::{UserDetector, UserRateLimitError},
 };
+use axum::{
+    extract::{Path, State},
+    http::{HeaderMap, StatusCode},
+    Json,
+};
+use serde::{Deserialize, Serialize};
+use std::str::FromStr;
+use std::sync::Arc;
+use tracing::error;
 
 /// Request structure for relaying transactions.
 ///
@@ -115,11 +115,7 @@ pub async fn send_transaction(
         {
             Ok(check) => {
                 if !check.allowed {
-                    rrelayer_error!(
-                        "Rate limit exceeded for user {}: {}",
-                        user_identifier,
-                        check.rule_type
-                    );
+                    error!("Rate limit exceeded for user {}: {}", user_identifier, check.rule_type);
                     return Err(StatusCode::TOO_MANY_REQUESTS);
                 }
             }
@@ -129,18 +125,14 @@ pub async fn send_transaction(
                 limit,
                 window_seconds,
             }) => {
-                rrelayer_error!(
+                error!(
                     "Rate limit exceeded for user {}: {}/{} {} in {}s",
-                    user_identifier,
-                    current,
-                    limit,
-                    rule_type,
-                    window_seconds
+                    user_identifier, current, limit, rule_type, window_seconds
                 );
                 return Err(StatusCode::TOO_MANY_REQUESTS);
             }
             Err(e) => {
-                rrelayer_error!("Rate limiting error: {}", e);
+                error!("Rate limiting error: {}", e);
                 // Don't block transaction for rate limiting errors, just log
             }
         }
