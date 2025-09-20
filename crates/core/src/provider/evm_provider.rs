@@ -574,7 +574,8 @@ impl EvmProvider {
             self.chain_id.u64(),
             1 |      // Ethereum Mainnet
            17000 |  // Holesky Testnet
-           11155111 // Sepolia Testnet
+           11155111 | // Sepolia Testnet
+            31337 // anvil fork
         )
     }
 

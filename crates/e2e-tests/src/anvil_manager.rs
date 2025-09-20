@@ -52,7 +52,7 @@ impl AnvilManager {
                 "31337",
                 // Enable EIP-1559 fee market behavior
                 "--hardfork",
-                "london",
+                "cancun",
             ])
             .stdout(std::process::Stdio::null()) // Suppress stdout
             .stderr(std::process::Stdio::null()) // Suppress stderr

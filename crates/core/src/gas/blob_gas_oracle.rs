@@ -166,14 +166,14 @@ pub async fn blob_gas_oracle(
         let _ = task.await;
     }
 
-    rrelayer_info!("Initial blob gas price collection completed for all blob-supporting providers");
+    info!("Initial blob gas price collection completed for all blob-supporting providers");
 
     for provider in providers.iter() {
         if !provider.supports_blob_transactions() {
             continue;
         }
 
-        rrelayer_info!("Starting blob_gas_oracle interval for provider: {}", provider.name);
+        info!("Starting blob_gas_oracle interval for provider: {}", provider.name);
         let cache = Arc::clone(&blob_gas_oracle_cache);
         let provider = Arc::new(provider.clone());
 
