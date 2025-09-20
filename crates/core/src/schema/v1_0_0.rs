@@ -51,7 +51,6 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
             deleted BOOLEAN DEFAULT FALSE NOT NULL,
             updated_on TIMESTAMPTZ DEFAULT NOW() NOT NULL,
             created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-            UNIQUE (chain_id, wallet_index),
             CONSTRAINT fk_relayer_record_chain_id
                 FOREIGN KEY (chain_id)
                     REFERENCES network.record (chain_id)

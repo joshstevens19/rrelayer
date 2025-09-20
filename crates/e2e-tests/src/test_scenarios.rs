@@ -324,8 +324,9 @@ impl TestRunner {
             "transaction_status_expired" => self.test_transaction_status_expired().await,
             "allowlist_restrictions" => self.test_allowlist_restrictions().await,
             "allowlist_edge_cases" => self.test_allowlist_edge_cases().await,
-            "relayer_pause_unpause" => self.test_relayer_pause_unpause().await,
             "relayer_delete" => self.test_relayer_delete().await,
+            "relayer_clone" => self.test_relayer_clone().await,
+            "relayer_pause_unpause" => self.test_relayer_pause_unpause().await,
             "relayer_gas_configuration" => self.test_relayer_gas_configuration().await,
             "relayer_allowlist_toggle" => self.test_relayer_allowlist_toggle().await,
             "transaction_nonce_management" => self.test_transaction_nonce_management().await,
@@ -397,8 +398,6 @@ impl TestRunner {
     }
 
     // Tests missing
-    // TODO: Relayer delete
-    // TODO: Relayer clone logic
     // TODO: Webhooks testing
     // TODO: Automatic top up tasks
     // TODO: Safe proxy
@@ -447,6 +446,7 @@ impl TestRunner {
             "allowlist_edge_cases" => "Allowlist edge case handling",
             "relayer_pause_unpause" => "Relayer pause/unpause functionality",
             "relayer_delete" => "Relayer delete functionality",
+            "relayer_clone" => "Relayer clone functionality",
             "relayer_gas_configuration" => "Relayer gas configuration management",
             "relayer_allowlist_toggle" => "Relayer allowlist toggle functionality",
             "transaction_nonce_management" => "Transaction nonce management",
@@ -962,7 +962,7 @@ impl TestRunner {
             return Err(anyhow!("Should only bring back 1 network"));
         }
 
-        let network = all_networks.first().unwrap();
+        let network = all_networks.first().context("No networks found")?;
         if network.disabled {
             return Err(anyhow!("Network should not be disabled"));
         }
@@ -2203,13 +2203,18 @@ impl TestRunner {
     /// run single with:
     /// make run-test-debug TEST=relayer_delete
     async fn test_relayer_delete(&self) -> Result<()> {
-        info!("Testing relayer pause/unpause...");
+        info!("Testing relayer delete...");
 
-        let relayer = self.create_and_fund_relayer("pause-test-relayer").await?;
+        let relayer = self.create_and_fund_relayer("delete-test-relayer").await?;
         info!("Created relayer: {:?}", relayer);
 
-        let created_relayer =
-            self.relayer_client.sdk.relayer.get(&relayer.id).await?.context("Relayer should exist")?;
+        let created_relayer = self
+            .relayer_client
+            .sdk
+            .relayer
+            .get(&relayer.id)
+            .await?
+            .context("Relayer should exist")?;
 
         if created_relayer.relayer.id != relayer.id {
             return Err(anyhow::anyhow!("Relayer should exist"));
@@ -2217,19 +2222,114 @@ impl TestRunner {
 
         self.relayer_client.sdk.relayer.delete(&relayer.id).await?;
 
-
-        let created_relayer =
-            self.relayer_client.sdk.relayer.get(&relayer.id).await;
+        let created_relayer = self.relayer_client.sdk.relayer.get(&relayer.id).await;
 
         match created_relayer {
-            Ok(_) => {
-                Err(anyhow::anyhow!("Relayer should have been deleted"))
-            }
+            Ok(_) => Err(anyhow::anyhow!("Relayer should have been deleted")),
             Err(_) => {
                 info!("✅ Relayer delete functionality working correctly");
                 Ok(())
             }
         }
+    }
+
+    /// run single with:
+    /// make run-test-debug TEST=relayer_clone
+    async fn test_relayer_clone(&self) -> Result<()> {
+        info!("Testing relayer clone...");
+
+        let relayer = self.create_and_fund_relayer("clone-test-relayer").await?;
+        info!("Created relayer: {:?}", relayer);
+
+        let created_relayer = self
+            .relayer_client
+            .sdk
+            .relayer
+            .get(&relayer.id)
+            .await?
+            .context("Relayer should exist")?;
+
+        if created_relayer.relayer.id != relayer.id {
+            return Err(anyhow::anyhow!("Relayer should exist"));
+        }
+
+        let cloned_relayer = self
+            .relayer_client
+            .sdk
+            .relayer
+            .clone(&relayer.id, 31337, "cloned-test-relayer")
+            .await?;
+        if cloned_relayer.id == relayer.id {
+            return Err(anyhow::anyhow!("Relayer should have been cloned and have its own ID"));
+        }
+
+        if cloned_relayer.address != relayer.address {
+            return Err(anyhow::anyhow!(
+                "Relayer should have been cloned and have the shared address"
+            ));
+        }
+
+        let recipient = &self.config.anvil_accounts[1];
+        info!("Sending ETH transfer to {} from the new cloned one", recipient);
+
+        let tx_response = self
+            .relayer_client
+            .send_transaction(
+                &cloned_relayer.id,
+                recipient,
+                alloy::primitives::utils::parse_ether("0.5")?.into(),
+                TransactionData::empty(),
+            )
+            .await
+            .context("Failed to send ETH transfer")?;
+
+        info!("ETH transfer sent: {:?}", tx_response);
+
+        let result = self.wait_for_transaction_completion(&tx_response.0.id).await?;
+
+        self.relayer_client.sent_transaction_compare(tx_response.1, result.0)?;
+
+        let paging = PagingContext { limit: 10, offset: 0 };
+        let first_relayer_transactions = self
+            .relayer_client
+            .sdk
+            .transaction
+            .get_transactions(&relayer.id, &paging)
+            .await
+            .context("Failed to get relayer transactions")?;
+
+        info!("✅ Found {} transactions for first relayer", first_relayer_transactions.items.len());
+
+        let cloned_relayer_transactions = self
+            .relayer_client
+            .sdk
+            .transaction
+            .get_transactions(&cloned_relayer.id, &paging)
+            .await
+            .context("Failed to get relayer transactions")?;
+
+        info!(
+            "✅ Found {} transactions for cloned relayer",
+            cloned_relayer_transactions.items.len()
+        );
+
+        if first_relayer_transactions.items.len() != 0 {
+            return Err(anyhow::anyhow!(
+                "First relayer expected at 0 transactions, but got {}",
+                first_relayer_transactions.items.len()
+            ));
+        }
+
+        if cloned_relayer_transactions.items.len() != 1 {
+            return Err(anyhow::anyhow!(
+                "Cloned relayer expected at 1 transactions, but got {}",
+                cloned_relayer_transactions.items.len()
+            ));
+        }
+
+        info!("✅ Relayer clone functionality working correctly");
+
+        Ok(())
     }
 
     /// run single with:
@@ -2900,8 +3000,7 @@ impl TestRunner {
         Ok(())
     }
 
-    // TODO: got to here
-
+    // TODO: COME BACK TO THIS ONE
     /// run single with:
     /// make run-test-debug TEST=blob_transaction_handling
     async fn test_blob_transaction_handling(&self) -> Result<()> {
@@ -2932,13 +3031,14 @@ impl TestRunner {
         Ok(())
     }
 
-    /// Test transaction data validation
+    /// run single with:
+    /// make run-test-debug TEST=transaction_data_validation
     async fn test_transaction_data_validation(&self) -> Result<()> {
         info!("Testing transaction data validation...");
 
         let relayer = self.create_and_fund_relayer("data-validation-relayer").await?;
+        info!("Created relayer: {:?}", relayer);
 
-        // Test 1: Valid hex data
         let valid_data_result = self
             .relayer_client
             .send_transaction(
@@ -2956,7 +3056,6 @@ impl TestRunner {
             ));
         }
 
-        // Test 2: Empty data (should be valid)
         let empty_data_result = self
             .relayer_client
             .send_transaction(
@@ -2974,47 +3073,23 @@ impl TestRunner {
             ));
         }
 
-        // Test 3: Invalid hex data (should be caught by client validation)
-        let _ = self
-            .relayer_client
-            .send_transaction(
-                &relayer.id,
-                &self.config.anvil_accounts[1],
-                alloy::primitives::utils::parse_ether("0.5")?.into(),
-                TransactionData::from_str("0xGGGG").unwrap(), // Invalid hex
-            )
-            .await;
+        let result = TransactionData::from_str("0xGGGG");
+        if result.is_ok() {
+            return Err(anyhow::anyhow!("Invalid hex data should return an error but got accepted"));
+        }
 
         info!("✅ Transaction data validation working");
         Ok(())
     }
 
-    /// Test balance edge cases
+    /// run single with:
+    /// make run-test-debug TEST=balance_edge_cases
     async fn test_balance_edge_cases(&self) -> Result<()> {
         info!("Testing balance edge cases...");
 
         let relayer = self.create_and_fund_relayer("balance-edge-relayer").await?;
+        info!("Created relayer: {:?}", relayer);
 
-        // Test 1: Get relayer balance - placeholder method
-        // Note: This method may not exist in current RelayerClient
-        let balance_result: Result<alloy::primitives::U256> =
-            Err(anyhow::anyhow!("Balance API not implemented"));
-        match balance_result {
-            Ok(balance) => {
-                info!("Relayer balance: {} ETH", alloy::primitives::utils::format_ether(balance));
-                if balance == U256::ZERO {
-                    return Err(anyhow::anyhow!(
-                        "Funded relayer should have positive balance, but got zero balance"
-                    ));
-                }
-            }
-            Err(e) => {
-                info!("Balance query failed: {}", e);
-                // This might be expected depending on API implementation
-            }
-        }
-
-        // Test 2: Try to send more than balance (should fail)
         let excessive_result = self
             .relayer_client
             .send_transaction(
@@ -3031,19 +3106,37 @@ impl TestRunner {
             ));
         }
 
-        // Test 3: Send exactly the gas cost amount (edge case)
-        let small_result = self
+        let exact_result = self
             .relayer_client
             .send_transaction(
                 &relayer.id,
                 &self.config.anvil_accounts[1],
-                alloy::primitives::utils::parse_ether("0.001")?.into(),
+                alloy::primitives::utils::parse_ether("10")?.into(),
                 TransactionData::empty(),
             )
             .await;
 
-        // This should succeed or fail based on gas costs
-        info!("Small amount transaction result: {:?}", small_result);
+        if exact_result.is_ok() {
+            return Err(anyhow::anyhow!(
+                "Transaction exceeding balance should fail as not enough gas, but succeeded"
+            ));
+        }
+
+        let just_under_result = self
+            .relayer_client
+            .send_transaction(
+                &relayer.id,
+                &self.config.anvil_accounts[1],
+                alloy::primitives::utils::parse_ether("9.98")?.into(),
+                TransactionData::empty(),
+            )
+            .await;
+
+        if just_under_result.is_err() {
+            return Err(anyhow::anyhow!(
+                "Transaction has enough balance should be allowed but failed"
+            ));
+        }
 
         info!("✅ Balance edge cases handled correctly");
         Ok(())

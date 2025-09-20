@@ -157,31 +157,6 @@ impl RelayerClient {
         Ok(status_result)
     }
 
-    /// Get relayer transactions with pagination
-    pub async fn get_relayer_transactions(
-        &self,
-        relayer_id: &RelayerId,
-        limit: u32,
-        offset: u32,
-    ) -> Result<PagingResult<Transaction>> {
-        info!(
-            "Getting relayer transactions for: {} (limit: {}, offset: {})",
-            relayer_id, limit, offset
-        );
-        let paging = PagingContext { limit, offset };
-
-        let results = self
-            .sdk
-            .transaction
-            .get_transactions(&relayer_id, &paging)
-            .await
-            .context("Failed to get relayer transactions")?;
-
-        info!("Relayer transactions: {:?}", results);
-
-        Ok(results)
-    }
-
     pub async fn get_transaction(&self, transaction_id: &TransactionId) -> Result<Transaction> {
         info!("Getting transaction status for: {}", transaction_id);
 
