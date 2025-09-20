@@ -3075,7 +3075,9 @@ impl TestRunner {
 
         let result = TransactionData::from_str("0xGGGG");
         if result.is_ok() {
-            return Err(anyhow::anyhow!("Invalid hex data should return an error but got accepted"));
+            return Err(anyhow::anyhow!(
+                "Invalid hex data should return an error but got accepted"
+            ));
         }
 
         info!("✅ Transaction data validation working");

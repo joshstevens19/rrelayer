@@ -5,6 +5,9 @@ use tokio::sync::Mutex;
 use tracing::{error, info, warn};
 
 use super::{transactions_queues::TransactionsQueues, types::TransactionRelayerSetup};
+use crate::transaction::queue_system::types::{
+    ProcessInmempoolTransactionError, ProcessMinedTransactionError, ProcessPendingTransactionError,
+};
 use crate::{
     gas::{blob_gas_oracle::BlobGasOracleCache, gas_oracle::GasOracleCache},
     postgres::{PostgresClient, PostgresConnectionError, PostgresError},
@@ -19,7 +22,6 @@ use crate::{
     },
     transaction::types::{Transaction, TransactionStatus},
 };
-use crate::transaction::queue_system::types::{ProcessInmempoolTransactionError, ProcessMinedTransactionError, ProcessPendingTransactionError};
 
 /// Spawns processing tasks for a single relayer.
 ///
@@ -108,14 +110,17 @@ async fn continuously_process_pending_transactions(
                 match e {
                     ProcessPendingTransactionError::RelayerTransactionsQueueNotFound(_) => {
                         // queue has been deleted kill out the loop
-                        info!("Relayer id {} has been deleted stopping the pending queue for it", relayer_id);
+                        info!(
+                            "Relayer id {} has been deleted stopping the pending queue for it",
+                            relayer_id
+                        );
                         break;
                     }
                     _ => {
                         error!("PENDING ERROR: {}", e)
                     }
                 }
-            },
+            }
         }
     }
 }
@@ -147,14 +152,17 @@ async fn continuously_process_inmempool_transactions(
                 match e {
                     ProcessInmempoolTransactionError::RelayerTransactionsQueueNotFound(_) => {
                         // queue has been deleted kill out the loop
-                        info!("Relayer id {} has been deleted stopping the inmempool queue for it", relayer_id);
+                        info!(
+                            "Relayer id {} has been deleted stopping the inmempool queue for it",
+                            relayer_id
+                        );
                         break;
                     }
                     _ => {
                         error!("INMEMPOOL ERROR: {}", e)
                     }
                 }
-            },
+            }
         }
     }
 }
@@ -188,7 +196,10 @@ async fn continuously_process_mined_transactions(
                 match e {
                     ProcessMinedTransactionError::RelayerTransactionsQueueNotFound(_) => {
                         // queue has been deleted kill out the loop
-                        info!("Relayer id {} has been deleted stopping the mined queue for it", relayer_id);
+                        info!(
+                            "Relayer id {} has been deleted stopping the mined queue for it",
+                            relayer_id
+                        );
                         break;
                     }
                     _ => {

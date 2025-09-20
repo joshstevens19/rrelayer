@@ -10,3 +10,5 @@ networks:
   block_explorer_url: http://localhost:8545
 api_config:
   port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}

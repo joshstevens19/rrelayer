@@ -397,6 +397,8 @@ pub struct ApiConfig {
     pub port: u32,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub allowed_origins: Option<Vec<String>>,
+    pub authentication_username: String,
+    pub authentication_password: String,
 }
 
 #[derive(Debug, Clone)]
