@@ -1,15 +1,15 @@
 use std::{collections::HashMap, sync::Arc};
 
-use tokio::{
-    sync::Mutex,
-    time::{self, Duration},
-};
-use tracing::info;
 use super::fee_estimator::base::{GasEstimatorResult, GasPriceResult};
 use crate::{
     network::types::ChainId, provider::EvmProvider, rrelayer_error, rrelayer_info,
     transaction::types::TransactionSpeed,
 };
+use tokio::{
+    sync::Mutex,
+    time::{self, Duration},
+};
+use tracing::info;
 
 /// Cache for gas prices across different chains.
 ///

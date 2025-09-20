@@ -91,15 +91,13 @@ impl RelayerClient {
             ));
         }
 
-        let transaction_blobs = transaction.blobs
+        let transaction_blobs = transaction
+            .blobs
             .as_ref()
             .map(|blobs| blobs.iter().map(|blob| blob.to_string()).collect::<Vec<String>>());
 
-
         if transaction_blobs != sent.blobs {
-            return Err(anyhow!(
-                "Transaction blobs do not match expected",
-            ));
+            return Err(anyhow!("Transaction blobs do not match expected",));
         }
 
         Ok(())

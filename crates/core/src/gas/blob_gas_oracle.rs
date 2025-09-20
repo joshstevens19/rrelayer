@@ -1,15 +1,15 @@
 use std::{collections::HashMap, sync::Arc};
 
+use crate::{
+    network::types::ChainId, provider::EvmProvider, rrelayer_error, rrelayer_info,
+    transaction::types::TransactionSpeed,
+};
 use serde::{Deserialize, Serialize};
 use tokio::{
     sync::Mutex,
     time::{self, Duration},
 };
 use tracing::info;
-use crate::{
-    network::types::ChainId, provider::EvmProvider, rrelayer_error, rrelayer_info,
-    transaction::types::TransactionSpeed,
-};
 
 /// Result structure for blob gas estimates
 #[derive(Clone, Debug)]

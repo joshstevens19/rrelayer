@@ -18,13 +18,13 @@ use rrelayer_core::{
         TransactionData, TransactionId, TransactionSpeed, TransactionStatus, TransactionValue,
     },
 };
+use rrelayer_sdk::SDK;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 use tokio::time::timeout;
 use tracing::{debug, error, info, warn};
-use rrelayer_sdk::SDK;
 
 #[derive(Debug, Clone)]
 pub enum TestResult {
@@ -2842,7 +2842,8 @@ impl TestRunner {
         info!("Testing unauthenticated requests...");
 
         let config = E2ETestConfig::default();
-        let sdk = SDK::new(config.rrelayer_base_url.clone(), "wrong".to_string(), "way".to_string());
+        let sdk =
+            SDK::new(config.rrelayer_base_url.clone(), "wrong".to_string(), "way".to_string());
         info!("Created SDK with wrong credentials");
 
         // Test basic auth status
