@@ -325,6 +325,7 @@ impl TestRunner {
             "allowlist_restrictions" => self.test_allowlist_restrictions().await,
             "allowlist_edge_cases" => self.test_allowlist_edge_cases().await,
             "relayer_pause_unpause" => self.test_relayer_pause_unpause().await,
+            "relayer_delete" => self.test_relayer_delete().await,
             "relayer_gas_configuration" => self.test_relayer_gas_configuration().await,
             "relayer_allowlist_toggle" => self.test_relayer_allowlist_toggle().await,
             "transaction_nonce_management" => self.test_transaction_nonce_management().await,
@@ -445,6 +446,7 @@ impl TestRunner {
             "allowlist_restrictions" => "Allowlist restriction enforcement",
             "allowlist_edge_cases" => "Allowlist edge case handling",
             "relayer_pause_unpause" => "Relayer pause/unpause functionality",
+            "relayer_delete" => "Relayer delete functionality",
             "relayer_gas_configuration" => "Relayer gas configuration management",
             "relayer_allowlist_toggle" => "Relayer allowlist toggle functionality",
             "transaction_nonce_management" => "Transaction nonce management",
@@ -2196,6 +2198,38 @@ impl TestRunner {
 
         info!("✅ Allowlist edge cases handled correctly");
         Ok(())
+    }
+
+    /// run single with:
+    /// make run-test-debug TEST=relayer_delete
+    async fn test_relayer_delete(&self) -> Result<()> {
+        info!("Testing relayer pause/unpause...");
+
+        let relayer = self.create_and_fund_relayer("pause-test-relayer").await?;
+        info!("Created relayer: {:?}", relayer);
+
+        let created_relayer =
+            self.relayer_client.sdk.relayer.get(&relayer.id).await?.context("Relayer should exist")?;
+
+        if created_relayer.relayer.id != relayer.id {
+            return Err(anyhow::anyhow!("Relayer should exist"));
+        }
+
+        self.relayer_client.sdk.relayer.delete(&relayer.id).await?;
+
+
+        let created_relayer =
+            self.relayer_client.sdk.relayer.get(&relayer.id).await;
+
+        match created_relayer {
+            Ok(_) => {
+                Err(anyhow::anyhow!("Relayer should have been deleted"))
+            }
+            Err(_) => {
+                info!("✅ Relayer delete functionality working correctly");
+                Ok(())
+            }
+        }
     }
 
     /// run single with:

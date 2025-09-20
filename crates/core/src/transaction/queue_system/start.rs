@@ -2,7 +2,7 @@ use std::{collections::VecDeque, sync::Arc};
 
 use thiserror::Error;
 use tokio::sync::Mutex;
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 
 use super::{transactions_queues::TransactionsQueues, types::TransactionRelayerSetup};
 use crate::{
@@ -19,6 +19,7 @@ use crate::{
     },
     transaction::types::{Transaction, TransactionStatus},
 };
+use crate::transaction::queue_system::types::{ProcessInmempoolTransactionError, ProcessMinedTransactionError, ProcessPendingTransactionError};
 
 /// Spawns processing tasks for a single relayer.
 ///
@@ -103,7 +104,18 @@ async fn continuously_process_pending_transactions(
                 // info!("PENDING: {:?}", result);
                 processes_next_break(&result.process_again_after).await;
             }
-            Err(e) => rrelayer_error!("PENDING ERROR: {}", e),
+            Err(e) => {
+                match e {
+                    ProcessPendingTransactionError::RelayerTransactionsQueueNotFound(_) => {
+                        // queue has been deleted kill out the loop
+                        info!("Relayer id {} has been deleted stopping the pending queue for it", relayer_id);
+                        break;
+                    }
+                    _ => {
+                        error!("PENDING ERROR: {}", e)
+                    }
+                }
+            },
         }
     }
 }
@@ -131,7 +143,18 @@ async fn continuously_process_inmempool_transactions(
                 // rrelayer_info!("INMEMPOOL: {:?}", result);
                 processes_next_break(&result.process_again_after).await;
             }
-            Err(e) => rrelayer_error!("INMEMPOOL ERROR: {}", e),
+            Err(e) => {
+                match e {
+                    ProcessInmempoolTransactionError::RelayerTransactionsQueueNotFound(_) => {
+                        // queue has been deleted kill out the loop
+                        info!("Relayer id {} has been deleted stopping the inmempool queue for it", relayer_id);
+                        break;
+                    }
+                    _ => {
+                        error!("INMEMPOOL ERROR: {}", e)
+                    }
+                }
+            },
         }
     }
 }
@@ -161,7 +184,18 @@ async fn continuously_process_mined_transactions(
                 // rrelayer_info!("MINED: {:?}", result);
                 processes_next_break(&result.process_again_after).await;
             }
-            Err(e) => rrelayer_error!("MINED ERROR: {}", e),
+            Err(e) => {
+                match e {
+                    ProcessMinedTransactionError::RelayerTransactionsQueueNotFound(_) => {
+                        // queue has been deleted kill out the loop
+                        info!("Relayer id {} has been deleted stopping the mined queue for it", relayer_id);
+                        break;
+                    }
+                    _ => {
+                        error!("MINED ERROR: {}", e)
+                    }
+                }
+            }
         }
     }
 }

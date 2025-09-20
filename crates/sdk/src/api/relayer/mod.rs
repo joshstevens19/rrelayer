@@ -36,7 +36,6 @@ impl RelayerApi {
             query.insert("chainId".to_string(), chain_id.to_string().into());
         }
 
-        // Handle the serde_json conversion error explicitly
         let paging_value = serde_json::to_value(paging)
             .map_err(|e| ApiSdkError::SerializationError(e.to_string()))?;
 
@@ -52,6 +51,7 @@ impl RelayerApi {
         self.client.get_with_query("relayers", Some(&query)).await
     }
 
+    // TODO: handle 404s here and also rework test_relayer_delete when doing it
     pub async fn get(&self, id: &RelayerId) -> ApiResult<Option<GetRelayerResult>> {
         self.client.get(&format!("relayers/{}", id)).await
     }
