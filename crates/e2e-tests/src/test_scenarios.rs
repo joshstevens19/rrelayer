@@ -2827,13 +2827,12 @@ impl TestRunner {
         info!("Testing webhook delivery mechanism...");
 
         self.start_webhook_server().await?;
-        
+
         // Test webhook server is accessible
         info!("🔍 Testing webhook server accessibility...");
-        let client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(5))
-            .build()?;
-        
+        let client =
+            reqwest::Client::builder().timeout(std::time::Duration::from_secs(5)).build()?;
+
         match client.get("http://localhost:8546/health").send().await {
             Ok(response) => {
                 if response.status().is_success() {
@@ -3054,9 +3053,11 @@ impl TestRunner {
             info!("⏳ Attempt {}/10: Waiting for transaction_confirmed webhook...", attempt);
             tokio::time::sleep(Duration::from_secs(1)).await;
         }
-        
+
         if confirmed_webhooks.is_empty() {
-            return Err(anyhow!("Missing 'transaction_confirmed' webhook event after 15 blocks and 15 seconds wait"));
+            return Err(anyhow!(
+                "Missing 'transaction_confirmed' webhook event after 15 blocks and 15 seconds wait"
+            ));
         }
 
         info!("✅ Received 'transaction_confirmed' webhook event");
@@ -3152,13 +3153,15 @@ impl TestRunner {
 
         info!("📤 Test 8: Comprehensive webhook event verification");
         let final_all_webhooks = webhook_server.get_received_webhooks();
-        let final_webhook_events: Vec<String> = final_all_webhooks.iter().map(|w| w.event_type.clone()).collect();
-        let final_unique_events: std::collections::HashSet<String> = final_webhook_events.iter().cloned().collect();
+        let final_webhook_events: Vec<String> =
+            final_all_webhooks.iter().map(|w| w.event_type.clone()).collect();
+        let final_unique_events: std::collections::HashSet<String> =
+            final_webhook_events.iter().cloned().collect();
 
         let webhook_events = [
-            "transaction_queued", 
-            "transaction_sent", 
-            "transaction_mined", 
+            "transaction_queued",
+            "transaction_sent",
+            "transaction_mined",
             "transaction_confirmed",
             "transaction_cancelled",
             // TODO: uncomment when fix nonce issue on webhooks
@@ -3174,42 +3177,41 @@ impl TestRunner {
             }
         }
 
-        info!("📋 Successfully received all transaction webhook events: {:?}", final_unique_events.into_iter().collect::<Vec<_>>());
+        info!(
+            "📋 Successfully received all transaction webhook events: {:?}",
+            final_unique_events.into_iter().collect::<Vec<_>>()
+        );
 
         info!("📤 Test 7: Signing operations webhook events");
-        
+
         // Clear previous webhooks to focus on signing events
         webhook_server.clear_webhooks();
-        
+
         // Test text signing webhook
         info!("🔐 Testing text signing webhook...");
         let text_to_sign = "Hello, RRelayer webhook test!";
-        
-        let sign_text_result = self
-            .relayer_client
-            .sdk
-            .sign
-            .sign_text(&relayer.id, text_to_sign)
-            .await?;
-            
+
+        let sign_text_result =
+            self.relayer_client.sdk.sign.sign_text(&relayer.id, text_to_sign).await?;
+
         info!("✅ Text signed successfully, signature: {:?}", sign_text_result.signature);
-        
+
         // Wait a moment for webhook delivery
         tokio::time::sleep(Duration::from_millis(500)).await;
-        
+
         let text_signing_webhooks = webhook_server.get_webhooks_by_event("text_signed");
         if text_signing_webhooks.is_empty() {
             return Err(anyhow!("No 'text_signed' webhook received"));
         }
-        
+
         info!("✅ Received {} text_signed webhook(s)", text_signing_webhooks.len());
-        
+
         // Validate text signing webhook payload
         let text_webhook = &text_signing_webhooks[0];
         if !text_webhook.payload.get("signing").is_some() {
             return Err(anyhow!("Text signing webhook missing 'signing' data"));
         }
-        
+
         let signing_data = text_webhook.payload.get("signing").unwrap();
         if !signing_data.get("message").is_some() {
             return Err(anyhow!("Text signing webhook missing 'message' field"));
@@ -3220,16 +3222,20 @@ impl TestRunner {
         if !signing_data.get("relayerId").is_some() {
             return Err(anyhow!("Text signing webhook missing 'relayerId' field"));
         }
-        
+
         let message_value = signing_data.get("message").unwrap().as_str().unwrap_or("");
         if message_value != text_to_sign {
-            return Err(anyhow!("Text signing webhook message mismatch: expected '{}', got '{}'", text_to_sign, message_value));
+            return Err(anyhow!(
+                "Text signing webhook message mismatch: expected '{}', got '{}'",
+                text_to_sign,
+                message_value
+            ));
         }
-        
+
         info!("✅ Text signing webhook payload validation passed");
 
         info!("🔐 Testing typed data signing webhook...");
-        
+
         use serde_json::json;
         let typed_data = json!({
             "types": {
@@ -3256,30 +3262,29 @@ impl TestRunner {
         });
 
         let typed_data_parsed: TypedData = serde_json::from_value(typed_data)?;
-        
-        let sign_typed_data_result = self
-            .relayer_client
-            .sdk
-            .sign
-            .sign_typed_data(&relayer.id, &typed_data_parsed)
-            .await?;
-            
-        info!("✅ Typed data signed successfully, signature: {:?}", sign_typed_data_result.signature);
+
+        let sign_typed_data_result =
+            self.relayer_client.sdk.sign.sign_typed_data(&relayer.id, &typed_data_parsed).await?;
+
+        info!(
+            "✅ Typed data signed successfully, signature: {:?}",
+            sign_typed_data_result.signature
+        );
 
         tokio::time::sleep(Duration::from_millis(500)).await;
-        
+
         let typed_data_signing_webhooks = webhook_server.get_webhooks_by_event("typed_data_signed");
         if typed_data_signing_webhooks.is_empty() {
             return Err(anyhow!("No 'typed_data_signed' webhook received"));
         }
-        
+
         info!("✅ Received {} typed_data_signed webhook(s)", typed_data_signing_webhooks.len());
 
         let typed_data_webhook = &typed_data_signing_webhooks[0];
         if !typed_data_webhook.payload.get("signing").is_some() {
             return Err(anyhow!("Typed data signing webhook missing 'signing' data"));
         }
-        
+
         let typed_signing_data = typed_data_webhook.payload.get("signing").unwrap();
         if !typed_signing_data.get("domainData").is_some() {
             return Err(anyhow!("Typed data signing webhook missing 'domainData' field"));
@@ -3293,12 +3298,16 @@ impl TestRunner {
         if !typed_signing_data.get("signature").is_some() {
             return Err(anyhow!("Typed data signing webhook missing 'signature' field"));
         }
-        
-        let primary_type_value = typed_signing_data.get("primaryType").unwrap().as_str().unwrap_or("");
+
+        let primary_type_value =
+            typed_signing_data.get("primaryType").unwrap().as_str().unwrap_or("");
         if primary_type_value != "TestMessage" {
-            return Err(anyhow!("Typed data signing webhook primaryType mismatch: expected 'TestMessage', got '{}'", primary_type_value));
+            return Err(anyhow!(
+                "Typed data signing webhook primaryType mismatch: expected 'TestMessage', got '{}'",
+                primary_type_value
+            ));
         }
-        
+
         info!("✅ Typed data signing webhook payload validation passed");
 
         for signing_webhook in [&text_signing_webhooks[0], &typed_data_signing_webhooks[0]] {
@@ -3311,7 +3320,7 @@ impl TestRunner {
             if !signing_webhook.headers.contains_key("x-rrelayer-delivery") {
                 return Err(anyhow!("Signing webhook missing delivery header"));
             }
-            
+
             if !signing_webhook.payload.get("event_type").is_some() {
                 return Err(anyhow!("Signing webhook payload missing event_type"));
             }
@@ -3322,7 +3331,7 @@ impl TestRunner {
                 return Err(anyhow!("Signing webhook payload missing api_version"));
             }
         }
-        
+
         info!("✅ Signing webhook structure validation passed");
         info!("📊 Signing tests summary:");
         info!("   🔐 Text signing webhook: ✅ received and validated");
@@ -3347,7 +3356,6 @@ impl TestRunner {
 
         Ok(())
     }
-
 
     // TODO: handle rate limits by making it more simple
     /// Test rate limiting enforcement

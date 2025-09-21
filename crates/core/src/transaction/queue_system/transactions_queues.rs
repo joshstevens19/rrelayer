@@ -796,7 +796,10 @@ impl TransactionsQueues {
                             tokio::spawn(async move {
                                 let webhook_manager = webhook_manager.lock().await;
                                 webhook_manager
-                                    .on_transaction_replaced(&new_transaction, &original_transaction_clone)
+                                    .on_transaction_replaced(
+                                        &new_transaction,
+                                        &original_transaction_clone,
+                                    )
                                     .await;
                             });
                         }
@@ -831,7 +834,10 @@ impl TransactionsQueues {
                             tokio::spawn(async move {
                                 let webhook_manager = webhook_manager.lock().await;
                                 webhook_manager
-                                    .on_transaction_replaced(&new_transaction, &original_transaction_clone)
+                                    .on_transaction_replaced(
+                                        &new_transaction,
+                                        &original_transaction_clone,
+                                    )
                                     .await;
                             });
                         }
@@ -1048,7 +1054,10 @@ impl TransactionsQueues {
                                         tokio::spawn(async move {
                                             let webhook_manager = webhook_manager.lock().await;
                                             webhook_manager
-                                                .on_transaction_mined(&mined_transaction, &receipt_clone)
+                                                .on_transaction_mined(
+                                                    &mined_transaction,
+                                                    &receipt_clone,
+                                                )
                                                 .await;
                                         });
                                     }
@@ -1244,7 +1253,10 @@ impl TransactionsQueues {
                             tokio::spawn(async move {
                                 let webhook_manager = webhook_manager.lock().await;
                                 webhook_manager
-                                    .on_transaction_confirmed(&confirmed_transaction, &receipt_clone)
+                                    .on_transaction_confirmed(
+                                        &confirmed_transaction,
+                                        &receipt_clone,
+                                    )
                                     .await;
                             });
                         }

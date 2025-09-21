@@ -120,17 +120,19 @@ pub async fn sign_typed_data(
         let message_data = serde_json::to_value(&typed_data.message).unwrap_or_default();
         let primary_type_clone = typed_data.primary_type.clone();
         let signature_clone = signature;
-        
+
         tokio::spawn(async move {
             let webhook_manager = webhook_manager.lock().await;
-            webhook_manager.on_typed_data_signed(
-                &relayer_id_clone,
-                chain_id,
-                domain_data,
-                message_data,
-                primary_type_clone,
-                signature_clone,
-            ).await;
+            webhook_manager
+                .on_typed_data_signed(
+                    &relayer_id_clone,
+                    chain_id,
+                    domain_data,
+                    message_data,
+                    primary_type_clone,
+                    signature_clone,
+                )
+                .await;
         });
     }
 

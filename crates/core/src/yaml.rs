@@ -547,6 +547,7 @@ pub struct WebhookConfig {
     pub endpoint: String,
     pub shared_secret: String,
     pub networks: Vec<String>,
+    pub max_retries: Option<u32>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

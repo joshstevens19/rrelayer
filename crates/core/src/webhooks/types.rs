@@ -95,15 +95,14 @@ impl WebhookDelivery {
         webhook_config: WebhookConfig,
         event_type: WebhookEventType,
         payload: serde_json::Value,
-        max_retries: u32,
     ) -> Self {
         Self {
             id: Uuid::new_v4(),
+            max_retries: webhook_config.max_retries.unwrap_or(3),
             webhook_config,
             event_type,
             payload,
             attempts: 0,
-            max_retries,
             created_at: SystemTime::now(),
             last_attempt_at: None,
             next_retry_at: None,

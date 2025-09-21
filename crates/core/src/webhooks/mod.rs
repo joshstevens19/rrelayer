@@ -1,3 +1,4 @@
+pub mod db;
 pub mod manager;
 pub mod payload;
 pub mod sender;

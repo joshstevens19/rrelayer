@@ -377,7 +377,11 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
 
     let webhook_manager = if config.webhooks.is_some() {
         rrelayer_info!("Initializing webhook manager with configuration");
-        Some(Arc::new(Mutex::new(crate::webhooks::WebhookManager::new(&config, None)?)))
+        Some(Arc::new(Mutex::new(crate::webhooks::WebhookManager::new(
+            Arc::clone(&postgres_client),
+            &config,
+            None,
+        )?)))
     } else {
         rrelayer_info!("Webhooks disabled - no webhook configuration found");
         None
@@ -396,7 +400,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
     let user_rate_limiter = if let Some(ref rate_limit_config) = config.user_rate_limits {
         rrelayer_info!("Initializing user rate limiter with configuration");
         let user_rate_limiter =
-            UserRateLimiter::new(rate_limit_config.clone(), postgres_client.clone());
+            UserRateLimiter::new(rate_limit_config.clone(), Arc::clone(&postgres_client));
 
         if let Err(e) = user_rate_limiter.initialize().await {
             rrelayer_error!("Failed to initialize user rate limiter: {}", e);

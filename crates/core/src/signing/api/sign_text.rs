@@ -123,15 +123,12 @@ pub async fn sign_text(
         let chain_id = relayer_provider_context.provider.chain_id;
         let message_clone = sign.text.clone();
         let signature_clone = signature;
-        
+
         tokio::spawn(async move {
             let webhook_manager = webhook_manager.lock().await;
-            webhook_manager.on_text_signed(
-                &relayer_id_clone,
-                chain_id,
-                message_clone,
-                signature_clone,
-            ).await;
+            webhook_manager
+                .on_text_signed(&relayer_id_clone, chain_id, message_clone, signature_clone)
+                .await;
         });
     }
 

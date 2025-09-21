@@ -83,7 +83,8 @@ impl EmbeddedRRelayerServer {
         let connection_string =
             std::env::var("DATABASE_URL").expect("DATABASE_URL needs to be set");
 
-        let schemas_to_drop = vec!["public", "rate_limit", "signing", "network", "relayer"];
+        let schemas_to_drop =
+            vec!["public", "rate_limit", "signing", "network", "relayer", "webhooks"];
 
         // Try to connect and drop schemas
         match tokio_postgres::connect(&connection_string, tokio_postgres::NoTls).await {

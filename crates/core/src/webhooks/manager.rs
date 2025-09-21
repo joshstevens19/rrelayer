@@ -11,8 +11,8 @@ use tracing::debug;
 use uuid::Uuid;
 
 use crate::{
-    network::types::ChainId, rrelayer_error, rrelayer_info, transaction::types::Transaction,
-    yaml::WebhookConfig, SetupConfig,
+    network::types::ChainId, postgres::PostgresClient, rrelayer_error, rrelayer_info,
+    transaction::types::Transaction, yaml::WebhookConfig, SetupConfig,
 };
 
 use super::{
@@ -47,22 +47,29 @@ impl WebhookManager {
     /// # Arguments
     /// * `config` - Application configuration containing webhook settings
     /// * `delivery_config` - Optional delivery configuration (uses defaults if None)
+    /// * `db` - Database client for logging webhook delivery history
     ///
     /// # Returns
     /// * `Ok(WebhookManager)` - Configured webhook manager
     /// * `Err(reqwest::Error)` - If HTTP client creation fails
     pub fn new(
+        db: Arc<PostgresClient>,
         config: &SetupConfig,
         delivery_config: Option<WebhookDeliveryConfig>,
     ) -> Result<Self, reqwest::Error> {
         let webhook_configs = config.webhooks.as_ref().cloned().unwrap_or_default();
         rrelayer_info!("🔧 WebhookManager::new - Found {} webhook configs", webhook_configs.len());
         for (i, config) in webhook_configs.iter().enumerate() {
-            rrelayer_info!("  {}. Endpoint: {}, Networks: {:?}", i + 1, config.endpoint, config.networks);
+            rrelayer_info!(
+                "  {}. Endpoint: {}, Networks: {:?}",
+                i + 1,
+                config.endpoint,
+                config.networks
+            );
         }
-        
+
         let delivery_config = delivery_config.unwrap_or_default();
-        let sender = WebhookSender::new(delivery_config)?;
+        let sender = WebhookSender::new(delivery_config, db)?;
 
         // Build network name mapping
         let mut network_names = HashMap::new();
@@ -134,7 +141,6 @@ impl WebhookManager {
                     webhook_config.clone(),
                     payload.event_type.clone(),
                     payload_json.clone(),
-                    3, // Default max retries, could be configurable per webhook
                 );
                 deliveries_to_queue.push(delivery);
             }
@@ -187,10 +193,8 @@ impl WebhookManager {
         }
 
         let network_names = self.network_names.read().await;
-        let chain_name = network_names
-            .get(&chain_id)
-            .cloned()
-            .unwrap_or_else(|| chain_id.to_string());
+        let chain_name =
+            network_names.get(&chain_id).cloned().unwrap_or_else(|| chain_id.to_string());
 
         let payload_json = match payload.to_json_value() {
             Ok(json) => json,
@@ -216,7 +220,6 @@ impl WebhookManager {
                     webhook_config.clone(),
                     payload.event_type.clone(),
                     payload_json.clone(),
-                    3, // Default max retries
                 );
                 deliveries_to_queue.push(delivery);
             }
@@ -255,8 +258,12 @@ impl WebhookManager {
 
     /// Queue a webhook for a transaction event
     pub async fn queue_webhook(&self, transaction: &Transaction, event_type: WebhookEventType) {
-        rrelayer_info!("🔔 queue_webhook called for transaction {} with event {:?}", transaction.id, event_type);
-        
+        rrelayer_info!(
+            "🔔 queue_webhook called for transaction {} with event {:?}",
+            transaction.id,
+            event_type
+        );
+
         if self.webhook_configs.is_empty() {
             rrelayer_info!(
                 "❌ No webhooks configured, skipping webhook for transaction {}",
@@ -264,8 +271,12 @@ impl WebhookManager {
             );
             return;
         }
-        
-        rrelayer_info!("✅ Found {} webhook configs for transaction {}", self.webhook_configs.len(), transaction.id);
+
+        rrelayer_info!(
+            "✅ Found {} webhook configs for transaction {}",
+            self.webhook_configs.len(),
+            transaction.id
+        );
 
         let network_names = self.network_names.read().await;
         let chain_name = network_names
@@ -294,7 +305,6 @@ impl WebhookManager {
                     webhook_config.clone(),
                     event_type.clone(),
                     payload_json.clone(),
-                    3, // Default max retries, could be configurable per webhook
                 );
                 deliveries_to_queue.push(delivery);
             }
@@ -512,12 +522,8 @@ impl WebhookManager {
         message: String,
         signature: alloy::primitives::PrimitiveSignature,
     ) {
-        let payload = WebhookSigningPayload::text_signed(
-            relayer_id.clone(),
-            chain_id,
-            message,
-            signature,
-        );
+        let payload =
+            WebhookSigningPayload::text_signed(relayer_id.clone(), chain_id, message, signature);
         self.queue_signing_webhook(relayer_id, chain_id, payload).await;
     }
 

@@ -19,6 +19,7 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
         CREATE SCHEMA IF NOT EXISTS relayer;
         CREATE SCHEMA IF NOT EXISTS signing;
         CREATE SCHEMA IF NOT EXISTS rate_limit;
+        CREATE SCHEMA IF NOT EXISTS webhook;
 
         CREATE TABLE IF NOT EXISTS network.record (
             chain_id BIGINT PRIMARY KEY NOT NULL,
@@ -228,11 +229,90 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
         CREATE INDEX IF NOT EXISTS idx_signing_typed_data_relayer_time 
         ON signing.typed_data_history(relayer_id, signed_at DESC);
 
+        DO $$
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_type t JOIN pg_namespace n ON t.typnamespace = n.oid WHERE t.typname = 'status' AND n.nspname = 'webhook' AND t.typtype = 'e') THEN
+                CREATE TYPE webhook.status AS ENUM ('PENDING', 'DELIVERED', 'FAILED', 'ABANDONED');
+            END IF;
+        END;
+        $$;
+
+        DO $$
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_type t JOIN pg_namespace n ON t.typnamespace = n.oid WHERE t.typname = 'event_type' AND n.nspname = 'webhook' AND t.typtype = 'e') THEN
+                CREATE TYPE webhook.event_type AS ENUM (
+                    'TRANSACTION_QUEUED', 'TRANSACTION_SENT', 'TRANSACTION_MINED', 
+                    'TRANSACTION_CONFIRMED', 'TRANSACTION_FAILED', 'TRANSACTION_EXPIRED',
+                    'TRANSACTION_CANCELLED', 'TRANSACTION_REPLACED', 'TEXT_SIGNED', 'TYPED_DATA_SIGNED'
+                );
+            END IF;
+        END;
+        $$;
+
+        CREATE TABLE IF NOT EXISTS webhook.delivery_history (
+            id UUID PRIMARY KEY NOT NULL,
+            webhook_endpoint VARCHAR(500) NOT NULL,
+            event_type webhook.event_type NOT NULL,
+            status webhook.status NOT NULL,
+            transaction_id UUID NULL,
+            relayer_id UUID NULL,
+            chain_id BIGINT NULL,
+            attempts INTEGER DEFAULT 1 NOT NULL,
+            max_retries INTEGER NOT NULL,
+            payload JSONB NOT NULL,
+            headers JSONB NULL,
+            http_status_code INTEGER NULL,
+            response_body TEXT NULL,
+            error_message TEXT NULL,
+            created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+            first_attempt_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+            last_attempt_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+            delivered_at TIMESTAMPTZ NULL,
+            abandoned_at TIMESTAMPTZ NULL,
+            total_duration_ms BIGINT NULL,
+            CONSTRAINT fk_webhook_delivery_relayer_id
+                FOREIGN KEY (relayer_id)
+                    REFERENCES relayer.record (id),
+            CONSTRAINT fk_webhook_delivery_transaction_id
+                FOREIGN KEY (transaction_id)
+                    REFERENCES relayer.transaction (id),
+            CONSTRAINT fk_webhook_delivery_chain_id
+                FOREIGN KEY (chain_id)
+                    REFERENCES network.record (chain_id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_webhook_delivery_endpoint_status 
+        ON webhook.delivery_history(webhook_endpoint, status, created_at DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_webhook_delivery_relayer_time 
+        ON webhook.delivery_history(relayer_id, created_at DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_webhook_delivery_transaction 
+        ON webhook.delivery_history(transaction_id, created_at DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_webhook_delivery_event_type 
+        ON webhook.delivery_history(event_type, created_at DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_webhook_delivery_status_time 
+        ON webhook.delivery_history(status, created_at DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_webhook_delivery_cleanup 
+        ON webhook.delivery_history(created_at);
+
         CREATE OR REPLACE FUNCTION cleanup_old_rate_limit_usage()
         RETURNS void AS $$
         BEGIN
             DELETE FROM rate_limit.usage
             WHERE window_start < NOW() - INTERVAL '24 hours';
+        END;
+        $$ LANGUAGE plpgsql;
+
+        CREATE OR REPLACE FUNCTION cleanup_old_webhook_deliveries()
+        RETURNS void AS $$
+        BEGIN
+            -- Keep webhook delivery history for 30 days
+            DELETE FROM webhook.delivery_history
+            WHERE created_at < NOW() - INTERVAL '30 days';
         END;
         $$ LANGUAGE plpgsql;
     "#;
