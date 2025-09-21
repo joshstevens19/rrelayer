@@ -147,7 +147,7 @@ async fn handle_sign_text(
     sdk: &SDK,
 ) -> Result<(), SigningError> {
     println!("Signing message with relayer {}...", relayer_id);
-    let result = sdk.sign.sign_text(relayer_id, message).await?;
+    let result = sdk.sign.sign_text(relayer_id, message, None).await?;
 
     println!("\n┌─────────────────────────────────────────────────────────────────────");
     println!("│ SIGNATURE DETAILS");
@@ -179,7 +179,7 @@ async fn handle_sign_typed_data(
         }
     };
 
-    let result = sdk.sign.sign_typed_data(relayer_id, &typed_data).await?;
+    let result = sdk.sign.sign_typed_data(relayer_id, &typed_data, None).await?;
 
     let pretty_json =
         serde_json::to_string_pretty(&typed_data).map_err(SigningError::Json)?.to_string();

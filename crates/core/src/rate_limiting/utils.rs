@@ -46,6 +46,10 @@ pub async fn check_and_reserve_rate_limit<'a>(
             );
             Err(StatusCode::TOO_MANY_REQUESTS)
         }
+        Err(RateLimitError::NoRateLimitKey) => {
+            // do nothing it's ok to have no key
+            Ok(None)
+        }
         Err(e) => {
             error!("Rate limiting error: {}", e);
             // Don't block operation for rate limiting errors, just log

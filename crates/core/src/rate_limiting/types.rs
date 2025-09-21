@@ -52,8 +52,8 @@ pub enum RateLimitError {
     #[error("Configuration error: {0}")]
     Configuration(String),
 
-    #[error("Detection error: {0}")]
-    Detection(String),
+    #[error("No rate limit key")]
+    NoRateLimitKey,
 }
 
 /// Simple result type for rate limit checks

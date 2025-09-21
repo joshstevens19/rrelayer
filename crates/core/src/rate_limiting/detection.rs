@@ -39,7 +39,7 @@ impl RateLimitDetector {
             });
         }
 
-        Err(RateLimitError::Detection("No rate limit key found".to_string()))
+        Err(RateLimitError::NoRateLimitKey)
     }
 }
 

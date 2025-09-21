@@ -219,6 +219,25 @@ impl TestRunner {
         println!("🚀 RRelayer E2E Test Suite");
         println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
+        self.start_webhook_server().await.unwrap();
+
+        info!("🔍 Testing webhook server accessibility...");
+        let client = reqwest::Client::builder().timeout(Duration::from_secs(5)).build().unwrap();
+
+        match client.get("http://localhost:8546/health").send().await {
+            Ok(response) => {
+                if response.status().is_success() {
+                    info!("✅ Webhook server is accessible at http://localhost:8546");
+                } else {
+                    info!("⚠️ Webhook server responded with status: {}", response.status());
+                }
+            }
+            Err(e) => {
+                info!("❌ Webhook server not accessible: {}", e);
+                info!("Continuing test without accessibility verification...");
+            }
+        }
+
         let mut suite = TestSuite::new("RRelayer E2E Tests".to_string());
         let overall_start = Instant::now();
 
@@ -281,6 +300,8 @@ impl TestRunner {
             suite.add_test(test_result);
         }
 
+        self.stop_webhook_server();
+
         suite.duration = overall_start.elapsed();
         self.print_final_report(&suite);
         suite
@@ -301,7 +322,10 @@ impl TestRunner {
         //     );
         // }
 
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        let webhook_server =
+            self.webhook_server().ok_or_else(|| anyhow!("Webhook server not initialized")).unwrap();
+
+        webhook_server.clear_webhooks();
 
         let result = timeout(Duration::from_secs(90), self.execute_test(test_name)).await;
 
@@ -440,6 +464,25 @@ impl TestRunner {
         println!("🚀 RRelayer E2E Test Suite - Single Test");
         println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
+        self.start_webhook_server().await.unwrap();
+
+        info!("🔍 Testing webhook server accessibility...");
+        let client = reqwest::Client::builder().timeout(Duration::from_secs(5)).build().unwrap();
+
+        match client.get("http://localhost:8546/health").send().await {
+            Ok(response) => {
+                if response.status().is_success() {
+                    info!("✅ Webhook server is accessible at http://localhost:8546");
+                } else {
+                    info!("⚠️ Webhook server responded with status: {}", response.status());
+                }
+            }
+            Err(e) => {
+                info!("❌ Webhook server not accessible: {}", e);
+                info!("Continuing test without accessibility verification...");
+            }
+        }
+
         let mut suite = TestSuite::new("Single Test Run".to_string());
         let overall_start = Instant::now();
 
@@ -496,6 +539,8 @@ impl TestRunner {
 
         let test_result = self.run_single_test(test_name, description).await;
         suite.add_test(test_result);
+
+        self.stop_webhook_server();
 
         suite.duration = overall_start.elapsed();
         self.print_final_report(&suite);
@@ -2853,28 +2898,6 @@ impl TestRunner {
     async fn test_webhook_delivery(&self) -> Result<()> {
         info!("Testing webhook delivery mechanism...");
 
-        self.start_webhook_server().await?;
-
-        // Test webhook server is accessible
-        info!("🔍 Testing webhook server accessibility...");
-        let client =
-            reqwest::Client::builder().timeout(std::time::Duration::from_secs(5)).build()?;
-
-        match client.get("http://localhost:8546/health").send().await {
-            Ok(response) => {
-                if response.status().is_success() {
-                    info!("✅ Webhook server is accessible at http://localhost:8546");
-                } else {
-                    info!("⚠️ Webhook server responded with status: {}", response.status());
-                }
-            }
-            Err(e) => {
-                info!("❌ Webhook server not accessible: {}", e);
-                // Don't fail the test, just log and continue
-                info!("Continuing test without accessibility verification...");
-            }
-        }
-
         let webhook_server =
             self.webhook_server().ok_or_else(|| anyhow!("Webhook server not initialized"))?;
 
@@ -3215,7 +3238,6 @@ impl TestRunner {
 
         info!("📤 Test 7: Signing operations webhook events");
 
-        // Clear previous webhooks to focus on signing events
         webhook_server.clear_webhooks();
 
         // Test text signing webhook
@@ -3294,8 +3316,12 @@ impl TestRunner {
 
         let typed_data_parsed: TypedData = serde_json::from_value(typed_data)?;
 
-        let sign_typed_data_result =
-            self.relayer_client.sdk.sign.sign_typed_data(&relayer.id, &typed_data_parsed, None).await?;
+        let sign_typed_data_result = self
+            .relayer_client
+            .sdk
+            .sign
+            .sign_typed_data(&relayer.id, &typed_data_parsed, None)
+            .await?;
 
         info!(
             "✅ Typed data signed successfully, signature: {:?}",
@@ -3369,9 +3395,6 @@ impl TestRunner {
         info!("   📝 Typed data signing webhook: ✅ received and validated");
         info!("   🔍 Payload structure: ✅ all required fields present");
         info!("   🔒 HMAC signature validation: ✅ headers present");
-
-        // Stop the webhook server
-        self.stop_webhook_server();
 
         info!("✅ Comprehensive webhook delivery testing completed successfully!");
         info!("   📊 Total webhooks received: {}", final_all_webhooks.len());
@@ -3627,7 +3650,6 @@ impl TestRunner {
             SDK::new(config.rrelayer_base_url.clone(), "wrong".to_string(), "way".to_string());
         info!("Created SDK with wrong credentials");
 
-        // Test basic auth status
         let auth_status = sdk.auth.test_auth().await;
         if auth_status.is_ok() {
             return Err(anyhow::anyhow!("SDK should not be authenticated"));
