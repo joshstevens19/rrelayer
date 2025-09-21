@@ -1,4 +1,6 @@
 use crate::api::{http::HttpClient, types::ApiResult};
+use reqwest::header::{HeaderMap, HeaderValue};
+use rrelayer_core::RATE_LIMIT_HEADER_NAME;
 use rrelayer_core::common_types::{PagingContext, PagingResult};
 use rrelayer_core::relayer::types::RelayerId;
 use rrelayer_core::signing::api::{SignTextResult, SignTypedDataResult};
@@ -15,9 +17,26 @@ impl SignApi {
         Self { client }
     }
 
-    pub async fn sign_text(&self, relayer_id: &RelayerId, text: &str) -> ApiResult<SignTextResult> {
+    pub async fn sign_text(
+        &self,
+        relayer_id: &RelayerId,
+        text: &str,
+        rate_limit_key: Option<String>,
+    ) -> ApiResult<SignTextResult> {
+        let mut headers = HeaderMap::new();
+        if let Some(rate_limit_key) = rate_limit_key.as_ref() {
+            headers.insert(
+                RATE_LIMIT_HEADER_NAME,
+                HeaderValue::from_str(rate_limit_key).expect("Invalid rate limit key"),
+            );
+        }
+
         self.client
-            .post(&format!("signing/{}/message", relayer_id), &serde_json::json!({ "text": text }))
+            .post_with_headers(
+                &format!("signing/{}/message", relayer_id),
+                &serde_json::json!({ "text": text }),
+                headers,
+            )
             .await
     }
 
@@ -25,8 +44,19 @@ impl SignApi {
         &self,
         relayer_id: &RelayerId,
         typed_data: &alloy::dyn_abi::TypedData,
+        rate_limit_key: Option<String>,
     ) -> ApiResult<SignTypedDataResult> {
-        self.client.post(&format!("signing/{}/typed-data", relayer_id), typed_data).await
+        let mut headers = HeaderMap::new();
+        if let Some(rate_limit_key) = rate_limit_key.as_ref() {
+            headers.insert(
+                RATE_LIMIT_HEADER_NAME,
+                HeaderValue::from_str(rate_limit_key).expect("Invalid rate limit key"),
+            );
+        }
+
+        self.client
+            .post_with_headers(&format!("signing/{}/typed-data", relayer_id), typed_data, headers)
+            .await
     }
 
     /// Retrieves the signing text history for a specific relayer with pagination.

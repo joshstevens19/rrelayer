@@ -61,7 +61,7 @@ impl TestInfo {
     pub fn new(name: String, result: TestResult, duration: Duration) -> Self {
         let error_message = match &result {
             TestResult::Failed(msg) => Some(msg.clone()),
-            TestResult::Timeout => Some("Test timed out after 30 seconds".to_string()),
+            TestResult::Timeout => Some("Test timed out after 90 seconds".to_string()),
             TestResult::Skipped(msg) => Some(msg.clone()),
             TestResult::Passed => None,
         };
@@ -303,7 +303,7 @@ impl TestRunner {
 
         tokio::time::sleep(Duration::from_millis(100)).await;
 
-        let result = timeout(Duration::from_secs(30), self.execute_test(test_name)).await;
+        let result = timeout(Duration::from_secs(90), self.execute_test(test_name)).await;
 
         let test_result = match result {
             Ok(Ok(())) => {
@@ -417,7 +417,7 @@ impl TestRunner {
                 if let TestResult::Failed(msg) = &test.result {
                     println!("  ❌ {} - {}", test.name, msg);
                 } else if let TestResult::Timeout = &test.result {
-                    println!("  ⏰ {} - Test timed out after 30 seconds", test.name);
+                    println!("  ⏰ {} - Test timed out after 90 seconds", test.name);
                 }
             }
         }
@@ -1350,7 +1350,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .sign
-            .sign_text(&relayer.id, test_message)
+            .sign_text(&relayer.id, test_message, None)
             .await
             .context("Failed to sign text message")?;
 
@@ -1435,7 +1435,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .sign
-            .sign_typed_data(&relayer.id, &typed_data)
+            .sign_typed_data(&relayer.id, &typed_data, None)
             .await
             .context("Failed to sign typed data")?;
 
@@ -2700,7 +2700,7 @@ impl TestRunner {
         self.mine_and_wait().await?;
         info!("Waiting for all transactions to reach mempool...");
 
-        let timeout = Duration::from_secs(30);
+        let timeout = Duration::from_secs(90);
         let start = Instant::now();
 
         loop {
@@ -3223,7 +3223,7 @@ impl TestRunner {
         let text_to_sign = "Hello, RRelayer webhook test!";
 
         let sign_text_result =
-            self.relayer_client.sdk.sign.sign_text(&relayer.id, text_to_sign).await?;
+            self.relayer_client.sdk.sign.sign_text(&relayer.id, text_to_sign, None).await?;
 
         info!("✅ Text signed successfully, signature: {:?}", sign_text_result.signature);
 
@@ -3295,7 +3295,7 @@ impl TestRunner {
         let typed_data_parsed: TypedData = serde_json::from_value(typed_data)?;
 
         let sign_typed_data_result =
-            self.relayer_client.sdk.sign.sign_typed_data(&relayer.id, &typed_data_parsed).await?;
+            self.relayer_client.sdk.sign.sign_typed_data(&relayer.id, &typed_data_parsed, None).await?;
 
         info!(
             "✅ Typed data signed successfully, signature: {:?}",
@@ -3396,8 +3396,9 @@ impl TestRunner {
         let relayer = self.create_and_fund_relayer("rate-limit-relayer").await?;
         info!("relayer: {:?}", relayer);
 
+        let relay_key = Some(self.config.anvil_accounts[0].to_string());
+
         let mut successful_transactions = 0;
-        let mut rate_limited = false;
 
         for i in 0..5 {
             let tx_result = self
@@ -3407,30 +3408,109 @@ impl TestRunner {
                     &self.config.anvil_accounts[1],
                     alloy::primitives::utils::parse_ether("0.5")?.into(),
                     TransactionData::empty(),
-                    Some(self.config.anvil_accounts[0].to_string())
+                    relay_key.clone(),
                 )
                 .await;
 
             match tx_result {
                 Ok(_) => successful_transactions += 1,
-                Err(e) => {
-                    if e.to_string().contains("rate limit")
-                        || e.to_string().contains("too many requests")
-                    {
-                        rate_limited = true;
-                        info!("Rate limiting triggered at transaction {}", i);
-                        break;
-                    } else {
-                        info!("Transaction {} failed with error: {}", i, e);
-                    }
-                }
+                Err(_) => {}
             }
         }
         if successful_transactions != 1 {
-            return Err(anyhow!("Rate limiting not enforced"));
+            return Err(anyhow!("Sending transactions rate limiting not enforced"));
         }
 
+        self.mine_blocks(1).await?;
         info!("Successful transactions before rate limit: {}", successful_transactions);
+
+        let mut successful_signing = 0;
+
+        for _ in 0..5 {
+            let sign_result = self
+                .relayer_client
+                .sdk
+                .sign
+                .sign_text(&relayer.id, "Hello, RRelayer!", relay_key.clone())
+                .await;
+
+            match sign_result {
+                Ok(_) => successful_signing += 1,
+                Err(_) => {}
+            }
+        }
+
+        if successful_signing != 1 {
+            return Err(anyhow!("Signing text rate limiting not enforced"));
+        }
+
+        info!("Successful signing text before rate limit: {}", successful_transactions);
+
+        info!("Sleep for 60 seconds to allow the rate limit to expire");
+        tokio::time::sleep(Duration::from_secs(60)).await;
+
+        let mut successful_signing = 0;
+
+        let typed_data_json = serde_json::json!({
+            "types": {
+                "EIP712Domain": [
+                    {"name": "name", "type": "string"},
+                    {"name": "version", "type": "string"},
+                    {"name": "chainId", "type": "uint256"},
+                    {"name": "verifyingContract", "type": "address"}
+                ],
+                "Mail": [
+                    {"name": "from", "type": "Person"},
+                    {"name": "to", "type": "Person"},
+                    {"name": "contents", "type": "string"}
+                ],
+                "Person": [
+                    {"name": "name", "type": "string"},
+                    {"name": "wallet", "type": "address"}
+                ]
+            },
+            "primaryType": "Mail",
+            "domain": {
+                "name": "RRelayer Test",
+                "version": "1",
+                "chainId": self.config.chain_id,
+                "verifyingContract": "0x0000000000000000000000000000000000000000"
+            },
+            "message": {
+                "from": {
+                    "name": "Alice",
+                    "wallet": "0x1234567890123456789012345678901234567890"
+                },
+                "to": {
+                    "name": "Bob",
+                    "wallet": "0x0987654321098765432109876543210987654321"
+                },
+                "contents": "Hello from E2E test!"
+            }
+        });
+
+        let typed_data: TypedData =
+            serde_json::from_value(typed_data_json).context("Failed to create typed data")?;
+
+        for _ in 0..5 {
+            let sign_result = self
+                .relayer_client
+                .sdk
+                .sign
+                .sign_typed_data(&relayer.id, &typed_data, relay_key.clone())
+                .await;
+
+            match sign_result {
+                Ok(_) => successful_signing += 1,
+                Err(_) => {}
+            }
+        }
+
+        if successful_signing != 1 {
+            return Err(anyhow!("Signing typed data rate limiting not enforced"));
+        }
+
+        info!("Successful signing typed data before rate limit: {}", successful_transactions);
 
         info!("Rate limiting mechanism verified");
         Ok(())
@@ -3503,7 +3583,7 @@ impl TestRunner {
         self.mine_and_wait().await?;
         info!("Waiting for all transactions to reach mined status...");
 
-        let timeout = Duration::from_secs(30);
+        let timeout = Duration::from_secs(90);
         let start = Instant::now();
 
         loop {
