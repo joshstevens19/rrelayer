@@ -1,9 +1,11 @@
 use crate::api::{http::HttpClient, types::ApiResult};
+use reqwest::header::{HeaderMap, HeaderValue};
 use rrelayer_core::transaction::api::get_transaction_status::RelayTransactionStatusResult;
 use rrelayer_core::transaction::api::send_transaction::{
     RelayTransactionRequest, SendTransactionResult,
 };
 use rrelayer_core::{
+    RATE_LIMIT_HEADER_NAME,
     common_types::{PagingContext, PagingResult},
     relayer::types::RelayerId,
     transaction::types::{Transaction, TransactionId},
@@ -41,8 +43,22 @@ impl TransactionApi {
         &self,
         relayer_id: &RelayerId,
         transaction: &RelayTransactionRequest,
+        rate_limit_key: Option<String>,
     ) -> ApiResult<SendTransactionResult> {
-        self.client.post(&format!("transactions/relayers/{}/send", relayer_id), transaction).await
+        let mut headers = HeaderMap::new();
+        if let Some(rate_limit_key) = rate_limit_key.as_ref() {
+            headers.insert(
+                RATE_LIMIT_HEADER_NAME,
+                HeaderValue::from_str(rate_limit_key).expect("Invalid rate limit key"),
+            );
+        }
+        self.client
+            .post_with_headers(
+                &format!("transactions/relayers/{}/send", relayer_id),
+                transaction,
+                headers,
+            )
+            .await
     }
 
     pub async fn cancel_transaction(&self, transaction_id: &TransactionId) -> ApiResult<bool> {

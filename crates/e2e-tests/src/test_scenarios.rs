@@ -366,7 +366,7 @@ impl TestRunner {
             "transaction_nonce_management" => self.test_transaction_nonce_management().await,
             "gas_price_bumping" => self.test_gas_price_bumping().await,
             "webhook_delivery" => self.test_webhook_delivery().await,
-            "rate_limiting_enforcement" => self.test_rate_limiting().await,
+            "rate_limiting" => self.test_rate_limiting().await,
             "concurrent_transactions" => self.test_concurrent_transactions().await,
             "unauthenticated" => self.test_unauthenticated().await,
             "blob_transaction_handling" => self.test_blob_transaction_handling().await,
@@ -485,7 +485,7 @@ impl TestRunner {
             "transaction_nonce_management" => "Transaction nonce management",
             "gas_price_bumping" => "Gas price bumping mechanism",
             "webhook_delivery" => "Webhook delivery testing",
-            "rate_limiting_enforcement" => "Rate limiting enforcement",
+            "rate_limiting" => "Rate limiting enforcement",
             "concurrent_transactions" => "Concurrent transaction handling",
             "unauthenticated" => "Unauthenticated protection",
             "blob_transaction_handling" => "Blob transaction handling (EIP-4844)",
@@ -1130,6 +1130,7 @@ impl TestRunner {
                     external_id: None,
                     blobs: None,
                 },
+                None,
             )
             .await;
 
@@ -1253,6 +1254,7 @@ impl TestRunner {
                     external_id: None,
                     blobs: None,
                 },
+                None,
             )
             .await;
 
@@ -1276,6 +1278,7 @@ impl TestRunner {
                         external_id: None,
                         blobs: None,
                     },
+                    None,
                 )
                 .await
                 .context("Failed to send transaction to allowed address")?;
@@ -1491,7 +1494,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .send_transaction(&relayer.id, &tx_request)
+            .send_transaction(&relayer.id, &tx_request, None)
             .await
             .context("Failed to send transaction")?;
 
@@ -1538,7 +1541,7 @@ impl TestRunner {
                 .relayer_client
                 .sdk
                 .transaction
-                .send_transaction(&relayer.id, &tx_request)
+                .send_transaction(&relayer.id, &tx_request, None)
                 .await
                 .context("Failed to send transaction")?;
         }
@@ -1586,7 +1589,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .send_transaction(&relayer.id, &tx_request)
+            .send_transaction(&relayer.id, &tx_request, None)
             .await
             .context("Failed to send transaction")?;
 
@@ -1644,7 +1647,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .send_transaction(&relayer.id, &tx_request)
+            .send_transaction(&relayer.id, &tx_request, None)
             .await
             .context("Failed to send transaction")?;
 
@@ -1698,7 +1701,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .send_transaction(&relayer.id, &tx_request)
+            .send_transaction(&relayer.id, &tx_request, None)
             .await
             .context("Failed to send transaction")?;
 
@@ -1788,7 +1791,7 @@ impl TestRunner {
                 .relayer_client
                 .sdk
                 .transaction
-                .send_transaction(&relayer.id, &tx_request)
+                .send_transaction(&relayer.id, &tx_request, None)
                 .await
                 .context(format!("Failed to send transaction {}", i))?;
 
@@ -1849,8 +1852,12 @@ impl TestRunner {
             blobs: None,
         };
 
-        let send_result =
-            self.relayer_client.sdk.transaction.send_transaction(&relayer.id, &tx_request).await?;
+        let send_result = self
+            .relayer_client
+            .sdk
+            .transaction
+            .send_transaction(&relayer.id, &tx_request, None)
+            .await?;
 
         let status = self
             .relayer_client
@@ -1901,8 +1908,12 @@ impl TestRunner {
             blobs: None,
         };
 
-        let send_result =
-            self.relayer_client.sdk.transaction.send_transaction(&relayer.id, &tx_request).await?;
+        let send_result = self
+            .relayer_client
+            .sdk
+            .transaction
+            .send_transaction(&relayer.id, &tx_request, None)
+            .await?;
 
         // Wait for transaction to be sent to network (should move to InMempool)
         let mut attempts = 0;
@@ -1951,8 +1962,12 @@ impl TestRunner {
             blobs: None,
         };
 
-        let send_result =
-            self.relayer_client.sdk.transaction.send_transaction(&relayer.id, &tx_request).await?;
+        let send_result = self
+            .relayer_client
+            .sdk
+            .transaction
+            .send_transaction(&relayer.id, &tx_request, None)
+            .await?;
 
         loop {
             tokio::time::sleep(Duration::from_millis(100)).await;
@@ -2023,8 +2038,12 @@ impl TestRunner {
             blobs: None,
         };
 
-        let send_result =
-            self.relayer_client.sdk.transaction.send_transaction(&relayer.id, &tx_request).await?;
+        let send_result = self
+            .relayer_client
+            .sdk
+            .transaction
+            .send_transaction(&relayer.id, &tx_request, None)
+            .await?;
 
         loop {
             tokio::time::sleep(Duration::from_millis(100)).await;
@@ -2094,8 +2113,12 @@ impl TestRunner {
             blobs: None,
         };
 
-        let send_result =
-            self.relayer_client.sdk.transaction.send_transaction(&relayer.id, &tx_request).await;
+        let send_result = self
+            .relayer_client
+            .sdk
+            .transaction
+            .send_transaction(&relayer.id, &tx_request, None)
+            .await;
 
         match send_result {
             Ok(tx_response) => {
@@ -2647,7 +2670,7 @@ impl TestRunner {
                 .relayer_client
                 .sdk
                 .transaction
-                .send_transaction(&relayer.id, &tx_request)
+                .send_transaction(&relayer.id, &tx_request, None)
                 .await?;
 
             transaction_ids.push(send_result.id);
@@ -2730,8 +2753,12 @@ impl TestRunner {
             blobs: None,
         };
 
-        let send_result =
-            self.relayer_client.sdk.transaction.send_transaction(&relayer.id, &tx_request).await?;
+        let send_result = self
+            .relayer_client
+            .sdk
+            .transaction
+            .send_transaction(&relayer.id, &tx_request, None)
+            .await?;
 
         let mut attempts = 0;
         loop {
@@ -2866,8 +2893,12 @@ impl TestRunner {
             blobs: None,
         };
 
-        let send_result =
-            self.relayer_client.sdk.transaction.send_transaction(&relayer.id, &tx_request).await?;
+        let send_result = self
+            .relayer_client
+            .sdk
+            .transaction
+            .send_transaction(&relayer.id, &tx_request, None)
+            .await?;
 
         info!("📨 Transaction submitted: {}", send_result.id);
 
@@ -2921,7 +2952,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .send_transaction(&relayer.id, &contract_tx_request)
+            .send_transaction(&relayer.id, &contract_tx_request, None)
             .await?;
 
         info!("📨 Contract transaction submitted: {}", contract_send_result.id);
@@ -3077,7 +3108,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .send_transaction(&relayer.id, &tx_request)
+            .send_transaction(&relayer.id, &tx_request, None)
             .await
             .context("Failed to send transaction")?;
 
@@ -3116,7 +3147,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .send_transaction(&relayer.id, &tx_request)
+            .send_transaction(&relayer.id, &tx_request, None)
             .await
             .context("Failed to send transaction")?;
 
@@ -3357,29 +3388,26 @@ impl TestRunner {
         Ok(())
     }
 
-    // TODO: handle rate limits by making it more simple
-    /// Test rate limiting enforcement
+    /// run single with:
+    /// make run-test-debug TEST=rate_limiting
     async fn test_rate_limiting(&self) -> Result<()> {
         info!("Testing rate limiting enforcement...");
 
-        // Note: Rate limiting depends on configuration and would need specific setup
-        // This test verifies the basic mechanism exists
-
         let relayer = self.create_and_fund_relayer("rate-limit-relayer").await?;
+        info!("relayer: {:?}", relayer);
 
-        // Send multiple transactions rapidly to potentially trigger rate limiting
         let mut successful_transactions = 0;
         let mut rate_limited = false;
 
-        for i in 0..10 {
-            let value: U256 = U256::ZERO * U256::from(i + 1);
+        for i in 0..5 {
             let tx_result = self
                 .relayer_client
-                .send_transaction(
+                .send_transaction_with_rate_limit_key(
                     &relayer.id,
                     &self.config.anvil_accounts[1],
-                    TransactionValue::new(value.into()),
+                    alloy::primitives::utils::parse_ether("0.5")?.into(),
                     TransactionData::empty(),
+                    Some(self.config.anvil_accounts[0].to_string())
                 )
                 .await;
 
@@ -3397,14 +3425,14 @@ impl TestRunner {
                     }
                 }
             }
-
-            // Small delay between requests
-            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+        if successful_transactions != 1 {
+            return Err(anyhow!("Rate limiting not enforced"));
         }
 
         info!("Successful transactions before rate limit: {}", successful_transactions);
 
-        info!("✅ Rate limiting mechanism verified (may not trigger with default config)");
+        info!("Rate limiting mechanism verified");
         Ok(())
     }
 
@@ -3437,8 +3465,11 @@ impl TestRunner {
             let relayer_id = relayer.id;
 
             let handle = tokio::spawn(async move {
-                let result =
-                    relayer_client.sdk.transaction.send_transaction(&relayer_id, &tx_request).await;
+                let result = relayer_client
+                    .sdk
+                    .transaction
+                    .send_transaction(&relayer_id, &tx_request, None)
+                    .await;
                 (i, result)
             });
 
@@ -3556,8 +3587,12 @@ impl TestRunner {
             blobs: Some(vec![hex_blob]),
         };
 
-        let blob_result =
-            self.relayer_client.sdk.transaction.send_transaction(&relayer.id, &tx_request).await?;
+        let blob_result = self
+            .relayer_client
+            .sdk
+            .transaction
+            .send_transaction(&relayer.id, &tx_request, None)
+            .await?;
 
         let result = self.wait_for_transaction_completion(&blob_result.id).await?;
 

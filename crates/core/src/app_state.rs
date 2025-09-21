@@ -6,9 +6,9 @@ use crate::{
     gas::{blob_gas_oracle::BlobGasOracleCache, gas_oracle::GasOracleCache},
     postgres::PostgresClient,
     provider::EvmProvider,
+    rate_limiting::RateLimiter,
     shared::cache::Cache,
     transaction::queue_system::transactions_queues::TransactionsQueues,
-    user_rate_limiting::UserRateLimiter,
     webhooks::WebhookManager,
     yaml::RateLimitConfig,
 };
@@ -42,7 +42,7 @@ pub struct AppState {
     /// Webhook delivery management
     pub webhook_manager: Option<Arc<Mutex<WebhookManager>>>,
     /// Rate limiting engine
-    pub user_rate_limiter: Option<Arc<UserRateLimiter>>,
+    pub user_rate_limiter: Option<Arc<RateLimiter>>,
     /// Rate limiting configuration
     pub rate_limit_config: Option<RateLimitConfig>,
 }

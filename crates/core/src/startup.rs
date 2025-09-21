@@ -12,6 +12,7 @@ use crate::{
     network::api::create_network_routes,
     postgres::{PostgresClient, PostgresConnectionError, PostgresError},
     provider::{load_providers, EvmProvider, LoadProvidersError},
+    rate_limiting::RateLimiter,
     read,
     relayer::api::create_relayer_routes,
     rrelayer_error, rrelayer_info,
@@ -27,7 +28,6 @@ use crate::{
             StartTransactionsQueuesError,
         },
     },
-    user_rate_limiting::UserRateLimiter,
     ApiConfig, RateLimitConfig,
 };
 use axum::{
@@ -45,6 +45,7 @@ use tokio::sync::Mutex;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 use tracing::error;
 use tracing::log::info;
+use crate::webhooks::WebhookManager;
 
 #[derive(Error, Debug)]
 #[allow(clippy::enum_variant_names)]
@@ -203,8 +204,8 @@ async fn start_api(
     transactions_queues: Arc<Mutex<TransactionsQueues>>,
     providers: Arc<Vec<EvmProvider>>,
     cache: Arc<Cache>,
-    webhook_manager: Option<Arc<Mutex<crate::webhooks::WebhookManager>>>,
-    user_rate_limiter: Option<Arc<UserRateLimiter>>,
+    webhook_manager: Option<Arc<Mutex<WebhookManager>>>,
+    user_rate_limiter: Option<Arc<RateLimiter>>,
 ) -> Result<(), StartApiError> {
     let mut db = PostgresClient::new().await.map_err(StartApiError::DatabaseConnectionError)?;
 
@@ -397,18 +398,12 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
     )
     .await?;
 
-    let user_rate_limiter = if let Some(ref rate_limit_config) = config.user_rate_limits {
+    let user_rate_limiter = if let Some(ref rate_limit_config) = config.rate_limits {
         rrelayer_info!("Initializing user rate limiter with configuration");
-        let user_rate_limiter =
-            UserRateLimiter::new(rate_limit_config.clone(), Arc::clone(&postgres_client));
+        let user_rate_limiter = RateLimiter::new(rate_limit_config.clone());
 
-        if let Err(e) = user_rate_limiter.initialize().await {
-            rrelayer_error!("Failed to initialize user rate limiter: {}", e);
-            None
-        } else {
-            rrelayer_info!("User rate limiter initialized successfully");
-            Some(Arc::new(user_rate_limiter))
-        }
+        rrelayer_info!("User rate limiter initialized successfully");
+        Some(Arc::new(user_rate_limiter))
     } else {
         rrelayer_info!("Rate limiting disabled - no configuration found");
         None
@@ -427,7 +422,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
 
     start_api(
         config.api_config,
-        config.user_rate_limits.clone(),
+        config.rate_limits.clone(),
         gas_oracle_cache,
         blob_gas_oracle_cache,
         transaction_queue,

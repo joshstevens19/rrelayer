@@ -150,34 +150,6 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
                    REFERENCES relayer.record (id)
         );
 
-        CREATE TABLE IF NOT EXISTS rate_limit.rules (
-            id SERIAL PRIMARY KEY NOT NULL,
-            user_identifier VARCHAR(255) NOT NULL, -- Address, relayer_id, or special identifier
-            rule_type VARCHAR(50) NOT NULL, -- 'transactions_per_minute', 'gas_per_hour', etc.
-            limit_value BIGINT NOT NULL,
-            window_duration_seconds INTEGER NOT NULL,
-            is_unlimited BOOLEAN DEFAULT FALSE,
-            created_at TIMESTAMPTZ DEFAULT NOW(),
-            updated_at TIMESTAMPTZ DEFAULT NOW(),
-            UNIQUE(user_identifier, rule_type)
-        );
-
-        CREATE TABLE IF NOT EXISTS rate_limit.usage (
-            id SERIAL PRIMARY KEY NOT NULL,
-            user_identifier VARCHAR(255) NOT NULL,
-            rule_type VARCHAR(50) NOT NULL,
-            window_start TIMESTAMPTZ NOT NULL,
-            usage_count BIGINT DEFAULT 0,
-            last_request_at TIMESTAMPTZ DEFAULT NOW(),
-            created_at TIMESTAMPTZ DEFAULT NOW(),
-            UNIQUE(user_identifier, rule_type, window_start)
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_rate_limit_usage_lookup 
-        ON rate_limit.usage(user_identifier, rule_type, window_start);
-
-        CREATE INDEX IF NOT EXISTS idx_rate_limit_usage_cleanup 
-        ON rate_limit.usage(window_start);
 
         CREATE TABLE IF NOT EXISTS rate_limit.transaction_metadata (
             id SERIAL PRIMARY KEY NOT NULL,
@@ -299,18 +271,9 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
         CREATE INDEX IF NOT EXISTS idx_webhook_delivery_cleanup 
         ON webhook.delivery_history(created_at);
 
-        CREATE OR REPLACE FUNCTION cleanup_old_rate_limit_usage()
-        RETURNS void AS $$
-        BEGIN
-            DELETE FROM rate_limit.usage
-            WHERE window_start < NOW() - INTERVAL '24 hours';
-        END;
-        $$ LANGUAGE plpgsql;
-
         CREATE OR REPLACE FUNCTION cleanup_old_webhook_deliveries()
         RETURNS void AS $$
         BEGIN
-            -- Keep webhook delivery history for 30 days
             DELETE FROM webhook.delivery_history
             WHERE created_at < NOW() - INTERVAL '30 days';
         END;

@@ -1,5 +1,14 @@
+use crate::rate_limiting::check_and_reserve_rate_limit;
+use crate::{
+    app_state::AppState,
+    rate_limiting::{RateLimitError, RateLimitOperation},
+    relayer::{get_relayer, get_relayer_provider_context_by_relayer_id, types::RelayerId},
+    rrelayer_error,
+    signing::db::write::RecordSignedTypedDataRequest,
+};
 use alloy::dyn_abi::TypedData;
 use alloy::primitives::PrimitiveSignature;
+use axum::http::HeaderMap;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -8,14 +17,6 @@ use axum::{
 use google_secretmanager1::client::serde_with::serde_derive::Serialize;
 use serde::Deserialize;
 use std::sync::Arc;
-
-use crate::{
-    app_state::AppState,
-    relayer::{get_relayer_provider_context_by_relayer_id, types::RelayerId},
-    rrelayer_error,
-    signing::db::write::RecordSignedTypedDataRequest,
-    user_rate_limiting::UserRateLimitError,
-};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SignTypedDataResult {
@@ -31,6 +32,7 @@ pub struct SignTypedDataResult {
 /// # Arguments
 /// * `state` - Application state containing database and provider connections
 /// * `relayer_id` - The unique identifier of the relayer to use for signing
+/// * `headers` - The request headers
 /// * `typed_data` - The structured typed data to sign following EIP-712 format
 ///
 /// # Returns
@@ -40,47 +42,12 @@ pub struct SignTypedDataResult {
 pub async fn sign_typed_data(
     State(state): State<Arc<AppState>>,
     Path(relayer_id): Path<RelayerId>,
+    headers: HeaderMap,
     Json(typed_data): Json<TypedData>,
 ) -> Result<Json<SignTypedDataResult>, StatusCode> {
-    if let Some(ref user_rate_limiter) = state.user_rate_limiter {
-        let user_identifier = format!("{:?}", relayer_id);
-
-        match user_rate_limiter
-            .check_rate_limit(&user_identifier, "signing_operations_per_minute", 1)
-            .await
-        {
-            Ok(check) => {
-                if !check.allowed {
-                    rrelayer_error!(
-                        "Signing rate limit exceeded for relayer {}: {}",
-                        relayer_id,
-                        check.rule_type
-                    );
-                    return Err(StatusCode::TOO_MANY_REQUESTS);
-                }
-            }
-            Err(UserRateLimitError::LimitExceeded {
-                rule_type,
-                current,
-                limit,
-                window_seconds,
-            }) => {
-                rrelayer_error!(
-                    "Signing rate limit exceeded for relayer {}: {}/{} {} in {}s",
-                    relayer_id,
-                    current,
-                    limit,
-                    rule_type,
-                    window_seconds
-                );
-                return Err(StatusCode::TOO_MANY_REQUESTS);
-            }
-            Err(e) => {
-                rrelayer_error!("Rate limiting error for signing: {}", e);
-                // Don't block signing for rate limiting errors, just log
-            }
-        }
-    }
+    let rate_limit_reservation =
+        check_and_reserve_rate_limit(&state, &headers, &relayer_id, RateLimitOperation::Signing)
+            .await?;
 
     let relayer_provider_context = get_relayer_provider_context_by_relayer_id(
         &state.db,
@@ -98,7 +65,6 @@ pub async fn sign_typed_data(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // Record the signing activity in the database
     let record_request = RecordSignedTypedDataRequest {
         relayer_id: relayer_id.into(),
         domain_data: serde_json::to_value(&typed_data.domain).unwrap_or_default(),
@@ -136,5 +102,11 @@ pub async fn sign_typed_data(
         });
     }
 
-    Ok(Json(SignTypedDataResult { signature }))
+    let result = SignTypedDataResult { signature };
+
+    if let Some(reservation) = rate_limit_reservation {
+        reservation.commit();
+    }
+
+    Ok(Json(result))
 }

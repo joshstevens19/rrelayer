@@ -161,6 +161,7 @@ async fn handle_withdraw(
                 blobs: None,
                 external_id: None,
             },
+            None,
         )
         .await?;
 
@@ -283,7 +284,7 @@ async fn handle_send(
 ) -> Result<(), TransactionError> {
     println!("Sending transaction: {:?}", transaction);
 
-    let tx = sdk.transaction.send_transaction(relayer_id, transaction).await?;
+    let tx = sdk.transaction.send_transaction(relayer_id, transaction, None).await?;
 
     println!("Transaction sent..");
     println!("Transaction id: {}", tx.id);

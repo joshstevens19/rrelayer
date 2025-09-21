@@ -1,7 +1,9 @@
 use super::types::TransactionSpeed;
+use crate::rate_limiting::check_and_reserve_rate_limit;
 use crate::shared::utils::convert_blob_strings_to_blobs;
 use crate::{
     app_state::AppState,
+    rate_limiting::{RateLimitError, RateLimitOperation},
     relayer::{get_relayer, types::RelayerId},
     rrelayer_error,
     shared::common_types::EvmAddress,
@@ -9,7 +11,6 @@ use crate::{
         queue_system::TransactionToSend,
         types::{TransactionData, TransactionHash, TransactionId, TransactionValue},
     },
-    user_rate_limiting::{UserDetector, UserRateLimitError},
 };
 use axum::{
     extract::{Path, State},
@@ -82,81 +83,13 @@ pub async fn send_transaction(
     headers: HeaderMap,
     Json(transaction): Json<RelayTransactionRequest>,
 ) -> Result<Json<SendTransactionResult>, StatusCode> {
-    if let Some(ref user_rate_limiter) = state.user_rate_limiter {
-        let relayer = get_relayer(&state.db, &state.cache, &relayer_id)
-            .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-            .ok_or(StatusCode::NOT_FOUND)?;
-
-        let user_detection_config = state
-            .rate_limit_config
-            .as_ref()
-            .and_then(|config| config.user_detection.clone())
-            .unwrap_or_default();
-        let user_detector = UserDetector::new(user_detection_config);
-
-        let transaction_bytes = transaction.data.clone().into_inner();
-        let user_context = user_detector
-            .detect_user(&headers, Some(&transaction.to), &transaction_bytes, &relayer.address)
-            .unwrap_or_else(|_| {
-                // Fallback to relayer address if detection fails
-                crate::user_rate_limiting::UserContext {
-                    user_address: relayer.address,
-                    detection_method: crate::user_rate_limiting::UserDetectionMethod::Fallback,
-                    transaction_type: crate::user_rate_limiting::TransactionType::Direct,
-                }
-            });
-
-        let user_identifier = format!("{:?}", user_context.user_address);
-
-        match user_rate_limiter
-            .check_rate_limit(&user_identifier, "transactions_per_minute", 1)
-            .await
-        {
-            Ok(check) => {
-                if !check.allowed {
-                    error!("Rate limit exceeded for user {}: {}", user_identifier, check.rule_type);
-                    return Err(StatusCode::TOO_MANY_REQUESTS);
-                }
-            }
-            Err(UserRateLimitError::LimitExceeded {
-                rule_type,
-                current,
-                limit,
-                window_seconds,
-            }) => {
-                error!(
-                    "Rate limit exceeded for user {}: {}/{} {} in {}s",
-                    user_identifier, current, limit, rule_type, window_seconds
-                );
-                return Err(StatusCode::TOO_MANY_REQUESTS);
-            }
-            Err(e) => {
-                error!("Rate limiting error: {}", e);
-                // Don't block transaction for rate limiting errors, just log
-            }
-        }
-
-        tokio::spawn({
-            let user_rate_limiter = user_rate_limiter.clone();
-            let relayer_id = relayer_id;
-            let user_context = user_context.clone();
-            async move {
-                let relayer_uuid: uuid::Uuid = relayer_id.into();
-                let _ = user_rate_limiter
-                    .record_transaction_metadata(
-                        None,
-                        &relayer_uuid,
-                        &user_context.user_address,
-                        &format!("{:?}", user_context.detection_method).to_lowercase(),
-                        &format!("{:?}", user_context.transaction_type).to_lowercase(),
-                        None,
-                        &["transactions_per_minute".to_string()],
-                    )
-                    .await;
-            }
-        });
-    }
+    let rate_limit_reservation = check_and_reserve_rate_limit(
+        &state,
+        &headers,
+        &relayer_id,
+        RateLimitOperation::Transaction,
+    )
+    .await?;
 
     let transaction_to_send = TransactionToSend::new(
         transaction.to,
@@ -174,12 +107,18 @@ pub async fn send_transaction(
         .add_transaction(&relayer_id, &transaction_to_send)
         .await
         .map_err(|e| {
-            rrelayer_error!("{}", e);
+            error!("{}", e);
             StatusCode::BAD_REQUEST
         })?;
 
-    Ok(Json(SendTransactionResult {
+    let result = SendTransactionResult {
         id: transaction.id,
         hash: transaction.known_transaction_hash.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?,
-    }))
+    };
+
+    if let Some(reservation) = rate_limit_reservation {
+        reservation.commit();
+    }
+
+    Ok(Json(result))
 }

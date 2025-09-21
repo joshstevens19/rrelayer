@@ -1,14 +1,17 @@
+use crate::rate_limiting::{check_and_reserve_rate_limit, RateLimitError, RateLimitOperation};
+use crate::relayer::get_relayer;
+use crate::{
+    app_state::AppState,
+    transaction::{get_transaction_by_id, types::TransactionId},
+};
+use axum::http::HeaderMap;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
     Json,
 };
 use std::sync::Arc;
-
-use crate::{
-    app_state::AppState,
-    transaction::{get_transaction_by_id, types::TransactionId},
-};
+use tracing::error;
 
 /// API endpoint to cancel a pending transaction.
 ///
@@ -25,11 +28,20 @@ use crate::{
 pub async fn cancel_transaction(
     State(state): State<Arc<AppState>>,
     Path(transaction_id): Path<TransactionId>,
+    headers: HeaderMap,
 ) -> Result<Json<bool>, StatusCode> {
     let transaction = get_transaction_by_id(&state.cache, &state.db, transaction_id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
+
+    let rate_limit_reservation = check_and_reserve_rate_limit(
+        &state,
+        &headers,
+        &transaction.relayer_id,
+        RateLimitOperation::Transaction,
+    )
+    .await?;
 
     let status = state
         .transactions_queues
@@ -38,6 +50,10 @@ pub async fn cancel_transaction(
         .cancel_transaction(&transaction)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    if let Some(reservation) = rate_limit_reservation {
+        reservation.commit();
+    }
 
     Ok(Json(status))
 }

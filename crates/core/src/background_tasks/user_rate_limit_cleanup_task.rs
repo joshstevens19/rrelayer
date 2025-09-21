@@ -1,26 +1,17 @@
-use crate::{rrelayer_info, user_rate_limiting::UserRateLimiter};
-use std::{sync::Arc, time::Duration};
-use tracing::{error, info};
+use crate::rrelayer_info;
+use std::sync::Arc;
+use tracing::info;
 
-/// Runs the rate limiter cleanup background task.
+/// Placeholder for rate limiter cleanup task.
 ///
-/// This function starts a periodic cleanup task that removes old rate limit
-/// usage records from the database to prevent unbounded growth.
+/// The new rate limiter uses in-memory caching with time-based windows,
+/// so no database cleanup is needed.
 ///
 /// # Arguments
-/// * `user_rate_limiter` - The user rate limiter instance to run cleanup on
-pub async fn run_user_rate_limit_cleanup_task(user_rate_limiter: Arc<UserRateLimiter>) {
-    rrelayer_info!("Starting rate limiter cleanup task");
-
-    tokio::spawn(async move {
-        let mut interval = tokio::time::interval(Duration::from_secs(3600)); // Every hour
-        loop {
-            interval.tick().await;
-            if let Err(e) = user_rate_limiter.cleanup_old_usage().await {
-                error!("Rate limiter cleanup error: {}", e);
-            }
-        }
-    });
-
-    info!("Rate limiter cleanup task initialized");
+/// * `_user_rate_limiter` - The user rate limiter instance (unused)
+pub async fn run_user_rate_limit_cleanup_task(
+    _user_rate_limiter: Arc<crate::rate_limiting::RateLimiter>,
+) {
+    rrelayer_info!("Rate limiter cleanup not needed - using in-memory cache");
+    info!("Rate limiter cleanup task placeholder initialized");
 }

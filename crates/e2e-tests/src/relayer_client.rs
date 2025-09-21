@@ -113,6 +113,19 @@ impl RelayerClient {
     ) -> Result<(SendTransactionResult, RelayTransactionRequest)> {
         info!("Sending transaction to: {} via relayer: {}", to, relayer_id);
 
+        self.send_transaction_with_rate_limit_key(relayer_id, to, value, data, None).await
+    }
+
+    pub async fn send_transaction_with_rate_limit_key(
+        &self,
+        relayer_id: &RelayerId,
+        to: &EvmAddress,
+        value: TransactionValue,
+        data: TransactionData,
+        rate_limit_key: Option<String>,
+    ) -> Result<(SendTransactionResult, RelayTransactionRequest)> {
+        info!("Sending transaction to: {} via relayer: {}", to, relayer_id);
+
         let request = RelayTransactionRequest {
             to: to.clone(),
             value,
@@ -127,7 +140,7 @@ impl RelayerClient {
         let result = self
             .sdk
             .transaction
-            .send_transaction(&relayer_id, &request)
+            .send_transaction(&relayer_id, &request, rate_limit_key)
             .await
             .context("Failed to send transaction")?;
 

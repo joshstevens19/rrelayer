@@ -13,8 +13,8 @@ use crate::{
         gas_oracle::{gas_oracle, GasOracleCache},
     },
     provider::EvmProvider,
+    rate_limiting::RateLimiter,
     rrelayer_info,
-    user_rate_limiting::UserRateLimiter,
     webhooks::WebhookManager,
     PostgresClient, SetupConfig,
 };
@@ -27,7 +27,7 @@ pub async fn run_background_tasks(
     blob_gas_oracle_cache: Arc<Mutex<BlobGasOracleCache>>,
     providers: Arc<Vec<EvmProvider>>,
     postgres_client: Arc<PostgresClient>,
-    user_rate_limiter: Option<Arc<UserRateLimiter>>,
+    user_rate_limiter: Option<Arc<RateLimiter>>,
     webhook_manager: Option<Arc<Mutex<WebhookManager>>>,
 ) {
     rrelayer_info!("Starting background tasks");

@@ -44,7 +44,7 @@ impl BasicAuthCredentials {
             return Err(BasicAuthError::InvalidHeaderFormat);
         }
 
-        let base64_credentials = &auth_header[6..]; // Skip "Basic "
+        let base64_credentials = &auth_header[6..];
         let decoded = general_purpose::STANDARD
             .decode(base64_credentials)
             .map_err(|_| BasicAuthError::InvalidBase64)?;

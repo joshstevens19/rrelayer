@@ -13,9 +13,9 @@ pub mod relayer;
 pub mod safe_proxy;
 pub use safe_proxy::{SafeProxyError, SafeProxyManager, SafeTransaction};
 pub use yaml::{
-    read, ApiConfig, AwsKmsSigningKey, DefaultRateLimits, GasProviders, GlobalRateLimits,
-    KmsKeyIds, NetworkSetupConfig, RateLimitConfig, RawSigningKey, SafeProxyConfig, SetupConfig,
-    SigningKey, UserDetectionConfig, UserRateLimits,
+    read, ApiConfig, AwsKmsSigningKey, GasProviders, GlobalRateLimits, KmsKeyIds,
+    NetworkSetupConfig, RateLimitConfig, RateLimits, RawSigningKey, SafeProxyConfig, SetupConfig,
+    SigningKey,
 };
 mod shared;
 pub use shared::common_types;
@@ -30,7 +30,8 @@ pub mod transaction;
 mod wallet;
 pub use wallet::{generate_seed_phrase, AwsKmsWalletManager, WalletError};
 mod background_tasks;
-pub mod user_rate_limiting;
+mod rate_limiting;
+pub use rate_limiting::RATE_LIMIT_HEADER_NAME;
 mod webhooks;
 mod yaml;
 
