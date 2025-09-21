@@ -6,6 +6,7 @@ use crate::{
     relayer::types::Relayer,
     safe_proxy::SafeProxyManager,
     shared::common_types::{EvmAddress, PagingContext},
+    transaction::{queue_system::transactions_queues::TransactionsQueues, types::TransactionNonce},
     yaml::{AutomaticTopUpConfig, Erc20TokenConfig, NativeTokenConfig, TopUpTargetAddresses},
     SetupConfig,
 };
@@ -56,6 +57,7 @@ pub struct AutomaticTopUpTask {
     relayer_cache: HashMap<ChainId, Vec<Relayer>>,
     relayer_refresh_interval: Interval,
     top_up_check_interval: Interval,
+    transactions_queues: Arc<tokio::sync::Mutex<TransactionsQueues>>,
 }
 
 impl AutomaticTopUpTask {
@@ -65,10 +67,12 @@ impl AutomaticTopUpTask {
     /// * `postgres_client` - Database client for querying relayer information
     /// * `providers` - Collection of EVM providers for different chains
     /// * `config` - Setup configuration containing network and top-up settings
+    /// * `transactions_queues` - Reference to the transaction queues for proper nonce management
     pub fn new(
         postgres_client: Arc<PostgresClient>,
         providers: Arc<Vec<EvmProvider>>,
         config: SetupConfig,
+        transactions_queues: Arc<tokio::sync::Mutex<TransactionsQueues>>,
     ) -> Self {
         // Initialize safe proxy manager if any safe proxy configs exist
         let safe_proxy_manager =
@@ -82,6 +86,7 @@ impl AutomaticTopUpTask {
             relayer_cache: HashMap::new(),
             relayer_refresh_interval: interval(Duration::from_secs(30)),
             top_up_check_interval: interval(Duration::from_secs(30)),
+            transactions_queues,
         }
     }
 
@@ -497,16 +502,16 @@ impl AutomaticTopUpTask {
                     safe_address, from_address, target_address
                 );
 
-                let wallet_index = match self.find_wallet_index_for_address(chain_id, from_address)
-                {
-                    Some(index) => index,
-                    None => {
-                        return Err(format!(
-                            "Cannot find wallet index for from_address {} on chain {}",
-                            from_address, chain_id
-                        ));
-                    }
-                };
+                let wallet_index =
+                    match self.find_wallet_index_for_address(chain_id, from_address).await {
+                        Some(index) => index,
+                        None => {
+                            return Err(format!(
+                                "Cannot find wallet index for from_address {} on chain {}",
+                                from_address, chain_id
+                            ));
+                        }
+                    };
 
                 let (_safe_tx, encoded_data) = safe_manager
                     .create_safe_transaction_with_signature(
@@ -530,9 +535,17 @@ impl AutomaticTopUpTask {
             (*target_address, native_config.top_up_amount, alloy::primitives::Bytes::new())
         };
 
+        // Get proper nonce from the transaction queue for this relayer
+        let nonce = match self.get_nonce_for_address(from_address, chain_id).await {
+            Ok(nonce) => nonce,
+            Err(e) => {
+                return Err(format!("Failed to get nonce for address {}: {}", from_address, e));
+            }
+        };
+
         let tx = TypedTransaction::Legacy(TxLegacy {
             chain_id: Some(provider.chain_id.u64()),
-            nonce: 0,
+            nonce: nonce.into(),
             gas_price: 20_000_000_000,
             gas_limit: if config.safe.is_some() { 300000 } else { 21000 },
             to: alloy::primitives::TxKind::Call(final_to.into()),
@@ -542,7 +555,7 @@ impl AutomaticTopUpTask {
 
         let wallet_index = if config.safe.is_none() {
             // For direct transactions, we need to find the wallet index
-            match self.find_wallet_index_for_address(chain_id, from_address) {
+            match self.find_wallet_index_for_address(chain_id, from_address).await {
                 Some(index) => index,
                 None => {
                     return Err(format!(
@@ -554,7 +567,7 @@ impl AutomaticTopUpTask {
         } else {
             // For Safe transactions, we use the signer's wallet (from_address)
             // This is already determined inside the Safe logic above
-            match self.find_wallet_index_for_address(chain_id, from_address) {
+            match self.find_wallet_index_for_address(chain_id, from_address).await {
                 Some(index) => index,
                 None => {
                     return Err(format!(
@@ -633,7 +646,10 @@ impl AutomaticTopUpTask {
                         addresses
                     }
                     Err(e) => {
-                        error!("Error fetching all the relayers on chainId {} - error {}", chain_id, e);
+                        error!(
+                            "Error fetching all the relayers on chainId {} - error {}",
+                            chain_id, e
+                        );
                         Vec::new()
                     }
                 }
@@ -772,17 +788,85 @@ impl AutomaticTopUpTask {
     /// # Returns
     /// * `Some(u32)` - Wallet index if address is found in relayer cache
     /// * `None` - Address not found in cache or chain not cached
-    fn find_wallet_index_for_address(
+
+    /// Gets the next nonce for a relayer address using the transaction queue's nonce manager.
+    async fn get_nonce_for_address(
+        &self,
+        address: &EvmAddress,
+        chain_id: &ChainId,
+    ) -> Result<TransactionNonce, String> {
+        let transactions_queues = self.transactions_queues.lock().await;
+
+        let relayer_id = if let Some(relayer) =
+            self.relayer_cache.values().flatten().find(|relayer| &relayer.address == address)
+        {
+            relayer.id
+        } else {
+            // Cache miss - fall back to database lookup
+            info!("Relayer with address {} not found in cache, querying database", address);
+
+            match self.postgres_client.get_relayer_by_address(address, chain_id).await {
+                Ok(Some(relayer)) => relayer.id,
+                Ok(None) => {
+                    return Err(format!("Relayer with address {} not found in database", address));
+                }
+                Err(e) => {
+                    return Err(format!(
+                        "Database error while looking up relayer {}: {}",
+                        address, e
+                    ));
+                }
+            }
+        };
+
+        // Get the transaction queue for this relayer
+        let queue = transactions_queues
+            .queues
+            .get(&relayer_id)
+            .ok_or_else(|| format!("Transaction queue not found for relayer {}", relayer_id))?;
+
+        // Get and increment nonce atomically
+        let nonce = queue.lock().await.nonce_manager.get_and_increment().await;
+        Ok(nonce)
+    }
+
+    async fn find_wallet_index_for_address(
         &self,
         chain_id: &ChainId,
         address: &EvmAddress,
     ) -> Option<u32> {
-        match self.relayer_cache.get(chain_id) {
-            Some(relayers) => relayers
-                .iter()
-                .find(|relayer| &relayer.address == address)
-                .map(|relayer| relayer.wallet_index),
-            None => None,
+        // First try cache
+        if let Some(relayers) = self.relayer_cache.get(chain_id) {
+            if let Some(relayer) = relayers.iter().find(|relayer| &relayer.address == address) {
+                return Some(relayer.wallet_index);
+            }
+        }
+
+        // Cache miss - fall back to database lookup
+        info!("Wallet index for address {} not found in cache, querying database", address);
+
+        match self.postgres_client.get_relayer_by_address(address, chain_id).await {
+            Ok(Some(relayer)) => {
+                info!(
+                    "Found wallet index {} for address {} in database",
+                    relayer.wallet_index, address
+                );
+                Some(relayer.wallet_index)
+            }
+            Ok(None) => {
+                warn!(
+                    "Relayer with address {} not found in database for chain {}",
+                    address, chain_id
+                );
+                None
+            }
+            Err(e) => {
+                error!(
+                    "Database error while looking up wallet index for address {}: {}",
+                    address, e
+                );
+                None
+            }
         }
     }
 
@@ -893,16 +977,16 @@ impl AutomaticTopUpTask {
                 );
 
                 // Get wallet index for signing
-                let wallet_index = match self.find_wallet_index_for_address(chain_id, from_address)
-                {
-                    Some(index) => index,
-                    None => {
-                        return Err(format!(
-                            "Cannot find wallet index for from_address {} on chain {}",
-                            from_address, chain_id
-                        ));
-                    }
-                };
+                let wallet_index =
+                    match self.find_wallet_index_for_address(chain_id, from_address).await {
+                        Some(index) => index,
+                        None => {
+                            return Err(format!(
+                                "Cannot find wallet index for from_address {} on chain {}",
+                                from_address, chain_id
+                            ));
+                        }
+                    };
 
                 // Use SafeProxyManager to create the complete Safe transaction with signature
                 let (_safe_tx, encoded_data) = safe_manager
@@ -927,9 +1011,16 @@ impl AutomaticTopUpTask {
             (token_config.address.into(), U256::ZERO, transfer_call.abi_encode().into())
         };
 
+        let nonce = match self.get_nonce_for_address(from_address, chain_id).await {
+            Ok(nonce) => nonce,
+            Err(e) => {
+                return Err(format!("Failed to get nonce for address {}: {}", from_address, e));
+            }
+        };
+
         let tx = TypedTransaction::Legacy(TxLegacy {
             chain_id: Some(provider.chain_id.u64()),
-            nonce: 0,                  // This will be updated by the provider
+            nonce: nonce.into(),
             gas_price: 20_000_000_000, // 20 gwei, will be updated by gas estimation
             gas_limit: if config.safe.is_some() { 400000 } else { 100000 }, // Higher gas limit for Safe transactions
             to: alloy::primitives::TxKind::Call(final_to.into()),
@@ -940,7 +1031,7 @@ impl AutomaticTopUpTask {
         // Find the wallet index for the from_address
         let wallet_index = if config.safe.is_none() {
             // For direct ERC-20 transactions
-            match self.find_wallet_index_for_address(chain_id, from_address) {
+            match self.find_wallet_index_for_address(chain_id, from_address).await {
                 Some(index) => index,
                 None => {
                     return Err(format!(
@@ -951,7 +1042,7 @@ impl AutomaticTopUpTask {
             }
         } else {
             // For Safe ERC-20 transactions, we use the signer's wallet (from_address)
-            match self.find_wallet_index_for_address(chain_id, from_address) {
+            match self.find_wallet_index_for_address(chain_id, from_address).await {
                 Some(index) => index,
                 None => {
                     return Err(format!(
@@ -1020,6 +1111,7 @@ impl AutomaticTopUpTask {
 /// * `config` - Setup configuration containing network and top-up settings
 /// * `postgres_client` - Database client for querying relayer information
 /// * `providers` - Collection of EVM providers for different blockchain networks
+/// * `transactions_queues` - Reference to the transaction queues for proper nonce management
 ///
 /// # Behavior
 /// The task will run indefinitely, performing these operations on configured intervals:
@@ -1032,10 +1124,12 @@ pub async fn run_automatic_top_up_task(
     config: SetupConfig,
     postgres_client: Arc<PostgresClient>,
     providers: Arc<Vec<EvmProvider>>,
+    transactions_queues: Arc<tokio::sync::Mutex<TransactionsQueues>>,
 ) {
     info!("Starting automatic top-up task");
 
-    let mut top_up_task = AutomaticTopUpTask::new(postgres_client, providers, config);
+    let mut top_up_task =
+        AutomaticTopUpTask::new(postgres_client, providers, config, transactions_queues);
 
     tokio::spawn(async move {
         top_up_task.run().await;

@@ -417,6 +417,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
         postgres_client.clone(),
         user_rate_limiter.clone(),
         webhook_manager.clone(),
+        transaction_queue.clone(),
     )
     .await;
 

@@ -134,6 +134,30 @@ impl PostgresClient {
         }
     }
 
+    pub async fn get_relayer_by_address(
+        &self,
+        address: &EvmAddress,
+        chain_id: &ChainId,
+    ) -> Result<Option<Relayer>, PostgresError> {
+        let row = self
+            .query_one_or_none(
+                "
+                    SELECT *
+                    FROM relayer.record
+                    WHERE address = $1
+                    AND chain_id = $2
+                    AND deleted = FALSE;
+                ",
+                &[address, chain_id],
+            )
+            .await?;
+
+        match row {
+            None => Ok(None),
+            Some(row) => Ok(Some(build_relayer(&row))),
+        }
+    }
+
     /// Retrieves a paginated list of allowlisted addresses for a specific relayer.
     ///
     /// This method queries the database for all Ethereum addresses that are allowed
