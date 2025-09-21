@@ -69,7 +69,6 @@ sign_typed_data:
 sign_typed_data_history:
 	cargo run -- sign --path $(CURDIR)/../../playground/example typed-data-history 7ed18611-1739-4a5f-99e3-e70356029984
 
-# TODO: TEST OUT ALL OF THIS LOGIC
 tx_queue:
 	cargo run -- tx --path $(CURDIR)/../../playground/example queue 3c24e942-3109-4516-bd3b-6e2a904ef473
 tx_get:
