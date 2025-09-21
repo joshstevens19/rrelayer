@@ -294,6 +294,7 @@ impl TestRunner {
             ("transaction_replacement_edge_cases", "Transaction replacement edge cases"),
             ("webhook_delivery_testing", "Webhook delivery testing"),
             ("rate_limiting_enforcement", "Rate limiting enforcement"),
+            ("automatic_top_up", "Automatic relayer balance top-up"),
             ("concurrent_transactions", "Concurrent transaction handling"),
             ("network_configuration_edge_cases", "Network configuration edge cases"),
             ("authentication_edge_cases", "Authentication edge cases"),
@@ -398,6 +399,7 @@ impl TestRunner {
             "gas_price_bumping" => self.test_gas_price_bumping().await,
             "webhook_delivery" => self.test_webhook_delivery().await,
             "rate_limiting" => self.test_rate_limiting().await,
+            "automatic_top_up" => self.test_automatic_top_up().await,
             "concurrent_transactions" => self.test_concurrent_transactions().await,
             "unauthenticated" => self.test_unauthenticated().await,
             "blob_transaction_handling" => self.test_blob_transaction_handling().await,
@@ -543,6 +545,7 @@ impl TestRunner {
             "gas_price_bumping" => "Gas price bumping mechanism",
             "webhook_delivery" => "Webhook delivery testing",
             "rate_limiting" => "Rate limiting enforcement",
+            "automatic_top_up" => "Automatic relayer balance top-up",
             "concurrent_transactions" => "Concurrent transaction handling",
             "unauthenticated" => "Unauthenticated protection",
             "blob_transaction_handling" => "Blob transaction handling (EIP-4844)",
@@ -3549,6 +3552,139 @@ impl TestRunner {
         info!("Successful signing typed data before rate limit: {}", successful_transactions);
 
         info!("Rate limiting mechanism verified");
+        Ok(())
+    }
+
+    /// run single with:
+    /// make run-test-debug TEST=automatic_top_up
+    async fn test_automatic_top_up(&self) -> Result<()> {
+        info!("Testing automatic relayer balance top-up...");
+
+        // Create multiple relayers with different starting balances
+        let relayer1 = self.create_and_fund_relayer("top-up-test-1").await?;
+        let relayer2 = self.create_and_fund_relayer("top-up-test-2").await?;
+        let relayer3 = self.create_and_fund_relayer("top-up-test-3").await?;
+
+        info!("Created test relayers: {:?}, {:?}, {:?}", relayer1.id, relayer2.id, relayer3.id);
+
+        // Check initial balances (should be funded by create_and_fund_relayer)
+        let initial_balance1 = self.contract_interactor.get_eth_balance(&relayer1.address).await?;
+        let initial_balance2 = self.contract_interactor.get_eth_balance(&relayer2.address).await?;
+        let initial_balance3 = self.contract_interactor.get_eth_balance(&relayer3.address).await?;
+
+        info!("Initial balances:");
+        info!("  Relayer 1: {} ETH", alloy::primitives::utils::format_ether(initial_balance1));
+        info!("  Relayer 2: {} ETH", alloy::primitives::utils::format_ether(initial_balance2));
+        info!("  Relayer 3: {} ETH", alloy::primitives::utils::format_ether(initial_balance3));
+
+        // Drain some balances to simulate low balance scenarios
+        let drain_amount = alloy::primitives::utils::parse_ether("90")?; // Leave about 10 ETH
+
+        // Send transactions to drain balances below top-up threshold
+        info!("Draining relayer balances to trigger top-up...");
+
+        // Drain relayer1 significantly
+        if initial_balance1 > drain_amount {
+            let tx_request = RelayTransactionRequest {
+                to: self.config.anvil_accounts[4],
+                value: drain_amount.into(),
+                data: TransactionData::empty(),
+                speed: Some(TransactionSpeed::Fast),
+                external_id: Some("drain-tx-1".to_string()),
+                blobs: None,
+            };
+
+            self.relayer_client
+                .sdk
+                .transaction
+                .send_transaction(&relayer1.id, &tx_request, None)
+                .await?;
+        }
+
+        // Drain relayer2 significantly
+        if initial_balance2 > drain_amount {
+            let tx_request = RelayTransactionRequest {
+                to: self.config.anvil_accounts[4],
+                value: drain_amount.into(),
+                data: TransactionData::empty(),
+                speed: Some(TransactionSpeed::Fast),
+                external_id: Some("drain-tx-2".to_string()),
+                blobs: None,
+            };
+
+            self.relayer_client
+                .sdk
+                .transaction
+                .send_transaction(&relayer2.id, &tx_request, None)
+                .await?;
+        }
+
+        // Mine a block to process the drain transactions
+        self.mine_and_wait().await?;
+
+        // Check balances after draining
+        let drained_balance1 = self.contract_interactor.get_eth_balance(&relayer1.address).await?;
+        let drained_balance2 = self.contract_interactor.get_eth_balance(&relayer2.address).await?;
+        let drained_balance3 = self.contract_interactor.get_eth_balance(&relayer3.address).await?;
+
+        info!("Balances after draining:");
+        info!("  Relayer 1: {} ETH", alloy::primitives::utils::format_ether(drained_balance1));
+        info!("  Relayer 2: {} ETH", alloy::primitives::utils::format_ether(drained_balance2));
+        info!("  Relayer 3: {} ETH", alloy::primitives::utils::format_ether(drained_balance3));
+
+        // Wait for automatic top-up to trigger (give it some time)
+        info!("Waiting for automatic top-up mechanism to trigger...");
+        tokio::time::sleep(Duration::from_secs(30)).await;
+
+        // Check if balances have been topped up to 100 ETH
+        let final_balance1 = self.contract_interactor.get_eth_balance(&relayer1.address).await?;
+        let final_balance2 = self.contract_interactor.get_eth_balance(&relayer2.address).await?;
+        let final_balance3 = self.contract_interactor.get_eth_balance(&relayer3.address).await?;
+
+        info!("Final balances after top-up:");
+        info!("  Relayer 1: {} ETH", alloy::primitives::utils::format_ether(final_balance1));
+        info!("  Relayer 2: {} ETH", alloy::primitives::utils::format_ether(final_balance2));
+        info!("  Relayer 3: {} ETH", alloy::primitives::utils::format_ether(final_balance3));
+
+        // Expected top-up amount is 100 ETH
+        let expected_top_up = alloy::primitives::utils::parse_ether("100")?;
+        let tolerance = alloy::primitives::utils::parse_ether("1")?; // 1 ETH tolerance for gas costs
+
+        // Verify that relayers with low balances got topped up
+        if drained_balance1 < expected_top_up {
+            if final_balance1.abs_diff(expected_top_up) > tolerance {
+                return Err(anyhow::anyhow!(
+                    "Relayer 1 balance not topped up correctly. Expected ~100 ETH, got {} ETH",
+                    alloy::primitives::utils::format_ether(final_balance1)
+                ));
+            }
+            info!("✅ Relayer 1 successfully topped up to ~100 ETH");
+        }
+
+        if drained_balance2 < expected_top_up {
+            if final_balance2.abs_diff(expected_top_up) > tolerance {
+                return Err(anyhow::anyhow!(
+                    "Relayer 2 balance not topped up correctly. Expected ~100 ETH, got {} ETH",
+                    alloy::primitives::utils::format_ether(final_balance2)
+                ));
+            }
+            info!("✅ Relayer 2 successfully topped up to ~100 ETH");
+        }
+
+        // Relayer 3 should remain unchanged if it wasn't drained
+        if drained_balance3 >= expected_top_up {
+            let balance_change = final_balance3.abs_diff(drained_balance3);
+            if balance_change > tolerance {
+                return Err(anyhow::anyhow!(
+                    "Relayer 3 balance changed unexpectedly. Was {} ETH, now {} ETH",
+                    alloy::primitives::utils::format_ether(drained_balance3),
+                    alloy::primitives::utils::format_ether(final_balance3)
+                ));
+            }
+            info!("✅ Relayer 3 balance remained stable (no top-up needed)");
+        }
+
+        info!("✅ Automatic top-up mechanism working correctly");
         Ok(())
     }
 

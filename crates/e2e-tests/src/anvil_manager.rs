@@ -39,6 +39,8 @@ impl AnvilManager {
                 &self.port.to_string(),
                 "--accounts",
                 "10",
+                "--balance",
+                "10000000000", // 10 billion ETH per account
                 "--mnemonic",
                 "test test test test test test test test test test test junk",
                 "--no-mining", // Don't auto-mine empty blocks

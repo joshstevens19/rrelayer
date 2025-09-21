@@ -79,6 +79,27 @@ impl PostgresClient {
         Ok(PagingResult::new(results, paging_context.next(result_count), paging_context.previous()))
     }
 
+    pub async fn get_all_relayers_for_chain(
+        &self,
+        chain_id: &ChainId,
+    ) -> Result<Vec<Relayer>, PostgresError> {
+        let rows = self
+            .query(
+                "
+                    SELECT *
+                    FROM relayer.record
+                    WHERE chain_id = $1
+                    AND deleted = FALSE
+                ",
+                &[&chain_id],
+            )
+            .await?;
+
+        let results: Vec<Relayer> = rows.iter().map(build_relayer).collect();
+
+        Ok(results)
+    }
+
     /// Retrieves a single relayer by its unique identifier.
     ///
     /// This method queries the database for a specific relayer using its ID,

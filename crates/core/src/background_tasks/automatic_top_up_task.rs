@@ -4,7 +4,6 @@ use crate::{
     postgres::{PostgresClient, PostgresError},
     provider::EvmProvider,
     relayer::types::Relayer,
-    rrelayer_error,
     safe_proxy::SafeProxyManager,
     shared::common_types::{EvmAddress, PagingContext},
     yaml::{AutomaticTopUpConfig, Erc20TokenConfig, NativeTokenConfig, TopUpTargetAddresses},
@@ -19,7 +18,7 @@ use alloy::sol;
 use alloy::sol_types::SolCall;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::time::{interval, Interval};
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 
 sol! {
     #[sol(rpc)]
@@ -81,7 +80,7 @@ impl AutomaticTopUpTask {
             config,
             safe_proxy_manager,
             relayer_cache: HashMap::new(),
-            relayer_refresh_interval: interval(Duration::from_secs(60)),
+            relayer_refresh_interval: interval(Duration::from_secs(30)),
             top_up_check_interval: interval(Duration::from_secs(30)),
         }
     }
@@ -119,11 +118,7 @@ impl AutomaticTopUpTask {
                 let chain_id = match network_config.get_chain_id().await {
                     Ok(id) => id,
                     Err(e) => {
-                        rrelayer_error!(
-                            "Failed to get chain ID for network {}: {}",
-                            network_config.name,
-                            e
-                        );
+                        error!("Failed to get chain ID for network {}: {}", network_config.name, e);
                         continue;
                     }
                 };
@@ -134,11 +129,7 @@ impl AutomaticTopUpTask {
                         self.relayer_cache.insert(chain_id, relayers);
                     }
                     Err(e) => {
-                        rrelayer_error!(
-                            "Failed to refresh relayer cache for chain {}: {}",
-                            chain_id,
-                            e
-                        );
+                        error!("Failed to refresh relayer cache for chain {}: {}", chain_id, e);
                     }
                 }
             }
@@ -192,11 +183,7 @@ impl AutomaticTopUpTask {
                 let chain_id = match network_config.get_chain_id().await {
                     Ok(id) => id,
                     Err(e) => {
-                        rrelayer_error!(
-                            "Failed to get chain ID for network {}: {}",
-                            network_config.name,
-                            e
-                        );
+                        error!("Failed to get chain ID for network {}: {}", network_config.name, e);
                         continue;
                     }
                 };
@@ -215,14 +202,6 @@ impl AutomaticTopUpTask {
     }
 
     /// Processes a single automatic top-up configuration for a specific chain.
-    ///
-    /// # Arguments
-    /// * `chain_id` - The chain ID being processed
-    /// * `provider` - EVM provider for the chain
-    /// * `config` - Automatic top-up configuration settings
-    ///
-    /// This method resolves target addresses, processes native token top-ups,
-    /// and processes ERC-20 token top-ups based on configuration.
     async fn process_top_up_config(
         &self,
         chain_id: &ChainId,
@@ -237,7 +216,7 @@ impl AutomaticTopUpTask {
         {
             Ok(addresses) => addresses,
             Err(e) => {
-                rrelayer_error!("Failed to resolve target addresses for chain {}: {}", chain_id, e);
+                error!("Failed to resolve target addresses for chain {}: {}", chain_id, e);
                 return;
             }
         };
@@ -294,14 +273,6 @@ impl AutomaticTopUpTask {
     }
 
     /// Processes native token (ETH) top-ups for target addresses.
-    ///
-    /// # Arguments
-    /// * `chain_id` - The chain ID being processed
-    /// * `provider` - EVM provider for the chain
-    /// * `from_address` - Source address for funds
-    /// * `target_addresses` - List of addresses to check and potentially top-up
-    /// * `native_config` - Native token configuration settings
-    /// * `config` - Automatic top-up configuration containing safe address if applicable
     async fn process_native_token_top_ups(
         &self,
         chain_id: &ChainId,
@@ -394,14 +365,6 @@ impl AutomaticTopUpTask {
     }
 
     /// Processes ERC-20 token top-ups for target addresses.
-    ///
-    /// # Arguments
-    /// * `chain_id` - The chain ID being processed
-    /// * `provider` - EVM provider for the chain
-    /// * `from_address` - Source address for funds
-    /// * `target_addresses` - List of addresses to check and potentially top-up
-    /// * `token_config` - ERC-20 token configuration settings
-    /// * `config` - Automatic top-up configuration containing safe address if applicable
     async fn process_erc20_token_top_ups(
         &self,
         chain_id: &ChainId,
@@ -503,18 +466,6 @@ impl AutomaticTopUpTask {
     }
 
     /// Sends a native token top-up transaction from one address to another.
-    ///
-    /// # Arguments
-    /// * `chain_id` - The chain ID for wallet index lookup
-    /// * `provider` - EVM provider to send the transaction through
-    /// * `from_address` - Source address for the funds
-    /// * `target_address` - Destination address to receive funds
-    /// * `native_config` - Native token configuration containing amount and settings
-    /// * `config` - Automatic top-up configuration containing safe address if applicable
-    ///
-    /// # Returns
-    /// * `Ok(String)` - Transaction hash if successful
-    /// * `Err(String)` - Error message if transaction fails
     async fn send_native_top_up_transaction(
         &self,
         chain_id: &ChainId,
@@ -581,9 +532,9 @@ impl AutomaticTopUpTask {
 
         let tx = TypedTransaction::Legacy(TxLegacy {
             chain_id: Some(provider.chain_id.u64()),
-            nonce: 0,                  // This will be updated by the provider
-            gas_price: 20_000_000_000, // 20 gwei, will be updated by gas estimation
-            gas_limit: if config.safe.is_some() { 300000 } else { 21000 }, // Higher gas limit for Safe transactions
+            nonce: 0,
+            gas_price: 20_000_000_000,
+            gas_limit: if config.safe.is_some() { 300000 } else { 21000 },
             to: alloy::primitives::TxKind::Call(final_to.into()),
             value: final_value,
             input: final_data,
@@ -672,18 +623,21 @@ impl AutomaticTopUpTask {
         chain_id: &ChainId,
         targets: &TopUpTargetAddresses,
         from_address: &EvmAddress,
-    ) -> Result<Vec<EvmAddress>, String> {
+    ) -> Result<Vec<EvmAddress>, PostgresError> {
         let mut addresses = match targets {
-            TopUpTargetAddresses::All => match self.relayer_cache.get(chain_id) {
-                Some(relayers) => {
-                    let addresses: Vec<EvmAddress> = relayers.iter().map(|r| r.address).collect();
-                    addresses
+            TopUpTargetAddresses::All => {
+                match self.postgres_client.get_all_relayers_for_chain(chain_id).await {
+                    Ok(relayers) => {
+                        let addresses: Vec<EvmAddress> =
+                            relayers.iter().map(|r| r.address).collect();
+                        addresses
+                    }
+                    Err(e) => {
+                        error!("Error fetching all the relayers on chainId {} - error {}", chain_id, e);
+                        Vec::new()
+                    }
                 }
-                None => {
-                    warn!("No cached relayers found for chain {}", chain_id);
-                    Vec::new()
-                }
-            },
+            }
             TopUpTargetAddresses::List(addresses) => addresses.clone(),
         };
 
