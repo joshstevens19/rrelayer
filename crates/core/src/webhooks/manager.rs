@@ -16,7 +16,7 @@ use crate::{
 };
 
 use super::{
-    payload::WebhookPayload,
+    payload::{WebhookPayload, WebhookSigningPayload},
     sender::WebhookSender,
     types::{WebhookDelivery, WebhookDeliveryConfig, WebhookEventType, WebhookFilter},
 };
@@ -152,6 +152,88 @@ impl WebhookManager {
             "Queuing {} webhooks for transaction {} event {} on chain {}",
             deliveries_to_queue.len(),
             transaction.id,
+            serde_json::to_string(&payload.event_type).unwrap_or_default(),
+            chain_name
+        );
+
+        // Add to pending deliveries
+        let mut pending = self.pending_deliveries.write().await;
+        for delivery in deliveries_to_queue {
+            pending.insert(delivery.id, delivery);
+        }
+
+        // Trigger immediate processing for fresh webhooks
+        tokio::spawn({
+            let manager = self.clone();
+            async move {
+                manager.process_ready_deliveries().await;
+            }
+        });
+    }
+
+    /// Queue a webhook for a signing event
+    pub async fn queue_signing_webhook(
+        &self,
+        relayer_id: &crate::relayer::types::RelayerId,
+        chain_id: ChainId,
+        payload: WebhookSigningPayload,
+    ) {
+        if self.webhook_configs.is_empty() {
+            rrelayer_info!(
+                "No webhooks configured, skipping signing webhook for relayer {}",
+                relayer_id
+            );
+            return;
+        }
+
+        let network_names = self.network_names.read().await;
+        let chain_name = network_names
+            .get(&chain_id)
+            .cloned()
+            .unwrap_or_else(|| chain_id.to_string());
+
+        let payload_json = match payload.to_json_value() {
+            Ok(json) => json,
+            Err(e) => {
+                rrelayer_error!(
+                    "Failed to serialize signing webhook payload for relayer {}: {}",
+                    relayer_id,
+                    e
+                );
+                return;
+            }
+        };
+
+        let mut deliveries_to_queue = Vec::new();
+
+        for webhook_config in &self.webhook_configs {
+            // Check if webhook should receive events for this network
+            if webhook_config.networks.is_empty()
+                || webhook_config.networks.contains(&chain_name)
+                || webhook_config.networks.contains(&"*".to_string())
+            {
+                let delivery = WebhookDelivery::new(
+                    webhook_config.clone(),
+                    payload.event_type.clone(),
+                    payload_json.clone(),
+                    3, // Default max retries
+                );
+                deliveries_to_queue.push(delivery);
+            }
+        }
+
+        if deliveries_to_queue.is_empty() {
+            debug!(
+                "No webhooks matched filters for signing operation relayer {} on chain {}",
+                relayer_id, chain_name
+            );
+            return;
+        }
+
+        rrelayer_info!(
+            "Queuing {} signing webhooks for relayer {} event {} on chain {}",
+            deliveries_to_queue.len(),
+            relayer_id,
             serde_json::to_string(&payload.event_type).unwrap_or_default(),
             chain_name
         );
@@ -420,5 +502,43 @@ impl WebhookManager {
     ) {
         let payload = WebhookPayload::transaction_replaced(new_transaction, original_transaction);
         self.queue_webhook_with_payload(new_transaction, payload).await;
+    }
+
+    /// Fire webhook when text is signed
+    pub async fn on_text_signed(
+        &self,
+        relayer_id: &crate::relayer::types::RelayerId,
+        chain_id: ChainId,
+        message: String,
+        signature: alloy::primitives::PrimitiveSignature,
+    ) {
+        let payload = WebhookSigningPayload::text_signed(
+            relayer_id.clone(),
+            chain_id,
+            message,
+            signature,
+        );
+        self.queue_signing_webhook(relayer_id, chain_id, payload).await;
+    }
+
+    /// Fire webhook when typed data is signed
+    pub async fn on_typed_data_signed(
+        &self,
+        relayer_id: &crate::relayer::types::RelayerId,
+        chain_id: ChainId,
+        domain_data: serde_json::Value,
+        message_data: serde_json::Value,
+        primary_type: String,
+        signature: alloy::primitives::PrimitiveSignature,
+    ) {
+        let payload = WebhookSigningPayload::typed_data_signed(
+            relayer_id.clone(),
+            chain_id,
+            domain_data,
+            message_data,
+            primary_type,
+            signature,
+        );
+        self.queue_signing_webhook(relayer_id, chain_id, payload).await;
     }
 }

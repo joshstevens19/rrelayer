@@ -27,6 +27,10 @@ pub enum WebhookEventType {
     TransactionCancelled,
     /// Transaction was replaced
     TransactionReplaced,
+    /// Text message was signed
+    TextSigned,
+    /// Typed data (EIP-712) was signed
+    TypedDataSigned,
 }
 
 impl From<TransactionStatus> for WebhookEventType {

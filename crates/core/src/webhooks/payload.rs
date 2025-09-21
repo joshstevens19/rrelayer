@@ -7,7 +7,7 @@ use crate::{
         TransactionValue,
     },
 };
-use alloy::network::AnyTransactionReceipt;
+use alloy::{network::AnyTransactionReceipt, primitives::PrimitiveSignature};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -86,6 +86,104 @@ impl From<&Transaction> for WebhookTransactionData {
             confirmed_at: transaction.confirmed_at.map(|dt| dt.into()),
             expires_at: transaction.expires_at.into(),
         }
+    }
+}
+
+/// Signing-specific payload for text and typed data signing events
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebhookSigningPayload {
+    /// Event type that triggered the webhook
+    pub event_type: WebhookEventType,
+    /// Signing operation data
+    pub signing: WebhookSigningData,
+    /// Timestamp when the event occurred
+    pub timestamp: DateTime<Utc>,
+    /// API version for payload compatibility
+    pub api_version: String,
+}
+
+/// Signing data optimized for webhook payloads
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebhookSigningData {
+    /// Relayer ID that performed the signing
+    #[serde(rename = "relayerId")]
+    pub relayer_id: RelayerId,
+    /// Chain ID where signing occurred
+    #[serde(rename = "chainId")]
+    pub chain_id: ChainId,
+    /// The signature produced
+    pub signature: PrimitiveSignature,
+    /// When the signing occurred
+    #[serde(rename = "signedAt")]
+    pub signed_at: DateTime<Utc>,
+    /// Text message (for text signing)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    /// Typed data domain (for typed data signing)
+    #[serde(rename = "domainData", skip_serializing_if = "Option::is_none")]
+    pub domain_data: Option<serde_json::Value>,
+    /// Typed data message (for typed data signing)
+    #[serde(rename = "messageData", skip_serializing_if = "Option::is_none")]
+    pub message_data: Option<serde_json::Value>,
+    /// Primary type (for typed data signing)
+    #[serde(rename = "primaryType", skip_serializing_if = "Option::is_none")]
+    pub primary_type: Option<String>,
+}
+
+impl WebhookSigningPayload {
+    /// Create a new webhook signing payload for text signing
+    pub fn text_signed(
+        relayer_id: RelayerId,
+        chain_id: ChainId,
+        message: String,
+        signature: PrimitiveSignature,
+    ) -> Self {
+        Self {
+            event_type: WebhookEventType::TextSigned,
+            signing: WebhookSigningData {
+                relayer_id,
+                chain_id,
+                signature,
+                signed_at: Utc::now(),
+                message: Some(message),
+                domain_data: None,
+                message_data: None,
+                primary_type: None,
+            },
+            timestamp: Utc::now(),
+            api_version: "1.0".to_string(),
+        }
+    }
+
+    /// Create a new webhook signing payload for typed data signing
+    pub fn typed_data_signed(
+        relayer_id: RelayerId,
+        chain_id: ChainId,
+        domain_data: serde_json::Value,
+        message_data: serde_json::Value,
+        primary_type: String,
+        signature: PrimitiveSignature,
+    ) -> Self {
+        Self {
+            event_type: WebhookEventType::TypedDataSigned,
+            signing: WebhookSigningData {
+                relayer_id,
+                chain_id,
+                signature,
+                signed_at: Utc::now(),
+                message: None,
+                domain_data: Some(domain_data),
+                message_data: Some(message_data),
+                primary_type: Some(primary_type),
+            },
+            timestamp: Utc::now(),
+            api_version: "1.0".to_string(),
+        }
+    }
+
+    /// Convert the payload to JSON value
+    pub fn to_json_value(&self) -> Result<serde_json::Value, serde_json::Error> {
+        serde_json::to_value(self)
     }
 }
 
