@@ -474,7 +474,6 @@ impl TestRunner {
     }
 
     // Tests missing
-    // TODO: Automatic top up tasks
     // TODO: Safe proxy
 
     /// Run a single filtered test with the new reporting system
