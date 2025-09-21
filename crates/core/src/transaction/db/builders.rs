@@ -27,8 +27,7 @@ pub fn build_transaction_from_transaction_view(row: &Row) -> Transaction {
         nonce: row.get("nonce"),
         gas_limit: row.get("gas_limit"),
         status: row.get("status"),
-        // TODO! load blobs from db
-        blobs: None,
+        blobs: row.get("blobs"),
         known_transaction_hash: row.get("hash"),
         queued_at: row.get("queued_at"),
         expires_at: row.get("expires_at"),

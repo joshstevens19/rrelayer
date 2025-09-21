@@ -3000,7 +3000,6 @@ impl TestRunner {
         Ok(())
     }
 
-    // TODO: COME BACK TO THIS ONE
     /// run single with:
     /// make run-test-debug TEST=blob_transaction_handling
     async fn test_blob_transaction_handling(&self) -> Result<()> {

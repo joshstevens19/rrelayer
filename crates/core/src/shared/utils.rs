@@ -1,4 +1,5 @@
 use crate::rrelayer_error;
+use crate::transaction::types::TransactionBlob;
 use alloy::primitives::U256;
 use alloy_eips::eip4844::Blob;
 use axum::http::StatusCode;
@@ -47,7 +48,7 @@ pub async fn sleep_ms(ms: &u64) {
 /// * `Err(StatusCode::BAD_REQUEST)` - If any blob string failed to parse
 pub fn convert_blob_strings_to_blobs(
     blob_strings: Option<Vec<String>>,
-) -> Result<Option<Vec<Blob>>, StatusCode> {
+) -> Result<Option<Vec<TransactionBlob>>, StatusCode> {
     match blob_strings {
         Some(strings) => {
             let mut blobs = Vec::new();
@@ -57,7 +58,7 @@ pub fn convert_blob_strings_to_blobs(
                     StatusCode::BAD_REQUEST
                 })?;
 
-                blobs.push(blob);
+                blobs.push(TransactionBlob::new(&blob));
             }
             Ok(Some(blobs))
         }

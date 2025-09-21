@@ -1,5 +1,6 @@
 use alloy_eips::eip4844::Blob;
 
+use crate::transaction::types::TransactionBlob;
 use crate::{
     shared::common_types::EvmAddress,
     transaction::types::{TransactionData, TransactionId, TransactionSpeed, TransactionValue},
@@ -15,7 +16,7 @@ pub struct TransactionToSend {
     pub to: EvmAddress,
     pub value: TransactionValue,
     pub data: TransactionData,
-    pub blobs: Option<Vec<Blob>>,
+    pub blobs: Option<Vec<TransactionBlob>>,
     pub external_id: Option<String>,
 }
 
@@ -37,7 +38,7 @@ impl TransactionToSend {
         value: TransactionValue,
         data: TransactionData,
         speed: Option<TransactionSpeed>,
-        blobs: Option<Vec<Blob>>,
+        blobs: Option<Vec<TransactionBlob>>,
         external_id: Option<String>,
     ) -> Self {
         Self {

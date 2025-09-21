@@ -30,8 +30,8 @@ pub enum TransactionConversionError {
 }
 
 use super::{
-    TransactionData, TransactionHash, TransactionId, TransactionNonce, TransactionSpeed,
-    TransactionStatus, TransactionValue,
+    TransactionBlob, TransactionData, TransactionHash, TransactionId, TransactionNonce,
+    TransactionSpeed, TransactionStatus, TransactionValue,
 };
 use crate::common_types::BlockNumber;
 use crate::{
@@ -69,7 +69,7 @@ pub struct Transaction {
     pub status: TransactionStatus,
 
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub blobs: Option<Vec<Blob>>,
+    pub blobs: Option<Vec<TransactionBlob>>,
 
     #[serde(rename = "txHash", skip_serializing_if = "Option::is_none", default)]
     pub known_transaction_hash: Option<TransactionHash>,
