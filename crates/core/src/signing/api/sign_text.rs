@@ -1,4 +1,4 @@
-use crate::rate_limiting::check_and_reserve_rate_limit;
+use crate::rate_limiting::RateLimiter;
 use crate::{
     app_state::AppState,
     rate_limiting::{RateLimitError, RateLimitOperation},
@@ -51,9 +51,13 @@ pub async fn sign_text(
     headers: HeaderMap,
     Json(sign): Json<SignTextDto>,
 ) -> Result<Json<SignTextResult>, StatusCode> {
-    let rate_limit_reservation =
-        check_and_reserve_rate_limit(&state, &headers, &relayer_id, RateLimitOperation::Signing)
-            .await?;
+    let rate_limit_reservation = RateLimiter::check_and_reserve_rate_limit(
+        &state,
+        &headers,
+        &relayer_id,
+        RateLimitOperation::Signing,
+    )
+    .await?;
 
     let relayer_provider_context = get_relayer_provider_context_by_relayer_id(
         &state.db,

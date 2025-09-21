@@ -1,9 +1,7 @@
 use super::send_transaction::RelayTransactionRequest;
-use crate::rate_limiting::{check_and_reserve_rate_limit, RateLimitError, RateLimitOperation};
-use crate::relayer::get_relayer;
+use crate::rate_limiting::{RateLimitOperation, RateLimiter};
 use crate::{
     app_state::AppState,
-    rrelayer_error,
     transaction::{get_transaction_by_id, types::TransactionId},
 };
 use axum::http::HeaderMap;
@@ -13,7 +11,6 @@ use axum::{
     Json,
 };
 use std::sync::Arc;
-use tracing::error;
 
 /// API endpoint to replace an existing pending transaction.
 ///
@@ -39,7 +36,7 @@ pub async fn replace_transaction(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
 
-    let rate_limit_reservation = check_and_reserve_rate_limit(
+    let rate_limit_reservation = RateLimiter::check_and_reserve_rate_limit(
         &state,
         &headers,
         &transaction.relayer_id,

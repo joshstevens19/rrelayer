@@ -112,8 +112,6 @@ pub struct RateLimits {
     pub transactions_per_minute: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub signing_operations_per_minute: Option<u64>,
-    #[serde(default)]
-    pub unlimited: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

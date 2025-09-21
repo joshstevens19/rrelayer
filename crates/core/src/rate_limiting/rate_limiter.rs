@@ -1,19 +1,23 @@
+use super::{
+    detection::RateLimitDetector,
+    types::{RateLimitDetectContext, RateLimitError, RateLimitOperation, RateLimitResult},
+};
+use crate::app_state::AppState;
+use crate::relayer::get_relayer;
+use crate::relayer::types::RelayerId;
 use crate::{
     common_types::EvmAddress,
     yaml::{RateLimitConfig, RateLimits},
+    GlobalRateLimits,
 };
-use axum::http::HeaderMap;
+use axum::http::{HeaderMap, StatusCode};
 use std::{
     collections::HashMap,
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
 use tokio::sync::RwLock;
-
-use super::{
-    detection::RateLimitDetector,
-    types::{RateLimitDetectContext, RateLimitError, RateLimitOperation, RateLimitResult},
-};
+use tracing::error;
 
 #[derive(Debug, Clone)]
 struct UsageWindow {
@@ -40,7 +44,43 @@ impl RateLimiter {
         }
     }
 
-    pub async fn check_and_reserve(
+    pub async fn check_and_reserve_rate_limit<'a>(
+        state: &'a Arc<AppState>,
+        headers: &HeaderMap,
+        relayer_id: &RelayerId,
+        operation: RateLimitOperation,
+    ) -> Result<Option<RateLimitReservation<'a>>, StatusCode> {
+        let Some(ref rate_limiter) = state.user_rate_limiter else {
+            return Ok(None);
+        };
+
+        let relayer = get_relayer(&state.db, &state.cache, relayer_id)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+            .ok_or(StatusCode::NOT_FOUND)?;
+
+        match rate_limiter.check_and_reserve(headers, &relayer.address, operation).await {
+            Ok(reservation) => Ok(Some(reservation)),
+            Err(RateLimitError::LimitExceeded { operation, current, limit, window_seconds }) => {
+                error!(
+                    "Rate limit exceeded: {}/{} {} in {}s",
+                    current, limit, operation, window_seconds
+                );
+                Err(StatusCode::TOO_MANY_REQUESTS)
+            }
+            Err(RateLimitError::NoRateLimitKey) => {
+                // do nothing it's ok to have no key
+                Ok(None)
+            }
+            Err(e) => {
+                error!("Rate limiting error: {}", e);
+                // Don't block operation for rate limiting errors, just log
+                Ok(None)
+            }
+        }
+    }
+
+    async fn check_and_reserve(
         &self,
         headers: &HeaderMap,
         relayer_address: &EvmAddress,
@@ -86,7 +126,7 @@ impl RateLimiter {
     async fn check_global_limits(
         &self,
         operation: RateLimitOperation,
-        global_limits: &crate::yaml::GlobalRateLimits,
+        global_limits: &GlobalRateLimits,
     ) -> Result<(), RateLimitError> {
         let current_time = SystemTime::now();
 
@@ -147,17 +187,6 @@ impl RateLimiter {
         operation: RateLimitOperation,
     ) -> Result<RateLimitResult, RateLimitError> {
         let limits = self.get_limits_for_user(user_key);
-
-        // If unlimited, allow everything
-        if limits.unlimited {
-            return Ok(RateLimitResult {
-                allowed: true,
-                current_usage: 0,
-                limit: u64::MAX,
-                window_seconds: 60,
-                reset_time: SystemTime::now(),
-            });
-        }
 
         let current_time = SystemTime::now();
 
@@ -329,14 +358,12 @@ impl RateLimiter {
 
     /// Get rate limits for a specific user
     fn get_limits_for_user(&self, user_key: &str) -> RateLimits {
-        // Check if user is in unlimited overrides
         if let Some(ref unlimited_users) = self.config.user_unlimited_overrides {
             if unlimited_users.contains(&user_key.to_string()) {
-                return RateLimits { unlimited: true, ..Default::default() };
+                return RateLimits { ..Default::default() };
             }
         }
 
-        // Use default limits
         self.config.limits.clone().unwrap_or_default()
     }
 
@@ -351,11 +378,7 @@ impl RateLimiter {
 
 impl Default for RateLimits {
     fn default() -> Self {
-        Self {
-            transactions_per_minute: Some(100), // Generous defaults
-            signing_operations_per_minute: Some(50),
-            unlimited: false,
-        }
+        Self { transactions_per_minute: Some(100), signing_operations_per_minute: Some(50) }
     }
 }
 
