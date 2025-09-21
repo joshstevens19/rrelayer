@@ -220,6 +220,13 @@ impl TestRunner {
         println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
         self.start_webhook_server().await.unwrap();
+        let relayer = self.create_and_fund_relayer("automatic_top_up").await.unwrap();
+        self.fund_relayer(
+            &relayer.address,
+            alloy::primitives::utils::parse_ether("100000000").unwrap(),
+        )
+        .await
+        .unwrap();
 
         info!("🔍 Testing webhook server accessibility...");
         let client = reqwest::Client::builder().timeout(Duration::from_secs(5)).build().unwrap();
@@ -465,6 +472,13 @@ impl TestRunner {
         println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
         self.start_webhook_server().await.unwrap();
+        let relayer = self.create_and_fund_relayer("automatic_top_up").await.unwrap();
+        self.fund_relayer(
+            &relayer.address,
+            alloy::primitives::utils::parse_ether("100000000").unwrap(),
+        )
+        .await
+        .unwrap();
 
         info!("🔍 Testing webhook server accessibility...");
         let client = reqwest::Client::builder().timeout(Duration::from_secs(5)).build().unwrap();
@@ -548,7 +562,7 @@ impl TestRunner {
     }
 
     /// Fund a relayer address with ETH from the first Anvil account
-    async fn fund_relayer(&self, relayer_address: &EvmAddress) -> Result<()> {
+    async fn fund_relayer(&self, relayer_address: &EvmAddress, funding_amount: U256) -> Result<()> {
         let anvil_url = format!("http://127.0.0.1:{}", self.config.anvil_port);
 
         // Create signer with first Anvil private key (has lots of ETH)
@@ -561,9 +575,6 @@ impl TestRunner {
             .with_recommended_fillers()
             .wallet(wallet)
             .on_http(anvil_url.parse()?);
-
-        // Send 10 ETH to the relayer
-        let funding_amount = U256::from(10_000_000_000_000_000_000_u128); // 10 ETH in wei
 
         let tx_request =
             TransactionRequest::default().to(relayer_address.into_address()).value(funding_amount);
@@ -598,7 +609,9 @@ impl TestRunner {
             .await
             .context("Failed to create relayer")?;
 
-        self.fund_relayer(&relayer.address).await.context("Failed to fund relayer")?;
+        self.fund_relayer(&relayer.address, alloy::primitives::utils::parse_ether("10")?)
+            .await
+            .context("Failed to fund relayer")?;
 
         Ok(relayer)
     }

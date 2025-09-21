@@ -6,8 +6,15 @@ networks:
 - name: local_anvil
   chain_id: 31337
   provider_urls:
-  - http://127.0.0.1:8545
+    - http://127.0.0.1:8545
   block_explorer_url: http://localhost:8545
+  automatic_top_up:
+    from_address: '0x655B2B8861D7E911D283A05A5CAD042C157106DA'
+    targets: '*'
+    native:
+      enabled: true
+      min_balance: "50"
+      top_up_amount: "100"
 api_config:
   port: 3000
   authentication_username: ${RRELAYER_AUTH_USERNAME}

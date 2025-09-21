@@ -4,7 +4,7 @@ use crate::{
     postgres::{PostgresClient, PostgresError},
     provider::EvmProvider,
     relayer::types::Relayer,
-    rrelayer_error, rrelayer_info,
+    rrelayer_error,
     safe_proxy::SafeProxyManager,
     shared::common_types::{EvmAddress, PagingContext},
     yaml::{AutomaticTopUpConfig, Erc20TokenConfig, NativeTokenConfig, TopUpTargetAddresses},
@@ -19,7 +19,7 @@ use alloy::sol;
 use alloy::sol_types::SolCall;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::time::{interval, Interval};
-use tracing::warn;
+use tracing::{info, warn};
 
 sol! {
     #[sol(rpc)]
@@ -91,7 +91,7 @@ impl AutomaticTopUpTask {
     /// This method runs indefinitely, periodically refreshing the relayer cache
     /// and checking addresses that need top-up based on configured intervals.
     pub async fn run(&mut self) {
-        rrelayer_info!("Starting automatic top-up background task");
+        info!("Starting automatic top-up background task");
 
         self.refresh_relayer_cache().await;
 
@@ -114,7 +114,7 @@ impl AutomaticTopUpTask {
     async fn refresh_relayer_cache(&mut self) {
         for network_config in &self.config.networks {
             if let Some(_automatic_top_up) = &network_config.automatic_top_up {
-                rrelayer_info!("Refreshing relayer cache for {}", network_config.name);
+                info!("Refreshing relayer cache for {}", network_config.name);
 
                 let chain_id = match network_config.get_chain_id().await {
                     Ok(id) => id,
@@ -130,7 +130,7 @@ impl AutomaticTopUpTask {
 
                 match self.get_all_relayers_for_chain(&chain_id).await {
                     Ok(relayers) => {
-                        rrelayer_info!("Cached {} relayers for chain {}", relayers.len(), chain_id);
+                        info!("Cached {} relayers for chain {}", relayers.len(), chain_id);
                         self.relayer_cache.insert(chain_id, relayers);
                     }
                     Err(e) => {
@@ -187,7 +187,7 @@ impl AutomaticTopUpTask {
     async fn check_and_top_up_addresses(&self) {
         for network_config in &self.config.networks {
             if let Some(automatic_top_up) = &network_config.automatic_top_up {
-                rrelayer_info!("Checking addresses for top-up on {}", network_config.name);
+                info!("Checking addresses for top-up on {}", network_config.name);
 
                 let chain_id = match network_config.get_chain_id().await {
                     Ok(id) => id,
@@ -229,11 +229,7 @@ impl AutomaticTopUpTask {
         provider: &EvmProvider,
         config: &AutomaticTopUpConfig,
     ) {
-        rrelayer_info!(
-            "Processing top-up config for chain {} from {}",
-            chain_id,
-            config.from_address
-        );
+        info!("Processing top-up config for chain {} from {}", chain_id, config.from_address);
 
         let target_addresses = match self
             .resolve_target_addresses(chain_id, &config.targets, &config.from_address)
@@ -247,16 +243,13 @@ impl AutomaticTopUpTask {
         };
 
         if target_addresses.is_empty() {
-            rrelayer_info!("No target addresses found for top-up on chain {}", chain_id);
+            info!("No target addresses found for top-up on chain {}", chain_id);
             return;
         }
 
         if let Some(native_config) = &config.native {
             if native_config.enabled {
-                rrelayer_info!(
-                    "Processing native token top-ups for {} addresses",
-                    target_addresses.len()
-                );
+                info!("Processing native token top-ups for {} addresses", target_addresses.len());
                 self.process_native_token_top_ups(
                     chain_id,
                     provider,
@@ -267,13 +260,13 @@ impl AutomaticTopUpTask {
                 )
                 .await;
             } else {
-                rrelayer_info!("Native token top-ups disabled for chain {}", chain_id);
+                info!("Native token top-ups disabled for chain {}", chain_id);
             }
         }
 
         if let Some(erc20_tokens) = &config.erc20_tokens {
             for (index, token_config) in erc20_tokens.iter().enumerate() {
-                rrelayer_info!(
+                info!(
                     "Processing ERC-20 token top-ups for token {} ({}/{}) on {} addresses",
                     token_config.address,
                     index + 1,
@@ -324,7 +317,7 @@ impl AutomaticTopUpTask {
             match provider.rpc_client().get_balance((*address).into()).await {
                 Ok(balance) => {
                     if balance < native_config.min_balance {
-                        rrelayer_info!(
+                        info!(
                             "Address {} native balance ({} ETH) is below minimum ({} ETH), needs top-up",
                             address,
                             format_wei_to_eth(&balance),
@@ -340,7 +333,7 @@ impl AutomaticTopUpTask {
         }
 
         if addresses_needing_top_up.is_empty() {
-            rrelayer_info!(
+            info!(
                 "All {} addresses have sufficient native token balance on chain {}",
                 target_addresses.len(),
                 chain_id
@@ -348,7 +341,7 @@ impl AutomaticTopUpTask {
             return;
         }
 
-        rrelayer_info!(
+        info!(
             "{} out of {} addresses need native token top-up on chain {}",
             addresses_needing_top_up.len(),
             target_addresses.len(),
@@ -386,7 +379,7 @@ impl AutomaticTopUpTask {
                 .await
             {
                 Ok(tx_hash) => {
-                    rrelayer_info!(
+                    info!(
                         "Topped up address {} with {} ETH (native). Transaction: {}",
                         address,
                         format_wei_to_eth(&native_config.top_up_amount),
@@ -425,7 +418,7 @@ impl AutomaticTopUpTask {
             match self.get_erc20_balance(provider, &token_config.address, address).await {
                 Ok(balance) => {
                     if balance < token_config.min_balance {
-                        rrelayer_info!(
+                        info!(
                             "Address {} ERC-20 balance ({}) is below minimum ({}) for token {}, needs top-up",
                             address,
                             format_token_amount(&balance),
@@ -445,7 +438,7 @@ impl AutomaticTopUpTask {
         }
 
         if addresses_needing_top_up.is_empty() {
-            rrelayer_info!(
+            info!(
                 "All {} addresses have sufficient ERC-20 token balance for token {} on chain {}",
                 target_addresses.len(),
                 token_config.address,
@@ -454,7 +447,7 @@ impl AutomaticTopUpTask {
             return;
         }
 
-        rrelayer_info!(
+        info!(
             "{} out of {} addresses need ERC-20 top-up for token {} on chain {}",
             addresses_needing_top_up.len(),
             target_addresses.len(),
@@ -494,7 +487,7 @@ impl AutomaticTopUpTask {
                 .await
             {
                 Ok(tx_hash) => {
-                    rrelayer_info!(
+                    info!(
                         "Topped up address {} with {} tokens ({}). Transaction: {}",
                         address,
                         format_token_amount(&token_config.top_up_amount),
@@ -538,7 +531,7 @@ impl AutomaticTopUpTask {
             ));
         }
 
-        rrelayer_info!(
+        info!(
             "Sending top-up transaction: {} -> {} ({} ETH){}",
             from_address,
             target_address,
@@ -548,11 +541,9 @@ impl AutomaticTopUpTask {
 
         let (final_to, final_value, final_data) = if let Some(safe_address) = &config.safe {
             if let Some(ref safe_manager) = self.safe_proxy_manager {
-                rrelayer_info!(
+                info!(
                     "Using Safe proxy {} for top-up transaction from {} to {}",
-                    safe_address,
-                    from_address,
-                    target_address
+                    safe_address, from_address, target_address
                 );
 
                 let wallet_index = match self.find_wallet_index_for_address(chain_id, from_address)
@@ -625,7 +616,7 @@ impl AutomaticTopUpTask {
 
         match provider.send_transaction(&wallet_index, tx).await {
             Ok(tx_hash) => {
-                rrelayer_info!("Top-up transaction sent successfully: {}", tx_hash);
+                info!("Top-up transaction sent successfully: {}", tx_hash);
                 Ok(tx_hash.to_string())
             }
             Err(e) => {
@@ -704,13 +695,13 @@ impl AutomaticTopUpTask {
         if contains_from_address {
             match targets {
                 TopUpTargetAddresses::All => {
-                    rrelayer_info!(
+                    info!(
                         "Filtered out from_address {} from relayer targets on chain {} to prevent self-funding", 
                         from_address, chain_id
                     );
                 }
                 TopUpTargetAddresses::List(_) => {
-                    rrelayer_info!(
+                    info!(
                         "Filtered out from_address {} from explicitly configured targets on chain {} to prevent self-funding. \
                         Note: from_address should not be included in the target list in YAML configuration.", 
                         from_address, chain_id
@@ -745,11 +736,7 @@ impl AutomaticTopUpTask {
             .await
             .map_err(|e| format!("Failed to get from_address balance: {}", e))?;
 
-        rrelayer_info!(
-            "From address {} has balance: {} ETH",
-            from_address,
-            format_wei_to_eth(&balance)
-        );
+        info!("From address {} has balance: {} ETH", from_address, format_wei_to_eth(&balance));
 
         let estimated_gas_cost =
             self.estimate_transaction_cost(provider).await.unwrap_or_else(|e| {
@@ -759,7 +746,7 @@ impl AutomaticTopUpTask {
 
         let min_required_balance = native_config.top_up_amount + estimated_gas_cost;
 
-        rrelayer_info!(
+        info!(
             "From address {} requires {} ETH (top-up: {} ETH + gas: {} ETH)",
             from_address,
             format_wei_to_eth(&min_required_balance),
@@ -800,7 +787,7 @@ impl AutomaticTopUpTask {
         let gas_limit = U256::from(21000u64);
         let total_cost = U256::from(gas_price) * gas_limit;
 
-        rrelayer_info!(
+        info!(
             "Estimated transaction cost: {} ETH (gas price: {} gwei, limit: {})",
             format_wei_to_eth(&total_cost),
             U256::from(gas_price) / U256::from(1_000_000_000u64),
@@ -867,7 +854,7 @@ impl AutomaticTopUpTask {
                 .await
                 .map_err(|e| format!("Failed to get from_address ERC-20 token balance: {}", e))?;
 
-        rrelayer_info!(
+        info!(
             "From address {} has ERC-20 token balance: {} for token {}",
             from_address,
             format_token_amount(&balance),
@@ -878,7 +865,7 @@ impl AutomaticTopUpTask {
         // We just need to ensure sufficient token balance for the top-up amount
         let min_required_balance = token_config.top_up_amount;
 
-        rrelayer_info!(
+        info!(
             "From address {} requires {} tokens for token {}",
             from_address,
             format_token_amount(&min_required_balance),
@@ -928,7 +915,7 @@ impl AutomaticTopUpTask {
             ));
         }
 
-        rrelayer_info!(
+        info!(
             "Sending ERC-20 top-up transaction: {} -> {} ({} tokens of {}){}",
             from_address,
             target_address,
@@ -946,11 +933,9 @@ impl AutomaticTopUpTask {
         let (final_to, final_value, final_data) = if let Some(safe_address) = &config.safe {
             // Use Safe proxy for ERC-20 transfer
             if let Some(ref safe_manager) = self.safe_proxy_manager {
-                rrelayer_info!(
+                info!(
                     "Using Safe proxy {} for ERC-20 top-up transaction from {} to {}",
-                    safe_address,
-                    from_address,
-                    target_address
+                    safe_address, from_address, target_address
                 );
 
                 // Get wallet index for signing
@@ -1025,7 +1010,7 @@ impl AutomaticTopUpTask {
 
         match provider.send_transaction(&wallet_index, tx).await {
             Ok(tx_hash) => {
-                rrelayer_info!("ERC-20 top-up transaction sent successfully: {}", tx_hash);
+                info!("ERC-20 top-up transaction sent successfully: {}", tx_hash);
                 Ok(tx_hash.to_string())
             }
             Err(e) => {
@@ -1094,7 +1079,7 @@ pub async fn run_automatic_top_up_task(
     postgres_client: Arc<PostgresClient>,
     providers: Arc<Vec<EvmProvider>>,
 ) {
-    rrelayer_info!("Starting automatic top-up task");
+    info!("Starting automatic top-up task");
 
     let mut top_up_task = AutomaticTopUpTask::new(postgres_client, providers, config);
 
