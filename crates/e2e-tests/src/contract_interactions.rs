@@ -239,11 +239,6 @@ impl ContractInteractor {
 
         info!("✅ Test ERC-20 token verified - Total supply: {}", total_supply._0);
 
-        // Update the YAML config with the deployed token address
-        self.update_yaml_config_with_token_address(token_address)
-            .await
-            .context("Failed to update YAML config with token address")?;
-
         // Transfer tokens from deployer to the automatic top-up funding address
         // The deployer (anvil_accounts[0]) has all the tokens, but the funding address in YAML is different
         // Use the known funding address from the config (we know it's 0x655B2B8861D7E911D283A05A5CAD042C157106DA)

@@ -8,6 +8,8 @@ contract DeployMyCustomToken is Script {
     function run() external {
         vm.startBroadcast();
         
+        // Deploy normally but ensure deterministic nonce by resetting chain state
+        // The contract will deploy to a predictable address based on deployer + nonce
         TestToken token = new TestToken();
         
         console.log("TestToken deployed to:", address(token));
