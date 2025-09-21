@@ -15,6 +15,10 @@ networks:
       enabled: true
       min_balance: "50"
       top_up_amount: "100"
+    erc20_tokens:
+      - address: "0x99bba657f2bbc93c02d617f8ba121cb8fc104acf" # Will be replaced with actual deployed TestToken address
+        min_balance: "100"
+        top_up_amount: "500"
 api_config:
   port: 3000
   authentication_username: ${RRELAYER_AUTH_USERNAME}

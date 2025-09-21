@@ -1,0 +1,30 @@
+# Foundry/Forge artifacts
+cache/
+out/
+broadcast/
+lib/
+
+# Dotenv file
+.env
+
+# Node.js dependencies (if using npm for additional tooling)
+node_modules/
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local configuration files
+.env.local
+.env.production
+
+# Temporary files
+*.tmp
+*.temp
+
+# Logs
+*.log

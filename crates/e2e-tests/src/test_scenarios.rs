@@ -136,6 +136,14 @@ impl TestRunner {
 
         info!("✅ Test contract deployed at: {:?}", contract_address);
 
+        // Deploy the ERC-20 test token
+        let token_address = contract_interactor
+            .deploy_test_token(deployer_private_key)
+            .await
+            .context("Failed to deploy test token")?;
+
+        info!("✅ Test ERC-20 token deployed at: {:?}", token_address);
+
         // Initialize webhook server with the shared secret from yaml
         let webhook_server = Some(WebhookTestServer::new("test-webhook-secret-123".to_string()));
 
@@ -399,7 +407,8 @@ impl TestRunner {
             "gas_price_bumping" => self.test_gas_price_bumping().await,
             "webhook_delivery" => self.test_webhook_delivery().await,
             "rate_limiting" => self.test_rate_limiting().await,
-            "automatic_top_up" => self.test_automatic_top_up().await,
+            "automatic_top_up_native" => self.test_automatic_top_up_native().await,
+            "automatic_top_up_erc20" => self.test_automatic_top_up_erc20().await,
             "concurrent_transactions" => self.test_concurrent_transactions().await,
             "unauthenticated" => self.test_unauthenticated().await,
             "blob_transaction_handling" => self.test_blob_transaction_handling().await,
@@ -545,7 +554,8 @@ impl TestRunner {
             "gas_price_bumping" => "Gas price bumping mechanism",
             "webhook_delivery" => "Webhook delivery testing",
             "rate_limiting" => "Rate limiting enforcement",
-            "automatic_top_up" => "Automatic relayer balance top-up",
+            "automatic_top_up_native" => "Automatic relayer native balance top-up",
+            "automatic_top_up_erc20" => "Automatic relayer erc20 balance top-up",
             "concurrent_transactions" => "Concurrent transaction handling",
             "unauthenticated" => "Unauthenticated protection",
             "blob_transaction_handling" => "Blob transaction handling (EIP-4844)",
@@ -724,7 +734,8 @@ impl TestRunner {
         }
         info!("✅ Contract verified as deployed with code at {}", contract_address);
 
-        let relayer_balance = self.contract_interactor.get_eth_balance(&relayer.address).await?;
+        let relayer_balance =
+            self.contract_interactor.get_eth_balance(&relayer.address.into_address()).await?;
         info!(
             "Relayer balance before transaction: {} ETH",
             alloy::primitives::utils::format_ether(relayer_balance)
@@ -3556,8 +3567,8 @@ impl TestRunner {
     }
 
     /// run single with:
-    /// make run-test-debug TEST=automatic_top_up
-    async fn test_automatic_top_up(&self) -> Result<()> {
+    /// make run-test-debug TEST=automatic_top_up_native
+    async fn test_automatic_top_up_native(&self) -> Result<()> {
         info!("Testing automatic relayer balance top-up...");
 
         // Create multiple relayers with different starting balances
@@ -3571,9 +3582,12 @@ impl TestRunner {
         info!("Created test relayers: {:?}, {:?}, {:?}", relayer1.id, relayer2.id, relayer3.id);
 
         // Check initial balances (should be funded by create_and_fund_relayer)
-        let initial_balance1 = self.contract_interactor.get_eth_balance(&relayer1.address).await?;
-        let initial_balance2 = self.contract_interactor.get_eth_balance(&relayer2.address).await?;
-        let initial_balance3 = self.contract_interactor.get_eth_balance(&relayer3.address).await?;
+        let initial_balance1 =
+            self.contract_interactor.get_eth_balance(&relayer1.address.into_address()).await?;
+        let initial_balance2 =
+            self.contract_interactor.get_eth_balance(&relayer2.address.into_address()).await?;
+        let initial_balance3 =
+            self.contract_interactor.get_eth_balance(&relayer3.address.into_address()).await?;
 
         info!("Initial balances:");
         info!("  Relayer 1: {} ETH", alloy::primitives::utils::format_ether(initial_balance1));
@@ -3626,9 +3640,12 @@ impl TestRunner {
         self.mine_and_wait().await?;
 
         // Check balances after draining
-        let drained_balance1 = self.contract_interactor.get_eth_balance(&relayer1.address).await?;
-        let drained_balance2 = self.contract_interactor.get_eth_balance(&relayer2.address).await?;
-        let drained_balance3 = self.contract_interactor.get_eth_balance(&relayer3.address).await?;
+        let drained_balance1 =
+            self.contract_interactor.get_eth_balance(&relayer1.address.into_address()).await?;
+        let drained_balance2 =
+            self.contract_interactor.get_eth_balance(&relayer2.address.into_address()).await?;
+        let drained_balance3 =
+            self.contract_interactor.get_eth_balance(&relayer3.address.into_address()).await?;
 
         info!("Balances after draining:");
         info!("  Relayer 1: {} ETH", alloy::primitives::utils::format_ether(drained_balance1));
@@ -3654,9 +3671,12 @@ impl TestRunner {
         self.mine_and_wait().await?;
 
         // Check if balances have been topped up to 100 ETH
-        let final_balance1 = self.contract_interactor.get_eth_balance(&relayer1.address).await?;
-        let final_balance2 = self.contract_interactor.get_eth_balance(&relayer2.address).await?;
-        let final_balance3 = self.contract_interactor.get_eth_balance(&relayer3.address).await?;
+        let final_balance1 =
+            self.contract_interactor.get_eth_balance(&relayer1.address.into_address()).await?;
+        let final_balance2 =
+            self.contract_interactor.get_eth_balance(&relayer2.address.into_address()).await?;
+        let final_balance3 =
+            self.contract_interactor.get_eth_balance(&relayer3.address.into_address()).await?;
 
         info!("Final balances after top-up:");
         info!("  Relayer 1: {} ETH", alloy::primitives::utils::format_ether(final_balance1));
@@ -3702,6 +3722,127 @@ impl TestRunner {
         }
 
         info!("✅ Automatic top-up mechanism working correctly");
+        Ok(())
+    }
+
+    /// run single with:
+    /// make run-test-debug TEST=automatic_top_up_erc20
+    async fn test_automatic_top_up_erc20(&self) -> Result<()> {
+        info!("Testing automatic ERC-20 token top-up...");
+
+        let token_address = self
+            .contract_interactor
+            .token_address()
+            .ok_or_else(|| anyhow::anyhow!("ERC-20 token not deployed"))?;
+
+        info!("Using ERC-20 token at address: {:?}", token_address);
+
+        // Create multiple relayers with different starting balances
+        let relayer1 = self.create_and_fund_relayer("erc20-top-up-test-1").await?;
+        info!("relayer1: {:?}", relayer1);
+        let relayer2 = self.create_and_fund_relayer("erc20-top-up-test-2").await?;
+        info!("relayer2: {:?}", relayer2);
+        let relayer3 = self.create_and_fund_relayer("erc20-top-up-test-3").await?;
+        info!("relayer3: {:?}", relayer3);
+
+        info!("Created test relayers: {:?}, {:?}, {:?}", relayer1.id, relayer2.id, relayer3.id);
+
+        // Check initial ERC-20 token balances (should be 0 for new relayers)
+        let initial_balance1 =
+            self.contract_interactor.get_token_balance(&relayer1.address.into_address()).await?;
+        let initial_balance2 =
+            self.contract_interactor.get_token_balance(&relayer2.address.into_address()).await?;
+        let initial_balance3 =
+            self.contract_interactor.get_token_balance(&relayer3.address.into_address()).await?;
+
+        info!("Initial ERC-20 token balances:");
+        info!(
+            "  Relayer 1: {} tokens",
+            alloy::primitives::utils::format_units(initial_balance1, 18)?
+        );
+        info!(
+            "  Relayer 2: {} tokens",
+            alloy::primitives::utils::format_units(initial_balance2, 18)?
+        );
+        info!(
+            "  Relayer 3: {} tokens",
+            alloy::primitives::utils::format_units(initial_balance3, 18)?
+        );
+
+        // Since relayers start with 0 token balance, they should automatically get topped up
+        // Wait for automatic top-up to trigger
+        info!("Waiting for automatic ERC-20 top-up mechanism to trigger...");
+        tokio::time::sleep(Duration::from_secs(30)).await;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+
+        // Check if balances have been topped up to 500 tokens (as configured in YAML)
+        let final_balance1 =
+            self.contract_interactor.get_token_balance(&relayer1.address.into_address()).await?;
+        let final_balance2 =
+            self.contract_interactor.get_token_balance(&relayer2.address.into_address()).await?;
+        let final_balance3 =
+            self.contract_interactor.get_token_balance(&relayer3.address.into_address()).await?;
+
+        info!("Final ERC-20 token balances after top-up:");
+        info!(
+            "  Relayer 1: {} tokens",
+            alloy::primitives::utils::format_units(final_balance1, 18)?
+        );
+        info!(
+            "  Relayer 2: {} tokens",
+            alloy::primitives::utils::format_units(final_balance2, 18)?
+        );
+        info!(
+            "  Relayer 3: {} tokens",
+            alloy::primitives::utils::format_units(final_balance3, 18)?
+        );
+
+        // Expected top-up amount is 500 tokens (as configured in YAML)
+        let expected_top_up = U256::from(500u64)
+            * U256::from(10u64).pow(U256::from(18u64));
+        let tolerance = U256::from(10u64)
+            * U256::from(10u64).pow(U256::from(18u64)); // 10 token tolerance
+
+        // Verify that all relayers got topped up since they started with 0 balance
+        if final_balance1.abs_diff(expected_top_up) > tolerance {
+            return Err(anyhow::anyhow!(
+                "Relayer 1 token balance not topped up correctly. Expected ~500 tokens, got {} tokens",
+                alloy::primitives::utils::format_units(final_balance1, 18)?
+            ));
+        }
+        info!("✅ Relayer 1 successfully topped up to ~500 tokens");
+
+        if final_balance2.abs_diff(expected_top_up) > tolerance {
+            return Err(anyhow::anyhow!(
+                "Relayer 2 token balance not topped up correctly. Expected ~500 tokens, got {} tokens",
+                alloy::primitives::utils::format_units(final_balance2, 18)?
+            ));
+        }
+        info!("✅ Relayer 2 successfully topped up to ~500 tokens");
+
+        if final_balance3.abs_diff(expected_top_up) > tolerance {
+            return Err(anyhow::anyhow!(
+                "Relayer 3 token balance not topped up correctly. Expected ~500 tokens, got {} tokens",
+                alloy::primitives::utils::format_units(final_balance3, 18)?
+            ));
+        }
+        info!("✅ Relayer 3 successfully topped up to ~500 tokens");
+
+        info!("✅ Automatic ERC-20 token top-up mechanism working correctly");
         Ok(())
     }
 

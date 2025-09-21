@@ -1,5 +1,6 @@
 use alloy::sol_types::SolCall;
 use alloy::{
+    contract::ContractInstance,
     network::EthereumWallet,
     primitives::{Address, FixedBytes, U256},
     providers::{Provider, ProviderBuilder, RootProvider},
@@ -31,16 +32,31 @@ sol! {
     }
 }
 
+// Define contract interface for the pre-deployed TestToken contract
+sol! {
+    #[allow(missing_docs)]
+    #[sol(rpc)]
+    contract TestToken {
+        function totalSupply() external view returns (uint256);
+        function balanceOf(address account) external view returns (uint256);
+        function transfer(address to, uint256 amount) external returns (bool);
+        function approve(address spender, uint256 amount) external returns (bool);
+        function transferFrom(address from, address to, uint256 amount) external returns (bool);
+        function allowance(address owner, address spender) external view returns (uint256);
+    }
+}
+
 pub struct ContractInteractor {
     provider: RootProvider<Http<Client>>,
     contract_address: Option<EvmAddress>,
+    token_address: Option<EvmAddress>,
 }
 
 impl ContractInteractor {
     pub async fn new(rpc_url: &str) -> Result<Self> {
         let provider = ProviderBuilder::new().on_http(rpc_url.parse().context("Invalid RPC URL")?);
 
-        Ok(Self { provider, contract_address: None })
+        Ok(Self { provider, contract_address: None, token_address: None })
     }
 
     /// Deploy the test contract using Alloy's sol! macro
@@ -117,7 +133,216 @@ impl ContractInteractor {
 
         info!("✅ Test contract deployed to: {:?}", contract_address);
 
+        // Wait longer to ensure deployment is fully settled and nonce is incremented
+        tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
+
         Ok(contract_address)
+    }
+
+    /// Deploy the ERC-20 test token contract using Forge
+    pub async fn deploy_test_token(&mut self, deployer_private_key: &str) -> Result<Address> {
+        info!("Deploying ERC-20 test token using Forge...");
+
+        // Get the RPC URL from the provider
+        let rpc_url = self.provider.client().transport().url().to_string();
+
+        // Verify contracts directory exists
+        let contracts_dir = std::path::Path::new("contracts");
+        if !contracts_dir.exists() {
+            return Err(anyhow::anyhow!(
+                "Contracts directory not found at {:?}",
+                contracts_dir.canonicalize()
+            ));
+        }
+
+        info!("Using RPC URL: {} and contracts dir: {:?}", rpc_url, contracts_dir.canonicalize());
+
+        // Wait longer to ensure any previous transactions are settled and nonces are updated
+        tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
+
+        // Enable auto-mining temporarily for forge deployment
+        let client = reqwest::Client::new();
+        let auto_mine_enable = serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "anvil_setAutomine",
+            "params": [true],
+            "id": 1
+        });
+
+        let _ = client
+            .post(&rpc_url)
+            .header("Content-Type", "application/json")
+            .json(&auto_mine_enable)
+            .send()
+            .await;
+
+        info!("Enabled auto-mining for forge deployment");
+
+        // Run the Forge deployment script with timeout
+        let deployer_key = deployer_private_key.to_string();
+        let rpc_url_clone = rpc_url.clone();
+        let forge_task = tokio::task::spawn_blocking(move || {
+            std::process::Command::new("forge")
+                .arg("script")
+                .arg("script/DeployMyCustomToken.s.sol:DeployMyCustomToken")
+                .arg("--rpc-url")
+                .arg(&rpc_url_clone)
+                .arg("--private-key")
+                .arg(&deployer_key)
+                .arg("--broadcast")
+                .current_dir("contracts")
+                .output()
+        });
+
+        // Wait for forge command with timeout
+        let output = tokio::time::timeout(tokio::time::Duration::from_secs(30), forge_task)
+            .await
+            .context("Forge deployment timed out")?
+            .context("Failed to execute forge task")?
+            .context("Failed to run forge script")?;
+
+        // Disable auto-mining after deployment
+        let auto_mine_disable = serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "anvil_setAutomine",
+            "params": [false],
+            "id": 2
+        });
+
+        let _ = client
+            .post(&rpc_url)
+            .header("Content-Type", "application/json")
+            .json(&auto_mine_disable)
+            .send()
+            .await;
+
+        info!("Disabled auto-mining after forge deployment");
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(anyhow::anyhow!("Forge deployment failed: {}", stderr));
+        }
+
+        // Parse the output to extract the deployed contract address
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let token_address = self
+            .extract_deployed_address(&stdout)
+            .context("Failed to extract deployed contract address from forge output")?;
+
+        self.token_address = Some(token_address.into());
+        info!("ERC-20 test token deployed to: {:?}", token_address);
+
+        // Verify the token contract exists and is working
+        let token_contract = TestToken::new(token_address, &self.provider);
+        let total_supply =
+            token_contract.totalSupply().call().await.context("Failed to verify token contract")?;
+
+        info!("✅ Test ERC-20 token verified - Total supply: {}", total_supply._0);
+
+        // Update the YAML config with the deployed token address
+        self.update_yaml_config_with_token_address(token_address)
+            .await
+            .context("Failed to update YAML config with token address")?;
+
+        // Transfer tokens from deployer to the automatic top-up funding address
+        // The deployer (anvil_accounts[0]) has all the tokens, but the funding address in YAML is different
+        // Use the known funding address from the config (we know it's 0x655B2B8861D7E911D283A05A5CAD042C157106DA)
+        let funding_address: alloy::primitives::Address = "0x655B2B8861D7E911D283A05A5CAD042C157106DA".parse()
+            .context("Failed to parse funding address")?;
+        
+        // Transfer a large amount of tokens (e.g., 100,000 tokens) to the funding address
+        let transfer_amount = alloy::primitives::U256::from(100_000u64) 
+            * alloy::primitives::U256::from(10u64).pow(alloy::primitives::U256::from(18u64));
+
+        info!("Transferring {} tokens from deployer to funding address {:?}", 
+              alloy::primitives::utils::format_units(transfer_amount, 18).unwrap_or("N/A".to_string()), 
+              funding_address);
+
+        self.transfer_tokens(&funding_address, transfer_amount, deployer_private_key)
+            .await
+            .context("Failed to transfer tokens to funding address")?;
+
+        // Wait a moment to ensure deployment is fully settled before returning
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+        Ok(token_address)
+    }
+
+    /// Extract the deployed contract address from forge script output
+    fn extract_deployed_address(&self, forge_output: &str) -> Result<Address> {
+        // Look for "TestToken deployed to: 0x..." in the output
+        for line in forge_output.lines() {
+            if line.contains("TestToken deployed to:") {
+                if let Some(addr_str) = line.split("TestToken deployed to: ").nth(1) {
+                    if let Some(addr) = addr_str.split_whitespace().next() {
+                        return addr.parse().context("Failed to parse contract address");
+                    }
+                }
+            }
+        }
+        Err(anyhow::anyhow!("Could not find deployed contract address in forge output"))
+    }
+
+    /// Update the rrelayer.yaml config file with the deployed token address
+    async fn update_yaml_config_with_token_address(&self, token_address: Address) -> Result<()> {
+        let config_path = std::path::Path::new("rrelayer.yaml");
+
+        // Read the current config
+        let config_content =
+            tokio::fs::read_to_string(config_path).await.context("Failed to read rrelayer.yaml")?;
+
+        // Replace the placeholder address with the actual deployed address
+        let updated_content = config_content
+            .replace("0x0000000000000000000000000000000000000000", &format!("{:?}", token_address));
+
+        // Write the updated config back
+        tokio::fs::write(config_path, updated_content)
+            .await
+            .context("Failed to write updated rrelayer.yaml")?;
+
+        info!("Updated rrelayer.yaml with token address: {:?}", token_address);
+        Ok(())
+    }
+
+    /// Transfer tokens to an address (for funding relayers during tests)
+    pub async fn transfer_tokens(
+        &self,
+        to_address: &Address,
+        amount: U256,
+        from_private_key: &str,
+    ) -> Result<()> {
+        let token_address = self.token_address.context("Token not deployed yet")?;
+
+        let signer: PrivateKeySigner = from_private_key.parse().context("Invalid private key")?;
+        let wallet = EthereumWallet::from(signer);
+
+        let provider_url_str = self.provider.client().transport().url();
+        let transfer_provider = ProviderBuilder::new()
+            .with_recommended_fillers()
+            .wallet(wallet)
+            .on_http(provider_url_str.parse().context("Failed to parse provider URL")?);
+
+        let token_contract = TestToken::new(token_address.into(), &transfer_provider);
+        let transfer_call = token_contract.transfer(*to_address, amount);
+        let pending_tx = transfer_call.send().await.context("Failed to transfer tokens")?;
+
+        info!("Transferred {} tokens to {:?}, tx: {:?}", amount, to_address, pending_tx.tx_hash());
+
+        Ok(())
+    }
+
+    /// Get ERC-20 token balance
+    pub async fn get_token_balance(&self, address: &Address) -> Result<U256> {
+        let token_address = self.token_address.context("Token not deployed yet")?;
+
+        let token_contract = TestToken::new(token_address.into(), &self.provider);
+        let balance = token_contract
+            .balanceOf(*address)
+            .call()
+            .await
+            .context("Failed to get token balance")?;
+
+        Ok(balance._0)
     }
 
     /// Generate calldata for a simple function call (e.g., setNumber)
@@ -144,68 +369,38 @@ impl ContractInteractor {
         self.contract_address
     }
 
+    /// Get the token address
+    pub fn token_address(&self) -> Option<EvmAddress> {
+        self.token_address
+    }
+
     /// Wait for a transaction to be mined and get its receipt
     pub async fn wait_for_transaction(&self, tx_hash: &str) -> Result<Option<TransactionReceipt>> {
         let hash: FixedBytes<32> = tx_hash.parse().context("Invalid transaction hash")?;
 
         // Poll for transaction receipt
         for _ in 0..30 {
-            // Wait up to 30 seconds
-            if let Some(receipt) = self.provider.get_transaction_receipt(hash).await? {
-                info!("Transaction {} mined in block {:?}", tx_hash, receipt.block_number);
+            if let Ok(Some(receipt)) = self.provider.get_transaction_receipt(hash).await {
                 return Ok(Some(receipt));
             }
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
         }
 
         Ok(None)
     }
 
-    pub async fn get_block_number(&self) -> Result<u64> {
-        let block_number = self.provider.get_block_number().await?;
-        Ok(block_number)
-    }
-
-    pub async fn get_eth_balance(&self, address: &EvmAddress) -> Result<U256> {
-        let balance = self.provider.get_balance(address.into_address()).await?;
-        Ok(balance)
-    }
-
+    /// Verify a contract is deployed at the expected address
     pub async fn verify_contract_deployed(&self) -> Result<bool> {
         if let Some(address) = self.contract_address {
-            let code = self.provider.get_code_at(address.into_address()).await?;
+            let code = self.provider.get_code_at(address.into()).await?;
             Ok(!code.is_empty())
         } else {
             Ok(false)
         }
     }
 
-    /// Mine a single block to confirm pending transactions
-    pub async fn mine_block(&self) -> Result<()> {
-        use reqwest::Client;
-
-        let client = Client::new();
-        let provider_url = self.provider.client().transport().url();
-
-        let mine_request = serde_json::json!({
-            "jsonrpc": "2.0",
-            "method": "anvil_mine",
-            "params": [1],
-            "id": 9999
-        });
-
-        let response = client
-            .post(provider_url)
-            .header("Content-Type", "application/json")
-            .json(&mine_request)
-            .send()
-            .await
-            .context("Failed to mine block")?;
-
-        if !response.status().is_success() {
-            anyhow::bail!("Failed to mine block: {}", response.status());
-        }
-
-        Ok(())
+    /// Get ETH balance for an address
+    pub async fn get_eth_balance(&self, address: &Address) -> Result<U256> {
+        self.provider.get_balance(*address).await.context("Failed to get ETH balance")
     }
 }
