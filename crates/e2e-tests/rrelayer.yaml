@@ -12,3 +12,8 @@ api_config:
   port: 3000
   authentication_username: ${RRELAYER_AUTH_USERNAME}
   authentication_password: ${RRELAYER_AUTH_PASSWORD}
+webhooks:
+- endpoint: http://localhost:8546/webhook
+  shared_secret: test-webhook-secret-123
+  networks:
+  - local_anvil

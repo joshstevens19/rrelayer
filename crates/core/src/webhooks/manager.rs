@@ -25,9 +25,9 @@ use super::{
 /// including queuing, retries, and cleanup
 pub struct WebhookManager {
     /// Active webhook deliveries pending retry or completion
-    pending_deliveries: Arc<RwLock<HashMap<Uuid, WebhookDelivery>>>,
+    pub(crate) pending_deliveries: Arc<RwLock<HashMap<Uuid, WebhookDelivery>>>,
     /// Webhook sender for HTTP requests
-    sender: WebhookSender,
+    pub(crate) sender: WebhookSender,
     /// Configured webhooks from setup
     webhook_configs: Vec<WebhookConfig>,
     /// Network name mapping for filtering
@@ -56,6 +56,11 @@ impl WebhookManager {
         delivery_config: Option<WebhookDeliveryConfig>,
     ) -> Result<Self, reqwest::Error> {
         let webhook_configs = config.webhooks.as_ref().cloned().unwrap_or_default();
+        rrelayer_info!("🔧 WebhookManager::new - Found {} webhook configs", webhook_configs.len());
+        for (i, config) in webhook_configs.iter().enumerate() {
+            rrelayer_info!("  {}. Endpoint: {}, Networks: {:?}", i + 1, config.endpoint, config.networks);
+        }
+        
         let delivery_config = delivery_config.unwrap_or_default();
         let sender = WebhookSender::new(delivery_config)?;
 
@@ -168,13 +173,17 @@ impl WebhookManager {
 
     /// Queue a webhook for a transaction event
     pub async fn queue_webhook(&self, transaction: &Transaction, event_type: WebhookEventType) {
+        rrelayer_info!("🔔 queue_webhook called for transaction {} with event {:?}", transaction.id, event_type);
+        
         if self.webhook_configs.is_empty() {
             rrelayer_info!(
-                "No webhooks configured, skipping webhook for transaction {}",
+                "❌ No webhooks configured, skipping webhook for transaction {}",
                 transaction.id
             );
             return;
         }
+        
+        rrelayer_info!("✅ Found {} webhook configs for transaction {}", self.webhook_configs.len(), transaction.id);
 
         let network_names = self.network_names.read().await;
         let chain_name = network_names

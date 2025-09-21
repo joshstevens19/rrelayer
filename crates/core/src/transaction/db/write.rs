@@ -41,8 +41,8 @@ impl PostgresClient {
         for table_name in TRANSACTION_TABLES.iter() {
             trans.execute(
                 format!("
-                INSERT INTO {}(id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, speed, status, expires_at, queued_at, external_id)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14);
+                INSERT INTO {}(id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit, speed, status, expires_at, queued_at, hash, external_id)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16);
             ", table_name).as_str(),
                 &[&transaction.id,
                     &relayer_id,
@@ -53,10 +53,12 @@ impl PostgresClient {
                     &transaction.data,
                     &transaction.value,
                     &transaction.blobs,
+                    &transaction.gas_limit,
                     &transaction.speed,
                     &transaction.status,
                     &transaction.expires_at,
                     &transaction.queued_at,
+                    &transaction.known_transaction_hash,
                     &transaction.external_id
                 ],
             )

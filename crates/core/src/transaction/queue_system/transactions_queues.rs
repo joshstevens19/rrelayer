@@ -306,7 +306,7 @@ impl TransactionsQueues {
         transaction.to = transactions_queue.relay_address();
         transaction.value = TransactionValue::zero();
         transaction.data = TransactionData::empty();
-        transaction.gas_limit = None;
+        transaction.gas_limit = Some(GasLimit::new(21000_u128));
         transaction.is_noop = true;
         transaction.speed = TransactionSpeed::Fast;
     }
@@ -642,8 +642,12 @@ impl TransactionsQueues {
         self.invalidate_transaction_cache(&transaction.id).await;
 
         if let Some(webhook_manager) = &self.webhook_manager {
-            let webhook_manager = webhook_manager.lock().await;
-            webhook_manager.on_transaction_queued(&transaction).await;
+            let webhook_manager = webhook_manager.clone();
+            let transaction_clone = transaction.clone();
+            tokio::spawn(async move {
+                let webhook_manager = webhook_manager.lock().await;
+                webhook_manager.on_transaction_queued(&transaction_clone).await;
+            });
         }
 
         Ok(transaction)
@@ -681,6 +685,15 @@ impl TransactionsQueues {
                         self.transaction_to_noop(&mut transactions_queue, &mut result.transaction);
                         self.invalidate_transaction_cache(&transaction.id).await;
 
+                        if let Some(webhook_manager) = &self.webhook_manager {
+                            let webhook_manager = webhook_manager.clone();
+                            let transaction_clone = result.transaction.clone();
+                            tokio::spawn(async move {
+                                let webhook_manager = webhook_manager.lock().await;
+                                webhook_manager.on_transaction_cancelled(&transaction_clone).await;
+                            });
+                        }
+
                         Ok(true)
                     }
                     EditableTransactionType::Inmempool => {
@@ -706,8 +719,12 @@ impl TransactionsQueues {
                         self.invalidate_transaction_cache(&transaction.id).await;
 
                         if let Some(webhook_manager) = &self.webhook_manager {
-                            let webhook_manager = webhook_manager.lock().await;
-                            webhook_manager.on_transaction_cancelled(&result.transaction).await;
+                            let webhook_manager = webhook_manager.clone();
+                            let transaction_clone = result.transaction.clone();
+                            tokio::spawn(async move {
+                                let webhook_manager = webhook_manager.lock().await;
+                                webhook_manager.on_transaction_cancelled(&transaction_clone).await;
+                            });
                         }
 
                         Ok(true)
@@ -735,6 +752,7 @@ impl TransactionsQueues {
     /// * `Ok(true)` - If the transaction was successfully replaced
     /// * `Ok(false)` - If the transaction was not found or cannot be replaced
     /// * `Err(ReplaceTransactionError)` - If replacement fails
+    /// TODO: look at the nonce management for replace to predict the new gas limit
     pub async fn replace_transaction(
         &mut self,
         transaction: &Transaction,
@@ -767,8 +785,22 @@ impl TransactionsQueues {
             {
                 match result.type_name {
                     EditableTransactionType::Pending => {
+                        let original_transaction = result.transaction.clone();
                         self.transaction_replace(&mut result.transaction, replace_with);
                         self.invalidate_transaction_cache(&transaction.id).await;
+
+                        if let Some(webhook_manager) = &self.webhook_manager {
+                            let webhook_manager = webhook_manager.clone();
+                            let new_transaction = result.transaction.clone();
+                            let original_transaction_clone = original_transaction.clone();
+                            tokio::spawn(async move {
+                                let webhook_manager = webhook_manager.lock().await;
+                                webhook_manager
+                                    .on_transaction_replaced(&new_transaction, &original_transaction_clone)
+                                    .await;
+                            });
+                        }
+
                         Ok(true)
                     }
                     EditableTransactionType::Inmempool => {
@@ -793,10 +825,15 @@ impl TransactionsQueues {
                         self.invalidate_transaction_cache(&transaction.id).await;
 
                         if let Some(webhook_manager) = &self.webhook_manager {
-                            let webhook_manager = webhook_manager.lock().await;
-                            webhook_manager
-                                .on_transaction_replaced(&result.transaction, &original_transaction)
-                                .await;
+                            let webhook_manager = webhook_manager.clone();
+                            let new_transaction = result.transaction.clone();
+                            let original_transaction_clone = original_transaction.clone();
+                            tokio::spawn(async move {
+                                let webhook_manager = webhook_manager.lock().await;
+                                webhook_manager
+                                    .on_transaction_replaced(&new_transaction, &original_transaction_clone)
+                                    .await;
+                            });
                         }
 
                         Ok(true)
@@ -852,14 +889,17 @@ impl TransactionsQueues {
                         self.invalidate_transaction_cache(&transaction.id).await;
 
                         if let Some(webhook_manager) = &self.webhook_manager {
-                            let webhook_manager = webhook_manager.lock().await;
+                            let webhook_manager = webhook_manager.clone();
                             let sent_transaction = Transaction {
                                 status: TransactionStatus::Inmempool,
                                 known_transaction_hash: Some(transaction_sent.hash),
                                 sent_at: Some(Utc::now()),
                                 ..transaction
                             };
-                            webhook_manager.on_transaction_sent(&sent_transaction).await;
+                            tokio::spawn(async move {
+                                let webhook_manager = webhook_manager.lock().await;
+                                webhook_manager.on_transaction_sent(&sent_transaction).await;
+                            });
                         }
                     }
                     Err(e) => {
@@ -998,15 +1038,19 @@ impl TransactionsQueues {
                                     self.invalidate_transaction_cache(&transaction.id).await;
 
                                     if let Some(webhook_manager) = &self.webhook_manager {
-                                        let webhook_manager = webhook_manager.lock().await;
+                                        let webhook_manager = webhook_manager.clone();
                                         let mined_transaction = Transaction {
                                             status: TransactionStatus::Mined,
                                             mined_at: Some(Utc::now()),
                                             ..transaction
                                         };
-                                        webhook_manager
-                                            .on_transaction_mined(&mined_transaction, &receipt)
-                                            .await;
+                                        let receipt_clone = receipt.clone();
+                                        tokio::spawn(async move {
+                                            let webhook_manager = webhook_manager.lock().await;
+                                            webhook_manager
+                                                .on_transaction_mined(&mined_transaction, &receipt_clone)
+                                                .await;
+                                        });
                                     }
                                 }
                                 TransactionStatus::Expired => {
@@ -1014,14 +1058,17 @@ impl TransactionsQueues {
                                     self.invalidate_transaction_cache(&transaction.id).await;
 
                                     if let Some(webhook_manager) = &self.webhook_manager {
-                                        let webhook_manager = webhook_manager.lock().await;
+                                        let webhook_manager = webhook_manager.clone();
                                         let expired_transaction = Transaction {
                                             status: TransactionStatus::Expired,
                                             ..transaction
                                         };
-                                        webhook_manager
-                                            .on_transaction_expired(&expired_transaction)
-                                            .await;
+                                        tokio::spawn(async move {
+                                            let webhook_manager = webhook_manager.lock().await;
+                                            webhook_manager
+                                                .on_transaction_expired(&expired_transaction)
+                                                .await;
+                                        });
                                     }
                                 }
                                 TransactionStatus::Failed => {
@@ -1031,14 +1078,17 @@ impl TransactionsQueues {
                                     self.invalidate_transaction_cache(&transaction.id).await;
 
                                     if let Some(webhook_manager) = &self.webhook_manager {
-                                        let webhook_manager = webhook_manager.lock().await;
+                                        let webhook_manager = webhook_manager.clone();
                                         let failed_transaction = Transaction {
                                             status: TransactionStatus::Failed,
                                             ..transaction
                                         };
-                                        webhook_manager
-                                            .on_transaction_failed(&failed_transaction)
-                                            .await;
+                                        tokio::spawn(async move {
+                                            let webhook_manager = webhook_manager.lock().await;
+                                            webhook_manager
+                                                .on_transaction_failed(&failed_transaction)
+                                                .await;
+                                        });
                                     }
                                 }
                                 _ => {}
@@ -1184,15 +1234,19 @@ impl TransactionsQueues {
                         self.invalidate_transaction_cache(&transaction.id).await;
 
                         if let Some(webhook_manager) = &self.webhook_manager {
-                            let webhook_manager = webhook_manager.lock().await;
+                            let webhook_manager = webhook_manager.clone();
                             let confirmed_transaction = Transaction {
                                 status: TransactionStatus::Confirmed,
                                 confirmed_at: Some(Utc::now()),
                                 ..transaction
                             };
-                            webhook_manager
-                                .on_transaction_confirmed(&confirmed_transaction, &receipt)
-                                .await;
+                            let receipt_clone = receipt.clone();
+                            tokio::spawn(async move {
+                                let webhook_manager = webhook_manager.lock().await;
+                                webhook_manager
+                                    .on_transaction_confirmed(&confirmed_transaction, &receipt_clone)
+                                    .await;
+                            });
                         }
 
                         return Ok(ProcessResult::<ProcessMinedStatus>::success());

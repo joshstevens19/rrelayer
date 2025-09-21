@@ -64,6 +64,7 @@ pub struct Transaction {
 
     pub chain_id: ChainId,
 
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub gas_limit: Option<GasLimit>,
 
     pub status: TransactionStatus,
@@ -108,6 +109,7 @@ pub struct Transaction {
 
     pub is_noop: bool,
 
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub external_id: Option<String>,
 }
 

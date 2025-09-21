@@ -10,6 +10,7 @@ mod relayer_client;
 mod rrelayer_manager;
 mod test_config;
 mod test_scenarios;
+mod webhook_server;
 
 use anvil_manager::AnvilManager;
 use embedded_rrelayer::EmbeddedRRelayerServer;

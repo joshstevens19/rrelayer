@@ -18,6 +18,7 @@ impl EditableTransaction {
     }
 
     pub fn to_inmempool(transaction: Transaction) -> EditableTransaction {
+        println!("EDITABLE TX READY - {:?}", transaction);
         EditableTransaction { transaction, type_name: EditableTransactionType::Inmempool }
     }
 }
