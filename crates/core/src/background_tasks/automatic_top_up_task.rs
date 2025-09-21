@@ -6,12 +6,10 @@ use crate::{
     relayer::types::Relayer,
     safe_proxy::SafeProxyManager,
     shared::common_types::{EvmAddress, PagingContext},
-    transaction::{queue_system::transactions_queues::TransactionsQueues, types::TransactionNonce},
+    transaction::queue_system::transactions_queues::TransactionsQueues,
     yaml::{AutomaticTopUpConfig, Erc20TokenConfig, NativeTokenConfig, TopUpTargetAddresses},
     SetupConfig,
 };
-use alloy::consensus::TxLegacy;
-use alloy::consensus::TypedTransaction;
 use alloy::primitives::U256;
 use alloy::providers::Provider;
 use alloy::rpc::types::serde_helpers::WithOtherFields;
@@ -535,88 +533,41 @@ impl AutomaticTopUpTask {
             (*target_address, native_config.top_up_amount, alloy::primitives::Bytes::new())
         };
 
-        // Get proper nonce from the transaction queue for this relayer
-        let nonce = match self.get_nonce_for_address(from_address, chain_id).await {
-            Ok(nonce) => nonce,
-            Err(e) => {
-                return Err(format!("Failed to get nonce for address {}: {}", from_address, e));
-            }
-        };
 
-        let tx = TypedTransaction::Legacy(TxLegacy {
-            chain_id: Some(provider.chain_id.u64()),
-            nonce: nonce.into(),
-            gas_price: 20_000_000_000,
-            gas_limit: if config.safe.is_some() { 300000 } else { 21000 },
-            to: alloy::primitives::TxKind::Call(final_to.into()),
-            value: final_value,
-            input: final_data,
-        });
+        // Instead of sending directly, use the transaction queue system
+        let transaction_to_send = crate::transaction::queue_system::TransactionToSend::new(
+            final_to,
+            crate::transaction::types::TransactionValue::new(final_value),
+            crate::transaction::types::TransactionData::new(final_data),
+            Some(crate::transaction::types::TransactionSpeed::Fast),
+            None, // No blobs for top-up transactions
+            Some(format!("automatic_top_up_native_{}_{}", from_address, target_address)),
+        );
 
-        let wallet_index = if config.safe.is_none() {
-            // For direct transactions, we need to find the wallet index
-            match self.find_wallet_index_for_address(chain_id, from_address).await {
-                Some(index) => index,
-                None => {
-                    return Err(format!(
-                        "Cannot find wallet index for from_address {} on chain {}",
-                        from_address, chain_id
-                    ));
-                }
-            }
+        // Find the relayer ID for the from_address
+        let relayer_id = if let Some(relayer) = self.relayer_cache.values().flatten().find(|relayer| &relayer.address == from_address) {
+            relayer.id
         } else {
-            // For Safe transactions, we use the signer's wallet (from_address)
-            // This is already determined inside the Safe logic above
-            match self.find_wallet_index_for_address(chain_id, from_address).await {
-                Some(index) => index,
-                None => {
-                    return Err(format!(
-                        "Cannot find wallet index for Safe signer {} on chain {}",
-                        from_address, chain_id
-                    ));
-                }
+            match self.postgres_client.get_relayer_by_address(from_address, chain_id).await {
+                Ok(Some(relayer)) => relayer.id,
+                Ok(None) => return Err(format!("Relayer with address {} not found in database", from_address)),
+                Err(e) => return Err(format!("Database error while looking up relayer {}: {}", from_address, e)),
             }
         };
 
-        match provider.send_transaction(&wallet_index, tx).await {
-            Ok(tx_hash) => {
-                info!("Top-up transaction sent successfully: {}", tx_hash);
-                Ok(tx_hash.to_string())
+        // Add transaction to the queue instead of sending directly
+        let mut transactions_queues = self.transactions_queues.lock().await;
+        match transactions_queues.add_transaction(&relayer_id, &transaction_to_send).await {
+            Ok(transaction) => {
+                info!("Top-up transaction queued successfully: {} (queue transaction ID: {})", transaction.known_transaction_hash.as_ref().map(|h| h.to_string()).unwrap_or_else(|| "pending".to_string()), transaction.id);
+                Ok(transaction.id.to_string())
             }
             Err(e) => {
                 warn!(
-                    "Failed to send top-up transaction from {} to {}: {}. This is non-fatal, will retry next cycle.",
+                    "Failed to queue top-up transaction from {} to {}: {}. This is non-fatal, will retry next cycle.",
                     from_address, target_address, e
                 );
-
-                match provider.rpc_client().get_balance((*from_address).into()).await {
-                    Ok(from_balance) => {
-                        let gas_price = provider
-                            .rpc_client()
-                            .get_gas_price()
-                            .await
-                            .unwrap_or(20_000_000_000u128);
-                        let estimated_gas =
-                            U256::from(if config.safe.is_some() { 300000 } else { 21000 })
-                                * U256::from(gas_price);
-                        let required_balance = if config.safe.is_some() {
-                            estimated_gas
-                        } else {
-                            native_config.top_up_amount + estimated_gas
-                        };
-
-                        if from_balance < required_balance {
-                            warn!(
-                                "Transaction failure likely due to insufficient from_address balance. Available: {} ETH, Required: {} ETH",
-                                format_wei_to_eth(&from_balance),
-                                format_wei_to_eth(&required_balance)
-                            );
-                        }
-                    }
-                    Err(_) => {}
-                }
-
-                Err(format!("Transaction failed: {}", e))
+                Err(format!("Failed to queue transaction: {}", e))
             }
         }
     }
@@ -768,68 +719,11 @@ impl AutomaticTopUpTask {
     }
 
     /// Finds the EVM provider for a specific chain ID.
-    ///
-    /// # Arguments
-    /// * `chain_id` - Chain ID to find provider for
-    ///
-    /// # Returns
-    /// * `Some(&EvmProvider)` - Provider found for the chain
-    /// * `None` - No provider configured for this chain
     fn get_provider_for_chain(&self, chain_id: &ChainId) -> Option<&EvmProvider> {
         self.providers.iter().find(|p| &p.chain_id == chain_id)
     }
 
     /// Finds the wallet index for a specific address on a given chain.
-    ///
-    /// # Arguments
-    /// * `chain_id` - Chain ID to search in
-    /// * `address` - Address to find wallet index for
-    ///
-    /// # Returns
-    /// * `Some(u32)` - Wallet index if address is found in relayer cache
-    /// * `None` - Address not found in cache or chain not cached
-
-    /// Gets the next nonce for a relayer address using the transaction queue's nonce manager.
-    async fn get_nonce_for_address(
-        &self,
-        address: &EvmAddress,
-        chain_id: &ChainId,
-    ) -> Result<TransactionNonce, String> {
-        let transactions_queues = self.transactions_queues.lock().await;
-
-        let relayer_id = if let Some(relayer) =
-            self.relayer_cache.values().flatten().find(|relayer| &relayer.address == address)
-        {
-            relayer.id
-        } else {
-            // Cache miss - fall back to database lookup
-            info!("Relayer with address {} not found in cache, querying database", address);
-
-            match self.postgres_client.get_relayer_by_address(address, chain_id).await {
-                Ok(Some(relayer)) => relayer.id,
-                Ok(None) => {
-                    return Err(format!("Relayer with address {} not found in database", address));
-                }
-                Err(e) => {
-                    return Err(format!(
-                        "Database error while looking up relayer {}: {}",
-                        address, e
-                    ));
-                }
-            }
-        };
-
-        // Get the transaction queue for this relayer
-        let queue = transactions_queues
-            .queues
-            .get(&relayer_id)
-            .ok_or_else(|| format!("Transaction queue not found for relayer {}", relayer_id))?;
-
-        // Get and increment nonce atomically
-        let nonce = queue.lock().await.nonce_manager.get_and_increment().await;
-        Ok(nonce)
-    }
-
     async fn find_wallet_index_for_address(
         &self,
         chain_id: &ChainId,
@@ -1011,59 +905,40 @@ impl AutomaticTopUpTask {
             (token_config.address.into(), U256::ZERO, transfer_call.abi_encode().into())
         };
 
-        let nonce = match self.get_nonce_for_address(from_address, chain_id).await {
-            Ok(nonce) => nonce,
-            Err(e) => {
-                return Err(format!("Failed to get nonce for address {}: {}", from_address, e));
-            }
-        };
+        // Instead of sending directly, use the transaction queue system
+        let transaction_to_send = crate::transaction::queue_system::TransactionToSend::new(
+            final_to,
+            crate::transaction::types::TransactionValue::new(final_value),
+            crate::transaction::types::TransactionData::new(final_data),
+            Some(crate::transaction::types::TransactionSpeed::Fast),
+            None, // No blobs for ERC-20 transactions
+            Some(format!("automatic_top_up_erc20_{}_{}_{}", token_config.address, from_address, target_address)),
+        );
 
-        let tx = TypedTransaction::Legacy(TxLegacy {
-            chain_id: Some(provider.chain_id.u64()),
-            nonce: nonce.into(),
-            gas_price: 20_000_000_000, // 20 gwei, will be updated by gas estimation
-            gas_limit: if config.safe.is_some() { 400000 } else { 100000 }, // Higher gas limit for Safe transactions
-            to: alloy::primitives::TxKind::Call(final_to.into()),
-            value: final_value,
-            input: final_data,
-        });
-
-        // Find the wallet index for the from_address
-        let wallet_index = if config.safe.is_none() {
-            // For direct ERC-20 transactions
-            match self.find_wallet_index_for_address(chain_id, from_address).await {
-                Some(index) => index,
-                None => {
-                    return Err(format!(
-                        "Cannot find wallet index for from_address {} on chain {}",
-                        from_address, chain_id
-                    ));
-                }
-            }
+        // Find the relayer ID for the from_address
+        let relayer_id = if let Some(relayer) = self.relayer_cache.values().flatten().find(|relayer| &relayer.address == from_address) {
+            relayer.id
         } else {
-            // For Safe ERC-20 transactions, we use the signer's wallet (from_address)
-            match self.find_wallet_index_for_address(chain_id, from_address).await {
-                Some(index) => index,
-                None => {
-                    return Err(format!(
-                        "Cannot find wallet index for Safe signer {} on chain {}",
-                        from_address, chain_id
-                    ));
-                }
+            match self.postgres_client.get_relayer_by_address(from_address, chain_id).await {
+                Ok(Some(relayer)) => relayer.id,
+                Ok(None) => return Err(format!("Relayer with address {} not found in database", from_address)),
+                Err(e) => return Err(format!("Database error while looking up relayer {}: {}", from_address, e)),
             }
         };
 
-        match provider.send_transaction(&wallet_index, tx).await {
-            Ok(tx_hash) => {
-                info!("ERC-20 top-up transaction sent successfully: {}", tx_hash);
-                Ok(tx_hash.to_string())
+        // Add transaction to the queue instead of sending directly
+        let mut transactions_queues = self.transactions_queues.lock().await;
+        match transactions_queues.add_transaction(&relayer_id, &transaction_to_send).await {
+            Ok(transaction) => {
+                info!("ERC-20 top-up transaction queued successfully: {} (queue transaction ID: {})", transaction.known_transaction_hash.as_ref().map(|h| h.to_string()).unwrap_or_else(|| "pending".to_string()), transaction.id);
+                Ok(transaction.id.to_string())
             }
             Err(e) => {
                 warn!(
-                    "Failed to send ERC-20 top-up transaction from {} to {}: {}. This is non-fatal, will retry next cycle.",
+                    "Failed to queue ERC-20 top-up transaction from {} to {}: {}. This is non-fatal, will retry next cycle.",
                     from_address, target_address, e
                 );
-                Err(format!("ERC-20 transaction failed: {}", e))
+                Err(format!("Failed to queue ERC-20 transaction: {}", e))
             }
         }
     }
