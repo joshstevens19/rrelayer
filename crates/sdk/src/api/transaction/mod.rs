@@ -20,6 +20,7 @@ impl TransactionApi {
         Self { client }
     }
 
+    // TODO: handle 404s here
     pub async fn get_transaction(
         &self,
         transaction_id: &TransactionId,
@@ -71,6 +72,7 @@ impl TransactionApi {
         self.client.put(&format!("transactions/replace/{}", transaction_id), replacement).await
     }
 
+    // TODO: handle 404s here
     pub async fn get_transaction_status(
         &self,
         transaction_id: &TransactionId,

@@ -33,7 +33,7 @@ clone:
 	cargo run -- clone --path $(CURDIR)/../../playground/example  7c73fbbb-04b1-4a9a-9597-b6b83d891a8f relayer2 sepolia_ethereum
 
 config_get:
-	cargo run -- config --path $(CURDIR)/../../playground/example get 7c73fbbb-04b1-4a9a-9597-b6b83d891a8f
+	cargo run -- config --path $(CURDIR)/../../playground/example get "b7b60cca-34a4-4879-8ae0-541b7ba41d9"
 config_pause:
 	cargo run -- config --path $(CURDIR)/../../playground/example pause 7c73fbbb-04b1-4a9a-9597-b6b83d891a8f
 config_unpause:
@@ -43,9 +43,10 @@ config_gas_latest:
 	cargo run -- config --path $(CURDIR)/../../playground/example gas 7c73fbbb-04b1-4a9a-9597-b6b83d891a8f latest
 config_gas_legacy:
 	cargo run -- config --path $(CURDIR)/../../playground/example gas 7c73fbbb-04b1-4a9a-9597-b6b83d891a8f legacy
-# TODO: How to unset max price
 config_gas_max_price:
 	cargo run -- config --path $(CURDIR)/../../playground/example gas 7c73fbbb-04b1-4a9a-9597-b6b83d891a8f max-price 1000000
+config_gas_max_price_unset:
+	cargo run -- config --path $(CURDIR)/../../playground/example gas 7c73fbbb-04b1-4a9a-9597-b6b83d891a8f max-price 0
 
 balance:
 	cargo run -- balance --path $(CURDIR)/../../playground/example 7c73fbbb-04b1-4a9a-9597-b6b83d891a8f
@@ -76,7 +77,7 @@ tx_get:
 tx_relayer_list:
 	cargo run -- tx --path $(CURDIR)/../../playground/example list 3c24e942-3109-4516-bd3b-6e2a904ef473
 tx_withdraw:
-	cargo run -- tx --path $(CURDIR)/../../playground/example withdraw 3c24e942-3109-4516-bd3b-6e2a904ef473 0x10AE77B225626C1341bae10C4e6528D5520E1E33 10000000
+	cargo run -- tx --path $(CURDIR)/../../playground/example withdraw 3c24e942-3109-4516-bd3b-6e2a904ef473 0x10AE77B225626C1341bae10C4e6528D5520E1E33 "0.001"
 tx_status:
 	cargo run -- tx --path $(CURDIR)/../../playground/example status 578eb9d1-f778-4009-9a26-e97b7b9982b6
 tx_send:
@@ -87,3 +88,5 @@ tx_replace:
 	cargo run -- tx --path $(CURDIR)/../../playground/example replace 578eb9d1-f778-4009-9a26-e97b7b9982b6 '{"to":"0x10AE77B225626C1341bae10C4e6528D5520E1E33","value":"1000000","data":"0x","gas_limit":21000}'
 tx_send_blob:
 	cargo run -- tx --path $(CURDIR)/../../playground/example send 3c24e942-3109-4516-bd3b-6e2a904ef473 '{"to":"0x10AE77B225626C1341bae10C4e6528D5520E1E33","value":"1000000","data":"0x","blobs":["0x$(shell python3 -c "print('01' * 131072)")"]}'
+tx_fund:
+	cargo run -- tx --path $(CURDIR)/../../playground/example fund b7b60cca-34a4-4879-8ae0-541b7ba41d9 "10"

@@ -21,6 +21,7 @@ thiserror = "1.0"
 prettytable = "0.10.0"
 chrono = "0.4.41"
 hex = "0.4.3"
+rpassword = "7.3"
 
 alloy = { workspace = true, features = ["full", "signer-mnemonic", "eips", "eip712", "signer-keystore"] }
 alloy-rlp = { workspace = true }

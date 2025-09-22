@@ -1,4 +1,9 @@
-use alloy::primitives::U256;
+use alloy::network::EthereumWallet;
+use alloy::primitives::utils::parse_units;
+use alloy::providers::{Provider, ProviderBuilder};
+use alloy::signers::local::PrivateKeySigner;
+use alloy::sol;
+use alloy::sol_types::SolCall;
 use chrono::{DateTime, Utc};
 use clap::Subcommand;
 use rrelayer_core::common_types::PagingContext;
@@ -11,8 +16,17 @@ use rrelayer_core::{
     },
 };
 use rrelayer_sdk::SDK;
+use std::io::{self, Write};
 
 use crate::commands::error::TransactionError;
+
+sol! {
+    #[sol(rpc)]
+    interface IERC20 {
+        function transfer(address to, uint256 amount) external returns (bool);
+        function balanceOf(address account) external view returns (uint256);
+    }
+}
 
 #[derive(Subcommand)]
 pub enum TxCommand {
@@ -88,13 +102,17 @@ pub enum TxCommand {
         #[clap(required = true)]
         to: EvmAddress,
 
-        /// Amount to send
+        /// Amount to send (e.g., "1.5" for 1.5 ETH or "100" for 100 tokens)
         #[clap(required = true)]
-        amount: U256,
+        amount: String,
 
         /// The token address if you want an erc20/721 balance
         #[arg(long)]
         token: Option<EvmAddress>,
+
+        /// Number of decimals for the token (default: 18 for ETH)
+        #[arg(long, default_value = "18")]
+        decimals: u8,
     },
     /// Fund tokens from a wallet to your relayer
     Fund {
@@ -102,13 +120,17 @@ pub enum TxCommand {
         #[clap(required = true)]
         relayer_id: RelayerId,
 
-        /// Amount to send
+        /// Amount to send (e.g., "1.5" for 1.5 ETH or "100" for 100 tokens)
         #[clap(required = true)]
-        amount: U256,
+        amount: String,
 
         /// The token address if you want an erc20/721 balance
         #[arg(long)]
         token: Option<EvmAddress>,
+
+        /// Number of decimals for the token (default: 18 for ETH)
+        #[arg(long, default_value = "18")]
+        decimals: u8,
     },
 }
 
@@ -123,8 +145,8 @@ pub enum TxStatus {
 pub async fn handle_tx(command: &TxCommand, sdk: &SDK) -> Result<(), TransactionError> {
     match command {
         TxCommand::Get { tx_id } => handle_get(tx_id, sdk).await,
-        TxCommand::Withdraw { relayer_id, to, amount, token: _ } => {
-            handle_withdraw(relayer_id, to, amount, sdk).await
+        TxCommand::Withdraw { relayer_id, to, amount, token, decimals } => {
+            handle_withdraw(relayer_id, to, amount, token, *decimals, sdk).await
         }
         TxCommand::Status { tx_id } => handle_status(tx_id, sdk).await,
         TxCommand::List { relayer_id, status, limit, offset } => {
@@ -136,9 +158,8 @@ pub async fn handle_tx(command: &TxCommand, sdk: &SDK) -> Result<(), Transaction
         TxCommand::Send { relayer_id, transaction } => {
             handle_send(relayer_id, transaction, sdk).await
         }
-        TxCommand::Fund { relayer_id: _, amount: _, token: _ } => {
-            // TODO: Implement Fund command
-            Err(TransactionError::CommandFailed("Fund command not yet implemented".to_string()))
+        TxCommand::Fund { relayer_id, amount, token, decimals } => {
+            handle_fund(relayer_id, amount, token, *decimals, sdk).await
         }
     }
 }
@@ -156,28 +177,71 @@ async fn handle_get(tx_id: &TransactionId, sdk: &SDK) -> Result<(), TransactionE
 async fn handle_withdraw(
     relayer_id: &RelayerId,
     to: &EvmAddress,
-    amount: &U256,
+    amount: &str,
+    token: &Option<EvmAddress>,
+    decimals: u8,
     sdk: &SDK,
 ) -> Result<(), TransactionError> {
-    let tx = sdk
-        .transaction
-        .send_transaction(
-            relayer_id,
-            &RelayTransactionRequest {
-                to: *to,
-                value: TransactionValue::new(*amount),
-                data: TransactionData::empty(),
-                speed: Some(TransactionSpeed::Fast),
-                blobs: None,
-                external_id: None,
-            },
-            None,
-        )
-        .await?;
+    let amount_wei = parse_units(amount, decimals)
+        .map_err(|e| {
+            TransactionError::CommandFailed(format!("Invalid amount format '{}': {}", amount, e))
+        })?
+        .into();
 
-    println!("Transaction sent..");
-    println!("Transaction id: {}", tx.id);
-    println!("Transaction hash: {}", tx.hash);
+    println!(
+        "Withdrawing {} {} (raw: {} wei)",
+        amount,
+        if token.is_some() { "tokens" } else { "ETH" },
+        amount_wei
+    );
+
+    match token {
+        Some(token_address) => {
+            let call = IERC20::transferCall { to: (*to).into(), amount: amount_wei };
+
+            let tx = sdk
+                .transaction
+                .send_transaction(
+                    relayer_id,
+                    &RelayTransactionRequest {
+                        to: *token_address,
+                        value: TransactionValue::zero(),
+                        data: TransactionData::new(call.abi_encode().into()),
+                        speed: Some(TransactionSpeed::Fast),
+                        blobs: None,
+                        external_id: None,
+                    },
+                    None,
+                )
+                .await?;
+
+            println!("ERC-20 token withdrawal transaction sent..");
+            println!("Transaction id: {}", tx.id);
+            println!("Transaction hash: {}", tx.hash);
+        }
+        None => {
+            // Native ETH transfer
+            let tx = sdk
+                .transaction
+                .send_transaction(
+                    relayer_id,
+                    &RelayTransactionRequest {
+                        to: *to,
+                        value: TransactionValue::new(amount_wei),
+                        data: TransactionData::empty(),
+                        speed: Some(TransactionSpeed::Fast),
+                        blobs: None,
+                        external_id: None,
+                    },
+                    None,
+                )
+                .await?;
+
+            println!("ETH withdrawal transaction sent..");
+            println!("Transaction id: {}", tx.id);
+            println!("Transaction hash: {}", tx.hash);
+        }
+    }
 
     Ok(())
 }
@@ -296,6 +360,164 @@ async fn handle_send(
     println!("Transaction sent..");
     println!("Transaction id: {}", tx.id);
     println!("Transaction hash: {}", tx.hash);
+
+    Ok(())
+}
+
+async fn handle_fund(
+    relayer_id: &RelayerId,
+    amount: &str,
+    token: &Option<EvmAddress>,
+    decimals: u8,
+    sdk: &SDK,
+) -> Result<(), TransactionError> {
+    let result = sdk.relayer.get(relayer_id).await?.ok_or_else(|| {
+        TransactionError::CommandFailed(format!("Relayer {} not found", relayer_id))
+    })?;
+
+    let target_address = result.relayer.address;
+    let chain_id = result.relayer.chain_id;
+
+    let amount_wei = parse_units(amount, decimals)
+        .map_err(|e| {
+            TransactionError::CommandFailed(format!("Invalid amount format '{}': {}", amount, e))
+        })?
+        .into();
+
+    let network = sdk.network.get_all_networks().await?;
+    let network = network.into_iter().find(|n| n.chain_id == chain_id).expect("Network not found");
+
+    println!("┌─────────────────────────────────────────────────────────────────────");
+    println!("│ FUNDING RELAYER");
+    println!("├─────────────────────────────────────────────────────────────────────");
+    println!("│ Relayer ID:        {}", relayer_id);
+    println!("│ Target Address:    {}", target_address);
+    println!("│ Chain ID:          {}", chain_id);
+
+    match token {
+        Some(token_address) => {
+            println!("│ Token:             {}", token_address);
+            println!("│ Amount:            {} tokens (raw: {} units)", amount, amount_wei);
+            println!("│ Decimals:          {}", decimals);
+        }
+        None => {
+            println!("│ Token:             ETH (native)");
+            println!("│ Amount:            {} ETH (raw: {} wei)", amount, amount_wei);
+            println!("│ Decimals:          {}", decimals);
+        }
+    }
+
+    println!("└─────────────────────────────────────────────────────────────────────");
+    println!();
+
+    print!("Enter the private key of the funding wallet (will be hidden): ");
+    io::stdout()
+        .flush()
+        .map_err(|e| TransactionError::CommandFailed(format!("IO error: {}", e)))?;
+
+    let private_key = rpassword::read_password().map_err(|e| {
+        TransactionError::CommandFailed(format!("Failed to read private key: {}", e))
+    })?;
+
+    if private_key.trim().is_empty() {
+        return Err(TransactionError::CommandFailed("Private key cannot be empty".to_string()));
+    }
+
+    let signer = PrivateKeySigner::from_slice(
+        &hex::decode(private_key.trim().trim_start_matches("0x")).map_err(|e| {
+            TransactionError::CommandFailed(format!("Invalid private key format: {}", e))
+        })?,
+    )
+    .map_err(|e| TransactionError::CommandFailed(format!("Failed to create signer: {}", e)))?;
+
+    let from_address = signer.address();
+    println!("Funding from address: {}", from_address);
+
+    let wallet = EthereumWallet::from(signer);
+
+    let rpc_url = network.provider_urls.first().expect("Providers not found").to_string();
+    let provider = ProviderBuilder::new()
+        .with_recommended_fillers()
+        .wallet(wallet)
+        .on_builtin(&rpc_url)
+        .await
+        .map_err(|e| TransactionError::CommandFailed(format!("Failed to connect to RPC: {}", e)))?;
+
+    println!("Connected to RPC at {}", rpc_url);
+
+    let actual_chain_id = provider
+        .get_chain_id()
+        .await
+        .map_err(|e| TransactionError::CommandFailed(format!("Failed to get chain ID: {}", e)))?;
+
+    if actual_chain_id != u64::from(chain_id) {
+        return Err(TransactionError::CommandFailed(format!(
+            "Chain ID mismatch! Expected {}, got {}",
+            chain_id, actual_chain_id
+        )));
+    }
+
+    match token {
+        Some(token_address) => {
+            println!("Sending {} tokens to {}...", amount, target_address);
+
+            let call =
+                IERC20::transferCall { to: target_address.into_address(), amount: amount_wei };
+
+            let tx_request = alloy::rpc::types::TransactionRequest::default()
+                .to((*token_address).into())
+                .input(call.abi_encode().into());
+
+            let tx_hash = provider
+                .send_transaction(tx_request)
+                .await
+                .map_err(|e| {
+                    TransactionError::CommandFailed(format!(
+                        "Failed to send ERC-20 transfer: {}",
+                        e
+                    ))
+                })?
+                .watch()
+                .await
+                .map_err(|e| {
+                    TransactionError::CommandFailed(format!(
+                        "Failed to wait for ERC-20 transfer: {}",
+                        e
+                    ))
+                })?;
+
+            println!("✅ ERC-20 transfer sent!");
+            println!("Transaction hash: {}", tx_hash);
+        }
+        None => {
+            println!("Sending {} ETH to {}...", amount, target_address);
+
+            let tx_request = alloy::rpc::types::TransactionRequest::default()
+                .to((target_address.into_address()).into())
+                .value(amount_wei);
+
+            let tx_hash = provider
+                .send_transaction(tx_request)
+                .await
+                .map_err(|e| {
+                    TransactionError::CommandFailed(format!("Failed to send ETH transfer: {}", e))
+                })?
+                .watch()
+                .await
+                .map_err(|e| {
+                    TransactionError::CommandFailed(format!(
+                        "Failed to wait for ETH transfer: {}",
+                        e
+                    ))
+                })?;
+
+            println!("✅ ETH transfer sent!");
+            println!("Transaction hash: {}", tx_hash);
+        }
+    }
+
+    println!("\n💰 Funding complete! Your relayer should receive the funds shortly.");
+    println!("Use 'rrelayer balance {}' to check the updated balance.", relayer_id);
 
     Ok(())
 }
