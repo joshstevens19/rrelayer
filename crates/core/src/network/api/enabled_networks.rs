@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
-use axum::{extract::State, http::StatusCode, Json};
+use axum::{extract::State, Json};
 
+use crate::shared::HttpError;
 use crate::{
     app_state::AppState,
     network::{
@@ -10,29 +11,15 @@ use crate::{
     },
 };
 
-/// HTTP handler for retrieving enabled networks only.
-///
-/// Returns a list of enabled networks from cache if available,
-/// otherwise fetches from database and caches the result.
-///
-/// # Arguments
-/// * `state` - Application state containing database connection and cache
-///
-/// # Returns
-/// * `Ok(Json<Vec<Network>>)` - List of enabled networks
-/// * `Err(StatusCode::INTERNAL_SERVER_ERROR)` - If database query fails
+/// Returns a list of enabled networks.
 pub async fn enabled_networks(
     State(state): State<Arc<AppState>>,
-) -> Result<Json<Vec<Network>>, StatusCode> {
+) -> Result<Json<Vec<Network>>, HttpError> {
     if let Some(cached_result) = get_enabled_networks_cache(&state.cache).await {
         return Ok(Json(cached_result));
     }
 
-    let enabled_networks = state
-        .db
-        .get_networks(NetworksFilterState::Enabled)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let enabled_networks = state.db.get_networks(NetworksFilterState::Enabled).await?;
 
     set_enabled_networks_cache(&state.cache, &enabled_networks).await;
     Ok(Json(enabled_networks))

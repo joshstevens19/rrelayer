@@ -7,16 +7,6 @@ use crate::{
 
 impl PostgresClient {
     /// Retrieves networks from the database with optional filtering.
-    ///
-    /// Fetches network data including provider URLs based on the specified filter.
-    /// Networks with multiple provider URLs are consolidated into single Network objects.
-    ///
-    /// # Arguments
-    /// * `filter` - Specifies which networks to retrieve (All, Enabled, or Disabled)
-    ///
-    /// # Returns
-    /// * `Ok(Vec<Network>)` - List of networks matching the filter criteria
-    /// * `Err(PostgresError)` - If database query fails
     pub async fn get_networks(
         &self,
         filter: NetworksFilterState,
@@ -68,5 +58,24 @@ impl PostgresClient {
         }
 
         Ok(networks_map.into_values().collect())
+    }
+
+    /// Checks if a network exists in the database.
+    pub async fn network_exists(&self, chain_id: ChainId) -> Result<bool, PostgresError> {
+        let query = r#"
+            SELECT EXISTS(
+                SELECT 1
+                FROM network.record
+                WHERE chain_id = $1
+            )
+        "#;
+
+        let rows = self.query(query, &[&chain_id]).await?;
+
+        if let Some(row) = rows.first() {
+            Ok(row.get::<_, bool>(0))
+        } else {
+            Ok(false)
+        }
     }
 }

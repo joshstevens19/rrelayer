@@ -13,45 +13,21 @@ use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 pub struct ChainId(u64);
 
 impl Default for ChainId {
-    /// Returns the default ChainId (Ethereum mainnet, chain ID 1).
-    ///
-    /// # Returns
-    /// * `ChainId` - Default chain ID set to 1 (Ethereum mainnet)
     fn default() -> Self {
         ChainId(1)
     }
 }
 
 impl ChainId {
-    /// Creates a new ChainId from a u64 value.
-    ///
-    /// # Arguments
-    /// * `id` - The numeric chain identifier
-    ///
-    /// # Returns
-    /// * `ChainId` - New chain ID instance
     pub fn new(id: u64) -> Self {
         ChainId(id)
     }
-
-    /// Extracts the underlying u64 value from the ChainId.
-    ///
-    /// # Returns
-    /// * `u64` - The numeric chain identifier
     pub fn u64(&self) -> u64 {
         self.0
     }
 }
 
 impl<'de> Deserialize<'de> for ChainId {
-    /// Deserializes a ChainId from a u64 value.
-    ///
-    /// # Arguments
-    /// * `deserializer` - The deserializer to read from
-    ///
-    /// # Returns
-    /// * `Ok(ChainId)` - Successfully deserialized chain ID
-    /// * `Err(D::Error)` - If deserialization fails
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -120,14 +96,6 @@ impl Error for ParseChainIdError {}
 impl FromStr for ChainId {
     type Err = ParseChainIdError;
 
-    /// Parses a ChainId from a string representation.
-    ///
-    /// # Arguments
-    /// * `param` - String containing the numeric chain ID
-    ///
-    /// # Returns
-    /// * `Ok(ChainId)` - Successfully parsed chain ID
-    /// * `Err(ParseChainIdError)` - If string cannot be parsed as valid u64
     fn from_str(param: &str) -> Result<Self, Self::Err> {
         u64::from_str(param).map(ChainId).map_err(|_| ParseChainIdError)
     }

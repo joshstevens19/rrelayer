@@ -4,19 +4,7 @@ use crate::{
 };
 
 impl PostgresClient {
-    /// Saves a new enabled network to the database.
-    ///
-    /// Creates a new network record and associated provider nodes in a transaction.
-    /// Uses ON CONFLICT DO NOTHING to handle duplicate entries gracefully.
-    ///
-    /// # Arguments
-    /// * `chain_id` - Unique identifier for the blockchain network
-    /// * `name` - Human-readable name for the network
-    /// * `provider_urls` - List of RPC provider URLs for this network
-    ///
-    /// # Returns
-    /// * `Ok(())` - If network was successfully saved
-    /// * `Err(PostgresError)` - If database transaction fails
+    /// Saves a new enabled network.
     pub async fn save_enabled_network(
         &mut self,
         chain_id: &ChainId,
@@ -47,17 +35,7 @@ impl PostgresClient {
         Ok(())
     }
 
-    /// Disables a network by setting its disabled flag to true.
-    ///
-    /// Updates the network record to mark it as disabled, preventing it from
-    /// being used in relay operations.
-    ///
-    /// # Arguments
-    /// * `chain_id` - Chain ID of the network to disable
-    ///
-    /// # Returns
-    /// * `Ok(())` - If network was successfully disabled
-    /// * `Err(PostgresError)` - If database update fails
+    /// Disables a network.
     pub async fn disable_network(&self, chain_id: ChainId) -> Result<(), PostgresError> {
         self.execute(
             "UPDATE network.record SET disabled = TRUE WHERE chain_id = $1;",
@@ -68,17 +46,7 @@ impl PostgresClient {
         Ok(())
     }
 
-    /// Enables a network by setting its disabled flag to false.
-    ///
-    /// Updates the network record to mark it as enabled, allowing it to
-    /// be used in relay operations.
-    ///
-    /// # Arguments
-    /// * `chain_id` - Chain ID of the network to enable
-    ///
-    /// # Returns
-    /// * `Ok(())` - If network was successfully enabled
-    /// * `Err(PostgresError)` - If database update fails
+    /// Enables a network
     pub async fn enable_network(&self, chain_id: ChainId) -> Result<(), PostgresError> {
         self.execute(
             "UPDATE network.record SET disabled = FALSE WHERE chain_id = $1;",

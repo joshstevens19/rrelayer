@@ -2,6 +2,7 @@ use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Instant};
 
 use crate::authentication::{basic_auth_guard, create_basic_auth_routes};
 use crate::background_tasks::run_background_tasks;
+use crate::network::create_network_routes;
 use crate::webhooks::WebhookManager;
 use crate::yaml::ReadYamlError;
 use crate::{
@@ -9,7 +10,6 @@ use crate::{
     gas::{
         api::create_gas_routes, blob_gas_oracle::BlobGasOracleCache, gas_oracle::GasOracleCache,
     },
-    network::api::create_network_routes,
     postgres::{PostgresClient, PostgresConnectionError, PostgresError},
     provider::{load_providers, EvmProvider, LoadProvidersError},
     rate_limiting::RateLimiter,
