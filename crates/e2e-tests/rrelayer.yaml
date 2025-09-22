@@ -8,17 +8,18 @@ networks:
   provider_urls:
     - http://127.0.0.1:8545
   block_explorer_url: http://localhost:8545
-  automatic_top_up:
-    from_address: '0x655B2B8861D7E911D283A05A5CAD042C157106DA'
-    targets: '*'
-    native:
-      enabled: true
-      min_balance: "50"
-      top_up_amount: "100"
-    erc20_tokens:
-      - address: "0x99bba657f2bbc93c02d617f8ba121cb8fc104acf" # Deterministic TestToken address  
-        min_balance: "100"
-        top_up_amount: "500"
+#  automatic_top_up:
+#    from_address: '0x655B2B8861D7E911D283A05A5CAD042C157106DA'
+#    targets: '*'
+#    safe: "0x8ce9bf333e65b4ce307be777434597bad3134408" # Deterministic Safe proxy address
+#    native:
+#      enabled: true
+#      min_balance: "50"
+#      top_up_amount: "100"
+#    erc20_tokens:
+#      - address: "0x99bba657f2bbc93c02d617f8ba121cb8fc104acf" # Deterministic TestToken address
+#        min_balance: "100"
+#        top_up_amount: "500"
 api_config:
   port: 3000
   authentication_username: ${RRELAYER_AUTH_USERNAME}
@@ -28,6 +29,10 @@ webhooks:
   shared_secret: test-webhook-secret-123
   networks:
   - local_anvil
+safe_proxy:
+  - address: "0xcfe267de230a234c5937f18f239617b7038ec271" # Deterministic Safe proxy address
+    relayers:
+      - "0x1C073e63f70701BC545019D3c4f2a25A69eCA8Cf" # Wallet index 80
 rate_limits:
   limits:
     transactions_per_minute: 1

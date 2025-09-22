@@ -360,13 +360,10 @@ impl SafeProxyManager {
         value: U256,
         data: Bytes,
     ) -> Result<(SafeTransaction, Bytes), SafeProxyError> {
-        // Fetch current nonce from Safe contract
         let safe_nonce = self.get_safe_nonce(provider, safe_address).await?;
 
-        // Create safe transaction
         let safe_tx = SafeTransaction::new(to, value, data, safe_nonce);
 
-        // Create signature for the transaction
         let signatures = self
             .create_safe_signature(
                 provider,
@@ -400,7 +397,6 @@ mod tests {
 
         let manager = SafeProxyManager::new(vec![config]);
 
-        // Test relayer authorization
         assert_eq!(manager.get_safe_proxy_for_relayer(&relayer1), Some(safe_address));
         assert_eq!(manager.get_safe_proxy_for_relayer(&relayer2), Some(safe_address));
         assert_eq!(

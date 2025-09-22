@@ -5,7 +5,7 @@ use bytes::BytesMut;
 use serde::{Deserialize, Serialize};
 use tokio_postgres::types::{to_sql_checked, FromSql, IsNull, ToSql, Type};
 
-#[derive(Debug, Copy, Clone, Serialize, PartialEq, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, PartialEq, Eq, Hash, Deserialize)]
 pub struct EvmAddress(Address);
 
 impl EvmAddress {

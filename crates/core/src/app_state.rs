@@ -45,4 +45,6 @@ pub struct AppState {
     pub user_rate_limiter: Option<Arc<RateLimiter>>,
     /// Rate limiting configuration
     pub rate_limit_config: Option<RateLimitConfig>,
+    /// Mutex to prevent concurrent relayer creation deadlocks
+    pub relayer_creation_mutex: Arc<Mutex<()>>,
 }

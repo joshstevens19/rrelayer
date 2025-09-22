@@ -1089,6 +1089,13 @@ impl TransactionsQueue {
         let mut working_transaction = transaction.clone();
         working_transaction.to = final_to;
         working_transaction.data = final_data;
+        
+        // If using safe proxy, the transaction value should be 0 because the ETH transfer
+        // amount is encoded in the execTransaction call data, not in the transaction value
+        if self.safe_proxy_manager.is_some() && 
+           self.safe_proxy_manager.as_ref().unwrap().get_safe_proxy_for_relayer(&self.relayer.address).is_some() {
+            working_transaction.value = TransactionValue::zero();
+        }
 
         // First, estimate gas limit by creating a temporary transaction with a high gas limit
         let temp_gas_limit = GasLimit::new(10_000_000); // High temporary limit for estimation
@@ -1136,7 +1143,7 @@ impl TransactionsQueue {
         };
 
         // TODO: look at this for replacement and cancels
-        let estimated_gas_limit = if let Some(gas_limit) = transaction.gas_limit {
+        let mut estimated_gas_limit = if let Some(gas_limit) = transaction.gas_limit {
             gas_limit
         } else {
             self.estimate_gas(&temp_transaction_request, working_transaction.is_noop)
@@ -1144,8 +1151,34 @@ impl TransactionsQueue {
                 .map_err(TransactionQueueSendTransactionError::TransactionEstimateGasError)?
         };
 
+        // Add extra gas buffer for Safe proxy transactions due to execTransaction overhead
+        if self.safe_proxy_manager.is_some() && 
+           self.safe_proxy_manager.as_ref().unwrap().get_safe_proxy_for_relayer(&self.relayer.address).is_some() {
+            let original_estimate = estimated_gas_limit;
+            
+            // Safe proxy gas overhead calculation:
+            // Test data shows: Failed at 25k and 37k gas, succeeded at 65k gas
+            // Safe execTransaction overhead includes:
+            // - Signature verification (~5-15k gas per signature)
+            // - Safe contract state checks (~5-10k gas)
+            // - Payment/refund logic (~5-10k gas)
+            // - Event emission (~5k gas)
+            // Total overhead: ~20-40k gas minimum
+            
+            // Add 45k gas overhead to base estimate to be safe and cater for the overhead
+            let safe_overhead = GasLimit::new(45_000);
+            estimated_gas_limit = estimated_gas_limit + safe_overhead;
+            
+            info!(
+                "Applied Safe proxy gas overhead for relayer: {} - original: {}, overhead: {}, final: {}",
+                self.relayer.name,
+                original_estimate.into_inner(),
+                safe_overhead.into_inner(),
+                estimated_gas_limit.into_inner()
+            );
+        }
+
         working_transaction.gas_limit = Some(estimated_gas_limit);
-        // Also update the original transaction for database storage
         transaction.gas_limit = Some(estimated_gas_limit);
 
         // Now create the final transaction with the estimated gas limit

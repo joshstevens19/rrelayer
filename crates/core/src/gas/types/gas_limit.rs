@@ -1,7 +1,7 @@
 use std::{
     error::Error,
     hash::{Hash, Hasher},
-    ops::{Div, Mul},
+    ops::{Add, Div, Mul},
     str,
     str::FromStr,
 };
@@ -40,6 +40,18 @@ impl PartialEq for GasLimit {
     }
 }
 
+impl PartialOrd for GasLimit {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for GasLimit {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.cmp(&other.0)
+    }
+}
+
 impl Hash for GasLimit {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.0.hash(state);
@@ -59,6 +71,14 @@ impl Mul<u32> for GasLimit {
 
     fn mul(self, other: u32) -> Self::Output {
         GasLimit(self.0 * other as u128)
+    }
+}
+
+impl Add for GasLimit {
+    type Output = GasLimit;
+
+    fn add(self, other: GasLimit) -> Self::Output {
+        GasLimit(self.0 + other.0)
     }
 }
 

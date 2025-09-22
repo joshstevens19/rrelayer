@@ -263,6 +263,155 @@ impl ContractInteractor {
         Ok(token_address)
     }
 
+    /// Deploy the Safe contracts using Forge
+    pub async fn deploy_safe_contracts(&mut self, deployer_private_key: &str) -> Result<Address> {
+        info!("Deploying Safe contracts using Forge...");
+
+        // Get the RPC URL from the provider
+        let rpc_url = self.provider.client().transport().url().to_string();
+
+        // Verify contracts directory exists
+        let contracts_dir = std::path::Path::new("contracts");
+        if !contracts_dir.exists() {
+            return Err(anyhow::anyhow!(
+                "Contracts directory not found at {:?}",
+                contracts_dir.canonicalize()
+            ));
+        }
+
+        info!("Using RPC URL: {} and contracts dir: {:?}", rpc_url, contracts_dir.canonicalize());
+
+        // Wait to ensure any previous transactions are settled
+        tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
+
+        // Enable auto-mining temporarily for forge deployment
+        let client = reqwest::Client::new();
+        let auto_mine_enable = serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "anvil_setAutomine",
+            "params": [true],
+            "id": 1
+        });
+
+        let _ = client
+            .post(&rpc_url)
+            .header("Content-Type", "application/json")
+            .json(&auto_mine_enable)
+            .send()
+            .await;
+
+        info!("Enabled auto-mining for Safe deployment");
+
+        // Run the Forge deployment script for Safe contracts
+        let deployer_key = deployer_private_key.to_string();
+        let rpc_url_clone = rpc_url.clone();
+        let forge_task = tokio::task::spawn_blocking(move || {
+            std::process::Command::new("forge")
+                .arg("script")
+                .arg("script/DeploySafe.s.sol:DeploySafe")
+                .arg("--rpc-url")
+                .arg(&rpc_url_clone)
+                .arg("--private-key")
+                .arg(&deployer_key)
+                .arg("--broadcast")
+                .current_dir("contracts")
+                .output()
+        });
+
+        // Wait for forge command with timeout
+        let output = tokio::time::timeout(tokio::time::Duration::from_secs(30), forge_task)
+            .await
+            .context("Safe deployment timed out")?
+            .context("Failed to execute Safe forge task")?
+            .context("Failed to run Safe forge script")?;
+
+        // Disable auto-mining after deployment
+        let auto_mine_disable = serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "anvil_setAutomine",
+            "params": [false],
+            "id": 2
+        });
+
+        let _ = client
+            .post(&rpc_url)
+            .header("Content-Type", "application/json")
+            .json(&auto_mine_disable)
+            .send()
+            .await;
+
+        info!("Disabled auto-mining after Safe deployment");
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(anyhow::anyhow!("Safe deployment failed: {}", stderr));
+        }
+
+        // Parse the output to extract the deployed Safe proxy address
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let safe_address = self
+            .extract_safe_address(&stdout)
+            .context("Failed to extract deployed Safe address from forge output")?;
+
+        info!("Safe contracts deployed - Safe proxy address: {:?}", safe_address);
+
+        // Verify the Safe address matches our expected deterministic address
+        let expected_address: Address = "0xcfe267de230a234c5937f18f239617b7038ec271"
+            .parse()
+            .context("Failed to parse expected Safe address")?;
+        
+        if safe_address != expected_address {
+            return Err(anyhow::anyhow!(
+                "Safe deployment address mismatch! Expected: {:?}, Got: {:?}",
+                expected_address,
+                safe_address
+            ));
+        }
+        
+        info!("✅ Safe proxy deployed to expected deterministic address: {:?}", safe_address);
+
+        // Wait a moment to ensure deployment is fully settled before returning
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+        Ok(safe_address)
+    }
+
+    /// Extract the deployed Safe proxy address from forge script output
+    fn extract_safe_address(&self, forge_output: &str) -> Result<Address> {
+        // Look for "Safe Proxy deployed to: 0x..." in the output
+        for line in forge_output.lines() {
+            if line.contains("Safe Proxy deployed to:") {
+                if let Some(addr_str) = line.split("Safe Proxy deployed to: ").nth(1) {
+                    if let Some(addr) = addr_str.split_whitespace().next() {
+                        return addr.parse().context("Failed to parse Safe address");
+                    }
+                }
+            }
+        }
+        Err(anyhow::anyhow!("Could not find deployed Safe address in forge output"))
+    }
+
+    /// Update the rrelayer.yaml config file with the deployed Safe address
+    async fn update_yaml_config_with_safe_address(&self, safe_address: Address) -> Result<()> {
+        let config_path = std::path::Path::new("rrelayer.yaml");
+
+        // Read the current config
+        let config_content =
+            tokio::fs::read_to_string(config_path).await.context("Failed to read rrelayer.yaml")?;
+
+        // Replace the placeholder Safe address with the actual deployed address
+        let updated_content = config_content
+            .replace("0x0000000000000000000000000000000000000001", &format!("{:?}", safe_address));
+
+        // Write the updated config back
+        tokio::fs::write(config_path, updated_content)
+            .await
+            .context("Failed to write updated rrelayer.yaml")?;
+
+        info!("Updated rrelayer.yaml with Safe address: {:?}", safe_address);
+        Ok(())
+    }
+
     /// Extract the deployed contract address from forge script output
     fn extract_deployed_address(&self, forge_output: &str) -> Result<Address> {
         // Look for "TestToken deployed to: 0x..." in the output

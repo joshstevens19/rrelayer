@@ -224,6 +224,7 @@ async fn start_api(
         webhook_manager,
         user_rate_limiter,
         rate_limit_config,
+        relayer_creation_mutex: Arc::new(Mutex::new(())),
     });
 
     let cors = CorsLayer::new()
