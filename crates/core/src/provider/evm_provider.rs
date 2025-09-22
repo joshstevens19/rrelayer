@@ -1,5 +1,21 @@
 use std::sync::Arc;
 
+use crate::wallet::{
+    AwsKmsWalletManager, MnemonicWalletManager, PrivyWalletManager, TurnkeyWalletManager,
+    WalletError, WalletManagerTrait,
+};
+use crate::yaml::{AwsKmsSigningKey, TurnkeySigningKey};
+use crate::{
+    gas::{
+        blob_gas_oracle::{BlobGasEstimatorResult, BlobGasPriceResult},
+        fee_estimator::base::{BaseGasFeeEstimator, GasEstimatorError, GasEstimatorResult},
+        types::GasLimit,
+    },
+    network::types::ChainId,
+    shared::common_types::{EvmAddress, WalletOrProviderError},
+    transaction::types::{TransactionHash, TransactionNonce},
+    NetworkSetupConfig,
+};
 use alloy::consensus::{SignableTransaction, TxEnvelope};
 use alloy::network::{AnyNetwork, AnyTransactionReceipt};
 use alloy::rpc::types::serde_helpers::WithOtherFields;
@@ -24,24 +40,7 @@ use alloy_eips::eip2718::Encodable2718;
 use rand::{thread_rng, Rng};
 use reqwest::Url;
 use thiserror::Error;
-
-use crate::wallet::{
-    AwsKmsWalletManager, MnemonicWalletManager, PrivyWalletManager, TurnkeyWalletManager,
-    WalletError, WalletManagerTrait,
-};
-use crate::yaml::{AwsKmsSigningKey, TurnkeySigningKey};
-use crate::{
-    gas::{
-        blob_gas_oracle::{BlobGasEstimatorResult, BlobGasPriceResult},
-        fee_estimator::base::{BaseGasFeeEstimator, GasEstimatorError, GasEstimatorResult},
-        types::GasLimit,
-    },
-    network::types::ChainId,
-    rrelayer_info,
-    shared::common_types::{EvmAddress, WalletOrProviderError},
-    transaction::types::{TransactionHash, TransactionNonce},
-    NetworkSetupConfig,
-};
+use tracing::info;
 
 pub type RelayerProvider = RootProvider<RetryBackoffService<Http<Client>>, AnyNetwork>;
 
@@ -58,26 +57,14 @@ pub struct EvmProvider {
     pub confirmations: u64,
 }
 
-/// Calculates the average block time difference by comparing recent blocks.
-///
-/// This function examines the timestamps of the last two blocks to determine
-/// the average block time for the network. If there are insufficient blocks,
-/// it defaults to 2 seconds.
-///
-/// # Arguments
-/// * `provider` - The RPC provider to query blockchain data
-///
-/// # Returns
-/// * `Ok(u64)` - Average block time in milliseconds (max 250ms)
-/// * `Err(RpcError<TransportErrorKind>)` - RPC error if unable to fetch block data
-pub async fn calculate_block_time_difference(
+async fn calculate_block_time_difference(
     provider: &RelayerProvider,
 ) -> Result<u64, RpcError<TransportErrorKind>> {
     let latest_block_number = provider.get_block_number().await?;
 
     // Ensure there's no underflow if not enough blocks to check set to 250ms (max limit)
     if latest_block_number <= 13 {
-        rrelayer_info!("Not enough blocks to calculate block time difference, setting to 250ms");
+        info!("Not enough blocks to calculate block time difference, setting to 250ms");
         return Ok(250);
     }
 
@@ -106,11 +93,9 @@ pub async fn calculate_block_time_difference(
 
     let limited_block_time_ms = std::cmp::max(block_time_ms, 250);
 
-    rrelayer_info!(
+    info!(
         "Calculated block time: {}s ({}ms), limited to {}ms",
-        block_time_seconds,
-        block_time_ms,
-        limited_block_time_ms
+        block_time_seconds, block_time_ms, limited_block_time_ms
     );
 
     Ok(limited_block_time_ms)
@@ -123,16 +108,6 @@ pub enum RetryClientError {
 }
 
 /// Creates a retry-enabled HTTP client for RPC communications.
-///
-/// This function sets up an HTTP client with automatic retry capabilities using
-/// exponential backoff for handling transient network failures.
-///
-/// # Arguments
-/// * `rpc_url` - The RPC endpoint URL to connect to
-///
-/// # Returns
-/// * `Ok(Arc<RelayerProvider>)` - Configured provider with retry functionality
-/// * `Err(RetryClientError)` - Error if the client cannot be created
 pub fn create_retry_client(rpc_url: &str) -> Result<Arc<RelayerProvider>, RetryClientError> {
     let url = Url::parse(rpc_url).map_err(|e| {
         RetryClientError::HttpProviderCantBeCreated(rpc_url.to_string(), e.to_string())
@@ -168,7 +143,7 @@ pub enum EvmProviderNewError {
     HttpProviderCantBeCreated(String, String),
 
     #[error("wallet manager error: {0}")]
-    WalletManagerError(String),
+    WalletManagerError(#[from] WalletError),
 
     #[error("{0}")]
     ProviderError(RpcError<TransportErrorKind>),
@@ -176,18 +151,6 @@ pub enum EvmProviderNewError {
 
 impl EvmProvider {
     /// Creates a new EvmProvider using a mnemonic phrase for wallet management.
-    ///
-    /// This constructor initializes an EvmProvider with a mnemonic-based wallet manager
-    /// for signing transactions and managing addresses.
-    ///
-    /// # Arguments
-    /// * `network_setup_config` - Network configuration including RPC URLs and chain settings
-    /// * `mnemonic` - BIP39 mnemonic phrase for wallet derivation
-    /// * `gas_estimator` - Gas fee estimation service for transaction pricing
-    ///
-    /// # Returns
-    /// * `Ok(Self)` - Successfully initialized EvmProvider
-    /// * `Err(EvmProviderNewError)` - Error during provider initialization
     pub async fn new_with_mnemonic(
         network_setup_config: &NetworkSetupConfig,
         mnemonic: &str,
@@ -198,45 +161,18 @@ impl EvmProvider {
     }
 
     /// Creates a new EvmProvider using Privy for wallet management.
-    ///
-    /// This constructor initializes an EvmProvider with Privy wallet management service
-    /// for handling user authentication and wallet operations.
-    ///
-    /// # Arguments
-    /// * `network_setup_config` - Network configuration including RPC URLs and chain settings
-    /// * `app_id` - Privy application identifier
-    /// * `app_secret` - Privy application secret for authentication
-    /// * `gas_estimator` - Gas fee estimation service for transaction pricing
-    ///
-    /// # Returns
-    /// * `Ok(Self)` - Successfully initialized EvmProvider
-    /// * `Err(EvmProviderNewError)` - Error during provider initialization
     pub async fn new_with_privy(
         network_setup_config: &NetworkSetupConfig,
         app_id: String,
         app_secret: String,
         gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
     ) -> Result<Self, EvmProviderNewError> {
-        let privy_manager = PrivyWalletManager::new(app_id, app_secret)
-            .await
-            .map_err(|e| EvmProviderNewError::WalletManagerError(e.to_string()))?;
+        let privy_manager = PrivyWalletManager::new(app_id, app_secret).await?;
         let wallet_manager = Arc::new(privy_manager);
         Self::new_internal(network_setup_config, wallet_manager, gas_estimator).await
     }
 
     /// Creates a new EvmProvider using AWS KMS for wallet management.
-    ///
-    /// This constructor initializes an EvmProvider with AWS KMS wallet management
-    /// for signing transactions using AWS Key Management Service keys.
-    ///
-    /// # Arguments
-    /// * `network_setup_config` - Network configuration including RPC URLs and chain settings
-    /// * `aws_kms_config` - AWS KMS configuration containing key IDs, region, and credentials
-    /// * `gas_estimator` - Gas fee estimation service for transaction pricing
-    ///
-    /// # Returns
-    /// * `Ok(EvmProvider)` - Successfully initialized provider with AWS KMS wallet manager
-    /// * `Err(EvmProviderNewError)` - Error if provider or AWS KMS setup fails
     pub async fn new_with_aws_kms(
         network_setup_config: &NetworkSetupConfig,
         aws_kms_config: AwsKmsSigningKey,
@@ -247,44 +183,16 @@ impl EvmProvider {
     }
 
     /// Creates a new EvmProvider using Turnkey for wallet management.
-    ///
-    /// This constructor initializes an EvmProvider with Turnkey wallet management service
-    /// for handling wallet operations and transaction signing through Turnkey's API.
-    ///
-    /// # Arguments
-    /// * `network_setup_config` - Network configuration including RPC URLs and chain settings
-    /// * `turnkey_config` - Turnkey configuration containing API credentials and wallet account mappings
-    /// * `gas_estimator` - Gas fee estimation service for transaction pricing
-    ///
-    /// # Returns
-    /// * `Ok(Self)` - Successfully initialized EvmProvider
-    /// * `Err(EvmProviderNewError)` - Error during provider initialization
     pub async fn new_with_turnkey(
         network_setup_config: &NetworkSetupConfig,
         turnkey_config: TurnkeySigningKey,
         gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
     ) -> Result<Self, EvmProviderNewError> {
-        let turnkey_manager = TurnkeyWalletManager::new(turnkey_config)
-            .await
-            .map_err(|e| EvmProviderNewError::WalletManagerError(e.to_string()))?;
+        let turnkey_manager = TurnkeyWalletManager::new(turnkey_config).await?;
         let wallet_manager = Arc::new(turnkey_manager);
         Self::new_internal(network_setup_config, wallet_manager, gas_estimator).await
     }
 
-    /// Internal constructor for creating an EvmProvider with any wallet manager.
-    ///
-    /// This is the shared initialization logic used by both mnemonic and Privy constructors.
-    /// It sets up RPC connections, determines chain ID, calculates block timing, and
-    /// configures the provider with all necessary components.
-    ///
-    /// # Arguments
-    /// * `network_setup_config` - Network configuration including RPC URLs and chain settings
-    /// * `wallet_manager` - Wallet management implementation (mnemonic or Privy)
-    /// * `gas_estimator` - Gas fee estimation service for transaction pricing
-    ///
-    /// # Returns
-    /// * `Ok(Self)` - Successfully initialized EvmProvider
-    /// * `Err(EvmProviderNewError)` - Error during provider initialization
     async fn new_internal(
         network_setup_config: &NetworkSetupConfig,
         wallet_manager: Arc<dyn WalletManagerTrait>,
@@ -324,60 +232,20 @@ impl EvmProvider {
     }
 
     /// Returns a random RPC client from the configured providers for load balancing.
-    ///
-    /// This method randomly selects one of the available RPC providers to distribute
-    /// load across multiple endpoints and improve reliability.
-    ///
-    /// # Returns
-    /// * `Arc<RelayerProvider>` - A randomly selected RPC provider
     pub fn rpc_client(&self) -> Arc<RelayerProvider> {
         let mut rng = thread_rng();
         let index = rng.gen_range(0..self.rpc_clients.len());
         self.rpc_clients[index].clone()
     }
 
-    /// Creates a new wallet at the specified index.
-    ///
-    /// This method generates a new wallet address using the configured wallet manager
-    /// (either mnemonic-based or Privy-based) at the given derivation index.
-    ///
-    /// # Arguments
-    /// * `wallet_index` - The derivation index for the new wallet
-    ///
-    /// # Returns
-    /// * `Ok(EvmAddress)` - The generated wallet address
-    /// * `Err(WalletError)` - Error if wallet creation fails
     pub async fn create_wallet(&self, wallet_index: u32) -> Result<EvmAddress, WalletError> {
         self.wallet_manager.create_wallet(wallet_index, &self.chain_id).await
     }
 
-    /// Retrieves the address for a wallet at the specified index.
-    ///
-    /// Gets the Ethereum address for a previously created or existing wallet
-    /// at the given derivation index.
-    ///
-    /// # Arguments
-    /// * `wallet_index` - The derivation index of the wallet
-    ///
-    /// # Returns
-    /// * `Ok(EvmAddress)` - The wallet address
-    /// * `Err(WalletError)` - Error if address retrieval fails
     pub async fn get_address(&self, wallet_index: u32) -> Result<EvmAddress, WalletError> {
         self.wallet_manager.get_address(wallet_index, &self.chain_id).await
     }
 
-    /// Retrieves the transaction receipt for a given transaction hash.
-    ///
-    /// Queries the blockchain for the receipt of a previously submitted transaction,
-    /// which contains information about execution status, gas usage, and logs.
-    ///
-    /// # Arguments
-    /// * `transaction_hash` - The hash of the transaction to query
-    ///
-    /// # Returns
-    /// * `Ok(Some(AnyTransactionReceipt))` - Transaction receipt if found
-    /// * `Ok(None)` - If transaction is not yet mined
-    /// * `Err(RpcError<TransportErrorKind>)` - RPC error during query
     pub async fn get_receipt(
         &self,
         transaction_hash: &TransactionHash,
@@ -388,17 +256,6 @@ impl EvmProvider {
         Ok(receipt)
     }
 
-    /// Retrieves the current transaction nonce for a wallet.
-    ///
-    /// Gets the next available nonce (transaction count) for the specified wallet,
-    /// which is required for transaction ordering and replay protection.
-    ///
-    /// # Arguments
-    /// * `wallet_index` - Index of the wallet to query
-    ///
-    /// # Returns
-    /// * `Ok(TransactionNonce)` - The next available nonce
-    /// * `Err(WalletOrProviderError)` - Error if nonce retrieval fails
     pub async fn get_nonce(
         &self,
         wallet_index: &u32,
@@ -432,17 +289,6 @@ impl EvmProvider {
     }
 
     /// Signs and broadcasts a transaction to the network.
-    ///
-    /// This method signs the provided transaction with the specified wallet
-    /// and submits it to the blockchain network for processing.
-    ///
-    /// # Arguments
-    /// * `wallet_index` - Index of the wallet to use for signing
-    /// * `transaction` - The transaction to sign and send
-    ///
-    /// # Returns
-    /// * `Ok(TransactionHash)` - Hash of the submitted transaction
-    /// * `Err(SendTransactionError)` - Error if signing or sending fails
     pub async fn send_transaction(
         &self,
         wallet_index: &u32,
@@ -470,17 +316,6 @@ impl EvmProvider {
     }
 
     /// Signs a transaction without broadcasting it.
-    ///
-    /// Creates a cryptographic signature for the transaction using the specified
-    /// wallet, but does not submit it to the network.
-    ///
-    /// # Arguments
-    /// * `wallet_index` - Index of the wallet to use for signing
-    /// * `transaction` - The transaction to sign
-    ///
-    /// # Returns
-    /// * `Ok(PrimitiveSignature)` - The transaction signature
-    /// * `Err(WalletError)` - Error if signing fails
     pub async fn sign_transaction(
         &self,
         wallet_index: &u32,
@@ -490,17 +325,6 @@ impl EvmProvider {
     }
 
     /// Signs a text message using EIP-191 personal message signing.
-    ///
-    /// Creates a signature for arbitrary text data that can be used for
-    /// authentication or message verification purposes.
-    ///
-    /// # Arguments
-    /// * `wallet_index` - Index of the wallet to use for signing
-    /// * `text` - The text message to sign
-    ///
-    /// # Returns
-    /// * `Ok(PrimitiveSignature)` - The message signature
-    /// * `Err(WalletError)` - Error if signing fails
     pub async fn sign_text(
         &self,
         wallet_index: &u32,
@@ -510,17 +334,6 @@ impl EvmProvider {
     }
 
     /// Signs structured data using EIP-712 typed data signing.
-    ///
-    /// Creates a signature for structured data following the EIP-712 standard,
-    /// commonly used for smart contract interactions and off-chain signatures.
-    ///
-    /// # Arguments
-    /// * `wallet_index` - Index of the wallet to use for signing
-    /// * `typed_data` - The structured data to sign following EIP-712 format
-    ///
-    /// # Returns
-    /// * `Ok(PrimitiveSignature)` - The typed data signature
-    /// * `Err(WalletError)` - Error if signing fails
     pub async fn sign_typed_data(
         &self,
         wallet_index: &u32,
@@ -530,16 +343,6 @@ impl EvmProvider {
     }
 
     /// Estimates the gas required for a transaction execution.
-    ///
-    /// Simulates the transaction execution to determine the amount of gas
-    /// that would be consumed, helping with accurate gas limit setting.
-    ///
-    /// # Arguments
-    /// * `transaction` - The transaction to estimate gas for
-    ///
-    /// # Returns
-    /// * `Ok(GasLimit)` - The estimated gas limit
-    /// * `Err(RpcError<TransportErrorKind>)` - RPC error during estimation
     pub async fn estimate_gas(
         &self,
         transaction: &TypedTransaction,
@@ -557,27 +360,11 @@ impl EvmProvider {
     }
 
     /// Calculates current gas prices for different transaction speeds.
-    ///
-    /// Uses the configured gas estimator to determine appropriate gas prices
-    /// for slow, medium, fast, and super-fast transaction confirmation speeds.
-    ///
-    /// # Returns
-    /// * `Ok(GasEstimatorResult)` - Gas price estimates for different speeds
-    /// * `Err(GasEstimatorError)` - Error during gas price calculation
     pub async fn calculate_gas_price(&self) -> Result<GasEstimatorResult, GasEstimatorError> {
         self.gas_estimator.get_gas_prices(&self.chain_id).await
     }
 
     /// Retrieves the ETH balance for a given address.
-    ///
-    /// Queries the blockchain for the current ETH balance of the specified address.
-    ///
-    /// # Arguments
-    /// * `address` - The Ethereum address to check the balance for
-    ///
-    /// # Returns
-    /// * `Ok(alloy::primitives::U256)` - The balance in wei
-    /// * `Err(RpcError<TransportErrorKind>)` - RPC error during balance query
     pub async fn get_balance(
         &self,
         address: &EvmAddress,
@@ -587,33 +374,17 @@ impl EvmProvider {
     }
 
     /// Checks if the current network supports blob transactions (EIP-4844).
-    ///
-    /// Blob transactions are a feature introduced in Ethereum's Dencun upgrade
-    /// that allows for more efficient data availability for Layer 2 solutions.
-    ///
-    /// # Returns
-    /// * `true` - If the network supports blob transactions
-    /// * `false` - If blob transactions are not supported
     pub fn supports_blob_transactions(&self) -> bool {
-        // Ethereum mainnet and testnet chain IDs that support blobs
         matches!(
             self.chain_id.u64(),
-            1 |      // Ethereum Mainnet
-           17000 |  // Holesky Testnet
+            1 |       // Ethereum Mainnet
+           17000 |    // Holesky Testnet
            11155111 | // Sepolia Testnet
             31337 // anvil fork
         )
     }
 
     /// Calculates blob gas prices for Ethereum blob transactions (EIP-4844).
-    ///
-    /// This method determines the current blob gas prices for different transaction speeds
-    /// on networks that support blob transactions. Blob transactions are used primarily
-    /// by Layer 2 solutions for efficient data availability.
-    ///
-    /// # Returns
-    /// * `Ok(BlobGasEstimatorResult)` - Blob gas price estimates for different speeds
-    /// * `Err(anyhow::Error)` - Error if blob gas calculation fails or network doesn't support blobs
     pub async fn calculate_ethereum_blob_gas_price(
         &self,
     ) -> Result<BlobGasEstimatorResult, anyhow::Error> {

@@ -4,11 +4,13 @@ use thiserror::Error;
 
 use crate::{
     gas::fee_estimator::base::get_gas_estimator, network::types::ChainId, SetupConfig, SigningKey,
+    WalletError,
 };
 
 mod evm_provider;
 
 use self::evm_provider::EvmProviderNewError;
+use crate::gas::fee_estimator::base::GasEstimatorError;
 use crate::wallet::get_mnemonic_from_signing_key;
 pub use evm_provider::{
     create_retry_client, EvmProvider, RelayerProvider, RetryClientError, SendTransactionError,
@@ -20,7 +22,7 @@ pub enum LoadProvidersError {
     NoSigningKey,
 
     #[error("Signing key failed to load: {0}")]
-    SigningKeyError(String),
+    SigningKeyError(#[from] WalletError),
 
     #[error("Providers are required in the yaml")]
     ProvidersRequired,
@@ -28,22 +30,11 @@ pub enum LoadProvidersError {
     #[error("{0}")]
     EvmProviderNewError(#[from] EvmProviderNewError),
 
-    #[error("Gas estimator error {0}")]
-    GasEstimatorError(String),
+    #[error(transparent)]
+    GasEstimatorError(#[from] GasEstimatorError),
 }
 
 /// Loads and initializes EVM providers for all configured networks.
-///
-/// This function creates an EvmProvider instance for each network configuration,
-/// setting up the appropriate signing mechanism (mnemonic or Privy) and gas estimator.
-///
-/// # Arguments
-/// * `project_path` - Path to the project directory for loading signing keys
-/// * `setup_config` - Configuration containing network settings and signing keys
-///
-/// # Returns
-/// * `Ok(Vec<EvmProvider>)` - Vector of initialized EVM providers
-/// * `Err(LoadProvidersError)` - Error if providers cannot be created
 pub async fn load_providers(
     project_path: &PathBuf,
     setup_config: &SetupConfig,
@@ -72,40 +63,30 @@ pub async fn load_providers(
                 &config,
                 privy.app_id.clone(),
                 privy.app_secret.clone(),
-                get_gas_estimator(&config.provider_urls, setup_config, config)
-                    .await
-                    .map_err(|e| LoadProvidersError::GasEstimatorError(e.to_string()))?,
+                get_gas_estimator(&config.provider_urls, setup_config, config).await?,
             )
             .await?
         } else if let Some(aws_kms) = &signing_key.aws_kms {
             EvmProvider::new_with_aws_kms(
                 &config,
                 aws_kms.clone(),
-                get_gas_estimator(&config.provider_urls, setup_config, config)
-                    .await
-                    .map_err(|e| LoadProvidersError::GasEstimatorError(e.to_string()))?,
+                get_gas_estimator(&config.provider_urls, setup_config, config).await?,
             )
             .await?
         } else if let Some(turnkey) = &signing_key.turnkey {
             EvmProvider::new_with_turnkey(
                 &config,
                 turnkey.clone(),
-                get_gas_estimator(&config.provider_urls, setup_config, config)
-                    .await
-                    .map_err(|e| LoadProvidersError::GasEstimatorError(e.to_string()))?,
+                get_gas_estimator(&config.provider_urls, setup_config, config).await?,
             )
             .await?
         } else {
-            let mnemonic = get_mnemonic_from_signing_key(project_path, signing_key)
-                .await
-                .map_err(|e| LoadProvidersError::SigningKeyError(e.to_string()))?;
+            let mnemonic = get_mnemonic_from_signing_key(project_path, signing_key).await?;
 
             EvmProvider::new_with_mnemonic(
                 &config,
                 &mnemonic,
-                get_gas_estimator(&config.provider_urls, setup_config, config)
-                    .await
-                    .map_err(|e| LoadProvidersError::GasEstimatorError(e.to_string()))?,
+                get_gas_estimator(&config.provider_urls, setup_config, config).await?,
             )
             .await?
         };
@@ -117,17 +98,6 @@ pub async fn load_providers(
 }
 
 /// Finds an EVM provider for a specific chain ID.
-///
-/// Searches through the provided list of EVM providers to find one that matches
-/// the specified chain ID.
-///
-/// # Arguments
-/// * `providers` - List of available EVM providers
-/// * `chain_id` - The chain ID to search for
-///
-/// # Returns
-/// * `Some(&EvmProvider)` - Reference to the matching provider if found
-/// * `None` - If no provider matches the chain ID
 pub async fn find_provider_for_chain_id<'a>(
     providers: &'a Vec<EvmProvider>,
     chain_id: &ChainId,
@@ -142,16 +112,6 @@ pub async fn find_provider_for_chain_id<'a>(
 }
 
 /// Checks if a specific chain ID is enabled in the provider configuration.
-///
-/// Determines whether any of the configured EVM providers support the specified chain ID.
-///
-/// # Arguments
-/// * `providers` - List of available EVM providers
-/// * `chain_id` - The chain ID to check for support
-///
-/// # Returns
-/// * `true` - If at least one provider supports the chain ID
-/// * `false` - If no providers support the chain ID
 pub fn chain_enabled(providers: &Vec<EvmProvider>, chain_id: &ChainId) -> bool {
     for provider in providers {
         if &provider.chain_id == chain_id {
