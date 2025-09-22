@@ -17,7 +17,6 @@ serde_json = { workspace = true }
 serde_yaml = "0.9.30"
 async-trait = "0.1"
 reqwest = { version = "0.12", features = ["json"] }
-lazy_static = "1.4"
 alloy = { workspace = true, features = ["full", "signer-mnemonic", "eips", "eip712", "signer-keystore", "signer-aws"] }
 alloy-rlp = { workspace = true }
 alloy-eips = { workspace = true }
@@ -26,15 +25,11 @@ rand = "0.8"
 aws-sdk-secretsmanager = "1.14.0"
 aws-sdk-kms = "1.14.0"
 aws-config = "1.1.4"
-async-recursion = "1.0.5"
 base64 = "0.22.0"
 chrono = "0.4.19"
 bytes = "1.5.0"
 regex = "1.5.4"
 thiserror = "1.0"
-strum = "0.26.1"
-strum_macros = "0.26.1"
-jsonwebtoken = "9.2"
 futures = "0.3"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "time"] }
@@ -43,10 +38,8 @@ native-tls = "0.2.12"
 bb8 = "0.8.3"
 bb8-postgres = "0.8.1"
 postgres-native-tls = "0.5"
-eth-keystore = "0.5.0"
 hex = "0.4.3"
 anyhow = "1.0.98"
-dirs = "6.0.0"
 rust_decimal = { version = "1.35.0", features = ["db-tokio-postgres"] }
 google-secretmanager1 = "5.0"
 hyper = "0.14"

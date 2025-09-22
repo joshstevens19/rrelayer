@@ -175,14 +175,12 @@ impl SafeProxyManager {
     }
 
     /// Get the transaction hash for a safe transaction using proper EIP-712 signing
-    /// This matches exactly the Safe v1.4.1 contract implementation
     pub fn get_safe_transaction_hash(
         &self,
         safe_address: &EvmAddress,
         safe_tx: &SafeTransaction,
         chain_id: u64,
     ) -> Result<[u8; 32], SafeProxyError> {
-        // Define Safe's EIP-712 types using sol! macro for type safety
         sol! {
             #[derive(Debug)]
             struct SafeTx {
@@ -215,7 +213,6 @@ impl SafeProxyManager {
         let safe_tx_hash = safe_tx_struct.eip712_hash_struct();
         let domain_separator = self.get_domain_separator(safe_address, chain_id)?;
 
-        // abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator(), safeTxHash)
         let mut final_data = Vec::new();
         final_data.push(0x19);
         final_data.push(0x01);
@@ -248,14 +245,6 @@ impl SafeProxyManager {
     }
 
     /// Fetches the current nonce from a Safe contract.
-    ///
-    /// # Arguments
-    /// * `provider` - EVM provider to query the Safe contract
-    /// * `safe_address` - Address of the Safe contract
-    ///
-    /// # Returns
-    /// * `Ok(U256)` - Current nonce from Safe contract
-    /// * `Err(SafeProxyError)` - Error if query fails
     pub async fn get_safe_nonce(
         &self,
         provider: &EvmProvider,
@@ -285,20 +274,6 @@ impl SafeProxyManager {
     }
 
     /// Creates a signature for a Safe transaction.
-    ///
-    /// This implementation uses the wallet's signing capability to create the required signature
-    /// for the Safe transaction. The signature follows Safe's format requirements.
-    ///
-    /// # Arguments
-    /// * `provider` - EVM provider with signing capability
-    /// * `wallet_index` - Index of the wallet to use for signing
-    /// * `safe_address` - Address of the Safe contract
-    /// * `safe_tx` - The Safe transaction to sign
-    /// * `chain_id` - Chain ID for EIP-712 domain
-    ///
-    /// # Returns
-    /// * `Ok(Bytes)` - Properly formatted signature for Safe transaction
-    /// * `Err(SafeProxyError)` - Error if signing fails
     pub async fn create_safe_signature(
         &self,
         provider: &EvmProvider,
@@ -307,10 +282,8 @@ impl SafeProxyManager {
         safe_tx: &SafeTransaction,
         chain_id: u64,
     ) -> Result<Bytes, SafeProxyError> {
-        // Get the transaction hash that needs to be signed
         let tx_hash = self.get_safe_transaction_hash(safe_address, safe_tx, chain_id)?;
 
-        // Convert the hash to a hex string for signing
         let hash_hex = format!("0x{}", hex::encode(tx_hash));
 
         // Sign the hash as text using the provider's text signing capability
@@ -336,21 +309,6 @@ impl SafeProxyManager {
     }
 
     /// Creates a Safe transaction with proper nonce and signature, ready for execution.
-    ///
-    /// This is a convenience method that combines nonce fetching, signature creation,
-    /// and transaction encoding into a single operation.
-    ///
-    /// # Arguments
-    /// * `provider` - EVM provider for contract interaction and signing
-    /// * `wallet_index` - Index of the wallet to use for signing
-    /// * `safe_address` - Address of the Safe contract
-    /// * `to` - Destination address for the transaction
-    /// * `value` - ETH value to send (0 for token transfers)
-    /// * `data` - Transaction data (empty for ETH transfers, encoded function call for tokens)
-    ///
-    /// # Returns
-    /// * `Ok((SafeTransaction, Bytes))` - The Safe transaction and its encoded call data
-    /// * `Err(SafeProxyError)` - Error if any step fails
     pub async fn create_safe_transaction_with_signature(
         &self,
         provider: &EvmProvider,
@@ -374,7 +332,6 @@ impl SafeProxyManager {
             )
             .await?;
 
-        // Encode the Safe transaction
         let encoded_data = self.encode_safe_transaction(&safe_tx, signatures)?;
 
         Ok((safe_tx, encoded_data))

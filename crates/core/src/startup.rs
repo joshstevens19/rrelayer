@@ -15,7 +15,6 @@ use crate::{
     rate_limiting::RateLimiter,
     read,
     relayer::create_relayer_routes,
-    rrelayer_error, rrelayer_info,
     safe_proxy::SafeProxyManager,
     schema::apply_schema,
     setup_info_logger,
@@ -58,25 +57,12 @@ pub enum StartApiError {
     ApiStartupError(#[from] std::io::Error),
 }
 
-/// Health check endpoint that returns HTTP 200 OK.
-///
-/// Used by load balancers and monitoring systems to verify the service is running.
+/// Health check endpoint
 async fn health_check() -> impl IntoResponse {
     "healthy"
 }
 
 /// Middleware that logs all HTTP requests and responses with timing information.
-///
-/// Provides detailed logging for client and server errors, including response body
-/// content for debugging purposes. For successful requests, logs basic timing info.
-///
-/// # Arguments
-/// * `req` - The incoming HTTP request
-/// * `next` - The next middleware or handler in the chain
-///
-/// # Returns
-/// * `Ok(Response)` - The response from the downstream handler
-/// * `Err(StatusCode)` - Internal server error if response processing fails
 async fn activity_logger(req: Request<Body>, next: Next) -> Result<Response, StatusCode> {
     let method = req.method().clone();
     let uri = req.uri().clone();
@@ -94,21 +80,9 @@ async fn activity_logger(req: Request<Body>, next: Next) -> Result<Response, Sta
             Ok(bytes) => bytes,
             Err(_) => {
                 if status.is_client_error() {
-                    rrelayer_error!(
-                        "{} {} responded with {} after {:?}",
-                        method,
-                        uri,
-                        status,
-                        duration
-                    );
+                    error!("{} {} responded with {} after {:?}", method, uri, status, duration);
                 } else {
-                    rrelayer_error!(
-                        "{} {} responded with {} after {:?}",
-                        method,
-                        uri,
-                        status,
-                        duration
-                    );
+                    error!("{} {} responded with {} after {:?}", method, uri, status, duration);
                 }
                 return match Response::builder().status(status).body(Body::empty()) {
                     Ok(response) => Ok(response),
@@ -125,7 +99,6 @@ async fn activity_logger(req: Request<Body>, next: Next) -> Result<Response, Sta
                     } else if let Some(message) = json.get("message").and_then(|m| m.as_str()) {
                         format!("Message: {}", message)
                     } else {
-                        // Just grab a preview of the JSON
                         let json_str = json.to_string();
                         if json_str.len() > 500 {
                             format!("Response: {}...", &json_str[0..500])
@@ -134,7 +107,6 @@ async fn activity_logger(req: Request<Body>, next: Next) -> Result<Response, Sta
                         }
                     }
                 }
-                // If not JSON, try to display as string if it's UTF-8
                 Err(_) => match std::str::from_utf8(&bytes) {
                     Ok(s) if !s.trim().is_empty() => {
                         if s.len() > 500 {
@@ -153,47 +125,31 @@ async fn activity_logger(req: Request<Body>, next: Next) -> Result<Response, Sta
         let response = Response::from_parts(parts, Body::from(bytes));
 
         if status.is_client_error() {
-            rrelayer_error!("{} {} responded with {} after {:?}", method, uri, status, duration);
+            error!("{} {} responded with {} after {:?}", method, uri, status, duration);
 
             if !error_details.is_empty() {
-                rrelayer_error!("Error details: {}", error_details);
+                error!("Error details: {}", error_details);
             }
 
             if status == StatusCode::BAD_REQUEST {
-                rrelayer_error!("Bad request error: URI={}, method={}", uri, method);
+                error!("Bad request error: URI={}, method={}", uri, method);
             }
         } else if status.is_server_error() {
-            rrelayer_error!("{} {} responded with {} after {:?}", method, uri, status, duration);
+            error!("{} {} responded with {} after {:?}", method, uri, status, duration);
 
             if !error_details.is_empty() {
-                rrelayer_error!("Error details: {}", error_details);
+                error!("Error details: {}", error_details);
             }
         }
 
         Ok(response)
     } else {
-        rrelayer_info!("{} {} responded with {} after {:?}", method, uri, status, duration);
+        info!("{} {} responded with {} after {:?}", method, uri, status, duration);
         Ok(response)
     }
 }
 
 /// Starts the HTTP API server with all configured routes and middleware.
-///
-/// Sets up the Axum web server with CORS, logging middleware, and all API routes.
-/// Initializes the application state with database connections, caches, and providers.
-///
-/// # Arguments
-/// * `api_config` - API configuration including port and allowed origins
-/// * `gas_oracle_cache` - Shared cache for gas price estimations
-/// * `blob_gas_oracle_cache` - Shared cache for blob gas prices
-/// * `transactions_queues` - Transaction processing queues
-/// * `providers` - EVM provider connections
-/// * `cache` - General purpose cache
-/// * `webhook_manager` - Webhook delivery manager
-///
-/// # Returns
-/// * `Ok(())` - If the server starts successfully
-/// * `Err(StartApiError)` - If server startup fails
 async fn start_api(
     api_config: ApiConfig,
     rate_limit_config: Option<RateLimitConfig>,
@@ -304,35 +260,6 @@ pub enum StartError {
 }
 
 /// Starts the RRelayer service with full initialization.
-///
-/// This is the main entry point that:
-/// 1. Sets up logging
-/// 2. Loads configuration from rrelayer.yaml
-/// 3. Initializes database connection and applies schema
-/// 4. Sets up admin users and authentication
-/// 5. Initializes blockchain providers and caches
-/// 6. Starts background tasks for gas estimation and transaction processing
-/// 7. Starts the HTTP API server
-///
-/// # Arguments
-/// * `project_path` - Path to the project directory containing rrelayer.yaml
-///
-/// # Returns
-/// * `Ok(())` - If the service starts successfully
-/// * `Err(StartError)` - If any initialization step fails
-///
-/// # Example
-/// ```rust,no_run
-/// use std::path::PathBuf;
-/// use rrelayer_core::start;
-///
-/// #[tokio::main]
-/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     let project_path = PathBuf::from(".");
-///     start(&project_path).await?;
-///     Ok(())
-/// }
-/// ```
 pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
     setup_info_logger();
     dotenv().ok();
@@ -341,7 +268,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
 
     let yaml_path = project_path.join("rrelayer.yaml");
     if !yaml_path.exists() {
-        rrelayer_error!("Found rrelayer.yaml in the current directory");
+        error!("Found rrelayer.yaml in the current directory");
         return Err(StartError::NoYamlFileFound);
     }
 
@@ -354,10 +281,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
 
     let safe_proxy_manager = if let Some(ref safe_proxy_configs) = config.safe_proxy {
         if !safe_proxy_configs.is_empty() {
-            rrelayer_info!(
-                "Initializing safe proxy with {} configurations",
-                safe_proxy_configs.len()
-            );
+            info!("Initializing safe proxy with {} configurations", safe_proxy_configs.len());
             Some(SafeProxyManager::new(safe_proxy_configs.clone()))
         } else {
             None
@@ -376,14 +300,14 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
     let postgres_client = Arc::new(postgres);
 
     let webhook_manager = if config.webhooks.is_some() {
-        rrelayer_info!("Initializing webhook manager with configuration");
-        Some(Arc::new(Mutex::new(crate::webhooks::WebhookManager::new(
+        info!("Initializing webhook manager with configuration");
+        Some(Arc::new(Mutex::new(WebhookManager::new(
             Arc::clone(&postgres_client),
             &config,
             None,
         )?)))
     } else {
-        rrelayer_info!("Webhooks disabled - no webhook configuration found");
+        info!("Webhooks disabled - no webhook configuration found");
         None
     };
 
@@ -398,13 +322,13 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
     .await?;
 
     let user_rate_limiter = if let Some(ref rate_limit_config) = config.rate_limits {
-        rrelayer_info!("Initializing user rate limiter with configuration");
+        info!("Initializing user rate limiter with configuration");
         let user_rate_limiter = RateLimiter::new(rate_limit_config.clone());
 
-        rrelayer_info!("User rate limiter initialized successfully");
+        info!("User rate limiter initialized successfully");
         Some(Arc::new(user_rate_limiter))
     } else {
-        rrelayer_info!("Rate limiting disabled - no configuration found");
+        info!("Rate limiting disabled - no configuration found");
         None
     };
 

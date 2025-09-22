@@ -14,18 +14,6 @@ use crate::{
 };
 
 /// Global application state shared across all HTTP handlers.
-///
-/// Contains all the shared resources needed by the RRelayer API:
-/// - Database connections
-/// - Blockchain provider connections
-/// - Gas estimation caches
-/// - Transaction processing queues
-/// - General purpose cache
-/// - Webhook delivery manager
-/// - Rate limiting engine
-///
-/// All fields are wrapped in Arc for efficient cloning across threads,
-/// with Mutex protection for mutable state.
 pub struct AppState {
     /// Database client with connection pooling
     pub db: Arc<PostgresClient>,

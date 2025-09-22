@@ -78,9 +78,7 @@ pub struct AwsKmsSigningKey {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum KmsKeyIds {
-    /// Single key ID used for all wallet indices
     Single(String),
-    /// Array of key IDs where index maps to wallet index
     Multiple(Vec<String>),
 }
 
@@ -136,11 +134,6 @@ pub struct GlobalRateLimits {
 }
 
 impl KmsKeyIds {
-    /// Validates the KMS key IDs configuration.
-    ///
-    /// # Returns
-    /// * `Ok(())` - If the configuration is valid
-    /// * `Err(String)` - If the configuration is invalid
     pub fn validate(&self) -> Result<(), String> {
         match self {
             KmsKeyIds::Single(key_id) => {
@@ -162,14 +155,6 @@ impl KmsKeyIds {
         Ok(())
     }
 
-    /// Gets the key ID for a given wallet index.
-    ///
-    /// # Arguments
-    /// * `wallet_index` - The wallet index to get the key for
-    ///
-    /// # Returns
-    /// * `Ok(String)` - The KMS key ID to use
-    /// * `Err(String)` - If the wallet index is out of bounds
     pub fn get_key_for_index(&self, wallet_index: u32) -> Result<&str, String> {
         match self {
             KmsKeyIds::Single(key_id) => Ok(key_id),
@@ -189,11 +174,6 @@ impl KmsKeyIds {
 }
 
 impl AwsKmsSigningKey {
-    /// Validates the AWS KMS signing key configuration.
-    ///
-    /// # Returns
-    /// * `Ok(())` - If the configuration is valid
-    /// * `Err(String)` - If the configuration is invalid
     pub fn validate(&self) -> Result<(), String> {
         if self.region.is_empty() {
             return Err("AWS region cannot be empty".to_string());
@@ -203,11 +183,6 @@ impl AwsKmsSigningKey {
 }
 
 impl TurnkeySigningKey {
-    /// Validates the Turnkey signing key configuration.
-    ///
-    /// # Returns
-    /// * `Ok(())` - If the configuration is valid
-    /// * `Err(String)` - If the configuration is invalid
     pub fn validate(&self) -> Result<(), String> {
         if self.api_public_key.is_empty() {
             return Err("Turnkey API public key cannot be empty".to_string());
@@ -226,13 +201,6 @@ impl TurnkeySigningKey {
 }
 
 impl SigningKey {
-    /// Creates a new signing key configuration using raw authentication.
-    ///
-    /// # Arguments
-    /// * `raw` - Raw configuration for wallet signing
-    ///
-    /// # Returns
-    /// * `SigningKey` - A signing key configured to use keystore authentication only
     pub fn from_raw(raw: RawSigningKey) -> Self {
         Self {
             raw: Some(raw),
@@ -244,13 +212,6 @@ impl SigningKey {
         }
     }
 
-    /// Creates a new signing key configuration using AWS KMS authentication.
-    ///
-    /// # Arguments
-    /// * `aws_kms` - AWS KMS configuration for wallet signing
-    ///
-    /// # Returns
-    /// * `SigningKey` - A signing key configured to use AWS KMS authentication only
     pub fn from_aws_kms(aws_kms: AwsKmsSigningKey) -> Self {
         Self {
             raw: None,
@@ -262,13 +223,6 @@ impl SigningKey {
         }
     }
 
-    /// Creates a new signing key configuration using Turnkey authentication.
-    ///
-    /// # Arguments
-    /// * `turnkey` - Turnkey configuration for wallet signing
-    ///
-    /// # Returns
-    /// * `SigningKey` - A signing key configured to use Turnkey authentication only
     pub fn from_turnkey(turnkey: TurnkeySigningKey) -> Self {
         Self {
             raw: None,
@@ -280,14 +234,6 @@ impl SigningKey {
         }
     }
 
-    /// Creates a new signing key configuration using AWS KMS with a single key ID.
-    ///
-    /// # Arguments
-    /// * `key_id` - AWS KMS key ID or ARN
-    /// * `region` - AWS region
-    ///
-    /// # Returns
-    /// * `SigningKey` - A signing key configured to use AWS KMS with a single key
     pub fn from_aws_kms_single(key_id: String, region: String) -> Self {
         let aws_kms = AwsKmsSigningKey {
             key_ids: KmsKeyIds::Single(key_id),
@@ -299,14 +245,6 @@ impl SigningKey {
         Self::from_aws_kms(aws_kms)
     }
 
-    /// Creates a new signing key configuration using AWS KMS with multiple key IDs.
-    ///
-    /// # Arguments
-    /// * `key_ids` - Array of AWS KMS key IDs or ARNs, indexed by wallet index
-    /// * `region` - AWS region
-    ///
-    /// # Returns
-    /// * `SigningKey` - A signing key configured to use AWS KMS with multiple keys
     pub fn from_aws_kms_multiple(key_ids: Vec<String>, region: String) -> Self {
         let aws_kms = AwsKmsSigningKey {
             key_ids: KmsKeyIds::Multiple(key_ids),
@@ -320,14 +258,6 @@ impl SigningKey {
 }
 
 impl SigningKey {
-    /// Validates that exactly one signing method is configured.
-    ///
-    /// Ensures that the signing key configuration is valid by checking that
-    /// only one of the available signing methods is set.
-    ///
-    /// # Returns
-    /// * `Ok(())` - If exactly one signing method is configured
-    /// * `Err(String)` - If no signing method or multiple methods are configured
     pub fn validate(&self) -> Result<(), String> {
         let configured_methods = [
             self.raw.is_some(),
@@ -370,14 +300,6 @@ pub struct NetworkSetupConfig {
 }
 
 impl NetworkSetupConfig {
-    /// Retrieves the chain ID by querying the first configured RPC provider.
-    ///
-    /// Makes an RPC call to the blockchain network to fetch the chain ID,
-    /// which is used to identify the specific blockchain network.
-    ///
-    /// # Returns
-    /// * `Ok(ChainId)` - The chain ID of the blockchain network
-    /// * `Err(String)` - If the RPC call fails or provider is invalid
     pub async fn get_chain_id(&self) -> Result<ChainId, String> {
         let provider_url = self.provider_urls[0].clone();
 
@@ -508,6 +430,7 @@ where
     D: Deserializer<'de>,
 {
     let s = String::deserialize(deserializer)?;
+    // TODO: look at decimals
     let result: U256 = parse_units(&s, 18).unwrap_or(ParseUnits::U256(U256::ZERO)).into();
     Ok(result)
 }
@@ -516,7 +439,6 @@ fn serialize_eth_amount<S>(amount: &U256, serializer: S) -> Result<S::Ok, S::Err
 where
     S: Serializer,
 {
-    // Convert back to ETH string representation
     let eth_divisor = U256::from(10u64.pow(18));
     let whole_eth = amount / eth_divisor;
     let remainder = amount % eth_divisor;
@@ -541,6 +463,7 @@ where
     let s = String::deserialize(deserializer)?;
     // For now, assume 18 decimals for ERC-20 tokens (same as ETH)
     // This can be enhanced to support different token decimals
+    // TODO: look at decimals
     let result: U256 = parse_units(&s, 18).unwrap_or(ParseUnits::U256(U256::ZERO)).into();
     Ok(result)
 }
@@ -599,19 +522,6 @@ pub struct SetupConfig {
 }
 
 /// Substitutes environment variables in YAML content.
-///
-/// Replaces patterns like `${VARIABLE_NAME}` with the actual environment
-/// variable values. Panics if any referenced environment variable is not found.
-///
-/// # Arguments
-/// * `contents` - The YAML file contents with environment variable placeholders
-///
-/// # Returns
-/// * `Ok(String)` - The content with environment variables substituted
-/// * `Err(regex::Error)` - If the regex pattern is invalid
-///
-/// # Panics
-/// Panics if any referenced environment variable is not found.
 fn substitute_env_variables(contents: &str) -> Result<String, regex::Error> {
     let re = Regex::new(r"\$\{([^}]+)\}")?;
     let result = re.replace_all(contents, |caps: &Captures| {
@@ -652,32 +562,6 @@ pub enum ReadYamlError {
 }
 
 /// Reads and parses the RRelayer configuration YAML file.
-///
-/// Loads the YAML configuration file, optionally substitutes environment variables,
-/// parses it into a `SetupConfig` struct, and validates the configuration.
-///
-/// # Arguments
-/// * `file_path` - Path to the rrelayer.yaml configuration file
-/// * `raw_yaml` - If true, skip environment variable substitution
-///
-/// # Returns
-/// * `Ok(SetupConfig)` - The parsed and validated configuration
-/// * `Err(ReadYamlError)` - If file reading, parsing, or validation fails
-///
-/// # Validation
-/// The function validates that:
-/// - At least one network is configured
-/// - Each network has at least one provider URL
-/// - Signing key configurations are valid (exactly one method per key)
-///
-/// # Example
-/// ```rust,no_run
-/// use std::path::PathBuf;
-/// use rrelayer_core::read;
-///
-/// let config_path = PathBuf::from("rrelayer.yaml");
-/// let config = read(&config_path, false).expect("Failed to read config");
-/// ```
 pub fn read(file_path: &PathBuf, raw_yaml: bool) -> Result<SetupConfig, ReadYamlError> {
     let mut file = File::open(file_path).map_err(|_| ReadYamlError::CanNotFindYaml)?;
     let mut contents = String::new();
@@ -706,12 +590,10 @@ pub fn read(file_path: &PathBuf, raw_yaml: bool) -> Result<SetupConfig, ReadYaml
     if let Some(signing_key) = &config.signing_key {
         signing_key.validate().map_err(ReadYamlError::SigningKeyYamlError)?;
 
-        // Additional validation for AWS KMS if present
         if let Some(aws_kms) = &signing_key.aws_kms {
             aws_kms.validate().map_err(ReadYamlError::SigningKeyYamlError)?;
         }
 
-        // Additional validation for Turnkey if present
         if let Some(turnkey) = &signing_key.turnkey {
             turnkey.validate().map_err(ReadYamlError::SigningKeyYamlError)?;
         }
