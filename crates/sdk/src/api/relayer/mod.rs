@@ -3,10 +3,7 @@ mod allowlist;
 pub use allowlist::RelayerAllowlist;
 use rrelayer_core::{
     common_types::{PagingContext, PagingResult},
-    relayer::{
-        api::{CreateRelayerResult, GetRelayerResult},
-        types::{Relayer, RelayerId},
-    },
+    relayer::{CreateRelayerResult, GetRelayerResult, Relayer, RelayerId},
 };
 use std::sync::Arc;
 

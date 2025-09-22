@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::common_types::Signature;
 use crate::network::ChainId;
 use crate::postgres::{PostgresClient, PostgresError};
-use crate::relayer::types::RelayerId;
+use crate::relayer::RelayerId;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecordSignedTypedDataRequest {

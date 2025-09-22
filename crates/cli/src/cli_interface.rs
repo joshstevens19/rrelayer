@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use rrelayer_core::{common_types::EvmAddress, relayer::types::RelayerId};
+use rrelayer_core::{common_types::EvmAddress, relayer::RelayerId};
 
 use crate::commands::{allowlist, auth::AuthCommand, config, network::NetworkCommands, sign, tx};
 

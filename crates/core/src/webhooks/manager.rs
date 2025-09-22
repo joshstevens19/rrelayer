@@ -180,7 +180,7 @@ impl WebhookManager {
     /// Queue a webhook for a signing event
     pub async fn queue_signing_webhook(
         &self,
-        relayer_id: &crate::relayer::types::RelayerId,
+        relayer_id: &crate::relayer::RelayerId,
         chain_id: ChainId,
         payload: WebhookSigningPayload,
     ) {
@@ -517,7 +517,7 @@ impl WebhookManager {
     /// Fire webhook when text is signed
     pub async fn on_text_signed(
         &self,
-        relayer_id: &crate::relayer::types::RelayerId,
+        relayer_id: &crate::relayer::RelayerId,
         chain_id: ChainId,
         message: String,
         signature: alloy::primitives::PrimitiveSignature,
@@ -530,7 +530,7 @@ impl WebhookManager {
     /// Fire webhook when typed data is signed
     pub async fn on_typed_data_signed(
         &self,
-        relayer_id: &crate::relayer::types::RelayerId,
+        relayer_id: &crate::relayer::RelayerId,
         chain_id: ChainId,
         domain_data: serde_json::Value,
         message_data: serde_json::Value,

@@ -2,7 +2,7 @@ use std::collections::{HashMap, VecDeque};
 
 use crate::{
     provider::EvmProvider,
-    relayer::types::Relayer,
+    relayer::Relayer,
     safe_proxy::SafeProxyManager,
     transaction::{
         nonce_manager::NonceManager,

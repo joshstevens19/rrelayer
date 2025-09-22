@@ -2,7 +2,7 @@ use crate::rate_limiting::RateLimiter;
 use crate::{
     app_state::AppState,
     rate_limiting::{RateLimitError, RateLimitOperation},
-    relayer::{get_relayer, get_relayer_provider_context_by_relayer_id, types::RelayerId},
+    relayer::{get_relayer, get_relayer_provider_context_by_relayer_id, RelayerId},
     rrelayer_error,
     signing::db::write::RecordSignedTextRequest,
 };

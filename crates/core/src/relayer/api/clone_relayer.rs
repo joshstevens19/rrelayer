@@ -2,21 +2,19 @@ use std::sync::Arc;
 
 use axum::{
     extract::{Path, State},
-    http::StatusCode,
     Json,
 };
 use serde::Deserialize;
 
+use super::create_relayer::CreateRelayerResult;
+use crate::shared::{not_found, HttpError};
 use crate::{
     app_state::AppState,
     network::ChainId,
     provider::find_provider_for_chain_id,
     relayer::{cache::invalidate_relayer_cache, types::RelayerId},
-    rrelayer_error,
     transaction::{queue_system::TransactionsQueueSetup, NonceManager},
 };
-
-use super::create_relayer::CreateRelayerResult;
 
 #[derive(Debug, Deserialize)]
 pub struct CloneRelayerRequest {
@@ -25,41 +23,21 @@ pub struct CloneRelayerRequest {
 }
 
 /// Clones an existing relayer to a new blockchain network.
-///
-/// This endpoint creates a new relayer by copying the wallet from an existing relayer
-/// but deploying it to a different chain. The new relayer inherits the same private key
-/// but operates on the specified target chain.
-///
-/// # Arguments
-/// * `state` - Application state containing database and provider connections
-/// * `relayer_id` - The ID of the existing relayer to clone from
-/// * `relayer` - Request body containing the new relayer name and target chain ID
-///
-/// # Returns
-/// * `Ok(Json<CreateRelayerResult>)` - The cloned relayer's ID and address
-/// * `Err(StatusCode)` - HTTP error code if cloning fails
 pub async fn clone_relayer(
     State(state): State<Arc<AppState>>,
     Path(relayer_id): Path<RelayerId>,
     Json(relayer): Json<CloneRelayerRequest>,
-) -> Result<Json<CreateRelayerResult>, StatusCode> {
+) -> Result<Json<CreateRelayerResult>, HttpError> {
     let provider = find_provider_for_chain_id(&state.evm_providers, &relayer.chain_id)
         .await
-        .ok_or(StatusCode::NOT_FOUND)?;
+        .ok_or(not_found("Could not find provider for the chain id".to_string()))?;
 
     let relayer = state
         .db
         .create_relayer(&relayer.new_relayer_name, &relayer.chain_id, provider, Some(relayer_id))
-        .await
-        .map_err(|e| {
-            rrelayer_error!("{}", e);
-            StatusCode::BAD_REQUEST
-        })?;
+        .await?;
 
-    let current_nonce = provider
-        .get_nonce(&relayer.wallet_index)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let current_nonce = provider.get_nonce(&relayer.wallet_index).await?;
 
     let id = relayer.id;
     let address = relayer.address;
@@ -76,12 +54,11 @@ pub async fn clone_relayer(
                 Default::default(),
                 Default::default(),
                 Default::default(),
-                None, // Safe proxy manager not available for dynamically added relayers
+                None,
             ),
             state.transactions_queues.clone(),
         )
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .await?;
 
     invalidate_relayer_cache(&state.cache, &id).await;
     Ok(Json(CreateRelayerResult { id, address }))

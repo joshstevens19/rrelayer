@@ -7,6 +7,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 
+use crate::shared::{not_found, HttpError};
 use crate::{
     app_state::AppState,
     provider::find_provider_for_chain_id,
@@ -24,26 +25,13 @@ pub struct GetRelayerResult {
 }
 
 /// Retrieves detailed information about a specific relayer.
-///
-/// This endpoint returns relayer details including its configuration and associated
-/// provider URLs.
-///
-/// # Arguments
-/// * `state` - Application state containing database and provider connections
-/// * `auth_guard` - Authentication guard that validates basic auth
-/// * `relayer_id` - The unique identifier of the relayer to retrieve
-///
-/// # Returns
-/// * `Ok(Json<GetRelayerResult>)` - Relayer details and provider URLs
-/// * `Err(StatusCode)` - HTTP error code if retrieval fails or unauthorized
 pub async fn get_relayer_api(
     State(state): State<Arc<AppState>>,
     Path(relayer_id): Path<RelayerId>,
-) -> Result<Json<GetRelayerResult>, StatusCode> {
+) -> Result<Json<GetRelayerResult>, HttpError> {
     let relayer = get_relayer(&state.db, &state.cache, &relayer_id)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .ok_or(StatusCode::NOT_FOUND)?;
+        .await?
+        .ok_or(not_found("Relayer could not be found".to_string()))?;
 
     let provider = find_provider_for_chain_id(&state.evm_providers, &relayer.chain_id).await;
     let provider_urls = provider.map(|p| p.provider_urls.clone()).unwrap_or_default();

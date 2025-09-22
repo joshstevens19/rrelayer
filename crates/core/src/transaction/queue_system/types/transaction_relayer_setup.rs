@@ -2,7 +2,7 @@ use std::collections::{HashMap, VecDeque};
 
 use crate::{
     provider::EvmProvider,
-    relayer::types::Relayer,
+    relayer::Relayer,
     transaction::types::{Transaction, TransactionId},
 };
 

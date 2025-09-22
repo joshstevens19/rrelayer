@@ -1,6 +1,6 @@
 use rrelayer_core::{
     common_types::{EvmAddress, PagingContext, PagingResult},
-    relayer::types::RelayerId,
+    relayer::RelayerId,
 };
 use std::sync::Arc;
 

@@ -11,7 +11,7 @@ use super::{
 };
 use crate::{
     postgres::PostgresError,
-    relayer::types::RelayerId,
+    relayer::RelayerId,
     shared::common_types::EvmAddress,
     transaction::types::{Transaction, TransactionId, TransactionStatus},
 };

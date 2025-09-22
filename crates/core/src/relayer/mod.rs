@@ -1,6 +1,11 @@
-pub mod api;
+mod api;
+pub use api::{
+    create_relayer_routes, CloneRelayerRequest, CreateRelayerRequest, CreateRelayerResult,
+    GetAllowlistAddressesQuery, GetRelayerResult, GetRelayersQuery,
+};
 
-pub mod types;
+mod types;
+pub use types::*;
 
 mod cache;
 

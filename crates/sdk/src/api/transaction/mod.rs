@@ -7,7 +7,7 @@ use rrelayer_core::transaction::api::send_transaction::{
 use rrelayer_core::{
     RATE_LIMIT_HEADER_NAME,
     common_types::{PagingContext, PagingResult},
-    relayer::types::RelayerId,
+    relayer::RelayerId,
     transaction::types::{Transaction, TransactionId},
 };
 use std::sync::Arc;

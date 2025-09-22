@@ -4,7 +4,7 @@ use crate::shared::utils::convert_blob_strings_to_blobs;
 use crate::{
     app_state::AppState,
     rate_limiting::{RateLimitError, RateLimitOperation},
-    relayer::{get_relayer, types::RelayerId},
+    relayer::{get_relayer, RelayerId},
     rrelayer_error,
     shared::common_types::EvmAddress,
     transaction::{

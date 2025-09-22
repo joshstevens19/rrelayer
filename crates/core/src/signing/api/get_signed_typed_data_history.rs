@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use crate::{
     app_state::AppState,
-    relayer::types::RelayerId,
+    relayer::RelayerId,
     shared::common_types::{PagingContext, PagingResult},
     signing::db::read::SignedTypedDataHistory,
 };

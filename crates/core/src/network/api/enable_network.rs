@@ -23,5 +23,5 @@ pub async fn enable_network(
 
     state.db.enable_network(chain_id).await?;
     invalidate_enabled_networks_cache(&state.cache).await;
-    Ok(StatusCode::OK)
+    Ok(StatusCode::NO_CONTENT)
 }

@@ -4,7 +4,7 @@ use super::{
 };
 use crate::app_state::AppState;
 use crate::relayer::get_relayer;
-use crate::relayer::types::RelayerId;
+use crate::relayer::RelayerId;
 use crate::{
     common_types::EvmAddress,
     yaml::{RateLimitConfig, RateLimits},

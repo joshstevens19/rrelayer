@@ -1,4 +1,4 @@
-use rrelayer_core::relayer::types::RelayerId;
+use rrelayer_core::relayer::RelayerId;
 use rrelayer_sdk::SDK;
 
 use crate::commands::error::RelayerManagementError;

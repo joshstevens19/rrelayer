@@ -14,7 +14,7 @@ use crate::{
     provider::{load_providers, EvmProvider, LoadProvidersError},
     rate_limiting::RateLimiter,
     read,
-    relayer::api::create_relayer_routes,
+    relayer::create_relayer_routes,
     rrelayer_error, rrelayer_info,
     safe_proxy::SafeProxyManager,
     schema::apply_schema,

@@ -33,7 +33,7 @@ pub struct Relayer {
     #[serde(rename = "allowlistedOnly")]
     pub allowlisted_only: bool,
 
-    /// The if 1559 transactions are enabled
+    /// If 1559 transactions are enabled
     #[serde(rename = "eip1559Enabled")]
     pub eip_1559_enabled: bool,
 

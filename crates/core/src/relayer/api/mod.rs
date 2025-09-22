@@ -7,19 +7,18 @@ use axum::{
 
 use crate::app_state::AppState;
 
-// Import all endpoint modules
-pub mod add_allowlist_address;
-pub mod clone_relayer;
-pub mod create_relayer;
-pub mod delete_allowlist_address;
-pub mod delete_relayer;
-pub mod get_allowlist_addresses;
-pub mod get_relayer_api;
-pub mod get_relayers;
-pub mod pause_relayer;
-pub mod unpause_relayer;
-pub mod update_relay_eip1559_status;
-pub mod update_relay_max_gas_price;
+mod add_allowlist_address;
+mod clone_relayer;
+mod create_relayer;
+mod delete_allowlist_address;
+mod delete_relayer;
+mod get_allowlist_addresses;
+mod get_relayer_api;
+mod get_relayers;
+mod pause_relayer;
+mod unpause_relayer;
+mod update_relay_eip1559_status;
+mod update_relay_max_gas_price;
 
 // Re-export public types from endpoint modules
 pub use clone_relayer::CloneRelayerRequest;

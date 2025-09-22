@@ -1,7 +1,7 @@
 use super::builders::build_transaction_from_transaction_view;
 use crate::{
     postgres::{PostgresClient, PostgresError},
-    relayer::types::RelayerId,
+    relayer::RelayerId,
     shared::common_types::{PagingContext, PagingResult},
     transaction::types::{Transaction, TransactionId, TransactionStatus},
 };

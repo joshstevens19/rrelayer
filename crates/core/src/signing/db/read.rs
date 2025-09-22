@@ -2,7 +2,7 @@ use crate::common_types::Signature;
 use crate::network::ChainId;
 use crate::{
     postgres::{PostgresClient, PostgresError},
-    relayer::types::RelayerId,
+    relayer::RelayerId,
     shared::common_types::{PagingContext, PagingResult},
 };
 use chrono::{DateTime, Utc};

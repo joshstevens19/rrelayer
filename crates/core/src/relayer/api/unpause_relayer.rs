@@ -5,40 +5,29 @@ use axum::{
     http::StatusCode,
 };
 
+use crate::relayer::get_relayer::relayer_exists;
+use crate::shared::{not_found, HttpError};
 use crate::{
     app_state::AppState,
     relayer::{cache::invalidate_relayer_cache, types::RelayerId},
 };
 
 /// Resumes transaction processing for a paused relayer.
-///
-/// This endpoint reactivates a paused relayer, allowing it to resume processing
-/// transactions. The relayer's queue is unpaused and the status is updated in the database.
-///
-/// # Arguments
-/// * `state` - Application state containing database and queue connections
-/// * `auth_guard` - Authentication guard requiring manager-level permissions
-/// * `relayer_id` - The unique identifier of the relayer to unpause
-///
-/// # Returns
-/// * `StatusCode::NO_CONTENT` - If unpause succeeds
-/// * `StatusCode::UNAUTHORIZED` - If authentication fails
-/// * `StatusCode::INTERNAL_SERVER_ERROR` - If database operation fails
 pub async fn unpause_relayer(
     State(state): State<Arc<AppState>>,
     Path(relayer_id): Path<RelayerId>,
-) -> StatusCode {
-    match state.db.unpause_relayer(&relayer_id).await {
-        Ok(_) => {
-            invalidate_relayer_cache(&state.cache, &relayer_id).await;
-            if let Ok(queue) =
-                state.transactions_queues.lock().await.get_transactions_queue_unsafe(&relayer_id)
-            {
-                queue.lock().await.set_is_paused(false);
-            }
-
-            StatusCode::NO_CONTENT
+) -> Result<StatusCode, HttpError> {
+    let exists = relayer_exists(&state.db, &state.cache, &relayer_id).await?;
+    if exists {
+        invalidate_relayer_cache(&state.cache, &relayer_id).await;
+        if let Ok(queue) =
+            state.transactions_queues.lock().await.get_transactions_queue_unsafe(&relayer_id)
+        {
+            queue.lock().await.set_is_paused(false);
         }
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+
+        Ok(StatusCode::NO_CONTENT)
+    } else {
+        Err(not_found("Relayer does not exist".to_string()))
     }
 }

@@ -2,7 +2,7 @@ use crate::{
     common_types::EvmAddress,
     gas::{fee_estimator::base::GasPriceResult, types::GasLimit},
     postgres::{PostgresClient, PostgresError},
-    relayer::types::RelayerId,
+    relayer::RelayerId,
     shared::{
         common_types::{BlockHash, BlockNumber},
         utils::option_if,

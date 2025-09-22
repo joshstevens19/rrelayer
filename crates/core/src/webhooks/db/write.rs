@@ -13,7 +13,7 @@ use uuid::Uuid;
 use crate::{
     network::ChainId,
     postgres::{PostgresClient, PostgresError, ToSql},
-    relayer::types::RelayerId,
+    relayer::RelayerId,
     transaction::types::TransactionId,
     webhooks::types::WebhookEventType,
 };

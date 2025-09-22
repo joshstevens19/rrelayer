@@ -9,7 +9,6 @@ use super::types::{
     MovePendingTransactionToInmempoolError, SendTransactionGasPriceError,
     TransactionQueueSendTransactionError, TransactionSentWithRelayer, TransactionsQueueSetup,
 };
-use crate::relayer::types::RelayerId;
 use crate::transaction::types::{TransactionNonce, TransactionValue};
 use crate::{
     gas::{
@@ -21,7 +20,7 @@ use crate::{
     network::ChainId,
     postgres::PostgresClient,
     provider::EvmProvider,
-    relayer::types::Relayer,
+    relayer::{Relayer, RelayerId},
     safe_proxy::SafeProxyManager,
     shared::common_types::EvmAddress,
     transaction::types::TransactionData,

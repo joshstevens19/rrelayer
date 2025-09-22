@@ -7,7 +7,7 @@ use super::{
 };
 use crate::{
     gas::types::{GasLimit, GasPrice, MaxFee, MaxPriorityFee},
-    relayer::types::Relayer,
+    relayer::Relayer,
     shared::common_types::{BlockHash, BlockNumber, EvmAddress},
 };
 

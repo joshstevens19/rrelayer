@@ -3,11 +3,11 @@ use alloy::network::AnyTransactionReceipt;
 use alloy::primitives::U256;
 use anyhow::{anyhow, Context, Result};
 use rrelayer_core::common_types::PagingResult;
-use rrelayer_core::relayer::api::CreateRelayerResult;
+use rrelayer_core::relayer::CreateRelayerResult;
 use rrelayer_core::transaction::types::Transaction;
 use rrelayer_core::{
     common_types::{EvmAddress, PagingContext},
-    relayer::types::RelayerId,
+    relayer::RelayerId,
     transaction::api::get_transaction_status::RelayTransactionStatusResult,
     transaction::api::send_transaction::{RelayTransactionRequest, SendTransactionResult},
     transaction::api::types::TransactionSpeed,

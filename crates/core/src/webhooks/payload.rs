@@ -1,6 +1,6 @@
 use crate::{
     network::ChainId,
-    relayer::types::RelayerId,
+    relayer::RelayerId,
     shared::common_types::EvmAddress,
     transaction::types::{
         Transaction, TransactionData, TransactionHash, TransactionId, TransactionStatus,

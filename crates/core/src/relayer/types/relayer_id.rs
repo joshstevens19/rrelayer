@@ -14,13 +14,6 @@ use uuid::Uuid;
 pub struct RelayerId(Uuid);
 
 impl RelayerId {
-    /// Creates a new random RelayerId.
-    ///
-    /// This method generates a new RelayerId using a random UUID v4, providing
-    /// a unique identifier for relayer instances.
-    ///
-    /// # Returns
-    /// * A new RelayerId with a randomly generated UUID
     pub fn new() -> RelayerId {
         RelayerId(Uuid::new_v4())
     }
@@ -77,7 +70,6 @@ impl ToSql for RelayerId {
         ty: &Type,
         out: &mut BytesMut,
     ) -> Result<IsNull, Box<dyn Error + Sync + Send + 'static>> {
-        // Delegate to the Uuid's ToSql implementation
         self.0.to_sql(ty, out)
     }
 

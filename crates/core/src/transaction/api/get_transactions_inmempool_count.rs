@@ -5,7 +5,7 @@ use axum::{
 };
 use std::sync::Arc;
 
-use crate::{app_state::AppState, relayer::types::RelayerId};
+use crate::{app_state::AppState, relayer::RelayerId};
 
 /// API endpoint to get the count of in-mempool transactions for a relayer.
 ///

@@ -6,7 +6,7 @@ use std::{
 
 use tokio::{sync::Mutex, time::sleep};
 
-use crate::{network::Network, relayer::types::Relayer, transaction::types::Transaction};
+use crate::{network::Network, relayer::Relayer, transaction::types::Transaction};
 
 #[derive(Clone)]
 pub enum CacheValue {

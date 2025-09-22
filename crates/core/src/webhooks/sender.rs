@@ -1,6 +1,6 @@
 use super::types::{WebhookDelivery, WebhookDeliveryConfig};
 use crate::network::ChainId;
-use crate::relayer::types::RelayerId;
+use crate::relayer::RelayerId;
 use crate::transaction::types::TransactionId;
 use crate::{
     postgres::PostgresClient,
@@ -406,13 +406,13 @@ impl WebhookSender {
                 .get("relayerId")
                 .and_then(|id| id.as_str())
                 .and_then(|id_str| uuid::Uuid::parse_str(id_str).ok())
-                .map(crate::relayer::types::RelayerId::from)
+                .map(crate::relayer::RelayerId::from)
         } else if let Some(signing) = payload.get("signing") {
             signing
                 .get("relayerId")
                 .and_then(|id| id.as_str())
                 .and_then(|id_str| uuid::Uuid::parse_str(id_str).ok())
-                .map(crate::relayer::types::RelayerId::from)
+                .map(crate::relayer::RelayerId::from)
         } else {
             None
         };

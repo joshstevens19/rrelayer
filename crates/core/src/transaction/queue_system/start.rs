@@ -12,7 +12,7 @@ use crate::{
     gas::{blob_gas_oracle::BlobGasOracleCache, gas_oracle::GasOracleCache},
     postgres::{PostgresClient, PostgresConnectionError, PostgresError},
     provider::{find_provider_for_chain_id, EvmProvider},
-    relayer::types::{Relayer, RelayerId},
+    relayer::{Relayer, RelayerId},
     rrelayer_error,
     safe_proxy::SafeProxyManager,
     shared::{

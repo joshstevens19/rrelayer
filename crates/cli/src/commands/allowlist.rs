@@ -1,7 +1,7 @@
 use clap::Subcommand;
 use rrelayer_core::{
     common_types::{EvmAddress, PagingContext},
-    relayer::types::RelayerId,
+    relayer::RelayerId,
 };
 use rrelayer_sdk::SDK;
 

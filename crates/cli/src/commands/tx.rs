@@ -5,7 +5,7 @@ use rrelayer_core::common_types::PagingContext;
 use rrelayer_core::transaction::api::send_transaction::RelayTransactionRequest;
 use rrelayer_core::{
     common_types::EvmAddress,
-    relayer::types::RelayerId,
+    relayer::RelayerId,
     transaction::types::{
         Transaction, TransactionData, TransactionId, TransactionSpeed, TransactionValue,
     },

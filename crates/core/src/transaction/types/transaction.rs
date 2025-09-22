@@ -41,7 +41,7 @@ use crate::{
         types::{GasLimit, MaxFee, MaxPriorityFee},
     },
     network::ChainId,
-    relayer::types::RelayerId,
+    relayer::RelayerId,
     shared::common_types::EvmAddress,
 };
 

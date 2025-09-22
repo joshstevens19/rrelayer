@@ -43,7 +43,7 @@ use crate::{
         types::GasLimit,
     },
     postgres::{PostgresClient, PostgresConnectionError, PostgresError},
-    relayer::types::RelayerId,
+    relayer::RelayerId,
     safe_proxy::SafeProxyManager,
     shared::{
         cache::Cache,

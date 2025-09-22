@@ -40,6 +40,15 @@ pub async fn get_relayer(
     Ok(relayer)
 }
 
+pub async fn relayer_exists(
+    db: &PostgresClient,
+    cache: &Arc<Cache>,
+    relayer_id: &RelayerId,
+) -> Result<bool, PostgresError> {
+    let relayer = get_relayer(db, cache, relayer_id).await?;
+    Ok(relayer.is_some())
+}
+
 /// Retrieves a relayer with its associated EVM provider context.
 ///
 /// This function gets a relayer by ID and pairs it with the appropriate EVM provider

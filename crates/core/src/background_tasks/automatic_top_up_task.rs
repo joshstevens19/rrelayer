@@ -5,7 +5,7 @@ use crate::{
     network::ChainId,
     postgres::{PostgresClient, PostgresError},
     provider::EvmProvider,
-    relayer::types::Relayer,
+    relayer::Relayer,
     safe_proxy::SafeProxyManager,
     shared::common_types::{EvmAddress, PagingContext},
     transaction::queue_system::transactions_queues::TransactionsQueues,
