@@ -9,29 +9,14 @@ use tokio_postgres::types::{to_sql_checked, FromSql, IsNull, ToSql, Type};
 pub struct EvmAddress(Address);
 
 impl EvmAddress {
-    /// Returns the hexadecimal string representation of the address.
-    ///
-    /// # Returns
-    /// * `String` - The address formatted as a hex string with 0x prefix
     pub fn hex(&self) -> String {
         format!("{:?}", self.0)
     }
 
-    /// Creates a new EvmAddress wrapper around an Alloy Address.
-    ///
-    /// # Arguments
-    /// * `address` - The Alloy Address to wrap
-    ///
-    /// # Returns
-    /// * `Self` - A new EvmAddress instance
     pub fn new(address: Address) -> Self {
         EvmAddress(address)
     }
 
-    /// Consumes this EvmAddress and returns the inner Alloy Address.
-    ///
-    /// # Returns
-    /// * `Address` - The inner Alloy Address
     pub fn into_address(self) -> Address {
         self.0
     }
@@ -54,7 +39,6 @@ impl Display for EvmAddress {
 
 impl<'a> FromSql<'a> for EvmAddress {
     fn from_sql(_ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
-        // Ensure the byte slice is the correct length for an Ethereum address (20 bytes)
         if raw.len() != 20 {
             return Err("Invalid byte length for Ethereum address".into());
         }

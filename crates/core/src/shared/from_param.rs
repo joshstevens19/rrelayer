@@ -3,16 +3,6 @@ use std::str::FromStr;
 use alloy::primitives::U256;
 
 /// Parses a string parameter into a U256 value.
-///
-/// Converts a string representation of a number into an Alloy U256 type,
-/// commonly used for parsing blockchain-related numeric values.
-///
-/// # Arguments
-/// * `param` - The string to parse as a U256
-///
-/// # Returns
-/// * `Ok(U256)` - The parsed U256 value
-/// * `Err(&str)` - Error message if parsing fails
 pub fn from_param_u256(param: &str) -> Result<U256, &str> {
     match U256::from_str(param) {
         Ok(value) => Ok(value),
