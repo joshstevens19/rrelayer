@@ -1,17 +1,6 @@
 use crate::postgres::{PostgresClient, PostgresError};
 
 /// Applies the RRelayer database schema version 1.0.0.
-///
-/// All tables include appropriate constraints, indexes, and foreign key
-/// relationships. The schema uses PostgreSQL-specific features like enums
-/// and TIMESTAMPTZ for proper timezone handling.
-///
-/// # Arguments
-/// * `client` - PostgreSQL client with schema creation permissions
-///
-/// # Returns
-/// * `Ok(())` - If schema creation succeeds
-/// * `Err(PostgresError)` - If any schema operation fails
 pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), PostgresError> {
     let schema_sql = r#"
         CREATE SCHEMA IF NOT EXISTS public;
