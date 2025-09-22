@@ -150,6 +150,35 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
                    REFERENCES relayer.record (id)
         );
 
+        CREATE INDEX IF NOT EXISTS idx_transaction_relayer_status_nonce 
+        ON relayer.transaction(relayer_id, status, nonce ASC);
+
+        CREATE INDEX IF NOT EXISTS idx_transaction_relayer_id 
+        ON relayer.transaction(relayer_id);
+
+        CREATE INDEX IF NOT EXISTS idx_transaction_expires_at 
+        ON relayer.transaction(expires_at);
+
+        CREATE INDEX IF NOT EXISTS idx_transaction_status 
+        ON relayer.transaction(status);
+
+        CREATE INDEX IF NOT EXISTS idx_relayer_chain_deleted 
+        ON relayer.record(chain_id, deleted);
+
+        CREATE INDEX IF NOT EXISTS idx_relayer_address_chain 
+        ON relayer.record(address, chain_id, deleted) WHERE address IS NOT NULL;
+
+        CREATE INDEX IF NOT EXISTS idx_relayer_chain_wallet_index 
+        ON relayer.record(chain_id, wallet_index);
+
+        CREATE INDEX IF NOT EXISTS idx_relayer_deleted 
+        ON relayer.record(deleted);
+
+        CREATE INDEX IF NOT EXISTS idx_network_disabled 
+        ON network.record(disabled);
+
+        CREATE INDEX IF NOT EXISTS idx_allowlist_relayer_created 
+        ON relayer.allowlisted_address(relayer_id, created_at DESC);
 
         CREATE TABLE IF NOT EXISTS rate_limit.transaction_metadata (
             id SERIAL PRIMARY KEY NOT NULL,

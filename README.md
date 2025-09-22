@@ -18,7 +18,6 @@
   - Testing handling custom gas with http call
 - Look over the gas logic again maybe add some max to protect over speeding huge amounts of ETH incase it gets its wrong
 - Change the TS sdk to work with the changes in the playground
-- Look over indexes required on all queries
 - AI write go and python SDK
 - Finish documentation
 - Internal documentation in the README.MD throughout
