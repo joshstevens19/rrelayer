@@ -1170,9 +1170,12 @@ impl TestRunner {
         let relayer = self.create_and_fund_relayer("gas-test-relayer").await?;
         info!("Created relayer: {:?}", relayer);
 
-        let balance_before = self.contract_interactor.get_eth_balance(&relayer.address.into_address()).await?;
-        info!("Relayer balance before transaction: {} ETH", 
-              alloy::primitives::utils::format_ether(balance_before));
+        let balance_before =
+            self.contract_interactor.get_eth_balance(&relayer.address.into_address()).await?;
+        info!(
+            "Relayer balance before transaction: {} ETH",
+            alloy::primitives::utils::format_ether(balance_before)
+        );
 
         let transfer_amount = alloy::primitives::utils::parse_ether("0.1")?;
         let tx_response = self
@@ -1190,16 +1193,22 @@ impl TestRunner {
         let completed_tx = self.wait_for_transaction_completion(&tx_response.0.id).await?;
         info!("Transaction completed");
 
-        let balance_after = self.contract_interactor.get_eth_balance(&relayer.address.into_address()).await?;
-        info!("Relayer balance after transaction: {} ETH",
-              alloy::primitives::utils::format_ether(balance_after));
+        let balance_after =
+            self.contract_interactor.get_eth_balance(&relayer.address.into_address()).await?;
+        info!(
+            "Relayer balance after transaction: {} ETH",
+            alloy::primitives::utils::format_ether(balance_after)
+        );
 
         let balance_diff = balance_before - balance_after;
         let expected_transfer = transfer_amount;
         let gas_cost = balance_diff - expected_transfer;
-        
+
         info!("Transaction cost breakdown:");
-        info!("  Transfer amount: {} ETH", alloy::primitives::utils::format_ether(expected_transfer));
+        info!(
+            "  Transfer amount: {} ETH",
+            alloy::primitives::utils::format_ether(expected_transfer)
+        );
         info!("  Gas cost: {} ETH", alloy::primitives::utils::format_ether(gas_cost));
         info!("  Total cost: {} ETH", alloy::primitives::utils::format_ether(balance_diff));
 
@@ -1229,7 +1238,7 @@ impl TestRunner {
                 "Gas limit too low for ETH transfer: {} (expected at least 21,000)",
                 gas_limit_value
             );
-            
+
             anyhow::ensure!(
                 gas_limit_value <= 100000u128,
                 "Gas limit too high for simple ETH transfer: {} (expected at most 100,000)",
@@ -1429,7 +1438,6 @@ impl TestRunner {
         Ok(())
     }
 
-    // TODO: FAILING ON SENDING TX WHEN PAUSED
     /// run single with:
     /// make run-test-debug TEST=network_management
     async fn test_network_management(&self) -> Result<()> {
@@ -1445,7 +1453,10 @@ impl TestRunner {
         info!("All networks: {} found", all_networks.len());
 
         if all_networks.len() != 1 {
-            return Err(anyhow!("Should only bring back 1 network"));
+            return Err(anyhow!(
+                "Should only bring back 1 network brought back {}",
+                all_networks.len()
+            ));
         }
 
         let network = all_networks.first().context("No networks found")?;
@@ -1482,7 +1493,10 @@ impl TestRunner {
         info!("Enabled networks: {} found", enabled_networks.len());
 
         if enabled_networks.len() != 1 {
-            return Err(anyhow!("Should only bring back 1 enabled network"));
+            return Err(anyhow!(
+                "Should only bring back 1 enabled network brought back {}",
+                enabled_networks.len()
+            ));
         }
 
         let network = enabled_networks.first().unwrap();
@@ -1516,7 +1530,10 @@ impl TestRunner {
         info!("Disabled networks: {} found", disabled_networks.len());
 
         if disabled_networks.len() != 0 {
-            return Err(anyhow!("Should only bring back 0 disabled network"));
+            return Err(anyhow!(
+                "Should only bring back 0 disabled network brought back {}",
+                enabled_networks.len()
+            ));
         }
 
         self.relayer_client.sdk.network.disable_network(31337).await?;
@@ -1530,7 +1547,10 @@ impl TestRunner {
             .context("Failed to get disabled networks")?;
 
         if disabled_networks.len() != 1 {
-            return Err(anyhow!("Should only bring back 1 enabled network"));
+            return Err(anyhow!(
+                "Should only bring back 1 disabled network brought back {}",
+                disabled_networks.len()
+            ));
         }
 
         let network = disabled_networks.first().unwrap();
@@ -1563,7 +1583,10 @@ impl TestRunner {
             .context("Failed to get enabled networks")?;
 
         if enabled_networks.len() != 0 {
-            return Err(anyhow!("Should only bring back 0 enabled network"));
+            return Err(anyhow!(
+                "Should only bring back 0 enabled network brought back {}",
+                enabled_networks.len()
+            ));
         }
 
         let relayer = self.create_and_fund_relayer("network-management").await?;
@@ -1601,6 +1624,13 @@ impl TestRunner {
             .await
             .context("Failed to get enabled networks")?;
 
+        if enabled_networks.len() != 1 {
+            return Err(anyhow!(
+                "Should only bring back 1 enabled network brought back {}",
+                enabled_networks.len()
+            ));
+        }
+
         let network = enabled_networks.first().unwrap();
         if network.disabled {
             return Err(anyhow!("Enabled network should not be disabled"));
@@ -1631,7 +1661,10 @@ impl TestRunner {
             .context("Failed to get disabled networks")?;
 
         if disabled_networks.len() != 0 {
-            return Err(anyhow!("Should only bring back 0 disabled network"));
+            return Err(anyhow!(
+                "Should only bring back 0 disabled network brought back {}",
+                enabled_networks.len()
+            ));
         }
 
         info!("[SUCCESS] Network management APIs work correctly");
@@ -2807,7 +2840,10 @@ impl TestRunner {
             .await
             .context("Failed to get relayer transactions")?;
 
-        info!("[SUCCESS] Found {} transactions for first relayer", first_relayer_transactions.items.len());
+        info!(
+            "[SUCCESS] Found {} transactions for first relayer",
+            first_relayer_transactions.items.len()
+        );
 
         let cloned_relayer_transactions = self
             .relayer_client
@@ -3743,7 +3779,10 @@ impl TestRunner {
             return Err(anyhow!("No 'typed_data_signed' webhook received"));
         }
 
-        info!("[SUCCESS] Received {} typed_data_signed webhook(s)", typed_data_signing_webhooks.len());
+        info!(
+            "[SUCCESS] Received {} typed_data_signed webhook(s)",
+            typed_data_signing_webhooks.len()
+        );
 
         let typed_data_webhook = &typed_data_signing_webhooks[0];
         if !typed_data_webhook.payload.get("signing").is_some() {

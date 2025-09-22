@@ -78,4 +78,22 @@ impl PostgresClient {
             Ok(false)
         }
     }
+
+    pub async fn network_enabled(&self, chain_id: ChainId) -> Result<bool, PostgresError> {
+        let query = r#"
+            SELECT EXISTS(
+                SELECT 1
+                FROM network.record
+                WHERE chain_id = $1 AND disabled = FALSE
+            )
+        "#;
+
+        let rows = self.query(query, &[&chain_id]).await?;
+
+        if let Some(row) = rows.first() {
+            Ok(row.get::<_, bool>(0))
+        } else {
+            Ok(false)
+        }
+    }
 }

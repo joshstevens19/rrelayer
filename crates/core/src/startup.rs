@@ -158,16 +158,10 @@ async fn start_api(
     cache: Arc<Cache>,
     webhook_manager: Option<Arc<Mutex<WebhookManager>>>,
     user_rate_limiter: Option<Arc<RateLimiter>>,
+    db: Arc<PostgresClient>,
 ) -> Result<(), StartApiError> {
-    let mut db = PostgresClient::new().await.map_err(StartApiError::DatabaseConnectionError)?;
-
-    for provider in providers.as_ref() {
-        db.save_enabled_network(&provider.chain_id, &provider.name, &provider.provider_urls)
-            .await?;
-    }
-
     let app_state = Arc::new(AppState {
-        db: Arc::new(db),
+        db: db.clone(),
         evm_providers: providers,
         gas_oracle_cache,
         blob_gas_oracle_cache,
@@ -292,6 +286,15 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
 
     let providers = Arc::new(load_providers(&project_path, &config).await?);
 
+    {
+        let mut db = PostgresClient::new().await.map_err(StartApiError::DatabaseConnectionError)?;
+
+        for provider in providers.as_ref() {
+            db.save_enabled_network(&provider.chain_id, &provider.name, &provider.provider_urls)
+                .await?;
+        }
+    }
+
     let gas_oracle_cache = Arc::new(Mutex::new(GasOracleCache::new()));
     let blob_gas_oracle_cache = Arc::new(Mutex::new(BlobGasOracleCache::new()));
 
@@ -325,6 +328,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
         blob_gas_oracle_cache.clone(),
         providers.clone(),
         postgres_client.clone(),
+        cache.clone(),
         webhook_manager.clone(),
         transaction_queue.clone(),
     )
@@ -351,6 +355,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
         cache,
         webhook_manager,
         user_rate_limiter,
+        postgres_client,
     )
     .await?;
 

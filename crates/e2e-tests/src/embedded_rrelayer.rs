@@ -113,7 +113,10 @@ impl EmbeddedRRelayerServer {
                 info!("[SUCCESS] Database reset complete");
             }
             Err(e) => {
-                warn!("[WARNING]  Could not connect to database for reset: {}. Continuing anyway...", e);
+                warn!(
+                    "[WARNING]  Could not connect to database for reset: {}. Continuing anyway...",
+                    e
+                );
                 warn!("   Make sure PostgreSQL is running with the correct credentials");
             }
         }

@@ -12,6 +12,7 @@ use super::{
 use crate::shared::{bad_request, internal_server_error, not_found, HttpError};
 use crate::transaction::types::TransactionConversionError;
 use crate::{
+    network::ChainId,
     postgres::PostgresError,
     relayer::RelayerId,
     shared::common_types::EvmAddress,
@@ -74,6 +75,9 @@ pub enum AddTransactionError {
 
     #[error("Relayer {0} is paused")]
     RelayerIsPaused(RelayerId),
+
+    #[error("Network {0} is disabled")]
+    NetworkDisabled(ChainId),
 
     #[error("{0}")]
     TransactionGasPriceError(#[from] SendTransactionGasPriceError),

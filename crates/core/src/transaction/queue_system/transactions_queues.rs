@@ -38,6 +38,7 @@ use crate::transaction::queue_system::types::SendTransactionGasPriceError;
 use crate::transaction::types::{TransactionConversionError, TransactionSpeed};
 use crate::{
     gas::{BlobGasOracleCache, BlobGasPriceResult, GasLimit, GasOracleCache, GasPriceResult},
+    network,
     postgres::{PostgresClient, PostgresConnectionError, PostgresError},
     relayer::RelayerId,
     safe_proxy::SafeProxyManager,
@@ -359,6 +360,20 @@ impl TransactionsQueues {
         if transactions_queue.is_paused() {
             return Err(AddTransactionError::RelayerIsPaused(*relayer_id));
         }
+
+        // Check if the network is disabled using cache to avoid DB lookup
+        let chain_id = transactions_queue.chain_id();
+        if let Some(networks) = network::get_networks_cache(&self.cache).await {
+            if let Some(network) = networks.iter().find(|n| n.chain_id == chain_id) {
+                if network.disabled {
+                    return Err(AddTransactionError::NetworkDisabled(chain_id));
+                }
+            }
+            // If network not found in the cache, optimistically assume it's enabled (new network)
+        }
+        // If cache returns None (cache not available), we allow the transaction through
+        // to maintain system availability. The cache is refreshed every 10 minutes by a background task.
+        // that said, it pushes the cache on new network creations and disabled and enabled
 
         if transactions_queue.is_allowlisted_only()
             && !self

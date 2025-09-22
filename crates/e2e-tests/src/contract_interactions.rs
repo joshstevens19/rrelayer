@@ -373,7 +373,10 @@ impl ContractInteractor {
             ));
         }
 
-        info!("[SUCCESS] Safe proxy deployed to expected deterministic address: {:?}", safe_address);
+        info!(
+            "[SUCCESS] Safe proxy deployed to expected deterministic address: {:?}",
+            safe_address
+        );
 
         // Wait a moment to ensure deployment is fully settled before returning
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
