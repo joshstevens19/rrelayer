@@ -1,4 +1,6 @@
 use crate::shared::utils::{format_token_amount, format_wei_to_eth};
+use crate::transaction::queue_system::TransactionToSend;
+use crate::transaction::types::{TransactionData, TransactionSpeed, TransactionValue};
 use crate::{
     network::types::ChainId,
     postgres::{PostgresClient, PostgresError},
@@ -27,20 +29,6 @@ sol! {
     }
 }
 
-/// Automatic top-up background task for managing relayer address balances.
-///
-/// This struct manages the automatic top-up functionality that monitors relayer
-/// addresses and ensures they maintain minimum balance thresholds by automatically
-/// transferring funds from configured source addresses.
-///
-/// # Key Features
-/// - Periodic balance monitoring of relayer addresses
-/// - Automatic fund transfers when balances fall below thresholds
-/// - Support for multiple blockchain networks
-/// - Configurable refresh and check intervals
-/// - Intelligent wallet index resolution for transactions
-///
-/// # Configuration
 /// The task behavior is controlled through the `SetupConfig` which contains
 /// network-specific `AutomaticTopUpConfig` settings including:
 /// - Source address for funds (`from_address`)
@@ -59,20 +47,12 @@ pub struct AutomaticTopUpTask {
 }
 
 impl AutomaticTopUpTask {
-    /// Creates a new AutomaticTopUpTask instance.
-    ///
-    /// # Arguments
-    /// * `postgres_client` - Database client for querying relayer information
-    /// * `providers` - Collection of EVM providers for different chains
-    /// * `config` - Setup configuration containing network and top-up settings
-    /// * `transactions_queues` - Reference to the transaction queues for proper nonce management
     pub fn new(
         postgres_client: Arc<PostgresClient>,
         providers: Arc<Vec<EvmProvider>>,
         config: SetupConfig,
         transactions_queues: Arc<tokio::sync::Mutex<TransactionsQueues>>,
     ) -> Self {
-        // Initialize safe proxy manager if any safe proxy configs exist
         let safe_proxy_manager =
             config.safe_proxy.as_ref().map(|configs| SafeProxyManager::new(configs.clone()));
 
@@ -88,10 +68,6 @@ impl AutomaticTopUpTask {
         }
     }
 
-    /// Main execution loop for the automatic top-up task.
-    ///
-    /// This method runs indefinitely, periodically refreshing the relayer cache
-    /// and checking addresses that need top-up based on configured intervals.
     pub async fn run(&mut self) {
         info!("Starting automatic top-up background task");
 
@@ -110,9 +86,6 @@ impl AutomaticTopUpTask {
     }
 
     /// Refreshes the internal cache of relayers for all configured networks.
-    ///
-    /// This method queries the database to get the latest relayer information
-    /// for each network that has automatic top-up configured.
     async fn refresh_relayer_cache(&mut self) {
         for network_config in &self.config.networks {
             if let Some(_automatic_top_up) = &network_config.automatic_top_up {
@@ -140,44 +113,16 @@ impl AutomaticTopUpTask {
     }
 
     /// Retrieves all relayers for a specific chain from the database.
-    ///
-    /// # Arguments
-    /// * `chain_id` - The chain ID to query relayers for
-    ///
-    /// # Returns
-    /// * `Ok(Vec<Relayer>)` - List of all relayers for the chain
-    /// * `Err(PostgresError)` - Database error if query fails
     async fn get_all_relayers_for_chain(
         &self,
         chain_id: &ChainId,
     ) -> Result<Vec<Relayer>, PostgresError> {
-        let mut all_relayers = Vec::new();
-        let mut offset = 0;
-        let limit = 100;
-
-        loop {
-            let paging_context = PagingContext::new(limit, offset);
-            let result =
-                self.postgres_client.get_relayers_for_chain(chain_id, &paging_context).await?;
-
-            let relayer_count = result.items.len();
-            all_relayers.extend(result.items);
-
-            if relayer_count < limit as usize {
-                break;
-            }
-
-            offset += limit;
-        }
+        let all_relayers = self.postgres_client.get_all_relayers_for_chain(chain_id).await?;
 
         Ok(all_relayers)
     }
 
     /// Checks all configured addresses and performs top-ups where needed.
-    ///
-    /// This method iterates through all networks with automatic top-up configured,
-    /// checks balances against minimum thresholds, and initiates top-up transactions
-    /// for addresses that fall below the configured minimum balance.
     async fn check_and_top_up_addresses(&self) {
         for network_config in &self.config.networks {
             if let Some(automatic_top_up) = &network_config.automatic_top_up {
@@ -275,7 +220,7 @@ impl AutomaticTopUpTask {
         }
     }
 
-    /// Processes native token (ETH) top-ups for target addresses.
+    /// Processes native token top-ups for target addresses.
     async fn process_native_token_top_ups(
         &self,
         chain_id: &ChainId,
@@ -379,7 +324,6 @@ impl AutomaticTopUpTask {
     ) {
         let mut addresses_needing_top_up = Vec::new();
 
-        // Check ERC-20 token balances for all target addresses
         for address in target_addresses {
             match self.get_erc20_balance(provider, &token_config.address, address).await {
                 Ok(balance) => {
@@ -439,7 +383,6 @@ impl AutomaticTopUpTask {
             }
         }
 
-        // Send ERC-20 token top-ups
         for address in addresses_needing_top_up {
             match self
                 .send_erc20_top_up_transaction(
@@ -518,7 +461,7 @@ impl AutomaticTopUpTask {
                         safe_address,
                         *target_address,
                         native_config.top_up_amount,
-                        alloy::primitives::Bytes::new(), // Empty data for native transfers
+                        alloy::primitives::Bytes::new(),
                     )
                     .await
                     .map_err(|e| format!("Failed to create Safe transaction: {}", e))?;
@@ -529,21 +472,18 @@ impl AutomaticTopUpTask {
                     .to_string());
             }
         } else {
-            // Direct transaction
             (*target_address, native_config.top_up_amount, alloy::primitives::Bytes::new())
         };
 
-        // Instead of sending directly, use the transaction queue system
-        let transaction_to_send = crate::transaction::queue_system::TransactionToSend::new(
+        let transaction_to_send = TransactionToSend::new(
             final_to,
-            crate::transaction::types::TransactionValue::new(final_value),
-            crate::transaction::types::TransactionData::new(final_data),
-            Some(crate::transaction::types::TransactionSpeed::Fast),
-            None, // No blobs for top-up transactions
+            TransactionValue::new(final_value),
+            TransactionData::new(final_data),
+            Some(TransactionSpeed::Fast),
+            None,
             Some(format!("automatic_top_up_native_{}_{}", from_address, target_address)),
         );
 
-        // Find the relayer ID for the from_address
         let relayer_id = if let Some(relayer) =
             self.relayer_cache.values().flatten().find(|relayer| &relayer.address == from_address)
         {
@@ -566,7 +506,6 @@ impl AutomaticTopUpTask {
             }
         };
 
-        // Add transaction to the queue instead of sending directly
         let mut transactions_queues = self.transactions_queues.lock().await;
         match transactions_queues.add_transaction(&relayer_id, &transaction_to_send).await {
             Ok(transaction) => {
@@ -592,15 +531,6 @@ impl AutomaticTopUpTask {
     }
 
     /// Resolves target addresses based on the configured target type.
-    ///
-    /// # Arguments
-    /// * `chain_id` - Chain ID to resolve addresses for
-    /// * `targets` - Target address configuration (All relayers or specific list)
-    /// * `from_address` - Source address to exclude from targets (prevent self-funding)
-    ///
-    /// # Returns
-    /// * `Ok(Vec<EvmAddress>)` - List of resolved target addresses (excluding from_address)
-    /// * `Err(String)` - Error message if resolution fails
     async fn resolve_target_addresses(
         &self,
         chain_id: &ChainId,
@@ -627,9 +557,8 @@ impl AutomaticTopUpTask {
             TopUpTargetAddresses::List(addresses) => addresses.clone(),
         };
 
-        // Filter out the from_address to prevent self-funding
-        let _original_count = addresses.len();
         let contains_from_address = addresses.contains(from_address);
+        // Filter out the from_address to prevent self-funding
         addresses.retain(|addr| addr != from_address);
 
         if contains_from_address {
@@ -654,16 +583,6 @@ impl AutomaticTopUpTask {
     }
 
     /// Checks if the from_address has sufficient native balance for top-up operations.
-    ///
-    /// # Arguments
-    /// * `provider` - EVM provider to query balance
-    /// * `from_address` - Address to check balance for
-    /// * `native_config` - Native token configuration for amount calculations
-    ///
-    /// # Returns
-    /// * `Ok(true)` - Address has sufficient balance
-    /// * `Ok(false)` - Address has insufficient balance
-    /// * `Err(String)` - Error occurred during balance check
     async fn check_native_from_address_balance(
         &self,
         provider: &EvmProvider,
@@ -710,13 +629,6 @@ impl AutomaticTopUpTask {
     }
 
     /// Estimates the gas cost for a standard transfer transaction.
-    ///
-    /// # Arguments
-    /// * `provider` - EVM provider to query gas prices
-    ///
-    /// # Returns
-    /// * `Ok(U256)` - Estimated transaction cost in wei
-    /// * `Err(String)` - Error message if estimation fails
     async fn estimate_transaction_cost(&self, provider: &EvmProvider) -> Result<U256, String> {
         let gas_price = provider
             .rpc_client()
@@ -748,14 +660,12 @@ impl AutomaticTopUpTask {
         chain_id: &ChainId,
         address: &EvmAddress,
     ) -> Option<u32> {
-        // First try cache
         if let Some(relayers) = self.relayer_cache.get(chain_id) {
             if let Some(relayer) = relayers.iter().find(|relayer| &relayer.address == address) {
                 return Some(relayer.wallet_index);
             }
         }
 
-        // Cache miss - fall back to database lookup
         info!("Wallet index for address {} not found in cache, querying database", address);
 
         match self.postgres_client.get_relayer_by_address(address, chain_id).await {
@@ -784,16 +694,6 @@ impl AutomaticTopUpTask {
     }
 
     /// Checks if the from_address has sufficient ERC-20 token balance for top-up operations.
-    ///
-    /// # Arguments
-    /// * `provider` - EVM provider to query balance
-    /// * `from_address` - Address to check balance for
-    /// * `token_config` - ERC-20 token configuration for amount calculations
-    ///
-    /// # Returns
-    /// * `Ok(true)` - Address has sufficient token balance
-    /// * `Ok(false)` - Address has insufficient token balance
-    /// * `Err(String)` - Error occurred during balance check
     async fn check_erc20_from_address_balance(
         &self,
         provider: &EvmProvider,
@@ -838,18 +738,6 @@ impl AutomaticTopUpTask {
     }
 
     /// Sends an ERC-20 token top-up transaction from one address to another.
-    ///
-    /// # Arguments
-    /// * `chain_id` - The chain ID for wallet index lookup
-    /// * `provider` - EVM provider to send the transaction through
-    /// * `from_address` - Source address for the tokens
-    /// * `target_address` - Destination address to receive tokens
-    /// * `token_config` - ERC-20 token configuration containing amount and settings
-    /// * `config` - Automatic top-up configuration containing safe address if applicable
-    ///
-    /// # Returns
-    /// * `Ok(String)` - Transaction hash if successful
-    /// * `Err(String)` - Error message if transaction fails
     async fn send_erc20_top_up_transaction(
         &self,
         chain_id: &ChainId,
@@ -880,16 +768,13 @@ impl AutomaticTopUpTask {
             amount: token_config.top_up_amount,
         };
 
-        // Check if we need to use Safe proxy
         let (final_to, final_value, final_data) = if let Some(safe_address) = &config.safe {
-            // Use Safe proxy for ERC-20 transfer
             if let Some(ref safe_manager) = self.safe_proxy_manager {
                 info!(
                     "Using Safe proxy {} for ERC-20 top-up transaction from {} to {}",
                     safe_address, from_address, target_address
                 );
 
-                // Get wallet index for signing
                 let wallet_index =
                     match self.find_wallet_index_for_address(chain_id, from_address).await {
                         Some(index) => index,
@@ -901,15 +786,14 @@ impl AutomaticTopUpTask {
                         }
                     };
 
-                // Use SafeProxyManager to create the complete Safe transaction with signature
                 let (_safe_tx, encoded_data) = safe_manager
                     .create_safe_transaction_with_signature(
                         provider,
                         wallet_index,
                         safe_address,
-                        token_config.address, // The to address is the token contract
-                        U256::ZERO,           // No ETH value for ERC-20 transfers
-                        transfer_call.abi_encode().into(), // The transfer call data
+                        token_config.address,
+                        U256::ZERO,
+                        transfer_call.abi_encode().into(),
                     )
                     .await
                     .map_err(|e| format!("Failed to create Safe transaction: {}", e))?;
@@ -920,24 +804,21 @@ impl AutomaticTopUpTask {
                     .to_string());
             }
         } else {
-            // Direct ERC-20 transfer
             (token_config.address.into(), U256::ZERO, transfer_call.abi_encode().into())
         };
 
-        // Instead of sending directly, use the transaction queue system
-        let transaction_to_send = crate::transaction::queue_system::TransactionToSend::new(
+        let transaction_to_send = TransactionToSend::new(
             final_to,
-            crate::transaction::types::TransactionValue::new(final_value),
-            crate::transaction::types::TransactionData::new(final_data),
-            Some(crate::transaction::types::TransactionSpeed::Fast),
-            None, // No blobs for ERC-20 transactions
+            TransactionValue::new(final_value),
+            TransactionData::new(final_data),
+            Some(TransactionSpeed::Fast),
+            None,
             Some(format!(
                 "automatic_top_up_erc20_{}_{}_{}",
                 token_config.address, from_address, target_address
             )),
         );
 
-        // Find the relayer ID for the from_address
         let relayer_id = if let Some(relayer) =
             self.relayer_cache.values().flatten().find(|relayer| &relayer.address == from_address)
         {
@@ -960,7 +841,6 @@ impl AutomaticTopUpTask {
             }
         };
 
-        // Add transaction to the queue instead of sending directly
         let mut transactions_queues = self.transactions_queues.lock().await;
         match transactions_queues.add_transaction(&relayer_id, &transaction_to_send).await {
             Ok(transaction) => {
@@ -986,15 +866,6 @@ impl AutomaticTopUpTask {
     }
 
     /// Gets the ERC-20 token balance for a specific address.
-    ///
-    /// # Arguments
-    /// * `provider` - EVM provider to query the balance
-    /// * `token_address` - The ERC-20 token contract address
-    /// * `wallet_address` - The wallet address to check balance for
-    ///
-    /// # Returns
-    /// * `Ok(U256)` - Token balance if successful
-    /// * `Err(String)` - Error message if query fails
     async fn get_erc20_balance(
         &self,
         provider: &EvmProvider,
@@ -1023,12 +894,6 @@ impl AutomaticTopUpTask {
 ///
 /// This function creates and starts an AutomaticTopUpTask instance that will
 /// continuously monitor and top-up addresses based on the provided configuration.
-///
-/// # Arguments
-/// * `config` - Setup configuration containing network and top-up settings
-/// * `postgres_client` - Database client for querying relayer information
-/// * `providers` - Collection of EVM providers for different blockchain networks
-/// * `transactions_queues` - Reference to the transaction queues for proper nonce management
 ///
 /// # Behavior
 /// The task will run indefinitely, performing these operations on configured intervals:

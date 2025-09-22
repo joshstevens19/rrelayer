@@ -1,11 +1,9 @@
 mod automatic_top_up_task;
-mod user_rate_limit_cleanup_task;
 mod webhook_manager_task;
 
 use crate::{
     background_tasks::{
         automatic_top_up_task::run_automatic_top_up_task,
-        user_rate_limit_cleanup_task::run_user_rate_limit_cleanup_task,
         webhook_manager_task::run_webhook_manager_task,
     },
     gas::{
@@ -14,13 +12,13 @@ use crate::{
     },
     provider::EvmProvider,
     rate_limiting::RateLimiter,
-    rrelayer_info,
     transaction::queue_system::transactions_queues::TransactionsQueues,
     webhooks::WebhookManager,
     PostgresClient, SetupConfig,
 };
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tracing::info;
 
 pub async fn run_background_tasks(
     config: &SetupConfig,
@@ -32,7 +30,7 @@ pub async fn run_background_tasks(
     webhook_manager: Option<Arc<Mutex<WebhookManager>>>,
     transactions_queues: Arc<Mutex<TransactionsQueues>>,
 ) {
-    rrelayer_info!("Starting background tasks");
+    info!("Starting background tasks");
 
     let gas_oracle_task = gas_oracle(Arc::clone(&providers), gas_oracle_cache);
     let blob_gas_oracle_task = blob_gas_oracle(Arc::clone(&providers), blob_gas_oracle_cache);
@@ -43,17 +41,11 @@ pub async fn run_background_tasks(
         transactions_queues,
     );
 
-    // Start webhook manager background tasks if enabled
     if let Some(webhook_manager) = webhook_manager {
         run_webhook_manager_task(webhook_manager, providers.clone()).await;
     }
 
-    // Start rate limiter cleanup task if rate limiter is enabled
-    if let Some(user_rate_limiter) = user_rate_limiter {
-        run_user_rate_limit_cleanup_task(user_rate_limiter).await;
-    }
-
     tokio::join!(gas_oracle_task, blob_gas_oracle_task, top_up_task);
 
-    rrelayer_info!("Background tasks spawned up");
+    info!("Background tasks spawned up");
 }
