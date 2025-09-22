@@ -9,7 +9,7 @@ use crate::transaction::queue_system::types::{
     ProcessInmempoolTransactionError, ProcessMinedTransactionError, ProcessPendingTransactionError,
 };
 use crate::{
-    gas::{blob_gas_oracle::BlobGasOracleCache, gas_oracle::GasOracleCache},
+    gas::{BlobGasOracleCache, GasOracleCache},
     postgres::{PostgresClient, PostgresConnectionError, PostgresError},
     provider::{find_provider_for_chain_id, EvmProvider},
     relayer::{Relayer, RelayerId},

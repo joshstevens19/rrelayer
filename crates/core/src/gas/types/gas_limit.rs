@@ -14,21 +14,10 @@ use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 pub struct GasLimit(u128);
 
 impl GasLimit {
-    /// Creates a new GasLimit instance.
-    ///
-    /// # Arguments
-    /// * `gas_limit` - The gas limit value as u128
-    ///
-    /// # Returns
-    /// * A new `GasLimit` instance
     pub fn new(gas_limit: u128) -> Self {
         GasLimit(gas_limit)
     }
 
-    /// Extracts the inner u128 value from the GasLimit.
-    ///
-    /// # Returns
-    /// * `u128` - The raw gas limit value
     pub fn into_inner(self) -> u128 {
         self.0
     }

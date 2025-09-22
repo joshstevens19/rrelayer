@@ -6,7 +6,7 @@ use super::{
     TransactionStatus, TransactionValue,
 };
 use crate::{
-    gas::types::{GasLimit, GasPrice, MaxFee, MaxPriorityFee},
+    gas::{GasLimit, GasPrice, MaxFee, MaxPriorityFee},
     relayer::Relayer,
     shared::common_types::{BlockHash, BlockNumber, EvmAddress},
 };

@@ -3,7 +3,7 @@ use thiserror::Error;
 
 use crate::shared::{internal_server_error, not_found, HttpError};
 use crate::{
-    gas::types::GasPrice,
+    gas::GasPrice,
     network::ChainId,
     postgres::{PostgresClient, PostgresError},
     provider::EvmProvider,

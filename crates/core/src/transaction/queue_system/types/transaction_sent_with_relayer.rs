@@ -1,10 +1,8 @@
 use core::fmt;
 use std::fmt::{Display, Formatter};
 
-use crate::{
-    gas::fee_estimator::base::GasPriceResult,
-    transaction::types::{TransactionHash, TransactionId},
-};
+use crate::gas::GasPriceResult;
+use crate::transaction::types::{TransactionHash, TransactionId};
 
 #[derive(Debug, Clone)]
 pub struct TransactionSentWithRelayer {

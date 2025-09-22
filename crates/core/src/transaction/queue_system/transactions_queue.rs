@@ -12,10 +12,8 @@ use super::types::{
 use crate::transaction::types::{TransactionNonce, TransactionValue};
 use crate::{
     gas::{
-        blob_gas_oracle::{BlobGasOracleCache, BlobGasPriceResult, BLOB_GAS_PER_BLOB},
-        fee_estimator::base::GasPriceResult,
-        gas_oracle::GasOracleCache,
-        types::{GasLimit, GasPrice},
+        BlobGasOracleCache, BlobGasPriceResult, GasLimit, GasOracleCache, GasPrice, GasPriceResult,
+        BLOB_GAS_PER_BLOB,
     },
     network::ChainId,
     postgres::PostgresClient,

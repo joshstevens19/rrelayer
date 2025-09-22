@@ -1,4 +1,4 @@
-use rrelayer_core::gas::fee_estimator::base::GasEstimatorResult;
+use rrelayer_core::gas::GasEstimatorResult;
 use std::sync::Arc;
 
 use crate::api::{http::HttpClient, types::ApiResult};

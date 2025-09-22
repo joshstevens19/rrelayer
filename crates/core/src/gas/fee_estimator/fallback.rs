@@ -25,26 +25,10 @@ pub struct FallbackGasFeeEstimator {
 }
 
 impl FallbackGasFeeEstimator {
-    /// Creates a new fallback gas fee estimator using the provided RPC provider.
-    ///
-    /// # Arguments
-    /// * `provider` - The RPC provider to use for blockchain queries
-    ///
-    /// # Returns
-    /// * A new `FallbackGasFeeEstimator` instance
     pub fn new(provider: Arc<RelayerProvider>) -> Self {
         FallbackGasFeeEstimator { provider }
     }
 
-    /// Retrieves a block with full transaction details for the specified block number.
-    ///
-    /// # Arguments
-    /// * `block_num` - The block number to retrieve
-    ///
-    /// # Returns
-    /// * `Ok(Some(AnyRpcBlock))` - The block with transactions if found
-    /// * `Ok(None)` - If the block doesn't exist
-    /// * `Err(TransportError)` - If the RPC call fails
     pub async fn get_block_with_txs(
         &self,
         block_num: BlockNumber,
@@ -60,27 +44,12 @@ impl FallbackGasFeeEstimator {
         Ok(block)
     }
 
-    /// Generates a safe block range to prevent underflow when calculating historical blocks.
-    ///
-    /// # Arguments
-    /// * `latest_block` - The latest block number
-    /// * `num_blocks` - The number of blocks to include in the range
-    ///
-    /// # Returns
-    /// * `Vec<u64>` - A vector of block numbers in the safe range
     fn get_safe_block_range(&self, latest_block: u64, num_blocks: u64) -> Vec<u64> {
         let start_block = latest_block.saturating_sub(num_blocks - 1);
         (start_block..=latest_block).collect()
     }
 }
 
-/// Calculates the median value from a slice of prices.
-///
-/// # Arguments
-/// * `prices` - A mutable slice of price values (will be sorted in-place)
-///
-/// # Returns
-/// * `u128` - The median value, or 0 if the slice is empty
 fn calculate_median(prices: &mut [u128]) -> u128 {
     if prices.is_empty() {
         return 0;
@@ -95,14 +64,6 @@ fn calculate_median(prices: &mut [u128]) -> u128 {
     }
 }
 
-/// Calculates a specific percentile from a slice of prices.
-///
-/// # Arguments
-/// * `prices` - A mutable slice of price values (will be sorted in-place)
-/// * `percentile` - The percentile to calculate (0.0 to 1.0)
-///
-/// # Returns
-/// * `u128` - The value at the specified percentile, or 0 if the slice is empty
 fn calculate_percentile(prices: &mut [u128], percentile: f64) -> u128 {
     if prices.is_empty() {
         return 0;
@@ -117,9 +78,8 @@ fn calculate_percentile(prices: &mut [u128], percentile: f64) -> u128 {
 impl BaseGasFeeEstimator for FallbackGasFeeEstimator {
     async fn get_gas_prices(
         &self,
-        chain_id: &ChainId,
+        _chain_id: &ChainId,
     ) -> Result<GasEstimatorResult, GasEstimatorError> {
-        // println!("=== STARTING GAS ESTIMATION for chain {} ===", chain_id.u64());
         let latest_block = self
             .provider
             .get_block_number()
@@ -129,9 +89,8 @@ impl BaseGasFeeEstimator for FallbackGasFeeEstimator {
         // println!("=== GAS ESTIMATION DEBUG ===");
         // println!("Latest block: {}", latest_block);
 
-        // Smart block selection: look for blocks with transactions
         let mut block_numbers = Vec::new();
-        let max_lookback = 50u64; // Don't go back more than 50 blocks
+        let max_lookback = 50u64;
 
         for i in 0..max_lookback {
             let block_num = latest_block.saturating_sub(i);
@@ -139,12 +98,11 @@ impl BaseGasFeeEstimator for FallbackGasFeeEstimator {
                 break;
             }
 
-            // Quick check if this block has transactions by looking at gas used
             if let Ok(Some(block)) = self
                 .provider
                 .get_block(
                     BlockId::Number(BlockNumberOrTag::Number(block_num.into())),
-                    BlockTransactionsKind::Full, // We need Full to get transaction details
+                    BlockTransactionsKind::Full,
                 )
                 .await
             {
@@ -152,7 +110,6 @@ impl BaseGasFeeEstimator for FallbackGasFeeEstimator {
                     block_numbers.push(block_num);
                     // println!("Found block with transactions: {} (gas_used: {})", block_num, block.header.gas_used);
                     if block_numbers.len() >= 10 {
-                        // Collect up to 10 blocks with transactions
                         break;
                     }
                 }
@@ -202,11 +159,9 @@ impl BaseGasFeeEstimator for FallbackGasFeeEstimator {
             // println!("Block gas used: {:?}", block.header.gas_used);
             // println!("Block transactions type: {:?}", std::mem::discriminant(&block.transactions));
 
-            // Let's also manually check what anvil returns for this block
             let block_num = block.header.number;
             // println!("*** MANUAL RPC CHECK for block {} ***", block_num);
 
-            // Make a direct RPC call to double-check
             if let Ok(direct_block) = self
                 .provider
                 .get_block(
@@ -245,7 +200,7 @@ impl BaseGasFeeEstimator for FallbackGasFeeEstimator {
                 .ok_or_else(|| {
                     GasEstimatorError::CustomError("Failed to get transactions".to_string())
                 })?
-                .to_vec(); // Clone the transactions
+                .to_vec();
 
             // println!("Extracted {} transactions from block", txs.len());
 
@@ -273,32 +228,26 @@ impl BaseGasFeeEstimator for FallbackGasFeeEstimator {
             }
         }
 
-        // If we have no transactions at all, return error
         if priority_fees.is_empty() && legacy_gas_prices.is_empty() {
             return Err(GasEstimatorError::CustomError(
                 "No transactions found for gas estimation".to_string(),
             ));
         }
 
-        // Calculate base fees using different approaches based on available data
         let (base_priority_fee, base_max_fee) = if !priority_fees.is_empty() {
             // Use EIP-1559 data
             let median_priority = calculate_median(&mut priority_fees);
             let median_max = calculate_median(&mut max_fees);
             (median_priority, median_max)
         } else {
-            // Fallback to legacy gas prices
             let median_legacy = calculate_median(&mut legacy_gas_prices);
-            // For legacy transactions, estimate priority fee as a portion of total gas price
-            let estimated_priority = median_legacy / 10; // Assume 10% priority fee
+            let estimated_priority = median_legacy / 10;
             (estimated_priority, median_legacy)
         };
 
-        // Ensure minimum values
-        let base_priority_fee = base_priority_fee.max(1_000_000_000); // 1 gwei minimum
-        let base_max_fee = base_max_fee.max(base_priority_fee * 2); // At least 2x priority fee
+        let base_priority_fee = base_priority_fee.max(1_000_000_000);
+        let base_max_fee = base_max_fee.max(base_priority_fee * 2);
 
-        // Create gas estimates with better scaling factors
         let gas_estimate_result = GasEstimatorResult {
             slow: GasPriceResult {
                 max_priority_fee: MaxPriorityFee::new((base_priority_fee * 80) / 100), // -20%

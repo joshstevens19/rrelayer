@@ -2,9 +2,7 @@ use alloy::providers::Provider;
 use clap::{Args, Subcommand};
 use dialoguer::{Confirm, Input};
 use prettytable::{Cell, Row, Table, format};
-use rrelayer_core::{
-    NetworkSetupConfig, create_retry_client, gas::fee_estimator::base::GasPriceResult,
-};
+use rrelayer_core::{NetworkSetupConfig, create_retry_client, gas::GasPriceResult};
 use rrelayer_sdk::SDK;
 
 use crate::project_location::ProjectLocation;

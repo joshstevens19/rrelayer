@@ -7,9 +7,8 @@ use crate::wallet::{
 use crate::yaml::{AwsKmsSigningKey, TurnkeySigningKey};
 use crate::{
     gas::{
-        blob_gas_oracle::{BlobGasEstimatorResult, BlobGasPriceResult},
-        fee_estimator::base::{BaseGasFeeEstimator, GasEstimatorError, GasEstimatorResult},
-        types::GasLimit,
+        BaseGasFeeEstimator, BlobGasEstimatorResult, BlobGasPriceResult, GasEstimatorError,
+        GasEstimatorResult, GasLimit,
     },
     network::ChainId,
     shared::common_types::{EvmAddress, WalletOrProviderError},

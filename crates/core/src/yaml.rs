@@ -8,19 +8,12 @@ use std::{env, fmt, fs::File, io::Read, path::PathBuf};
 use thiserror::Error;
 use tracing::error;
 
-use crate::network::ChainId;
-use crate::{
-    create_retry_client,
-    gas::{
-        fee_estimator::{
-            custom::CustomGasFeeEstimator, infura::InfuraGasProviderSetupConfig,
-            tenderly::TenderlyGasProviderSetupConfig,
-        },
-        types::{deserialize_gas_provider, GasProvider},
-    },
-    rrelayer_error,
-    shared::common_types::EvmAddress,
+use crate::gas::{
+    deserialize_gas_provider, CustomGasFeeEstimator, GasProvider, InfuraGasProviderSetupConfig,
+    TenderlyGasProviderSetupConfig,
 };
+use crate::network::ChainId;
+use crate::{create_retry_client, rrelayer_error, shared::common_types::EvmAddress};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GcpSigningKey {

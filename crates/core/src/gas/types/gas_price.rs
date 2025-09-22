@@ -13,21 +13,10 @@ use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 pub struct GasPrice(u128);
 
 impl GasPrice {
-    /// Creates a new GasPrice instance.
-    ///
-    /// # Arguments
-    /// * `gas_price` - The gas price value in wei
-    ///
-    /// # Returns
-    /// * A new `GasPrice` instance
     pub fn new(gas_price: u128) -> Self {
         GasPrice(gas_price)
     }
 
-    /// Extracts the inner u128 value from the GasPrice.
-    ///
-    /// # Returns
-    /// * `u128` - The raw gas price value in wei
     pub fn into_u128(self) -> u128 {
         self.0
     }

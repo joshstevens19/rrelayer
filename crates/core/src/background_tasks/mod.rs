@@ -1,14 +1,11 @@
 mod automatic_top_up_task;
 mod webhook_manager_task;
 
+use crate::gas::{blob_gas_oracle, gas_oracle, BlobGasOracleCache, GasOracleCache};
 use crate::{
     background_tasks::{
         automatic_top_up_task::run_automatic_top_up_task,
         webhook_manager_task::run_webhook_manager_task,
-    },
-    gas::{
-        blob_gas_oracle::{blob_gas_oracle, BlobGasOracleCache},
-        gas_oracle::{gas_oracle, GasOracleCache},
     },
     provider::EvmProvider,
     rate_limiting::RateLimiter,
@@ -26,7 +23,6 @@ pub async fn run_background_tasks(
     blob_gas_oracle_cache: Arc<Mutex<BlobGasOracleCache>>,
     providers: Arc<Vec<EvmProvider>>,
     postgres_client: Arc<PostgresClient>,
-    user_rate_limiter: Option<Arc<RateLimiter>>,
     webhook_manager: Option<Arc<Mutex<WebhookManager>>>,
     transactions_queues: Arc<Mutex<TransactionsQueues>>,
 ) {

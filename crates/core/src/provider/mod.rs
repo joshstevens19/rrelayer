@@ -2,15 +2,12 @@ use std::path::PathBuf;
 
 use thiserror::Error;
 
-use crate::{
-    gas::fee_estimator::base::get_gas_estimator, network::ChainId, SetupConfig, SigningKey,
-    WalletError,
-};
+use crate::{gas::get_gas_estimator, network::ChainId, SetupConfig, SigningKey, WalletError};
 
 mod evm_provider;
 
 use self::evm_provider::EvmProviderNewError;
-use crate::gas::fee_estimator::base::GasEstimatorError;
+use crate::gas::GasEstimatorError;
 use crate::wallet::get_mnemonic_from_signing_key;
 pub use evm_provider::{
     create_retry_client, EvmProvider, RelayerProvider, RetryClientError, SendTransactionError,

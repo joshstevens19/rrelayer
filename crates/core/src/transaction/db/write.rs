@@ -1,6 +1,6 @@
 use crate::{
     common_types::EvmAddress,
-    gas::{fee_estimator::base::GasPriceResult, types::GasLimit},
+    gas::{GasLimit, GasPriceResult},
     postgres::{PostgresClient, PostgresError},
     relayer::RelayerId,
     shared::{

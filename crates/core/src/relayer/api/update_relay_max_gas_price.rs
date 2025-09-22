@@ -7,7 +7,7 @@ use axum::{
 
 use crate::relayer::get_relayer::relayer_exists;
 use crate::shared::{not_found, HttpError};
-use crate::{app_state::AppState, gas::types::GasPrice, relayer::types::RelayerId};
+use crate::{app_state::AppState, gas::GasPrice, relayer::types::RelayerId};
 
 /// Updates the maximum gas price limit for a relayer.
 pub async fn update_relay_max_gas_price(

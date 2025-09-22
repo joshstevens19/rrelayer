@@ -4,7 +4,7 @@ use axum::{routing::get, Router};
 
 use crate::app_state::AppState;
 
-pub mod get_gas_price;
+mod get_gas_price;
 
 /// Creates and configures the gas-related HTTP routes.
 ///

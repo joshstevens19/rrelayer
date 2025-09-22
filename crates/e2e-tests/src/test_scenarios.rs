@@ -6,7 +6,7 @@ use alloy::rpc::types::TransactionRequest;
 use alloy::signers::local::PrivateKeySigner;
 use anyhow::{anyhow, Context, Result};
 use futures;
-use rrelayer_core::gas::types::GasPrice;
+use rrelayer_core::gas::GasPrice;
 use rrelayer_core::network::ChainId;
 use rrelayer_core::relayer::CreateRelayerResult;
 use rrelayer_core::transaction::api::RelayTransactionStatusResult;

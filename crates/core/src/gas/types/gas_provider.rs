@@ -28,18 +28,6 @@ impl FromStr for GasProvider {
     }
 }
 
-/// Custom deserializer for GasProvider that handles optional string values.
-///
-/// Converts string representations to GasProvider enum variants, supporting
-/// case-insensitive matching.
-///
-/// # Arguments
-/// * `deserializer` - The serde deserializer
-///
-/// # Returns
-/// * `Ok(Some(GasProvider))` - Successfully parsed gas provider
-/// * `Ok(None)` - If the field was not present
-/// * `Err(D::Error)` - If parsing failed
 pub fn deserialize_gas_provider<'de, D>(deserializer: D) -> Result<Option<GasProvider>, D::Error>
 where
     D: Deserializer<'de>,

@@ -36,12 +36,7 @@ use super::{
 use crate::transaction::api::RelayTransactionRequest;
 use crate::transaction::types::TransactionSpeed;
 use crate::{
-    gas::{
-        blob_gas_oracle::{BlobGasOracleCache, BlobGasPriceResult},
-        fee_estimator::base::GasPriceResult,
-        gas_oracle::GasOracleCache,
-        types::GasLimit,
-    },
+    gas::{BlobGasOracleCache, BlobGasPriceResult, GasLimit, GasOracleCache, GasPriceResult},
     postgres::{PostgresClient, PostgresConnectionError, PostgresError},
     relayer::RelayerId,
     safe_proxy::SafeProxyManager,

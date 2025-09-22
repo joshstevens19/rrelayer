@@ -1,5 +1,15 @@
-pub mod base;
-pub mod custom;
-pub mod fallback;
-pub mod infura;
-pub mod tenderly;
+mod base;
+pub use base::{
+    get_gas_estimator, BaseGasFeeEstimator, GasEstimatorError, GasEstimatorResult, GasPriceResult,
+};
+
+mod custom;
+pub use custom::CustomGasFeeEstimator;
+
+mod fallback;
+
+mod infura;
+pub use infura::InfuraGasProviderSetupConfig;
+
+mod tenderly;
+pub use tenderly::TenderlyGasProviderSetupConfig;

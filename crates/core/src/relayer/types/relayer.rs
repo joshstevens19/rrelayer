@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use super::RelayerId;
-use crate::{gas::types::GasPrice, network::ChainId, shared::common_types::EvmAddress};
+use crate::{gas::GasPrice, network::ChainId, shared::common_types::EvmAddress};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Relayer {

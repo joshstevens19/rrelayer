@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use crate::{
-    gas::{blob_gas_oracle::BlobGasOracleCache, gas_oracle::GasOracleCache},
+    gas::{BlobGasOracleCache, GasOracleCache},
     postgres::PostgresClient,
     provider::EvmProvider,
     rate_limiting::RateLimiter,

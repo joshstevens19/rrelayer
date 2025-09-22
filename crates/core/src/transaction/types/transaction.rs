@@ -35,11 +35,7 @@ use super::{
 };
 use crate::common_types::BlockNumber;
 use crate::{
-    gas::{
-        blob_gas_oracle::BlobGasPriceResult,
-        fee_estimator::base::GasPriceResult,
-        types::{GasLimit, MaxFee, MaxPriorityFee},
-    },
+    gas::{BlobGasPriceResult, GasLimit, GasPriceResult, MaxFee, MaxPriorityFee},
     network::ChainId,
     relayer::RelayerId,
     shared::common_types::EvmAddress,

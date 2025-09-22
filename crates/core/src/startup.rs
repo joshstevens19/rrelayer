@@ -2,14 +2,12 @@ use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Instant};
 
 use crate::authentication::{basic_auth_guard, create_basic_auth_routes};
 use crate::background_tasks::run_background_tasks;
+use crate::gas::{create_gas_routes, BlobGasOracleCache, GasOracleCache};
 use crate::network::create_network_routes;
 use crate::webhooks::WebhookManager;
 use crate::yaml::ReadYamlError;
 use crate::{
     app_state::AppState,
-    gas::{
-        api::create_gas_routes, blob_gas_oracle::BlobGasOracleCache, gas_oracle::GasOracleCache,
-    },
     postgres::{PostgresClient, PostgresConnectionError, PostgresError},
     provider::{load_providers, EvmProvider, LoadProvidersError},
     rate_limiting::RateLimiter,
@@ -321,6 +319,17 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
     )
     .await?;
 
+    run_background_tasks(
+        &config,
+        gas_oracle_cache.clone(),
+        blob_gas_oracle_cache.clone(),
+        providers.clone(),
+        postgres_client.clone(),
+        webhook_manager.clone(),
+        transaction_queue.clone(),
+    )
+    .await;
+
     let user_rate_limiter = if let Some(ref rate_limit_config) = config.rate_limits {
         info!("Initializing user rate limiter with configuration");
         let user_rate_limiter = RateLimiter::new(rate_limit_config.clone());
@@ -331,18 +340,6 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
         info!("Rate limiting disabled - no configuration found");
         None
     };
-
-    run_background_tasks(
-        &config,
-        gas_oracle_cache.clone(),
-        blob_gas_oracle_cache.clone(),
-        providers.clone(),
-        postgres_client.clone(),
-        user_rate_limiter.clone(),
-        webhook_manager.clone(),
-        transaction_queue.clone(),
-    )
-    .await;
 
     start_api(
         config.api_config,
