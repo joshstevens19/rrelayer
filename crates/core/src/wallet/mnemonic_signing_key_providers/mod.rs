@@ -8,11 +8,6 @@ mod gcp_secret_manager;
 use gcp_secret_manager::get_gcp_secret;
 
 /// Retrieves a mnemonic phrase from various signing key sources.
-///
-/// This function supports multiple methods for retrieving mnemonic phrases:
-/// - Raw mnemonic directly from configuration
-/// - AWS Secrets Manager
-/// - GCP Secret Manager
 pub async fn get_mnemonic_from_signing_key(
     project_path: &PathBuf,
     signing_key: &SigningKey,

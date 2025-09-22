@@ -142,16 +142,6 @@ pub struct TurnkeyWalletManager {
 }
 
 impl TurnkeyWalletManager {
-    /// Creates a new TurnkeyWalletManager with the provided configuration.
-    ///
-    /// This constructor initializes the Turnkey client with the provided credentials.
-    ///
-    /// # Arguments
-    /// * `config` - The Turnkey signing key configuration
-    ///
-    /// # Returns
-    /// * `Ok(Self)` - A fully initialized TurnkeyWalletManager
-    /// * `Err(WalletError)` - If initialization fails
     pub async fn new(config: TurnkeySigningKey) -> Result<Self, WalletError> {
         let client = reqwest::Client::new();
         let manager = Self {
@@ -166,15 +156,6 @@ impl TurnkeyWalletManager {
         Ok(manager)
     }
 
-    /// Creates an API signature for Turnkey authentication.
-    ///
-    /// # Arguments
-    /// * `body` - The request body to sign
-    /// * `timestamp` - The timestamp for the request
-    ///
-    /// # Returns
-    /// * `Ok(String)` - The base64-encoded signature
-    /// * `Err(WalletError)` - If signing fails
     fn create_signature(&self, body: &str, timestamp: &str) -> Result<String, WalletError> {
         let message = format!("{}{}", body, timestamp);
 
@@ -193,7 +174,6 @@ impl TurnkeyWalletManager {
         Ok(general_purpose::STANDARD.encode(signature))
     }
 
-    /// Gets the current timestamp in milliseconds.
     fn get_timestamp_ms() -> String {
         SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis().to_string()
     }
@@ -206,7 +186,6 @@ impl WalletManagerTrait for TurnkeyWalletManager {
         wallet_index: u32,
         _chain_id: &ChainId,
     ) -> Result<EvmAddress, WalletError> {
-        // Check if we already have this account cached
         {
             let accounts = self.accounts.lock().await;
             if let Some(account) = accounts.get(&wallet_index) {
@@ -216,7 +195,6 @@ impl WalletManagerTrait for TurnkeyWalletManager {
             }
         }
 
-        // Create new wallet account using Turnkey API
         let timestamp = Self::get_timestamp_ms();
         let request = TurnkeyCreateAccountRequest {
             activity_type: "ACTIVITY_TYPE_CREATE_WALLET_ACCOUNTS".to_string(),
@@ -277,7 +255,6 @@ impl WalletManagerTrait for TurnkeyWalletManager {
             WalletError::ApiError { message: format!("Invalid address format: {}", e) }
         })?;
 
-        // Cache the account
         {
             let mut accounts = self.accounts.lock().await;
             accounts.insert(wallet_index, account);
@@ -291,7 +268,6 @@ impl WalletManagerTrait for TurnkeyWalletManager {
         wallet_index: u32,
         chain_id: &ChainId,
     ) -> Result<EvmAddress, WalletError> {
-        // Try to create/get the wallet, which will cache it if needed
         self.create_wallet(wallet_index, chain_id).await
     }
 
@@ -301,7 +277,6 @@ impl WalletManagerTrait for TurnkeyWalletManager {
         transaction: &TypedTransaction,
         _chain_id: &ChainId,
     ) -> Result<PrimitiveSignature, WalletError> {
-        // Get the account for this wallet index
         let accounts = self.accounts.lock().await;
         let account = accounts
             .get(&wallet_index)
@@ -309,7 +284,6 @@ impl WalletManagerTrait for TurnkeyWalletManager {
         let account_id = account.account_id.clone();
         drop(accounts);
 
-        // Serialize the transaction
         let unsigned_transaction = serde_json::to_string(transaction).map_err(|e| {
             WalletError::ApiError { message: format!("Failed to serialize transaction: {}", e) }
         })?;
@@ -365,7 +339,6 @@ impl WalletManagerTrait for TurnkeyWalletManager {
                 WalletError::ApiError { message: "No sign result in response".to_string() },
             )?;
 
-        // Decode the signed transaction to extract the signature
         let signed_tx_hex = sign_result.signed_transaction.trim_start_matches("0x");
         let tx_bytes = hex::decode(signed_tx_hex)?;
         let tx_envelope = TxEnvelope::decode(&mut tx_bytes.as_slice())?;
@@ -389,7 +362,6 @@ impl WalletManagerTrait for TurnkeyWalletManager {
         wallet_index: u32,
         text: &str,
     ) -> Result<PrimitiveSignature, WalletError> {
-        // Get the account for this wallet index
         let accounts = self.accounts.lock().await;
         let account = accounts
             .get(&wallet_index)
@@ -397,7 +369,6 @@ impl WalletManagerTrait for TurnkeyWalletManager {
         let account_id = account.account_id.clone();
         drop(accounts);
 
-        // Create Ethereum signed message hash
         let message = format!("\x19Ethereum Signed Message:\n{}{}", text.len(), text);
         let message_hash = keccak256(message.as_bytes());
 
@@ -460,7 +431,6 @@ impl WalletManagerTrait for TurnkeyWalletManager {
         wallet_index: u32,
         typed_data: &TypedData,
     ) -> Result<PrimitiveSignature, WalletError> {
-        // Get the account for this wallet index
         let accounts = self.accounts.lock().await;
         let account = accounts
             .get(&wallet_index)
@@ -468,7 +438,6 @@ impl WalletManagerTrait for TurnkeyWalletManager {
         let account_id = account.account_id.clone();
         drop(accounts);
 
-        // Create EIP-712 hash
         let encoded_data = typed_data.eip712_signing_hash().map_err(|e| WalletError::ApiError {
             message: format!("Failed to encode typed data: {}", e),
         })?;

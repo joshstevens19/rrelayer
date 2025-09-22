@@ -1,23 +1,28 @@
-mod mnemonic_wallet_manager;
-
 use crate::common_types::EvmAddress;
 use crate::network::ChainId;
 use alloy::consensus::TypedTransaction;
 use alloy::dyn_abi::TypedData;
 use alloy::primitives::PrimitiveSignature;
 use async_trait::async_trait;
-pub use mnemonic_wallet_manager::{generate_seed_phrase, MnemonicWalletManager};
-pub use privy_wallet_manager::PrivyWalletManager;
 use thiserror::Error;
+
+mod mnemonic_wallet_manager;
+pub use mnemonic_wallet_manager::{generate_seed_phrase, MnemonicWalletManager};
 
 mod mnemonic_signing_key_providers;
 pub use mnemonic_signing_key_providers::get_mnemonic_from_signing_key;
+
 mod aws_kms_wallet_manager;
-mod privy_wallet_manager;
-mod turnkey_wallet_manager;
-use crate::shared::{internal_server_error, HttpError};
 pub use aws_kms_wallet_manager::AwsKmsWalletManager;
+
+mod privy_wallet_manager;
+pub use privy_wallet_manager::PrivyWalletManager;
+
+mod turnkey_wallet_manager;
+
 pub use turnkey_wallet_manager::TurnkeyWalletManager;
+
+use crate::shared::{internal_server_error, HttpError};
 
 #[derive(Error, Debug)]
 pub enum WalletError {
@@ -83,20 +88,12 @@ impl From<WalletError> for HttpError {
 }
 
 impl From<alloy::signers::Error> for WalletError {
-    /// Converts an Alloy signer error into a WalletError.
-    ///
-    /// # Arguments
-    /// * `error` - The Alloy signer error to convert
-    ///
-    /// # Returns
-    /// * A WalletError with the GenericSignerError variant containing the formatted error message
     fn from(error: alloy::signers::Error) -> Self {
         WalletError::GenericSignerError(format!("Alloy signer error: {}", error))
     }
 }
 
 impl From<alloy::dyn_abi::Error> for WalletError {
-    /// Converts an Alloy DynABI error into a WalletError.
     fn from(error: alloy::dyn_abi::Error) -> Self {
         WalletError::Eip712Error(format!("EIP712 error: {}", error))
     }
@@ -104,21 +101,18 @@ impl From<alloy::dyn_abi::Error> for WalletError {
 
 #[async_trait]
 pub trait WalletManagerTrait: Send + Sync {
-    /// Create a new wallet at the specified index for the given chain
     async fn create_wallet(
         &self,
         wallet_index: u32,
         chain_id: &ChainId,
     ) -> Result<EvmAddress, WalletError>;
 
-    /// Get the address of an existing wallet
     async fn get_address(
         &self,
         wallet_index: u32,
         chain_id: &ChainId,
     ) -> Result<EvmAddress, WalletError>;
 
-    /// Sign a transaction with the specified wallet
     async fn sign_transaction(
         &self,
         wallet_index: u32,
@@ -126,14 +120,12 @@ pub trait WalletManagerTrait: Send + Sync {
         chain_id: &ChainId,
     ) -> Result<PrimitiveSignature, WalletError>;
 
-    /// Sign text with the specified wallet
     async fn sign_text(
         &self,
         wallet_index: u32,
         text: &str,
     ) -> Result<PrimitiveSignature, WalletError>;
 
-    /// Sign typed data with the specified wallet
     async fn sign_typed_data(
         &self,
         wallet_index: u32,
