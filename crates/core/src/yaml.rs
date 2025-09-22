@@ -382,28 +382,126 @@ impl<'de> Deserialize<'de> for TopUpTargetAddresses {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone)]
 pub struct NativeTokenConfig {
     pub enabled: bool,
-    #[serde(deserialize_with = "deserialize_eth_amount", serialize_with = "serialize_eth_amount")]
     pub min_balance: U256,
-    #[serde(deserialize_with = "deserialize_eth_amount", serialize_with = "serialize_eth_amount")]
     pub top_up_amount: U256,
+    pub decimals: u8,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+impl Serialize for NativeTokenConfig {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("NativeTokenConfig", 4)?;
+        state.serialize_field("enabled", &self.enabled)?;
+        state.serialize_field(
+            "min_balance",
+            &serialize_amount_with_decimals(&self.min_balance, self.decimals),
+        )?;
+        state.serialize_field(
+            "top_up_amount",
+            &serialize_amount_with_decimals(&self.top_up_amount, self.decimals),
+        )?;
+        state.serialize_field("decimals", &self.decimals)?;
+        state.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for NativeTokenConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct NativeTokenConfigHelper {
+            enabled: bool,
+            min_balance: String,
+            top_up_amount: String,
+            #[serde(default = "default_decimals")]
+            decimals: u8,
+        }
+
+        let helper = NativeTokenConfigHelper::deserialize(deserializer)?;
+
+        let min_balance = parse_units(&helper.min_balance, helper.decimals)
+            .unwrap_or(ParseUnits::U256(U256::ZERO))
+            .into();
+        let top_up_amount = parse_units(&helper.top_up_amount, helper.decimals)
+            .unwrap_or(ParseUnits::U256(U256::ZERO))
+            .into();
+
+        Ok(NativeTokenConfig {
+            enabled: helper.enabled,
+            min_balance,
+            top_up_amount,
+            decimals: helper.decimals,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Erc20TokenConfig {
     pub address: EvmAddress,
-    #[serde(
-        deserialize_with = "deserialize_token_amount",
-        serialize_with = "serialize_token_amount"
-    )]
     pub min_balance: U256,
-    #[serde(
-        deserialize_with = "deserialize_token_amount",
-        serialize_with = "serialize_token_amount"
-    )]
     pub top_up_amount: U256,
+    pub decimals: u8,
+}
+
+impl Serialize for Erc20TokenConfig {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("Erc20TokenConfig", 4)?;
+        state.serialize_field("address", &self.address)?;
+        state.serialize_field(
+            "min_balance",
+            &serialize_amount_with_decimals(&self.min_balance, self.decimals),
+        )?;
+        state.serialize_field(
+            "top_up_amount",
+            &serialize_amount_with_decimals(&self.top_up_amount, self.decimals),
+        )?;
+        state.serialize_field("decimals", &self.decimals)?;
+        state.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for Erc20TokenConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct Erc20TokenConfigHelper {
+            address: EvmAddress,
+            min_balance: String,
+            top_up_amount: String,
+            #[serde(default = "default_decimals")]
+            decimals: u8,
+        }
+
+        let helper = Erc20TokenConfigHelper::deserialize(deserializer)?;
+
+        let min_balance = parse_units(&helper.min_balance, helper.decimals)
+            .unwrap_or(ParseUnits::U256(U256::ZERO))
+            .into();
+        let top_up_amount = parse_units(&helper.top_up_amount, helper.decimals)
+            .unwrap_or(ParseUnits::U256(U256::ZERO))
+            .into();
+
+        Ok(Erc20TokenConfig {
+            address: helper.address,
+            min_balance,
+            top_up_amount,
+            decimals: helper.decimals,
+        })
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -418,54 +516,24 @@ pub struct AutomaticTopUpConfig {
     pub erc20_tokens: Option<Vec<Erc20TokenConfig>>,
 }
 
-fn deserialize_eth_amount<'de, D>(deserializer: D) -> Result<U256, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s = String::deserialize(deserializer)?;
-    // TODO: look at decimals
-    let result: U256 = parse_units(&s, 18).unwrap_or(ParseUnits::U256(U256::ZERO)).into();
-    Ok(result)
+/// Default decimals value (18 for ETH-like tokens)
+fn default_decimals() -> u8 {
+    18
 }
 
-fn serialize_eth_amount<S>(amount: &U256, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    let eth_divisor = U256::from(10u64.pow(18));
-    let whole_eth = amount / eth_divisor;
-    let remainder = amount % eth_divisor;
+/// Serialize an amount with custom decimal precision
+fn serialize_amount_with_decimals(amount: &U256, decimals: u8) -> String {
+    let divisor = U256::from(10u64.pow(decimals as u32));
+    let whole_part = amount / divisor;
+    let remainder = amount % divisor;
 
-    let eth_string = if remainder.is_zero() {
-        format!("{}", whole_eth)
+    if remainder.is_zero() {
+        format!("{}", whole_part)
     } else {
-        let decimal_str = format!("{:018}", remainder);
+        let decimal_str = format!("{:0width$}", remainder, width = decimals as usize);
         let decimal_trimmed = decimal_str.trim_end_matches('0');
-        format!("{}.{}", whole_eth, decimal_trimmed)
-    };
-
-    serializer.serialize_str(&eth_string)
-}
-
-// For ERC-20 tokens, we'll use 18 decimals as default but this can be extended
-// to query the token contract for actual decimals in the future
-fn deserialize_token_amount<'de, D>(deserializer: D) -> Result<U256, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s = String::deserialize(deserializer)?;
-    // For now, assume 18 decimals for ERC-20 tokens (same as ETH)
-    // This can be enhanced to support different token decimals
-    // TODO: look at decimals
-    let result: U256 = parse_units(&s, 18).unwrap_or(ParseUnits::U256(U256::ZERO)).into();
-    Ok(result)
-}
-
-fn serialize_token_amount<S>(amount: &U256, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    serialize_eth_amount(amount, serializer)
+        format!("{}.{}", whole_part, decimal_trimmed)
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
