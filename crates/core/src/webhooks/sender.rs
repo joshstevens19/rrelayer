@@ -5,7 +5,7 @@ use crate::transaction::types::TransactionId;
 use crate::{
     postgres::PostgresClient,
     rrelayer_error, rrelayer_info,
-    webhooks::db::write::{
+    webhooks::db::{
         CreateWebhookDeliveryRequest, UpdateWebhookDeliveryRequest, WebhookDeliveryStatus,
     },
 };
@@ -18,14 +18,6 @@ use std::{
 };
 use tracing::{debug, warn};
 
-/// HTTP client for sending webhook requests with retry logic.
-///
-/// Handles the actual HTTP delivery of webhook payloads including:
-/// - Request signing with HMAC-SHA256
-/// - Timeout management
-/// - Retry logic with exponential backoff
-/// - Concurrent delivery processing
-/// - Database logging of delivery attempts and outcomes
 pub struct WebhookSender {
     client: Client,
     config: WebhookDeliveryConfig,
@@ -33,15 +25,6 @@ pub struct WebhookSender {
 }
 
 impl WebhookSender {
-    /// Creates a new webhook sender with the specified configuration.
-    ///
-    /// # Arguments
-    /// * `config` - Delivery configuration including timeouts and retry settings
-    /// * `db` - Database client for logging webhook delivery attempts
-    ///
-    /// # Returns
-    /// * `Ok(WebhookSender)` - Configured webhook sender
-    /// * `Err(reqwest::Error)` - If HTTP client creation fails
     pub fn new(
         config: WebhookDeliveryConfig,
         db: Arc<PostgresClient>,
@@ -54,17 +37,6 @@ impl WebhookSender {
         Ok(Self { client, config, db })
     }
 
-    /// Sends a webhook with automatic retry logic.
-    ///
-    /// Attempts to deliver the webhook and updates the delivery status based on
-    /// the response. On failure, schedules retries with exponential backoff.
-    /// Logs all attempts and outcomes to the database for monitoring and debugging.
-    ///
-    /// # Arguments
-    /// * `delivery` - The webhook delivery to process
-    ///
-    /// # Returns
-    /// * `WebhookDelivery` - Updated delivery with new status and retry information
     pub async fn send_webhook(&self, mut delivery: WebhookDelivery) -> WebhookDelivery {
         rrelayer_info!(
             "Sending webhook {} to {} for event {} (attempt {}/{})",
@@ -75,7 +47,6 @@ impl WebhookSender {
             delivery.max_retries + 1
         );
 
-        // Log initial webhook attempt to database if this is the first attempt
         if delivery.attempts == 0 {
             self.log_initial_webhook_attempt(&delivery).await;
         }
@@ -99,7 +70,6 @@ impl WebhookSender {
                     );
                     delivery.mark_completed();
 
-                    // Log successful delivery to database
                     self.log_webhook_success(&delivery, status_code, &response_text, duration_ms)
                         .await;
                 } else {
@@ -142,7 +112,6 @@ impl WebhookSender {
         delivery
     }
 
-    /// Send a single HTTP request for the webhook
     async fn send_single_request(
         &self,
         delivery: &WebhookDelivery,
@@ -150,6 +119,7 @@ impl WebhookSender {
         let signature =
             self.generate_signature(&delivery.payload, &delivery.webhook_config.shared_secret);
 
+        // TODO: look at why we need these headers at all
         self.client
             .post(&delivery.webhook_config.endpoint)
             .header("Content-Type", "application/json")
@@ -174,7 +144,6 @@ impl WebhookSender {
             .await
     }
 
-    /// Handle a failed webhook attempt
     async fn handle_failed_attempt(
         &self,
         delivery: &mut WebhookDelivery,
@@ -225,7 +194,6 @@ impl WebhookSender {
                 error
             );
 
-            // Log failed attempt to database (not permanent failure yet)
             self.log_webhook_failure(
                 delivery,
                 &error,
@@ -238,7 +206,6 @@ impl WebhookSender {
         }
     }
 
-    /// Calculate exponential backoff delay for retries
     fn calculate_retry_delay(&self, attempt: u32) -> u64 {
         let delay = (self.config.initial_retry_delay_ms as f32)
             * self.config.retry_multiplier.powi(attempt as i32);
@@ -246,7 +213,6 @@ impl WebhookSender {
         (delay as u64).min(self.config.max_retry_delay_ms)
     }
 
-    /// Generate HMAC signature for webhook verification
     fn generate_signature(&self, payload: &Value, secret: &str) -> String {
         use hmac::{Hmac, Mac};
         use sha2::Sha256;
@@ -262,7 +228,6 @@ impl WebhookSender {
         format!("sha256={}", hex::encode(result.into_bytes()))
     }
 
-    /// Process multiple webhook deliveries concurrently
     pub async fn send_multiple_webhooks(
         &self,
         deliveries: Vec<WebhookDelivery>,
@@ -295,9 +260,7 @@ impl WebhookSender {
         results
     }
 
-    /// Log initial webhook attempt to database
     async fn log_initial_webhook_attempt(&self, delivery: &WebhookDelivery) {
-        // Extract transaction ID and relayer ID from payload if available
         let (transaction_id, relayer_id, chain_id) = self.extract_delivery_identifiers(delivery);
 
         let request = CreateWebhookDeliveryRequest {
@@ -324,7 +287,6 @@ impl WebhookSender {
         }
     }
 
-    /// Log successful webhook delivery to database
     async fn log_webhook_success(
         &self,
         delivery: &WebhookDelivery,
@@ -350,7 +312,6 @@ impl WebhookSender {
         }
     }
 
-    /// Log failed webhook delivery to database
     async fn log_webhook_failure(
         &self,
         delivery: &WebhookDelivery,
@@ -384,7 +345,6 @@ impl WebhookSender {
         }
     }
 
-    /// Extract transaction ID, relayer ID, and chain ID from delivery payload
     fn extract_delivery_identifiers(
         &self,
         delivery: &WebhookDelivery,

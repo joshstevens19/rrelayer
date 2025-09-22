@@ -7,7 +7,6 @@ use crate::{
     yaml::WebhookConfig,
 };
 
-/// Webhook event types that trigger webhook calls
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum WebhookEventType {
@@ -46,7 +45,6 @@ impl From<TransactionStatus> for WebhookEventType {
     }
 }
 
-/// Configuration for webhook delivery with defaults
 #[derive(Debug, Clone)]
 pub struct WebhookDeliveryConfig {
     /// Maximum number of retry attempts
@@ -66,14 +64,13 @@ impl Default for WebhookDeliveryConfig {
         Self {
             max_retries: 3,
             timeout_seconds: 30,
-            initial_retry_delay_ms: 1000, // 1 second
-            max_retry_delay_ms: 60000,    // 1 minute
+            initial_retry_delay_ms: 1000,
+            max_retry_delay_ms: 120000,
             retry_multiplier: 2.0,
         }
     }
 }
 
-/// Webhook delivery attempt tracking
 #[derive(Debug, Clone)]
 pub struct WebhookDelivery {
     pub id: Uuid,
@@ -123,7 +120,7 @@ impl WebhookDelivery {
 
         match self.next_retry_at {
             Some(retry_time) => now >= retry_time,
-            None => true, // First attempt
+            None => true,
         }
     }
 
@@ -148,17 +145,14 @@ impl WebhookDelivery {
     }
 }
 
-/// Filter for determining which webhooks should receive which events
 pub struct WebhookFilter;
 
 impl WebhookFilter {
-    /// Check if a webhook should receive an event for a specific transaction
     pub fn should_send_webhook(
         webhook_config: &WebhookConfig,
         _transaction: &Transaction,
         chain_name: &str,
     ) -> bool {
-        // Check if the webhook is configured for this network
         webhook_config.networks.is_empty()
             || webhook_config.networks.contains(&chain_name.to_string())
             || webhook_config.networks.contains(&"*".to_string())

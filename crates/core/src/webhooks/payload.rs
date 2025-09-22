@@ -31,7 +31,6 @@ pub struct WebhookPayload {
     pub receipt: Option<AnyTransactionReceipt>,
 }
 
-/// Transaction data optimized for webhook payloads
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebhookTransactionData {
     /// Transaction ID
@@ -89,7 +88,6 @@ impl From<&Transaction> for WebhookTransactionData {
     }
 }
 
-/// Signing-specific payload for text and typed data signing events
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebhookSigningPayload {
     /// Event type that triggered the webhook
@@ -102,7 +100,6 @@ pub struct WebhookSigningPayload {
     pub api_version: String,
 }
 
-/// Signing data optimized for webhook payloads
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebhookSigningData {
     /// Relayer ID that performed the signing
@@ -131,7 +128,6 @@ pub struct WebhookSigningData {
 }
 
 impl WebhookSigningPayload {
-    /// Create a new webhook signing payload for text signing
     pub fn text_signed(
         relayer_id: RelayerId,
         chain_id: ChainId,
@@ -155,7 +151,6 @@ impl WebhookSigningPayload {
         }
     }
 
-    /// Create a new webhook signing payload for typed data signing
     pub fn typed_data_signed(
         relayer_id: RelayerId,
         chain_id: ChainId,
@@ -181,14 +176,12 @@ impl WebhookSigningPayload {
         }
     }
 
-    /// Convert the payload to JSON value
     pub fn to_json_value(&self) -> Result<serde_json::Value, serde_json::Error> {
         serde_json::to_value(self)
     }
 }
 
 impl WebhookPayload {
-    /// Create a new webhook payload from transaction and event type
     pub fn new(transaction: &Transaction, event_type: WebhookEventType) -> Self {
         Self {
             event_type,
@@ -200,7 +193,6 @@ impl WebhookPayload {
         }
     }
 
-    /// Create a new webhook payload for replacement events with original transaction
     pub fn new_with_original(
         transaction: &Transaction,
         event_type: WebhookEventType,
@@ -216,7 +208,6 @@ impl WebhookPayload {
         }
     }
 
-    /// Create a new webhook payload with transaction receipt
     pub fn new_with_receipt(
         transaction: &Transaction,
         event_type: WebhookEventType,
@@ -232,22 +223,18 @@ impl WebhookPayload {
         }
     }
 
-    /// Create payload for transaction queued event
     pub fn transaction_queued(transaction: &Transaction) -> Self {
         Self::new(transaction, WebhookEventType::TransactionQueued)
     }
 
-    /// Create payload for transaction sent event
     pub fn transaction_sent(transaction: &Transaction) -> Self {
         Self::new(transaction, WebhookEventType::TransactionSent)
     }
 
-    /// Create payload for transaction mined event
     pub fn transaction_mined(transaction: &Transaction) -> Self {
         Self::new(transaction, WebhookEventType::TransactionMined)
     }
 
-    /// Create payload for transaction mined event with receipt
     pub fn transaction_mined_with_receipt(
         transaction: &Transaction,
         receipt: &AnyTransactionReceipt,
@@ -255,12 +242,10 @@ impl WebhookPayload {
         Self::new_with_receipt(transaction, WebhookEventType::TransactionMined, receipt)
     }
 
-    /// Create payload for transaction confirmed event
     pub fn transaction_confirmed(transaction: &Transaction) -> Self {
         Self::new(transaction, WebhookEventType::TransactionConfirmed)
     }
 
-    /// Create payload for transaction confirmed event with receipt
     pub fn transaction_confirmed_with_receipt(
         transaction: &Transaction,
         receipt: &AnyTransactionReceipt,
@@ -268,22 +253,18 @@ impl WebhookPayload {
         Self::new_with_receipt(transaction, WebhookEventType::TransactionConfirmed, receipt)
     }
 
-    /// Create payload for transaction failed event
     pub fn transaction_failed(transaction: &Transaction) -> Self {
         Self::new(transaction, WebhookEventType::TransactionFailed)
     }
 
-    /// Create payload for transaction expired event
     pub fn transaction_expired(transaction: &Transaction) -> Self {
         Self::new(transaction, WebhookEventType::TransactionExpired)
     }
 
-    /// Create payload for transaction cancelled event
     pub fn transaction_cancelled(transaction: &Transaction) -> Self {
         Self::new(transaction, WebhookEventType::TransactionCancelled)
     }
 
-    /// Create payload for transaction replaced event
     pub fn transaction_replaced(
         new_transaction: &Transaction,
         original_transaction: &Transaction,
@@ -295,7 +276,6 @@ impl WebhookPayload {
         )
     }
 
-    /// Convert the payload to JSON value
     pub fn to_json_value(&self) -> Result<serde_json::Value, serde_json::Error> {
         serde_json::to_value(self)
     }

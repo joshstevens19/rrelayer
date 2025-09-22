@@ -18,7 +18,6 @@ use crate::{
     webhooks::types::WebhookEventType,
 };
 
-/// Status of a webhook delivery attempt
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum WebhookDeliveryStatus {
@@ -259,7 +258,6 @@ impl ToSql for WebhookDeliveryEventType {
     tokio_postgres::types::to_sql_checked!();
 }
 
-/// Request to create a new webhook delivery history record
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateWebhookDeliveryRequest {
     pub id: Uuid,
@@ -276,7 +274,6 @@ pub struct CreateWebhookDeliveryRequest {
     pub first_attempt_at: DateTime<Utc>,
 }
 
-/// Request to update a webhook delivery attempt
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateWebhookDeliveryRequest {
     pub id: Uuid,
@@ -292,14 +289,6 @@ pub struct UpdateWebhookDeliveryRequest {
 }
 
 impl PostgresClient {
-    /// Creates a new webhook delivery history record.
-    ///
-    /// # Arguments
-    /// * `request` - The webhook delivery record to create
-    ///
-    /// # Returns
-    /// * `Ok(())` - If the record was created successfully
-    /// * `Err(PostgresError)` - If the database operation fails
     pub async fn create_webhook_delivery(
         &self,
         request: &CreateWebhookDeliveryRequest,
@@ -338,14 +327,6 @@ impl PostgresClient {
         Ok(())
     }
 
-    /// Updates a webhook delivery attempt.
-    ///
-    /// # Arguments
-    /// * `request` - The webhook delivery update information
-    ///
-    /// # Returns
-    /// * `Ok(())` - If the record was updated successfully
-    /// * `Err(PostgresError)` - If the database operation fails
     pub async fn update_webhook_delivery(
         &self,
         request: &UpdateWebhookDeliveryRequest,
@@ -387,11 +368,6 @@ impl PostgresClient {
         Ok(())
     }
 
-    /// Cleans up old webhook delivery records (older than 30 days).
-    ///
-    /// # Returns
-    /// * `Ok(u64)` - Number of records deleted
-    /// * `Err(PostgresError)` - If the database operation fails
     pub async fn cleanup_old_webhook_deliveries(&self) -> Result<u64, PostgresError> {
         let query = "SELECT cleanup_old_webhook_deliveries();";
         let conn = self.pool.get().await?;

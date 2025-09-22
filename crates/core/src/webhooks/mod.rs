@@ -1,7 +1,8 @@
-pub mod db;
-pub mod manager;
-pub mod payload;
-pub mod sender;
-pub mod types;
+mod db;
 
+mod manager;
 pub use manager::WebhookManager;
+
+mod payload;
+mod sender;
+mod types;
