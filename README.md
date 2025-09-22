@@ -1,7 +1,6 @@
 # rrelayer
 
 ## The last core feature to see how much scope gets added:
-- turnkey signer
 - cron job to hit a contract call with parameters every n minutes
 - send tx on event firing using rindexer
 
