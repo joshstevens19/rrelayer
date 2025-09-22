@@ -26,6 +26,7 @@ use crate::{
         nonce_manager::NonceManager,
         types::{Transaction, TransactionHash, TransactionId, TransactionSpeed, TransactionStatus},
     },
+    WalletError,
 };
 use alloy::network::{AnyTransactionReceipt, ReceiptResponse};
 use alloy::{
@@ -54,7 +55,6 @@ pub struct TransactionsQueue {
 }
 
 impl TransactionsQueue {
-    /// Creates a new TransactionsQueue for a specific relayer.
     pub fn new(
         setup: TransactionsQueueSetup,
         gas_oracle_cache: Arc<Mutex<GasOracleCache>>,
@@ -79,7 +79,6 @@ impl TransactionsQueue {
         }
     }
 
-    /// Returns the number of blocks to wait before bumping gas price based on transaction speed.
     fn blocks_to_wait_before_bump(&self, speed: &TransactionSpeed) -> u64 {
         match speed {
             TransactionSpeed::Slow => 10,
@@ -89,7 +88,6 @@ impl TransactionsQueue {
         }
     }
 
-    /// Determines if gas price should be bumped based on elapsed time and transaction speed.
     pub fn should_bump_gas(&self, ms_between_times: u64, speed: &TransactionSpeed) -> bool {
         let should_bump = ms_between_times
             > (self.evm_provider.blocks_every * self.blocks_to_wait_before_bump(speed));
@@ -105,7 +103,6 @@ impl TransactionsQueue {
         should_bump
     }
 
-    /// Adds a new transaction to the pending queue.
     pub async fn add_pending_transaction(&mut self, transaction: Transaction) {
         info!(
             "Adding pending transaction {} to queue for relayer: {}",
@@ -120,14 +117,12 @@ impl TransactionsQueue {
         );
     }
 
-    /// Gets the next pending transaction without removing it from the queue.
     pub async fn get_next_pending_transaction(&self) -> Option<Transaction> {
         let transactions = self.pending_transactions.lock().await;
 
         transactions.front().cloned()
     }
 
-    /// Returns the number of transactions in the pending queue.
     pub async fn get_pending_transaction_count(&self) -> usize {
         let transactions = self.pending_transactions.lock().await;
         let count = transactions.len();
@@ -135,7 +130,6 @@ impl TransactionsQueue {
         count
     }
 
-    /// Searches for a transaction by ID across pending and inmempool queues.
     pub async fn get_editable_transaction_by_id(
         &self,
         id: &TransactionId,
@@ -176,7 +170,6 @@ impl TransactionsQueue {
         }
     }
 
-    /// Moves a transaction from pending to inmempool queue after a successful transaction submission.
     pub async fn move_pending_to_inmempool(
         &mut self,
         transaction_sent: &TransactionSentWithRelayer,
@@ -227,7 +220,6 @@ impl TransactionsQueue {
         }
     }
 
-    /// Removes the next pending transaction from the queue, marking it as failed.
     pub async fn move_next_pending_to_failed(&mut self) {
         let mut transactions = self.pending_transactions.lock().await;
         if let Some(tx) = transactions.front() {
@@ -244,14 +236,12 @@ impl TransactionsQueue {
         );
     }
 
-    /// Gets the next transaction from the inmempool queue without removing it.
     pub async fn get_next_inmempool_transaction(&self) -> Option<Transaction> {
         let transactions = self.inmempool_transactions.lock().await;
 
         transactions.front().cloned()
     }
 
-    /// Returns the number of transactions currently in the inmempool queue.
     pub async fn get_inmempool_transaction_count(&self) -> usize {
         let transactions = self.inmempool_transactions.lock().await;
         let count = transactions.len();
@@ -259,7 +249,6 @@ impl TransactionsQueue {
         count
     }
 
-    /// Updates the first inmempool transaction with new gas values after a gas bump.
     pub async fn update_inmempool_transaction_gas(
         &mut self,
         transaction_sent: &TransactionSentWithRelayer,
@@ -282,7 +271,6 @@ impl TransactionsQueue {
         }
     }
 
-    /// Updates the inmempool transaction with no-op details after cancellation.
     pub async fn update_inmempool_transaction_noop(
         &mut self,
         transaction_id: &TransactionId,
@@ -306,7 +294,6 @@ impl TransactionsQueue {
         }
     }
 
-    /// Updates the inmempool transaction with a new transaction
     pub async fn update_inmempool_transaction_replaced(
         &mut self,
         transaction_id: &TransactionId,
@@ -348,18 +335,6 @@ impl TransactionsQueue {
         }
     }
 
-    /// Moves a transaction from inmempool to mined queue after receiving a block receipt.
-    ///
-    /// Analyzes the transaction receipt to determine final status (Mined, Failed, or Expired)
-    /// and updates the transaction accordingly. The transaction then awaits final confirmation.
-    ///
-    /// # Arguments
-    /// * `id` - The transaction ID to move
-    /// * `receipt` - The blockchain receipt containing execution results
-    ///
-    /// # Returns
-    /// * `Ok(TransactionStatus)` - The final transaction status (Mined/Failed/Expired)
-    /// * `Err(MoveInmempoolTransactionToMinedError)` - If transaction not found or ID mismatch
     pub async fn move_inmempool_to_mining(
         &mut self,
         id: &TransactionId,
@@ -423,11 +398,6 @@ impl TransactionsQueue {
         }
     }
 
-    /// Gets the next mined transaction awaiting confirmation.
-    ///
-    /// # Returns
-    /// * `Some(Transaction)` - A mined transaction if any exist
-    /// * `None` - If no mined transactions are awaiting confirmation
     pub async fn get_next_mined_transaction(&self) -> Option<Transaction> {
         let transactions = self.mined_transactions.lock().await;
 
@@ -438,13 +408,6 @@ impl TransactionsQueue {
         None
     }
 
-    /// Moves a transaction from mined to confirmed state.
-    ///
-    /// Removes the transaction from the mined queue as it has reached
-    /// the required number of confirmations.
-    ///
-    /// # Arguments
-    /// * `id` - The transaction ID to confirm
     pub async fn move_mining_to_confirmed(&mut self, id: &TransactionId) {
         info!(
             "Moving transaction {} from mined to confirmed for relayer: {}",
@@ -460,37 +423,18 @@ impl TransactionsQueue {
         );
     }
 
-    /// Returns the relayer's wallet address.
-    ///
-    /// # Returns
-    /// * `EvmAddress` - The relayer's wallet address
     pub fn relay_address(&self) -> EvmAddress {
         self.relayer.address
     }
 
-    /// Returns the relayer's ID.
-    ///
-    /// # Returns
-    /// * `RelayerId` - The relayer id
     pub fn relay_id(&self) -> RelayerId {
         self.relayer.id
     }
 
-    /// Checks if the relayer uses legacy transaction types.
-    ///
-    /// # Returns
-    /// * `bool` - True if using legacy transactions (pre-EIP-1559)
     pub fn is_legacy_transactions(&self) -> bool {
         !self.relayer.eip_1559_enabled
     }
 
-    /// Sets whether this relayer should use legacy transaction format.
-    ///
-    /// Legacy transactions use the pre-EIP-1559 format with only gas price,
-    /// while modern transactions use max fee and priority fee structures.
-    ///
-    /// # Arguments
-    /// * `is_legacy_transactions` - True to use legacy format, false for EIP-1559
     pub fn set_is_legacy_transactions(&mut self, is_legacy_transactions: bool) {
         info!(
             "Setting legacy transactions to {} for relayer: {}",
@@ -499,20 +443,10 @@ impl TransactionsQueue {
         self.relayer.eip_1559_enabled = is_legacy_transactions;
     }
 
-    /// Checks if this relayer only accepts transactions from allowlisted addresses.
-    ///
-    /// # Returns
-    /// * `bool` - True if only allowlisted addresses can use this relayer
     pub fn is_allowlisted_only(&self) -> bool {
         self.relayer.allowlisted_only
     }
 
-    /// Sets whether this relayer should only accept allowlisted transactions.
-    ///
-    /// When enabled, only transactions from pre-approved addresses will be processed.
-    ///
-    /// # Arguments
-    /// * `is_allowlisted_only` - True to restrict to allowlisted addresses only
     pub fn set_is_allowlisted_only(&mut self, is_allowlisted_only: bool) {
         info!(
             "Setting allowlisted only to {} for relayer: {}",
@@ -521,77 +455,33 @@ impl TransactionsQueue {
         self.relayer.allowlisted_only = is_allowlisted_only;
     }
 
-    /// Checks if this relayer is currently paused.
-    ///
-    /// Paused relayers will not process new transactions until unpaused.
-    ///
-    /// # Returns
-    /// * `bool` - True if the relayer is paused
     pub fn is_paused(&self) -> bool {
         self.relayer.paused
     }
 
-    /// Sets the paused state of this relayer.
-    ///
-    /// Paused relayers stop processing new transactions but maintain their queues.
-    ///
-    /// # Arguments
-    /// * `is_paused` - True to pause the relayer, false to resume
     pub fn set_is_paused(&mut self, is_paused: bool) {
         info!("Setting paused to {} for relayer: {}", is_paused, self.relayer.name);
         self.relayer.paused = is_paused;
     }
 
-    /// Updates the display name of this relayer.
-    ///
-    /// # Arguments
-    /// * `name` - The new name for the relayer
     pub fn set_name(&mut self, name: &str) {
         info!("Changing relayer name from {} to {}", self.relayer.name, name);
         self.relayer.name = name.to_string();
     }
 
-    /// Returns the maximum gas price this relayer will pay for transactions.
-    ///
-    /// Transactions requiring higher gas prices will be rejected to prevent
-    /// excessive costs during network congestion.
-    ///
-    /// # Returns
-    /// * `Some(GasPrice)` - The maximum gas price limit if set
-    /// * `None` - If no limit is configured (unlimited)
     pub fn max_gas_price(&self) -> Option<GasPrice> {
         self.relayer.max_gas_price
     }
 
-    /// Sets the maximum gas price this relayer will pay for transactions.
-    ///
-    /// This provides cost control by rejecting transactions that would be too expensive.
-    ///
-    /// # Arguments
-    /// * `max_gas_price` - The new maximum gas price, or None for no limit
     pub fn set_max_gas_price(&mut self, max_gas_price: Option<GasPrice>) {
         info!("Setting max gas price to {:?} for relayer: {}", max_gas_price, self.relayer.name);
         self.relayer.max_gas_price = max_gas_price;
     }
 
-    /// Returns the blockchain network chain ID for this relayer.
-    ///
-    /// # Returns
-    /// * `ChainId` - The chain ID of the blockchain network
     pub fn chain_id(&self) -> ChainId {
         self.relayer.chain_id
     }
 
-    /// Checks if the proposed gas price is within configured bounds.
-    ///
-    /// Compares the gas price against the relayer's maximum limit to prevent
-    /// overpaying during network congestion.
-    ///
-    /// # Arguments
-    /// * `gas` - The gas price result to validate
-    ///
-    /// # Returns
-    /// * `bool` - True if within bounds or no limit set, false if exceeds maximum
     fn within_gas_price_bounds(&self, gas: &GasPriceResult) -> bool {
         if let Some(max) = &self.max_gas_price() {
             let within_bounds = if self.relayer.eip_1559_enabled {
@@ -619,26 +509,10 @@ impl TransactionsQueue {
         true
     }
 
-    /// Returns the average block time in milliseconds for this blockchain.
-    ///
-    /// Used for timing calculations like confirmation waits and gas price bumping.
-    ///
-    /// # Returns
-    /// * `u64` - Block time in milliseconds (already stored in ms)
     pub fn blocks_every_ms(&self) -> u64 {
         self.evm_provider.blocks_every
     }
 
-    /// Checks if enough time has passed for a transaction to be considered confirmed.
-    ///
-    /// Uses the blockchain's block time and required confirmation count to determine
-    /// if sufficient time has elapsed for confidence in transaction finality.
-    ///
-    /// # Arguments
-    /// * `elapsed` - Time since the transaction was mined in milliseconds
-    ///
-    /// # Returns
-    /// * `bool` - True if enough time has passed for confirmation
     pub fn in_confirmed_range(&self, elapsed: u64) -> bool {
         let threshold = self.blocks_every_ms() * self.confirmations;
         let in_range = elapsed > threshold;
@@ -651,19 +525,6 @@ impl TransactionsQueue {
         in_range
     }
 
-    /// Computes the appropriate gas price for a transaction based on speed tier.
-    ///
-    /// Queries the gas oracle for current network conditions and applies speed-based
-    /// multipliers. If the transaction was previously sent, bumps the gas price by 10%
-    /// to improve confirmation chances.
-    ///
-    /// # Arguments
-    /// * `transaction_speed` - The desired transaction speed tier (Slow/Medium/Fast/Super)
-    /// * `sent_last_with` - Previous gas price if this is a retry attempt
-    ///
-    /// # Returns
-    /// * `Ok(GasPriceResult)` - The computed gas prices (max fee and priority fee)
-    /// * `Err(SendTransactionGasPriceError)` - If gas price calculation fails
     pub async fn compute_gas_price_for_transaction(
         &self,
         transaction_speed: &TransactionSpeed,
@@ -718,18 +579,6 @@ impl TransactionsQueue {
         Ok(gas_price)
     }
 
-    /// Computes the appropriate blob gas price for EIP-4844 blob transactions.
-    ///
-    /// Queries the blob gas oracle for current blob space pricing and applies
-    /// speed-based adjustments. Bumps price by 10% on retry attempts.
-    ///
-    /// # Arguments
-    /// * `transaction_speed` - The desired transaction speed tier
-    /// * `sent_last_with` - Previous blob gas price if this is a retry
-    ///
-    /// # Returns
-    /// * `Ok(BlobGasPriceResult)` - The computed blob gas price and total fee
-    /// * `Err(SendTransactionGasPriceError)` - If blob gas price calculation fails
     pub async fn compute_blob_gas_price_for_transaction(
         &self,
         transaction_speed: &TransactionSpeed,
@@ -775,28 +624,14 @@ impl TransactionsQueue {
         Ok(blob_gas_price)
     }
 
-    /// Computes the transaction hash by signing the transaction.
-    ///
-    /// Creates a signature for the transaction using the relayer's wallet
-    /// and derives the final transaction hash that will appear on-chain.
-    ///
-    /// # Arguments
-    /// * `transaction` - The transaction to compute hash for
-    ///
-    /// # Returns
-    /// * `Ok(TransactionHash)` - The computed transaction hash
-    /// * `Err(LocalSignerError)` - If signing fails
     pub async fn compute_tx_hash(
         &self,
         transaction: &TypedTransaction,
-    ) -> Result<TransactionHash, LocalSignerError> {
+    ) -> Result<TransactionHash, WalletError> {
         info!("Computing transaction hash for relayer: {}", self.relayer.name);
 
-        let signature = self
-            .evm_provider
-            .sign_transaction(&self.relayer.wallet_index, transaction)
-            .await
-            .unwrap(); // TODO: fix error
+        let signature =
+            self.evm_provider.sign_transaction(&self.relayer.wallet_index, transaction).await?;
 
         let hash = match transaction {
             TypedTransaction::Legacy(tx) => {
@@ -826,18 +661,6 @@ impl TransactionsQueue {
         Ok(tx_hash)
     }
 
-    /// Estimates the gas limit required for a transaction.
-    ///
-    /// Calls the network to estimate gas usage and applies a 20% buffer
-    /// for non-noop transactions to account for state changes during execution.
-    ///
-    /// # Arguments
-    /// * `transaction_request` - The transaction to estimate gas for
-    /// * `is_noop` - True if this is a no-op transaction (no buffer applied)
-    ///
-    /// # Returns
-    /// * `Ok(GasLimit)` - The estimated gas limit
-    /// * `Err(RpcError)` - If estimation fails
     pub async fn estimate_gas(
         &self,
         transaction_request: &TypedTransaction,
@@ -876,18 +699,6 @@ impl TransactionsQueue {
         Ok(estimated_gas_result)
     }
 
-    /// Sends a transaction to the blockchain network.
-    ///
-    /// Performs gas estimation, nonce management, transaction signing, and network submission.
-    /// Updates the database with transaction details upon successful submission.
-    ///
-    /// # Arguments
-    /// * `db` - Database client for persisting transaction state
-    /// * `transaction` - The transaction to send (will be mutated with gas estimates)
-    ///
-    /// # Returns
-    /// * `Ok(TransactionSentWithRelayer)` - Transaction details if successfully sent
-    /// * `Err(TransactionQueueSendTransactionError)` - If sending fails
     pub async fn send_transaction(
         &mut self,
         db: &mut PostgresClient,
@@ -905,8 +716,7 @@ impl TransactionsQueue {
                 &transaction.speed,
                 transaction.sent_with_gas.as_ref(),
             )
-            .await
-            .map_err(TransactionQueueSendTransactionError::SendTransactionGasPriceError)?;
+            .await?;
 
         if !self.within_gas_price_bounds(&gas_price) {
             info!(
@@ -916,7 +726,6 @@ impl TransactionsQueue {
             return Err(TransactionQueueSendTransactionError::GasPriceTooHigh);
         }
 
-        // Check if this relayer should use safe proxy
         let (final_to, final_data) = if let Some(ref safe_proxy_manager) = self.safe_proxy_manager {
             if let Some(safe_address) =
                 safe_proxy_manager.get_safe_proxy_for_relayer(&self.relayer.address)
@@ -926,6 +735,7 @@ impl TransactionsQueue {
                     transaction.id, safe_address, self.relayer.name
                 );
 
+                // TODO: safe_nonce!!!!
                 // Get the safe's current nonce (this would need to be implemented)
                 // For now, using a placeholder - this should get the actual safe nonce
                 let safe_nonce = alloy::primitives::U256::ZERO;
@@ -944,7 +754,6 @@ impl TransactionsQueue {
                         )
                     })?;
 
-                // Get the safe transaction hash that needs to be signed
                 let safe_tx_hash = safe_proxy_manager
                     .get_safe_transaction_hash(
                         &safe_addr,
@@ -957,10 +766,8 @@ impl TransactionsQueue {
                         )
                     })?;
 
-                // Convert hash to hex string for signing
                 let hash_hex = format!("0x{}", hex::encode(safe_tx_hash));
 
-                // Sign the safe transaction hash with the relayer's wallet
                 let signature =
                     self.evm_provider
                         .sign_text(&self.relayer.wallet_index, &hash_hex)
@@ -989,18 +796,14 @@ impl TransactionsQueue {
                         )
                     })?;
 
-                // Update transaction to point to safe with encoded data
                 (safe_addr, TransactionData::new(safe_call_data))
             } else {
-                // No safe proxy for this relayer, use original transaction
                 (transaction.to, transaction.data.clone())
             }
         } else {
-            // No safe proxy configuration, use original transaction
             (transaction.to, transaction.data.clone())
         };
 
-        // Create a modified transaction for safe proxy if needed
         let mut working_transaction = transaction.clone();
         working_transaction.to = final_to;
         working_transaction.data = final_data;
@@ -1018,8 +821,8 @@ impl TransactionsQueue {
             working_transaction.value = TransactionValue::zero();
         }
 
-        // First, estimate gas limit by creating a temporary transaction with a high gas limit
-        let temp_gas_limit = GasLimit::new(10_000_000); // High temporary limit for estimation
+        // Estimate gas limit by creating a temporary transaction with a high gas limit to avoid failing the estimate
+        let temp_gas_limit = GasLimit::new(10_000_000);
 
         let temp_transaction_request = if working_transaction.is_blob_transaction() {
             info!(
@@ -1072,7 +875,6 @@ impl TransactionsQueue {
                 .map_err(TransactionQueueSendTransactionError::TransactionEstimateGasError)?
         };
 
-        // Add extra gas buffer for Safe proxy transactions due to execTransaction overhead
         if self.safe_proxy_manager.is_some()
             && self
                 .safe_proxy_manager
@@ -1108,7 +910,6 @@ impl TransactionsQueue {
         working_transaction.gas_limit = Some(estimated_gas_limit);
         transaction.gas_limit = Some(estimated_gas_limit);
 
-        // Now create the final transaction with the estimated gas limit
         let transaction_request: TypedTransaction = if working_transaction.is_blob_transaction() {
             info!("Creating final blob transaction for relayer: {}", self.relayer.name);
             let blob_gas_price = self
@@ -1187,12 +988,9 @@ impl TransactionsQueue {
                     &transaction_sent.sent_with_gas,
                     self.is_legacy_transactions(),
                 )
-                .await
-                .map_err(TransactionQueueSendTransactionError::CouldNotUpdateTransactionDb)?;
+                .await?;
             } else if transaction.is_noop {
-                db.update_transaction_noop(&transaction.id, &transaction.to)
-                    .await
-                    .map_err(TransactionQueueSendTransactionError::CouldNotUpdateTransactionDb)?;
+                db.update_transaction_noop(&transaction.id, &transaction.to).await?;
             }
         } else {
             info!(
@@ -1208,18 +1006,6 @@ impl TransactionsQueue {
         Ok(transaction_sent)
     }
 
-    /// Retrieves the transaction receipt from the blockchain.
-    ///
-    /// Queries the network for the receipt of a transaction that has been mined.
-    /// The receipt contains execution results, gas used, and success/failure status.
-    ///
-    /// # Arguments
-    /// * `transaction_hash` - The hash of the transaction to get receipt for
-    ///
-    /// # Returns
-    /// * `Ok(Some(AnyTransactionReceipt))` - The receipt if transaction is mined
-    /// * `Ok(None)` - If transaction is not yet mined
-    /// * `Err(RpcError)` - If network query fails
     pub async fn get_receipt(
         &mut self,
         transaction_hash: &TransactionHash,

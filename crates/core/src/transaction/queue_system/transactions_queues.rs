@@ -34,7 +34,8 @@ use super::{
     },
 };
 use crate::transaction::api::RelayTransactionRequest;
-use crate::transaction::types::TransactionSpeed;
+use crate::transaction::queue_system::types::SendTransactionGasPriceError;
+use crate::transaction::types::{TransactionConversionError, TransactionSpeed};
 use crate::{
     gas::{BlobGasOracleCache, BlobGasPriceResult, GasLimit, GasOracleCache, GasPriceResult},
     postgres::{PostgresClient, PostgresConnectionError, PostgresError},
@@ -70,21 +71,6 @@ pub struct TransactionsQueues {
 
 impl TransactionsQueues {
     /// Creates a new TransactionsQueues instance with the given relayer setups.
-    ///
-    /// Initializes individual transaction queues for each relayer and establishes
-    /// connections to shared resources like databases, caches, and oracles.
-    ///
-    /// # Arguments
-    /// * `setups` - Configuration for each relayer's transaction queue
-    /// * `gas_oracle_cache` - Shared cache for gas price information
-    /// * `blob_gas_oracle_cache` - Shared cache for blob gas price information
-    /// * `cache` - General application cache
-    /// * `webhook_manager` - Optional manager for webhook notifications
-    /// * `safe_proxy_manager` - Optional Safe proxy manager for multisig operations
-    ///
-    /// # Returns
-    /// * `Ok(TransactionsQueues)` - The initialized queues system
-    /// * `Err(TransactionsQueuesError)` - If initialization fails
     pub async fn new(
         setups: Vec<TransactionRelayerSetup>,
         gas_oracle_cache: Arc<Mutex<GasOracleCache>>,
@@ -132,13 +118,6 @@ impl TransactionsQueues {
     }
 
     /// Retrieves a transaction queue for the specified relayer.
-    ///
-    /// # Arguments
-    /// * `relayer_id` - The ID of the relayer to get the queue for
-    ///
-    /// # Returns
-    /// * `Some(Arc<Mutex<TransactionsQueue>>)` - The queue if found
-    /// * `None` - If no queue exists for the relayer
     pub fn get_transactions_queue(
         &self,
         relayer_id: &RelayerId,
@@ -146,16 +125,7 @@ impl TransactionsQueues {
         self.queues.get(relayer_id).cloned()
     }
 
-    /// Retrieves a transaction queue for the specified relayer or returns an error.
-    ///
-    /// This is the "unsafe" version that returns an error instead of None when the queue is not found.
-    ///
-    /// # Arguments
-    /// * `relayer_id` - The ID of the relayer to get the queue for
-    ///
-    /// # Returns
-    /// * `Ok(Arc<Mutex<TransactionsQueue>>)` - The queue if found
-    /// * `Err(String)` - Error message if no queue exists for the relayer
+    /// Retrieves a transaction queue for the specified relayer.
     pub fn get_transactions_queue_unsafe(
         &self,
         relayer_id: &RelayerId,
@@ -167,32 +137,16 @@ impl TransactionsQueues {
     }
 
     /// Removes a transaction queue for the specified relayer.
-    ///
-    /// This permanently deletes the queue and all its state. Use with caution.
-    ///
-    /// # Arguments
-    /// * `relayer_id` - The ID of the relayer whose queue should be removed
     pub async fn delete_queue(&mut self, relayer_id: &RelayerId) {
         self.queues.remove(relayer_id);
     }
 
     /// Invalidates the cache entry for a specific transaction.
-    ///
-    /// This ensures that cached transaction data is refreshed on the next access.
-    ///
-    /// # Arguments
-    /// * `id` - The ID of the transaction to invalidate in cache
     async fn invalidate_transaction_cache(&self, id: &TransactionId) {
         invalidate_transaction_no_state_cache(&self.cache, id).await;
     }
 
     /// Returns the count of pending transactions for a specific relayer.
-    ///
-    /// # Arguments
-    /// * `relayer_id` - The relayer to get the pending count for
-    ///
-    /// # Returns
-    /// * `usize` - Number of pending transactions (0 if relayer not found)
     pub async fn pending_transactions_count(&self, relayer_id: &RelayerId) -> usize {
         if let Some(queue_arc) = self.get_transactions_queue(relayer_id) {
             let queue = queue_arc.lock().await;
@@ -203,12 +157,6 @@ impl TransactionsQueues {
     }
 
     /// Returns the count of in-mempool transactions for a specific relayer.
-    ///
-    /// # Arguments
-    /// * `relayer_id` - The relayer to get the in-mempool count for
-    ///
-    /// # Returns
-    /// * `usize` - Number of in-mempool transactions (0 if relayer not found)
     pub async fn inmempool_transactions_count(&self, relayer_id: &RelayerId) -> usize {
         if let Some(queue_arc) = self.get_transactions_queue(relayer_id) {
             let queue = queue_arc.lock().await;
@@ -219,18 +167,6 @@ impl TransactionsQueues {
     }
 
     /// Adds a new relayer and its transaction queue to the system.
-    ///
-    /// Creates a new transaction queue for the relayer with fresh state (empty queues).
-    /// The current nonce is fetched from the provider to ensure proper initialization.
-    /// Spawns the processing tasks for the new relayer.
-    ///
-    /// # Arguments
-    /// * `setup` - The configuration for the new relayer's transaction queue
-    /// * `queues_arc` - Arc reference to the TransactionsQueues for spawning processing tasks
-    ///
-    /// # Returns
-    /// * `Ok(())` - If the relayer was added successfully
-    /// * `Err(WalletOrProviderError)` - If nonce retrieval or setup fails
     pub async fn add_new_relayer(
         &mut self,
         setup: TransactionsQueueSetup,
@@ -256,43 +192,21 @@ impl TransactionsQueues {
             ))),
         );
 
-        // Spawn processing tasks for the new relayer
         spawn_processing_tasks_for_relayer(queues_arc, &relayer_id).await;
 
         Ok(())
     }
 
-    /// Calculates the expiration time for new transactions.
-    ///
-    /// Transactions expire after 12 hours, after which they are converted to no-op transactions.
-    ///
-    /// # Returns
-    /// * `DateTime<Utc>` - The expiration time (12 hours from now)
     fn expires_at(&self) -> DateTime<Utc> {
-        // 12 hours we then send them to noop
         Utc::now() + chrono::Duration::hours(12)
     }
 
     /// Checks if a transaction has expired.
-    ///
-    /// # Arguments
-    /// * `transaction` - The transaction to check for expiration
-    ///
-    /// # Returns
-    /// * `true` - If the transaction has expired
-    /// * `false` - If the transaction is still valid
     fn has_expired(&self, transaction: &Transaction) -> bool {
         transaction.expires_at < Utc::now()
     }
 
     /// Converts a transaction to a no-op transaction.
-    ///
-    /// This is used for expired or cancelled transactions. The transaction is modified
-    /// to send zero value with no data to the relayer's own address.
-    ///
-    /// # Arguments
-    /// * `transactions_queue` - The queue containing the relayer's configuration
-    /// * `transaction` - The transaction to convert to no-op
     fn transaction_to_noop(
         &self,
         transactions_queue: &mut TransactionsQueue,
@@ -307,13 +221,6 @@ impl TransactionsQueues {
     }
 
     /// Replaces the content of an existing transaction with new parameters.
-    ///
-    /// Updates the transaction's destination, data, and value while preserving
-    /// other metadata like nonce and timing information.
-    ///
-    /// # Arguments
-    /// * `current_transaction` - The transaction to modify
-    /// * `replace_with` - The new transaction parameters to apply
     fn transaction_replace(
         &self,
         current_transaction: &mut Transaction,
@@ -329,18 +236,6 @@ impl TransactionsQueues {
     }
 
     /// Checks if a relayer is allowed to send transactions to a specific address.
-    ///
-    /// Queries the database to verify if the target address is on the relayer's allowlist.
-    /// This is used when relayers have restricted transaction destinations.
-    ///
-    /// # Arguments
-    /// * `relayer_id` - The relayer attempting to send the transaction
-    /// * `to` - The destination address to check
-    ///
-    /// # Returns
-    /// * `Ok(true)` - If the relayer is allowed to send to this address
-    /// * `Ok(false)` - If the relayer is not allowed
-    /// * `Err(PostgresError)` - If database query fails
     async fn relayer_allowed_to_send_transaction_to(
         &self,
         relayer_id: &RelayerId,
@@ -351,32 +246,15 @@ impl TransactionsQueues {
     }
 
     /// Computes gas prices for a transaction based on its type.
-    ///
-    /// # Arguments
-    /// * `transactions_queue` - The transaction queue containing gas oracles
-    /// * `transaction` - The transaction to compute gas prices for
-    /// * `speed` - The speed tier for gas pricing
-    ///
-    /// # Returns
-    /// * `Ok((gas_price, blob_gas_price))` - Gas prices for the transaction
-    /// * `Err(AddTransactionError)` - If gas price computation fails
     async fn compute_transaction_gas_prices(
         transactions_queue: &TransactionsQueue,
         transaction: &Transaction,
-        speed: &crate::transaction::types::TransactionSpeed,
-    ) -> Result<(GasPriceResult, Option<BlobGasPriceResult>), AddTransactionError> {
-        let gas_price = transactions_queue
-            .compute_gas_price_for_transaction(speed, None)
-            .await
-            .map_err(AddTransactionError::TransactionGasPriceError)?;
+        speed: &TransactionSpeed,
+    ) -> Result<(GasPriceResult, Option<BlobGasPriceResult>), SendTransactionGasPriceError> {
+        let gas_price = transactions_queue.compute_gas_price_for_transaction(speed, None).await?;
 
         let blob_gas_price = if transaction.is_blob_transaction() {
-            Some(
-                transactions_queue
-                    .compute_blob_gas_price_for_transaction(speed, &None)
-                    .await
-                    .map_err(AddTransactionError::TransactionGasPriceError)?,
-            )
+            Some(transactions_queue.compute_blob_gas_price_for_transaction(speed, &None).await?)
         } else {
             None
         };
@@ -385,69 +263,29 @@ impl TransactionsQueues {
     }
 
     /// Creates a typed transaction request for gas estimation or sending.
-    ///
-    /// # Arguments
-    /// * `transactions_queue` - The transaction queue with provider details
-    /// * `transaction` - The transaction to convert
-    /// * `gas_price` - The computed gas price
-    /// * `blob_gas_price` - The blob gas price (if applicable)
-    /// * `gas_limit` - The gas limit to use
-    ///
-    /// # Returns
-    /// * `Ok(TypedTransaction)` - The typed transaction request
-    /// * `Err(AddTransactionError)` - If transaction conversion fails
     fn create_typed_transaction(
         transactions_queue: &TransactionsQueue,
         transaction: &Transaction,
         gas_price: &GasPriceResult,
         blob_gas_price: Option<&BlobGasPriceResult>,
         gas_limit: GasLimit,
-    ) -> Result<TypedTransaction, AddTransactionError> {
+    ) -> Result<TypedTransaction, TransactionConversionError> {
         if transaction.is_blob_transaction() {
-            transaction
-                .to_blob_typed_transaction_with_gas_limit(
-                    Some(gas_price),
-                    blob_gas_price,
-                    Some(gas_limit),
-                )
-                .map_err(|e| {
-                    AddTransactionError::InternalError(format!(
-                        "Transaction conversion error: {}",
-                        e
-                    ))
-                })
+            Ok(transaction.to_blob_typed_transaction_with_gas_limit(
+                Some(gas_price),
+                blob_gas_price,
+                Some(gas_limit),
+            )?)
         } else if transactions_queue.is_legacy_transactions() {
-            transaction
-                .to_legacy_typed_transaction_with_gas_limit(Some(gas_price), Some(gas_limit))
-                .map_err(|e| {
-                    AddTransactionError::InternalError(format!(
-                        "Transaction conversion error: {}",
-                        e
-                    ))
-                })
+            Ok(transaction
+                .to_legacy_typed_transaction_with_gas_limit(Some(gas_price), Some(gas_limit))?)
         } else {
-            transaction
-                .to_eip1559_typed_transaction_with_gas_limit(Some(gas_price), Some(gas_limit))
-                .map_err(|e| {
-                    AddTransactionError::InternalError(format!(
-                        "Transaction conversion error: {}",
-                        e
-                    ))
-                })
+            Ok(transaction
+                .to_eip1559_typed_transaction_with_gas_limit(Some(gas_price), Some(gas_limit))?)
         }
     }
 
     /// Estimates gas limit for a transaction and validates it via simulation.
-    ///
-    /// # Arguments
-    /// * `transactions_queue` - The transaction queue with provider access
-    /// * `transaction` - The transaction to estimate gas for
-    /// * `gas_price` - The computed gas price
-    /// * `blob_gas_price` - The blob gas price (if applicable)
-    ///
-    /// # Returns
-    /// * `Ok(GasLimit)` - The estimated gas limit
-    /// * `Err(AddTransactionError)` - If estimation or simulation fails
     async fn estimate_and_validate_gas(
         transactions_queue: &mut TransactionsQueue,
         transaction: &Transaction,
@@ -484,8 +322,7 @@ impl TransactionsQueues {
             AddTransactionError::TransactionEstimateGasError(transaction.relayer_id, e)
         })?;
 
-        let gas_cost =
-            estimated_gas_limit.into_inner() as u128 * gas_price.legacy_gas_price().into_u128();
+        let gas_cost = estimated_gas_limit.into_inner() * gas_price.legacy_gas_price().into_u128();
         let total_required =
             transaction.value.into_inner() + alloy::primitives::U256::from(gas_cost);
 
@@ -506,16 +343,6 @@ impl TransactionsQueues {
     }
 
     /// Adds a new transaction to the specified relayer's queue.
-    ///
-    /// Validates relayer permissions, creates the transaction, and adds it to the pending queue.
-    ///
-    /// # Arguments
-    /// * `relayer_id` - The relayer to add the transaction to
-    /// * `transaction_to_send` - The transaction parameters
-    ///
-    /// # Returns
-    /// * `Ok(Transaction)` - The created transaction if successful
-    /// * `Err(AddTransactionError)` - If adding the transaction fails
     pub async fn add_transaction(
         &mut self,
         relayer_id: &RelayerId,
@@ -545,7 +372,6 @@ impl TransactionsQueues {
             ));
         }
 
-        // Atomically get nonce and increment to prevent race conditions
         let assigned_nonce = transactions_queue.nonce_manager.get_and_increment().await;
 
         let mut transaction = Transaction {
@@ -591,8 +417,6 @@ impl TransactionsQueues {
         )
         .await;
 
-        info!("estimated_gas_limit {:?}", estimated_gas_limit);
-
         let estimated_gas_limit = match estimated_gas_limit {
             Ok(limit) => limit,
             Err(err) => {
@@ -620,12 +444,8 @@ impl TransactionsQueues {
             estimated_gas_limit,
         )?;
 
-        transaction.known_transaction_hash = Some(
-            transactions_queue
-                .compute_tx_hash(&transaction_request)
-                .await
-                .map_err(AddTransactionError::ComputeTransactionHashError)?,
-        );
+        transaction.known_transaction_hash =
+            Some(transactions_queue.compute_tx_hash(&transaction_request).await?);
 
         self.db
             .save_transaction(relayer_id, &transaction)
@@ -649,18 +469,6 @@ impl TransactionsQueues {
     }
 
     /// Cancels an existing transaction by converting it to a no-op.
-    ///
-    /// For pending transactions, the cancellation happens immediately.
-    /// For in-mempool transactions, a replacement no-op transaction is sent.
-    /// Mined transactions cannot be cancelled.
-    ///
-    /// # Arguments
-    /// * `transaction` - The transaction to cancel
-    ///
-    /// # Returns
-    /// * `Ok(true)` - If the transaction was successfully cancelled
-    /// * `Ok(false)` - If the transaction was not found or cannot be cancelled
-    /// * `Err(CancelTransactionError)` - If cancellation fails
     pub async fn cancel_transaction(
         &mut self,
         transaction: &Transaction,
@@ -701,8 +509,7 @@ impl TransactionsQueues {
 
                         let transaction_sent = transactions_queue
                             .send_transaction(&mut self.db, &mut result.transaction)
-                            .await
-                            .map_err(CancelTransactionError::SendTransactionError)?;
+                            .await?;
 
                         transactions_queue
                             .update_inmempool_transaction_noop(&transaction.id, &transaction_sent)
@@ -734,19 +541,6 @@ impl TransactionsQueues {
     }
 
     /// Replaces an existing transaction with new parameters.
-    ///
-    /// For pending transactions, the replacement happens immediately.
-    /// For in-mempool transactions, a replacement transaction is sent with higher gas.
-    /// Mined transactions cannot be replaced.
-    ///
-    /// # Arguments
-    /// * `transaction` - The transaction to replace
-    /// * `replace_with` - The new transaction parameters
-    ///
-    /// # Returns
-    /// * `Ok(true)` - If the transaction was successfully replaced
-    /// * `Ok(false)` - If the transaction was not found or cannot be replaced
-    /// * `Err(ReplaceTransactionError)` - If replacement fails
     /// TODO: look at the nonce management for replace to predict the new gas limit
     pub async fn replace_transaction(
         &mut self,
@@ -807,8 +601,7 @@ impl TransactionsQueues {
 
                         let transaction_sent = transactions_queue
                             .send_transaction(&mut self.db, &mut result.transaction)
-                            .await
-                            .map_err(ReplaceTransactionError::SendTransactionError)?;
+                            .await?;
 
                         transactions_queue
                             .update_inmempool_transaction_replaced(
@@ -849,17 +642,6 @@ impl TransactionsQueues {
     }
 
     /// Processes a single pending transaction for the specified relayer.
-    ///
-    /// Takes the next pending transaction, validates it, estimates gas, and sends it
-    /// to the network. If successful, moves the transaction to the in-mempool state.
-    /// Handles various error conditions including gas price issues and simulation failures.
-    ///
-    /// # Arguments
-    /// * `relayer_id` - The relayer whose pending transactions to process
-    ///
-    /// # Returns
-    /// * `Ok(ProcessResult<ProcessPendingStatus>)` - Processing result with status
-    /// * `Err(ProcessPendingTransactionError)` - If processing fails critically
     pub async fn process_single_pending(
         &mut self,
         relayer_id: &RelayerId,
@@ -881,12 +663,8 @@ impl TransactionsQueues {
 
                 match transactions_queue.send_transaction(&mut self.db, &mut transaction).await {
                     Ok(transaction_sent) => {
-                        transactions_queue
-                            .move_pending_to_inmempool(&transaction_sent)
-                            .await
-                            .map_err(
-                            ProcessPendingTransactionError::MovePendingTransactionToInmempoolError,
-                        )?;
+                        transactions_queue.move_pending_to_inmempool(&transaction_sent).await?;
+
                         self.invalidate_transaction_cache(&transaction.id).await;
 
                         if let Some(webhook_manager) = &self.webhook_manager {
@@ -1003,18 +781,6 @@ impl TransactionsQueues {
     }
 
     /// Processes a single in-mempool transaction for the specified relayer.
-    ///
-    /// Checks if the transaction has been mined by querying for its receipt.
-    /// If mined, moves it to the mined state. If still pending and enough time
-    /// has passed, may bump the gas price and resend. Handles transaction lifecycle
-    /// from in-mempool to mined/failed/expired states.
-    ///
-    /// # Arguments
-    /// * `relayer_id` - The relayer whose in-mempool transactions to process
-    ///
-    /// # Returns
-    /// * `Ok(ProcessResult<ProcessInmempoolStatus>)` - Processing result with status
-    /// * `Err(ProcessInmempoolTransactionError)` - If processing fails critically
     pub async fn process_single_inmempool(
         &mut self,
         relayer_id: &RelayerId,
@@ -1109,10 +875,7 @@ impl TransactionsQueues {
                                 ) {
                                     let transaction_sent = transactions_queue
                                         .send_transaction(&mut self.db, &mut transaction)
-                                        .await
-                                        .map_err(
-                                            ProcessInmempoolTransactionError::SendTransactionError,
-                                        )?;
+                                        .await?;
 
                                     // Update the actual transaction in the inmempool queue
                                     transactions_queue
@@ -1170,18 +933,6 @@ impl TransactionsQueues {
     }
 
     /// Processes a single mined transaction for the specified relayer.
-    ///
-    /// Checks if enough confirmations have passed to consider the transaction
-    /// confirmed. Once confirmed, moves the transaction to the confirmed state
-    /// and triggers confirmation webhooks. Handles the final stage of transaction
-    /// lifecycle from mined to confirmed.
-    ///
-    /// # Arguments
-    /// * `relayer_id` - The relayer whose mined transactions to process
-    ///
-    /// # Returns
-    /// * `Ok(ProcessResult<ProcessMinedStatus>)` - Processing result with status
-    /// * `Err(ProcessMinedTransactionError)` - If processing fails critically
     pub async fn process_single_mined(
         &mut self,
         relayer_id: &RelayerId,

@@ -24,10 +24,10 @@ pub enum TransactionQueueSendTransactionError {
     GasCalculationError,
 
     #[error("Transaction send error: {0}")]
-    TransactionSendError(SendTransactionError),
+    TransactionSendError(#[from] SendTransactionError),
 
     #[error("Transaction could not be updated in DB: {0}")]
-    CouldNotUpdateTransactionDb(PostgresError),
+    CouldNotUpdateTransactionDb(#[from] PostgresError),
 
     #[error("{0}")]
     SendTransactionGasPriceError(#[from] SendTransactionGasPriceError),

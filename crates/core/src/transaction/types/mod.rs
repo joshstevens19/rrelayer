@@ -22,7 +22,7 @@ pub use transaction_status::TransactionStatus;
 mod relayer_transaction;
 
 mod transaction;
-pub use transaction::Transaction;
+pub use transaction::{Transaction, TransactionConversionError};
 
 mod transaction_blob;
 pub use transaction_blob::TransactionBlob;

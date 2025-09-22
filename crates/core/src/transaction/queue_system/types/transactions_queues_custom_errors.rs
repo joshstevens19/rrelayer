@@ -10,17 +10,19 @@ use super::{
     SendTransactionGasPriceError, TransactionQueueSendTransactionError, TransactionSentWithRelayer,
 };
 use crate::shared::{bad_request, internal_server_error, not_found, HttpError};
+use crate::transaction::types::TransactionConversionError;
 use crate::{
     postgres::PostgresError,
     relayer::RelayerId,
     shared::common_types::EvmAddress,
     transaction::types::{Transaction, TransactionId, TransactionStatus},
+    WalletError,
 };
 
 #[derive(Error, Debug)]
 pub enum ReplaceTransactionError {
     #[error("Send transaction error: {0}")]
-    SendTransactionError(TransactionQueueSendTransactionError),
+    SendTransactionError(#[from] TransactionQueueSendTransactionError),
 
     #[error("Transaction could not be found: {0}")]
     TransactionNotFound(TransactionId),
@@ -74,19 +76,19 @@ pub enum AddTransactionError {
     RelayerIsPaused(RelayerId),
 
     #[error("{0}")]
-    TransactionGasPriceError(SendTransactionGasPriceError),
+    TransactionGasPriceError(#[from] SendTransactionGasPriceError),
 
     #[error("{0}")]
-    ComputeTransactionHashError(LocalSignerError),
+    ComputeTransactionHashError(#[from] WalletError),
 
     #[error("could not estimate gas limit - {0}")]
     TransactionEstimateGasError(RelayerId, RpcError<TransportErrorKind>),
 
-    #[error("Internal error: {0}")]
-    InternalError(String),
-
     #[error("Could not get current on chain nonce for relayer {0} - {1}")]
     CouldNotGetCurrentOnChainNonce(RelayerId, RpcError<TransportErrorKind>),
+
+    #[error("Conversion error: {0}")]
+    TransactionConversionError(#[from] TransactionConversionError),
 }
 
 impl From<AddTransactionError> for HttpError {
@@ -110,7 +112,7 @@ impl From<AddTransactionError> for HttpError {
 #[derive(Error, Debug)]
 pub enum CancelTransactionError {
     #[error("Send transaction error: {0}")]
-    SendTransactionError(TransactionQueueSendTransactionError),
+    SendTransactionError(#[from] TransactionQueueSendTransactionError),
 
     #[error("Could not update transaction in database: {0}")]
     CouldNotUpdateTransactionDb(PostgresError),
@@ -142,19 +144,19 @@ pub enum ProcessPendingTransactionError {
     RelayerTransactionsQueueNotFound(RelayerId),
 
     #[error("Send transaction error: {0}")]
-    SendTransactionError(TransactionQueueSendTransactionError),
+    SendTransactionError(#[from] TransactionQueueSendTransactionError),
 
     #[error("Transaction could not be sent due to gas calculation error for relayer {0}: tx {1}")]
     GasCalculationError(RelayerId, Transaction),
 
     #[error("{0}")]
-    MovePendingTransactionToInmempoolError(MovePendingTransactionToInmempoolError),
+    MovePendingTransactionToInmempoolError(#[from] MovePendingTransactionToInmempoolError),
 
     #[error("Transaction estimate gas error: {0}")]
-    TransactionEstimateGasError(RpcError<TransportErrorKind>),
+    TransactionEstimateGasError(#[from] RpcError<TransportErrorKind>),
 
     #[error("Transaction could not be updated in DB: {0}")]
-    DbError(PostgresError),
+    DbError(#[from] PostgresError),
 }
 
 #[derive(Error, Debug)]
@@ -163,7 +165,7 @@ pub enum ProcessInmempoolTransactionError {
     RelayerTransactionsQueueNotFound(RelayerId),
 
     #[error("Send transaction error: {0}")]
-    SendTransactionError(TransactionQueueSendTransactionError),
+    SendTransactionError(#[from] TransactionQueueSendTransactionError),
 
     #[error(
         "Transaction status {3} could not be updated in the database for relayer {0}: tx {1} - error {2}"
@@ -176,7 +178,7 @@ pub enum ProcessInmempoolTransactionError {
     ),
 
     #[error("{0}")]
-    MoveInmempoolTransactionToMinedError(MoveInmempoolTransactionToMinedError),
+    MoveInmempoolTransactionToMinedError(#[from] MoveInmempoolTransactionToMinedError),
 
     #[error("Could not read transaction receipt relayer {0} tx - {1} error - {2}")]
     CouldNotGetTransactionReceipt(RelayerId, Transaction, RpcError<TransportErrorKind>),
