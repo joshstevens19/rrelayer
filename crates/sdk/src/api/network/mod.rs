@@ -1,4 +1,4 @@
-use rrelayer_core::network::types::Network;
+use rrelayer_core::network::Network;
 use std::sync::Arc;
 
 use crate::api::{http::HttpClient, types::ApiResult};

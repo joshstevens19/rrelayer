@@ -1,5 +1,5 @@
 use crate::common_types::EvmAddress;
-use crate::network::types::ChainId;
+use crate::network::ChainId;
 use crate::wallet::{WalletError, WalletManagerTrait};
 use crate::yaml::AwsKmsSigningKey;
 use alloy::consensus::TypedTransaction;

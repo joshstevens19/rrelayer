@@ -1,5 +1,5 @@
 use crate::common_types::EvmAddress;
-use crate::network::types::ChainId;
+use crate::network::ChainId;
 use crate::wallet::{WalletError, WalletManagerTrait};
 use alloy::consensus::TypedTransaction;
 use alloy::dyn_abi::TypedData;

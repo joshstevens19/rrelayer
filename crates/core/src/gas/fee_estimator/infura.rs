@@ -9,7 +9,7 @@ use super::base::{
 };
 use crate::{
     gas::types::{MaxFee, MaxPriorityFee},
-    network::types::ChainId,
+    network::ChainId,
 };
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

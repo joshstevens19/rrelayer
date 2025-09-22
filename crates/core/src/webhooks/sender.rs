@@ -1,3 +1,7 @@
+use super::types::{WebhookDelivery, WebhookDeliveryConfig};
+use crate::network::ChainId;
+use crate::relayer::types::RelayerId;
+use crate::transaction::types::TransactionId;
 use crate::{
     postgres::PostgresClient,
     rrelayer_error, rrelayer_info,
@@ -13,8 +17,6 @@ use std::{
     time::{Duration, SystemTime},
 };
 use tracing::{debug, warn};
-
-use super::types::{WebhookDelivery, WebhookDeliveryConfig};
 
 /// HTTP client for sending webhook requests with retry logic.
 ///
@@ -386,11 +388,7 @@ impl WebhookSender {
     fn extract_delivery_identifiers(
         &self,
         delivery: &WebhookDelivery,
-    ) -> (
-        Option<crate::transaction::types::TransactionId>,
-        Option<crate::relayer::types::RelayerId>,
-        Option<crate::network::types::ChainId>,
-    ) {
+    ) -> (Option<TransactionId>, Option<RelayerId>, Option<ChainId>) {
         let payload = &delivery.payload;
 
         let transaction_id = if let Some(transaction) = payload.get("transaction") {
@@ -398,7 +396,7 @@ impl WebhookSender {
                 .get("id")
                 .and_then(|id| id.as_str())
                 .and_then(|id_str| uuid::Uuid::parse_str(id_str).ok())
-                .map(crate::transaction::types::TransactionId::from)
+                .map(TransactionId::from)
         } else {
             None
         };
@@ -420,15 +418,9 @@ impl WebhookSender {
         };
 
         let chain_id = if let Some(transaction) = payload.get("transaction") {
-            transaction
-                .get("chainId")
-                .and_then(|id| id.as_u64())
-                .map(crate::network::types::ChainId::new)
+            transaction.get("chainId").and_then(|id| id.as_u64()).map(ChainId::new)
         } else if let Some(signing) = payload.get("signing") {
-            signing
-                .get("chainId")
-                .and_then(|id| id.as_u64())
-                .map(crate::network::types::ChainId::new)
+            signing.get("chainId").and_then(|id| id.as_u64()).map(ChainId::new)
         } else {
             None
         };

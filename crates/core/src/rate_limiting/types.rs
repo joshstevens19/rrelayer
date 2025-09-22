@@ -1,7 +1,7 @@
+use crate::postgres::PostgresError;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-/// Simple enum for rate limiting operations
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RateLimitOperation {
     Transaction,
@@ -17,14 +17,12 @@ impl RateLimitOperation {
     }
 }
 
-/// User detection method for rate limiting
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RateLimitDetectMethod {
     Header,
     Fallback,
 }
 
-/// Transaction type classification
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TransactionType {
     Direct,
@@ -32,7 +30,6 @@ pub enum TransactionType {
     Automated,
 }
 
-/// Context for rate limit detection
 #[derive(Debug, Clone)]
 pub struct RateLimitDetectContext {
     pub key: String,
@@ -40,14 +37,13 @@ pub struct RateLimitDetectContext {
     pub transaction_type: TransactionType,
 }
 
-/// Rate limiting errors
 #[derive(Debug, Error)]
 pub enum RateLimitError {
     #[error("Rate limit exceeded for {operation}: {current}/{limit} in {window_seconds}s")]
     LimitExceeded { operation: String, current: u64, limit: u64, window_seconds: u32 },
 
     #[error("Database error: {0}")]
-    Database(#[from] crate::postgres::PostgresError),
+    Database(#[from] PostgresError),
 
     #[error("Configuration error: {0}")]
     Configuration(String),
@@ -56,7 +52,6 @@ pub enum RateLimitError {
     NoRateLimitKey,
 }
 
-/// Simple result type for rate limit checks
 #[derive(Debug, Clone)]
 pub struct RateLimitResult {
     pub allowed: bool,

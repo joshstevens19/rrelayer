@@ -9,7 +9,7 @@ use serde::Deserialize;
 
 use crate::{
     app_state::AppState,
-    network::types::ChainId,
+    network::ChainId,
     provider::chain_enabled,
     relayer::types::Relayer,
     shared::common_types::{PagingContext, PagingResult},

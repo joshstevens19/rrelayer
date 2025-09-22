@@ -9,7 +9,7 @@ use serde::Deserialize;
 
 use crate::{
     app_state::AppState,
-    network::types::ChainId,
+    network::ChainId,
     provider::find_provider_for_chain_id,
     relayer::{cache::invalidate_relayer_cache, types::RelayerId},
     rrelayer_error,

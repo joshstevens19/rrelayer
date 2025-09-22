@@ -14,7 +14,7 @@ use futures::future::join_all;
 use super::base::{BaseGasFeeEstimator, GasEstimatorError, GasEstimatorResult, GasPriceResult};
 use crate::{
     gas::types::{MaxFee, MaxPriorityFee},
-    network::types::ChainId,
+    network::ChainId,
     provider::RelayerProvider,
     shared::common_types::BlockNumber,
 };

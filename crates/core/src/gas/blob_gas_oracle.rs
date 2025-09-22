@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use crate::{
-    network::types::ChainId, provider::EvmProvider, rrelayer_error, rrelayer_info,
+    network::ChainId, provider::EvmProvider, rrelayer_error, rrelayer_info,
     transaction::types::TransactionSpeed,
 };
 use serde::{Deserialize, Serialize};

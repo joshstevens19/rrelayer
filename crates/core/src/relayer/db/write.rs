@@ -3,7 +3,7 @@ use thiserror::Error;
 
 use crate::{
     gas::types::GasPrice,
-    network::types::ChainId,
+    network::ChainId,
     postgres::{PostgresClient, PostgresError},
     provider::EvmProvider,
     relayer::types::{Relayer, RelayerId},

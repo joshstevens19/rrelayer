@@ -1,5 +1,5 @@
 use crate::{
-    network::types::ChainId,
+    network::ChainId,
     relayer::types::RelayerId,
     shared::common_types::EvmAddress,
     transaction::types::{

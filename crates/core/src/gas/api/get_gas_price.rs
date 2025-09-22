@@ -6,9 +6,7 @@ use axum::{
     Json,
 };
 
-use crate::{
-    app_state::AppState, gas::fee_estimator::base::GasEstimatorResult, network::types::ChainId,
-};
+use crate::{app_state::AppState, gas::fee_estimator::base::GasEstimatorResult, network::ChainId};
 
 /// Retrieves gas price estimates for a specific chain via HTTP API.
 ///

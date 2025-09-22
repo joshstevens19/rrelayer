@@ -18,7 +18,7 @@ use crate::{
         gas_oracle::GasOracleCache,
         types::{GasLimit, GasPrice},
     },
-    network::types::ChainId,
+    network::ChainId,
     postgres::PostgresClient,
     provider::EvmProvider,
     relayer::types::Relayer,

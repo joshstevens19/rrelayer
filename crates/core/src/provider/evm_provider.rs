@@ -11,7 +11,7 @@ use crate::{
         fee_estimator::base::{BaseGasFeeEstimator, GasEstimatorError, GasEstimatorResult},
         types::GasLimit,
     },
-    network::types::ChainId,
+    network::ChainId,
     shared::common_types::{EvmAddress, WalletOrProviderError},
     transaction::types::{TransactionHash, TransactionNonce},
     NetworkSetupConfig,

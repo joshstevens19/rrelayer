@@ -33,7 +33,7 @@ impl RateLimitDetector {
 
         if self.fallback_to_relayer {
             return Ok(RateLimitDetectContext {
-                key: format!("{:?}", relayer_address),
+                key: relayer_address.hex(),
                 detection_method: RateLimitDetectMethod::Fallback,
                 transaction_type: TransactionType::Direct,
             });

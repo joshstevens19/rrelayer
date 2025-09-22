@@ -1,5 +1,5 @@
 use crate::common_types::Signature;
-use crate::network::types::ChainId;
+use crate::network::ChainId;
 use crate::{
     postgres::{PostgresClient, PostgresError},
     relayer::types::RelayerId,

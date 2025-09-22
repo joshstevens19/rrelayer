@@ -1,7 +1,7 @@
 mod mnemonic_wallet_manager;
 
 use crate::common_types::EvmAddress;
-use crate::network::types::ChainId;
+use crate::network::ChainId;
 use alloy::consensus::TypedTransaction;
 use alloy::dyn_abi::TypedData;
 use alloy::primitives::PrimitiveSignature;

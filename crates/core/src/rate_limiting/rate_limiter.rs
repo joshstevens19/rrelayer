@@ -86,15 +86,12 @@ impl RateLimiter {
         relayer_address: &EvmAddress,
         operation: RateLimitOperation,
     ) -> Result<RateLimitReservation, RateLimitError> {
-        // Step 1: Detect user
         let context = self.detector.detect(headers, relayer_address)?;
 
-        // Step 2: Check global limits first (if configured)
         if let Some(ref global_limits) = self.config.global_limits {
             self.check_global_limits(operation, global_limits).await?;
         }
 
-        // Step 3: Check user limits
         let user_key = &context.key;
         let result = self.check_user_limits(user_key, operation).await?;
 
@@ -107,7 +104,6 @@ impl RateLimiter {
             });
         }
 
-        // Step 4: Reserve the operation (atomically increment)
         self.reserve_operation(user_key, operation).await?;
         if self.config.global_limits.is_some() {
             self.reserve_global_operation(operation).await?;
@@ -122,7 +118,6 @@ impl RateLimiter {
         })
     }
 
-    /// Check global rate limits
     async fn check_global_limits(
         &self,
         operation: RateLimitOperation,
@@ -180,7 +175,6 @@ impl RateLimiter {
         Ok(())
     }
 
-    /// Check user-specific rate limits
     async fn check_user_limits(
         &self,
         user_key: &str,
@@ -235,7 +229,6 @@ impl RateLimiter {
         Ok(RateLimitResult { allowed, current_usage, limit, window_seconds, reset_time })
     }
 
-    /// Reserve an operation (increment counter)
     async fn reserve_operation(
         &self,
         user_key: &str,
@@ -265,7 +258,6 @@ impl RateLimiter {
         Ok(())
     }
 
-    /// Reserve a global operation
     async fn reserve_global_operation(
         &self,
         operation: RateLimitOperation,
@@ -306,7 +298,6 @@ impl RateLimiter {
         Ok(())
     }
 
-    /// Revert a reserved operation (decrement counter)
     async fn revert_operation(
         &self,
         user_key: &str,
@@ -330,7 +321,6 @@ impl RateLimiter {
         Ok(())
     }
 
-    /// Revert global operation
     async fn revert_global_operation(
         &self,
         operation: RateLimitOperation,
@@ -356,7 +346,6 @@ impl RateLimiter {
         Ok(())
     }
 
-    /// Get rate limits for a specific user
     fn get_limits_for_user(&self, user_key: &str) -> RateLimits {
         if let Some(ref unlimited_users) = self.config.user_unlimited_overrides {
             if unlimited_users.contains(&user_key.to_string()) {
@@ -367,7 +356,6 @@ impl RateLimiter {
         self.config.limits.clone().unwrap_or_default()
     }
 
-    /// Calculate window start time
     fn calculate_window_start(&self, current_time: SystemTime, window_seconds: u32) -> SystemTime {
         let current_timestamp = current_time.duration_since(UNIX_EPOCH).unwrap().as_secs();
         let window_start_timestamp =
@@ -382,7 +370,6 @@ impl Default for RateLimits {
     }
 }
 
-/// A reservation that can be reverted if the operation fails
 pub struct RateLimitReservation<'a> {
     rate_limiter: &'a RateLimiter,
     user_key: String,
@@ -392,12 +379,10 @@ pub struct RateLimitReservation<'a> {
 }
 
 impl<'a> RateLimitReservation<'a> {
-    /// Commit the reservation (operation succeeded)
     pub fn commit(mut self) {
-        self.reserved = false; // Prevent auto-revert
+        self.reserved = false;
     }
 
-    /// Manually revert the reservation (operation failed)
     pub async fn revert(mut self) -> Result<(), RateLimitError> {
         if self.reserved {
             self.rate_limiter.revert_operation(&self.user_key, self.operation).await?;
@@ -410,7 +395,6 @@ impl<'a> RateLimitReservation<'a> {
 impl<'a> Drop for RateLimitReservation<'a> {
     fn drop(&mut self) {
         if self.reserved {
-            // Auto-revert on drop if not committed
             let rate_limiter = self.rate_limiter.clone();
             let user_key = self.user_key.clone();
             let operation = self.operation;
@@ -421,7 +405,6 @@ impl<'a> Drop for RateLimitReservation<'a> {
     }
 }
 
-// We need Clone for the rate limiter reference in async contexts
 impl Clone for RateLimiter {
     fn clone(&self) -> Self {
         Self {

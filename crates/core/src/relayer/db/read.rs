@@ -1,6 +1,6 @@
 use super::builders::build_relayer;
 use crate::{
-    network::types::ChainId,
+    network::ChainId,
     postgres::{PostgresClient, PostgresError},
     relayer::types::{Relayer, RelayerId},
     shared::common_types::{EvmAddress, PagingContext, PagingResult},

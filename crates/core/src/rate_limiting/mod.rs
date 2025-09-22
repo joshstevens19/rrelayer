@@ -1,7 +1,6 @@
-pub mod detection;
-pub mod rate_limiter;
-pub mod types;
-
-pub use detection::*;
-pub use rate_limiter::*;
+mod detection;
+pub use detection::RATE_LIMIT_HEADER_NAME;
+mod rate_limiter;
+pub use rate_limiter::RateLimiter;
+mod types;
 pub use types::*;

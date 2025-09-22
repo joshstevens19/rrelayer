@@ -16,7 +16,7 @@ use crate::{
         fee_estimator::tenderly::TenderlyGasFeeEstimator,
         types::{GasPrice, GasProvider, MaxFee, MaxPriorityFee},
     },
-    network::types::ChainId,
+    network::ChainId,
     provider::RetryClientError,
     NetworkSetupConfig, SetupConfig,
 };

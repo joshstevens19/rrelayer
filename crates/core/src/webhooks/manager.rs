@@ -11,7 +11,7 @@ use tracing::debug;
 use uuid::Uuid;
 
 use crate::{
-    network::types::ChainId, postgres::PostgresClient, rrelayer_error, rrelayer_info,
+    network::ChainId, postgres::PostgresClient, rrelayer_error, rrelayer_info,
     transaction::types::Transaction, yaml::WebhookConfig, SetupConfig,
 };
 

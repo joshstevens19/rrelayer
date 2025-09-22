@@ -11,7 +11,7 @@ use tokio_postgres::types::{FromSql, IsNull, Type};
 use uuid::Uuid;
 
 use crate::{
-    network::types::ChainId,
+    network::ChainId,
     postgres::{PostgresClient, PostgresError, ToSql},
     relayer::types::RelayerId,
     transaction::types::TransactionId,

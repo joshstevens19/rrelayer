@@ -8,7 +8,7 @@ use std::{env, fmt, fs::File, io::Read, path::PathBuf};
 use thiserror::Error;
 use tracing::error;
 
-use crate::network::types::ChainId;
+use crate::network::ChainId;
 use crate::{
     create_retry_client,
     gas::{

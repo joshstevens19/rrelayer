@@ -2,7 +2,7 @@ use crate::shared::utils::{format_token_amount, format_wei_to_eth};
 use crate::transaction::queue_system::TransactionToSend;
 use crate::transaction::types::{TransactionData, TransactionSpeed, TransactionValue};
 use crate::{
-    network::types::ChainId,
+    network::ChainId,
     postgres::{PostgresClient, PostgresError},
     provider::EvmProvider,
     relayer::types::Relayer,

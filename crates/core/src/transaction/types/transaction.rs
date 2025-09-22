@@ -40,7 +40,7 @@ use crate::{
         fee_estimator::base::GasPriceResult,
         types::{GasLimit, MaxFee, MaxPriorityFee},
     },
-    network::types::ChainId,
+    network::ChainId,
     relayer::types::RelayerId,
     shared::common_types::EvmAddress,
 };

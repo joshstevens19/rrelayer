@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use thiserror::Error;
 
 use crate::{
-    gas::fee_estimator::base::get_gas_estimator, network::types::ChainId, SetupConfig, SigningKey,
+    gas::fee_estimator::base::get_gas_estimator, network::ChainId, SetupConfig, SigningKey,
     WalletError,
 };
 
