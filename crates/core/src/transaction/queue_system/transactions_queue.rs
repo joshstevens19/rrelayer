@@ -42,12 +42,6 @@ use tokio::sync::Mutex;
 use tracing::error;
 use tracing::log::info;
 
-/// Queue system for managing transactions in different states for a single relayer.
-///
-/// Handles the complete lifecycle of transactions from pending to confirmed:
-/// - Pending: Transactions waiting to be sent
-/// - In-mempool: Transactions sent to the network but not yet mined
-/// - Mined: Transactions included in blocks but awaiting confirmations
 pub struct TransactionsQueue {
     pending_transactions: Mutex<VecDeque<Transaction>>,
     inmempool_transactions: Mutex<VecDeque<Transaction>>,
@@ -63,14 +57,6 @@ pub struct TransactionsQueue {
 
 impl TransactionsQueue {
     /// Creates a new TransactionsQueue for a specific relayer.
-    ///
-    /// # Arguments
-    /// * `setup` - Configuration and initial transaction queues for the relayer
-    /// * `gas_oracle_cache` - Shared cache for gas price information
-    /// * `blob_oracle_cache` - Shared cache for blob gas price information
-    ///
-    /// # Returns
-    /// * `TransactionsQueue` - A new queue system for the relayer
     pub fn new(
         setup: TransactionsQueueSetup,
         gas_oracle_cache: Arc<Mutex<GasOracleCache>>,
@@ -96,12 +82,6 @@ impl TransactionsQueue {
     }
 
     /// Returns the number of blocks to wait before bumping gas price based on transaction speed.
-    ///
-    /// # Arguments
-    /// * `speed` - The transaction speed tier
-    ///
-    /// # Returns
-    /// * `u64` - Number of blocks to wait before gas price bump
     fn blocks_to_wait_before_bump(&self, speed: &TransactionSpeed) -> u64 {
         match speed {
             TransactionSpeed::Slow => 10,
@@ -112,13 +92,6 @@ impl TransactionsQueue {
     }
 
     /// Determines if gas price should be bumped based on elapsed time and transaction speed.
-    ///
-    /// # Arguments
-    /// * `ms_between_times` - Milliseconds elapsed since the transaction was sent
-    /// * `speed` - The transaction speed tier
-    ///
-    /// # Returns
-    /// * `bool` - True if gas price should be bumped
     pub fn should_bump_gas(&self, ms_between_times: u64, speed: &TransactionSpeed) -> bool {
         let should_bump = ms_between_times
             > (self.evm_provider.blocks_every * self.blocks_to_wait_before_bump(speed));
@@ -135,9 +108,6 @@ impl TransactionsQueue {
     }
 
     /// Adds a new transaction to the pending queue.
-    ///
-    /// # Arguments
-    /// * `transaction` - The transaction to add to the pending queue
     pub async fn add_pending_transaction(&mut self, transaction: Transaction) {
         info!(
             "Adding pending transaction {} to queue for relayer: {}",
@@ -153,10 +123,6 @@ impl TransactionsQueue {
     }
 
     /// Gets the next pending transaction without removing it from the queue.
-    ///
-    /// # Returns
-    /// * `Some(Transaction)` - The next pending transaction if queue is not empty
-    /// * `None` - If the pending queue is empty
     pub async fn get_next_pending_transaction(&self) -> Option<Transaction> {
         let transactions = self.pending_transactions.lock().await;
 
@@ -164,9 +130,6 @@ impl TransactionsQueue {
     }
 
     /// Returns the number of transactions in the pending queue.
-    ///
-    /// # Returns
-    /// * `usize` - The count of pending transactions
     pub async fn get_pending_transaction_count(&self) -> usize {
         let transactions = self.pending_transactions.lock().await;
         let count = transactions.len();
@@ -175,16 +138,6 @@ impl TransactionsQueue {
     }
 
     /// Searches for a transaction by ID across pending and inmempool queues.
-    ///
-    /// Returns an editable wrapper that indicates which queue the transaction is in.
-    /// This is useful for transaction management and status updates.
-    ///
-    /// # Arguments
-    /// * `id` - The transaction ID to search for
-    ///
-    /// # Returns
-    /// * `Some(EditableTransaction)` - The transaction if found, wrapped with queue location info
-    /// * `None` - If the transaction is not found in any queue
     pub async fn get_editable_transaction_by_id(
         &self,
         id: &TransactionId,
@@ -225,17 +178,7 @@ impl TransactionsQueue {
         }
     }
 
-    /// Moves a transaction from pending to inmempool queue after successful network submission.
-    ///
-    /// Updates the transaction with network details (hash, gas prices, timestamps) and moves it
-    /// from the pending queue to the inmempool queue where it awaits confirmation.
-    ///
-    /// # Arguments
-    /// * `transaction_sent` - Details of the successfully sent transaction including hash and gas info
-    ///
-    /// # Returns
-    /// * `Ok(())` - If the transaction was successfully moved
-    /// * `Err(MovePendingTransactionToInmempoolError)` - If transaction not found or ID mismatch
+    /// Moves a transaction from pending to inmempool queue after a successful transaction submission.
     pub async fn move_pending_to_inmempool(
         &mut self,
         transaction_sent: &TransactionSentWithRelayer,
@@ -287,9 +230,6 @@ impl TransactionsQueue {
     }
 
     /// Removes the next pending transaction from the queue, marking it as failed.
-    ///
-    /// This is typically called when a transaction cannot be sent due to errors
-    /// like insufficient funds, network issues, or validation failures.
     pub async fn move_next_pending_to_failed(&mut self) {
         let mut transactions = self.pending_transactions.lock().await;
         if let Some(tx) = transactions.front() {
@@ -307,13 +247,6 @@ impl TransactionsQueue {
     }
 
     /// Gets the next transaction from the inmempool queue without removing it.
-    ///
-    /// Inmempool transactions are those that have been sent to the network
-    /// but have not yet been mined into a block.
-    ///
-    /// # Returns
-    /// * `Some(Transaction)` - The next inmempool transaction if queue is not empty
-    /// * `None` - If the inmempool queue is empty
     pub async fn get_next_inmempool_transaction(&self) -> Option<Transaction> {
         let transactions = self.inmempool_transactions.lock().await;
 
@@ -321,9 +254,6 @@ impl TransactionsQueue {
     }
 
     /// Returns the number of transactions currently in the inmempool queue.
-    ///
-    /// # Returns
-    /// * `usize` - The count of transactions awaiting mining
     pub async fn get_inmempool_transaction_count(&self) -> usize {
         let transactions = self.inmempool_transactions.lock().await;
         let count = transactions.len();
@@ -332,9 +262,6 @@ impl TransactionsQueue {
     }
 
     /// Updates the first inmempool transaction with new gas values after a gas bump.
-    ///
-    /// # Arguments
-    /// * `transaction_sent` - The transaction details with updated gas values
     pub async fn update_inmempool_transaction_gas(
         &mut self,
         transaction_sent: &TransactionSentWithRelayer,
@@ -358,10 +285,6 @@ impl TransactionsQueue {
     }
 
     /// Updates the inmempool transaction with no-op details after cancellation.
-    ///
-    /// # Arguments
-    /// * `transaction_id` - The ID of the transaction to update
-    /// * `transaction_sent` - The transaction details with new hash and no-op data
     pub async fn update_inmempool_transaction_noop(
         &mut self,
         transaction_id: &TransactionId,
@@ -386,11 +309,6 @@ impl TransactionsQueue {
     }
 
     /// Updates the inmempool transaction with a new transaction
-    ///
-    /// # Arguments
-    /// * `transaction_id` - The ID of the transaction to update
-    /// * `transaction_sent_with_relayer` - The transaction details with new hash and no-op data
-    /// * `replacement_transaction` - The replacement transaction
     pub async fn update_inmempool_transaction_replaced(
         &mut self,
         transaction_id: &TransactionId,

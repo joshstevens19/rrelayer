@@ -3,8 +3,8 @@ use reqwest::header::{HeaderMap, HeaderValue};
 use rrelayer_core::RATE_LIMIT_HEADER_NAME;
 use rrelayer_core::common_types::{PagingContext, PagingResult};
 use rrelayer_core::relayer::RelayerId;
-use rrelayer_core::signing::api::{SignTextResult, SignTypedDataResult};
-use rrelayer_core::signing::db::read::{SignedTextHistory, SignedTypedDataHistory};
+use rrelayer_core::signing::{SignTextResult, SignTypedDataResult};
+use rrelayer_core::signing::{SignedTextHistory, SignedTypedDataHistory};
 use std::sync::Arc;
 
 #[derive(Clone)]

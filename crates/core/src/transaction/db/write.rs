@@ -17,18 +17,6 @@ use alloy::network::AnyTransactionReceipt;
 const TRANSACTION_TABLES: [&str; 2] = ["relayer.transaction", "relayer.transaction_audit_log"];
 
 impl PostgresClient {
-    /// Saves a new transaction to the database.
-    ///
-    /// Inserts the transaction into both the main transaction table and the audit log
-    /// within a database transaction to ensure consistency.
-    ///
-    /// # Arguments
-    /// * `relayer_id` - The ID of the relayer handling this transaction
-    /// * `transaction` - The transaction to save
-    ///
-    /// # Returns
-    /// * `Ok(())` - If the transaction was saved successfully
-    /// * `Err(PostgresError)` - If a database error occurs
     pub async fn save_transaction(
         &mut self,
         relayer_id: &RelayerId,
@@ -69,21 +57,6 @@ impl PostgresClient {
         Ok(())
     }
 
-    /// Updates a transaction's status to 'Inmempool' after it has been sent to the network.
-    ///
-    /// Records the transaction hash, gas parameters, and timestamp when the transaction
-    /// was successfully sent to the blockchain network.
-    /// Updates the main transaction table and creates a new audit log entry.
-    ///
-    /// # Arguments
-    /// * `transaction_id` - The ID of the transaction that was sent
-    /// * `transaction_hash` - The hash assigned by the blockchain network
-    /// * `sent_with_gas` - The gas price parameters used for sending
-    /// * `legacy_transaction` - Whether this is a legacy transaction type
-    ///
-    /// # Returns
-    /// * `Ok(())` - If the update was successful
-    /// * `Err(PostgresError)` - If a database error occurs
     pub async fn transaction_sent(
         &mut self,
         transaction_id: &TransactionId,
@@ -154,19 +127,6 @@ impl PostgresClient {
         Ok(())
     }
 
-    /// Records a transaction that failed to be sent to the network.
-    ///
-    /// Creates a new entry in both transaction tables with a failed status and the reason
-    /// for the failure. The failure reason is truncated to 2000 characters.
-    ///
-    /// # Arguments
-    /// * `relayer_id` - The ID of the relayer that attempted to send the transaction
-    /// * `transaction` - The transaction that failed to send
-    /// * `failed_reason` - The reason why the transaction failed to send
-    ///
-    /// # Returns
-    /// * `Ok(())` - If the failure was recorded successfully
-    /// * `Err(PostgresError)` - If a database error occurs
     pub async fn transaction_failed_on_send(
         &self,
         relayer_id: &RelayerId,
@@ -209,16 +169,6 @@ impl PostgresClient {
         Ok(())
     }
 
-    /// Updates a transaction's content when converted to a no-op during cancellation.
-    /// Updates the main transaction table and creates a new audit log entry.
-    ///
-    /// # Arguments
-    /// * `transaction_id` - The unique identifier of the transaction
-    /// * `to` - The new recipient address (usually the relayer's own address)
-    ///
-    /// # Returns
-    /// * `Ok(())` - If the update was successful
-    /// * `Err(PostgresError)` - If a database error occurs
     pub async fn update_transaction_noop(
         &mut self,
         transaction_id: &TransactionId,
@@ -268,19 +218,6 @@ impl PostgresClient {
         Ok(())
     }
 
-    /// Updates an existing transaction's status to 'Failed'.
-    /// Updates the main transaction table and creates a new audit log entry.
-    ///
-    /// Sets the transaction status to failed, records the failure timestamp and reason.
-    /// The failure reason is truncated to 2000 characters.
-    ///
-    /// # Arguments
-    /// * `transaction_id` - The ID of the transaction that failed
-    /// * `reason` - The reason why the transaction failed
-    ///
-    /// # Returns
-    /// * `Ok(())` - If the update was successful
-    /// * `Err(PostgresError)` - If a database error occurs
     pub async fn update_transaction_failed(
         &mut self,
         transaction_id: &TransactionId,
@@ -334,19 +271,6 @@ impl PostgresClient {
         Ok(())
     }
 
-    /// Updates a transaction's status to 'Mined' after it has been included in a block.
-    /// Updates the main transaction table and creates a new audit log entry.
-    ///
-    /// Records block information, gas usage, and the timestamp when the transaction
-    /// was mined on the blockchain.
-    ///
-    /// # Arguments
-    /// * `transaction` - The transaction that was mined
-    /// * `transaction_receipt` - The receipt containing block and gas information
-    ///
-    /// # Returns
-    /// * `Ok(())` - If the update was successful
-    /// * `Err(PostgresError)` - If a database error occurs
     pub async fn transaction_mined(
         &mut self,
         transaction: &Transaction,
@@ -443,18 +367,6 @@ impl PostgresClient {
         Ok(())
     }
 
-    /// Updates a transaction's status to 'Confirmed' after sufficient block confirmations.
-    /// Updates the main transaction table and creates a new audit log entry.
-    ///
-    /// Records the timestamp when the transaction reached the required number of
-    /// confirmations on the blockchain.
-    ///
-    /// # Arguments
-    /// * `transaction_id` - The ID of the transaction that was confirmed
-    ///
-    /// # Returns
-    /// * `Ok(())` - If the update was successful
-    /// * `Err(PostgresError)` - If a database error occurs
     pub async fn transaction_confirmed(
         &mut self,
         transaction_id: &TransactionId,
@@ -500,18 +412,6 @@ impl PostgresClient {
         Ok(())
     }
 
-    /// Updates a transaction's status to 'Expired' when it has timed out.
-    /// Updates the main transaction table and creates a new audit log entry.
-    ///
-    /// Records the timestamp when the transaction was marked as expired,
-    /// typically when it hasn't been mined within the expected timeframe.
-    ///
-    /// # Arguments
-    /// * `transaction_id` - The ID of the transaction that expired
-    ///
-    /// # Returns
-    /// * `Ok(())` - If the update was successful
-    /// * `Err(PostgresError)` - If a database error occurs
     pub async fn transaction_expired(
         &mut self,
         transaction_id: &TransactionId,
@@ -557,17 +457,6 @@ impl PostgresClient {
         Ok(())
     }
 
-    /// Updates an existing transaction with new data.
-    /// Updates the main transaction table and creates a new audit log entry.
-    ///
-    /// This is useful for recording changes like replacements, gas bumps, or other modifications.
-    ///
-    /// # Arguments
-    /// * `transaction` - The transaction with updated data
-    ///
-    /// # Returns
-    /// * `Ok(())` - If the update was successful
-    /// * `Err(PostgresError)` - If a database error occurs
     pub async fn transaction_update(&self, transaction: &Transaction) -> Result<(), PostgresError> {
         let mut conn = self.pool.get().await?;
         let trans = conn.transaction().await.map_err(PostgresError::PgError)?;

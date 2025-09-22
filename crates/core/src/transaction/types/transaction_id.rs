@@ -74,7 +74,6 @@ impl ToSql for TransactionId {
         ty: &Type,
         out: &mut BytesMut,
     ) -> Result<IsNull, Box<dyn Error + Sync + Send + 'static>> {
-        // Delegate to the Uuid's ToSql implementation
         self.0.to_sql(ty, out)
     }
 

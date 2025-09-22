@@ -8,7 +8,7 @@ use crate::{
     provider::EvmProvider,
     rate_limiting::RateLimiter,
     shared::cache::Cache,
-    transaction::queue_system::transactions_queues::TransactionsQueues,
+    transaction::queue_system::TransactionsQueues,
     webhooks::WebhookManager,
     yaml::RateLimitConfig,
 };

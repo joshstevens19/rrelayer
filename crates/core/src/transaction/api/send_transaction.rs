@@ -1,12 +1,11 @@
 use super::types::TransactionSpeed;
 use crate::rate_limiting::RateLimiter;
 use crate::shared::utils::convert_blob_strings_to_blobs;
-use crate::shared::HttpError;
+use crate::shared::{internal_server_error, HttpError};
 use crate::{
     app_state::AppState,
-    rate_limiting::{RateLimitError, RateLimitOperation},
-    relayer::{get_relayer, RelayerId},
-    rrelayer_error,
+    rate_limiting::RateLimitOperation,
+    relayer::RelayerId,
     shared::common_types::EvmAddress,
     transaction::{
         queue_system::TransactionToSend,
@@ -21,11 +20,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use std::sync::Arc;
-use tracing::error;
 
-/// Request structure for relaying transactions.
-///
-/// Contains all necessary information to create and relay a blockchain transaction.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct RelayTransactionRequest {
     pub to: EvmAddress,
@@ -43,22 +38,11 @@ pub struct RelayTransactionRequest {
 impl FromStr for RelayTransactionRequest {
     type Err = serde_json::Error;
 
-    /// Parses a RelayTransactionRequest from a JSON string.
-    ///
-    /// # Arguments
-    /// * `s` - The JSON string to parse
-    ///
-    /// # Returns
-    /// * `Ok(RelayTransactionRequest)` - The parsed request
-    /// * `Err(serde_json::Error)` - If JSON parsing fails
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         serde_json::from_str(s)
     }
 }
 
-/// Response structure for send transaction requests.
-///
-/// Contains the assigned transaction ID and the blockchain transaction hash.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SendTransactionResult {
     pub id: TransactionId,
@@ -66,18 +50,6 @@ pub struct SendTransactionResult {
 }
 
 /// API endpoint to send a new transaction through a relayer.
-///
-/// Creates a new transaction and adds it to the transaction queue for processing.
-///
-/// # Arguments
-/// * `state` - The application state containing transaction queues and other services
-/// * `relayer_id` - The relayer ID path parameter
-/// * `headers` - HTTP headers (for future API key validation)
-/// * `transaction` - The transaction request payload
-///
-/// # Returns
-/// * `Ok(Json<SendTransactionResult>)` - The transaction ID and hash if successful
-/// * `Err(StatusCode)` - BAD_REQUEST for invalid transactions, INTERNAL_SERVER_ERROR for other failures
 pub async fn send_transaction(
     State(state): State<Arc<AppState>>,
     Path(relayer_id): Path<RelayerId>,
@@ -106,15 +78,13 @@ pub async fn send_transaction(
         .lock()
         .await
         .add_transaction(&relayer_id, &transaction_to_send)
-        .await
-        .map_err(|e| {
-            error!("{}", e);
-            StatusCode::BAD_REQUEST
-        })?;
+        .await?;
 
     let result = SendTransactionResult {
         id: transaction.id,
-        hash: transaction.known_transaction_hash.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?,
+        hash: transaction.known_transaction_hash.ok_or(internal_server_error(Some(
+            "should always have a known transaction hash".to_string(),
+        )))?,
     };
 
     if let Some(reservation) = rate_limit_reservation {

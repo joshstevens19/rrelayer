@@ -33,7 +33,7 @@ use super::{
         TransactionsQueueSetup,
     },
 };
-use crate::transaction::api::send_transaction::RelayTransactionRequest;
+use crate::transaction::api::RelayTransactionRequest;
 use crate::transaction::types::TransactionSpeed;
 use crate::{
     gas::{

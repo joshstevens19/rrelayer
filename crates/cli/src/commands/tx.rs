@@ -2,7 +2,7 @@ use alloy::primitives::U256;
 use chrono::{DateTime, Utc};
 use clap::Subcommand;
 use rrelayer_core::common_types::PagingContext;
-use rrelayer_core::transaction::api::send_transaction::RelayTransactionRequest;
+use rrelayer_core::transaction::api::RelayTransactionRequest;
 use rrelayer_core::{
     common_types::EvmAddress,
     relayer::RelayerId,

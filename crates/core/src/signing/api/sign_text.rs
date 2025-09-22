@@ -1,10 +1,10 @@
 use crate::rate_limiting::RateLimiter;
 use crate::shared::{not_found, HttpError};
+use crate::signing::db::RecordSignedTextRequest;
 use crate::{
     app_state::AppState,
     rate_limiting::RateLimitOperation,
     relayer::{get_relayer_provider_context_by_relayer_id, RelayerId},
-    signing::db::write::RecordSignedTextRequest,
 };
 use alloy::primitives::PrimitiveSignature;
 use axum::http::HeaderMap;

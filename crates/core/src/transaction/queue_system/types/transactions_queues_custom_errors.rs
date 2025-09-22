@@ -9,6 +9,7 @@ use thiserror::Error;
 use super::{
     SendTransactionGasPriceError, TransactionQueueSendTransactionError, TransactionSentWithRelayer,
 };
+use crate::shared::{bad_request, internal_server_error, not_found, HttpError};
 use crate::{
     postgres::PostgresError,
     relayer::RelayerId,
@@ -35,6 +36,24 @@ pub enum ReplaceTransactionError {
 
     #[error("Relayer could not update the transaction in the db {0}")]
     CouldNotUpdateTransactionInDb(#[from] PostgresError),
+}
+
+impl From<ReplaceTransactionError> for HttpError {
+    fn from(value: ReplaceTransactionError) -> Self {
+        if matches!(value, ReplaceTransactionError::TransactionNotFound(_)) {
+            return bad_request(value.to_string());
+        }
+
+        if matches!(value, ReplaceTransactionError::RelayerIsPaused(_)) {
+            return bad_request(value.to_string());
+        }
+
+        if matches!(value, ReplaceTransactionError::RelayerNotAllowedToSendTransactionTo(_, _)) {
+            return bad_request(value.to_string());
+        }
+
+        internal_server_error(Some(value.to_string()))
+    }
 }
 
 #[derive(Error, Debug)]
@@ -70,6 +89,24 @@ pub enum AddTransactionError {
     CouldNotGetCurrentOnChainNonce(RelayerId, RpcError<TransportErrorKind>),
 }
 
+impl From<AddTransactionError> for HttpError {
+    fn from(value: AddTransactionError) -> Self {
+        if matches!(value, AddTransactionError::RelayerIsPaused(_)) {
+            return bad_request(value.to_string());
+        }
+
+        if matches!(value, AddTransactionError::RelayerNotFound(_)) {
+            return not_found(value.to_string());
+        }
+
+        if matches!(value, AddTransactionError::RelayerNotAllowedToSendTransactionTo(_, _)) {
+            return bad_request(value.to_string());
+        }
+
+        internal_server_error(Some(value.to_string()))
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum CancelTransactionError {
     #[error("Send transaction error: {0}")]
@@ -83,6 +120,20 @@ pub enum CancelTransactionError {
 
     #[error("Relayer {0} is paused")]
     RelayerIsPaused(RelayerId),
+}
+
+impl From<CancelTransactionError> for HttpError {
+    fn from(value: CancelTransactionError) -> Self {
+        if matches!(value, CancelTransactionError::RelayerIsPaused(_)) {
+            return bad_request(value.to_string());
+        }
+
+        if matches!(value, CancelTransactionError::RelayerNotFound(_)) {
+            return not_found(value.to_string());
+        }
+
+        internal_server_error(Some(value.to_string()))
+    }
 }
 
 #[derive(Error, Debug)]

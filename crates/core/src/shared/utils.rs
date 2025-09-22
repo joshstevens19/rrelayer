@@ -1,4 +1,5 @@
 use crate::rrelayer_error;
+use crate::shared::{bad_request, HttpError};
 use crate::transaction::types::TransactionBlob;
 use alloy::primitives::U256;
 use alloy_eips::eip4844::Blob;
@@ -23,14 +24,14 @@ pub async fn sleep_ms(ms: &u64) {
 /// Converts optional blob strings to optional blob objects.
 pub fn convert_blob_strings_to_blobs(
     blob_strings: Option<Vec<String>>,
-) -> Result<Option<Vec<TransactionBlob>>, StatusCode> {
+) -> Result<Option<Vec<TransactionBlob>>, HttpError> {
     match blob_strings {
         Some(strings) => {
             let mut blobs = Vec::new();
             for blob_str in strings {
                 let blob = blob_str.parse::<Blob>().map_err(|e| {
                     rrelayer_error!("Failed to parse blob hex string '{}': {:?}", blob_str, e);
-                    StatusCode::BAD_REQUEST
+                    bad_request("Failed to parse blob hex string".to_string())
                 })?;
 
                 blobs.push(TransactionBlob::new(&blob));

@@ -71,12 +71,10 @@ impl TryFrom<TransactionBlob> for Blob {
 }
 
 impl TransactionBlob {
-    /// Convert a vector of Blobs to TransactionBlobs
     pub fn from_blobs(blobs: &[Blob]) -> Vec<TransactionBlob> {
         blobs.iter().map(|blob| TransactionBlob::from(*blob)).collect()
     }
 
-    /// Convert a vector of TransactionBlobs to Blobs
     pub fn to_blobs(transaction_blobs: &[TransactionBlob]) -> Result<Vec<Blob>> {
         transaction_blobs.iter().map(|tb| tb.to_blob()).collect()
     }

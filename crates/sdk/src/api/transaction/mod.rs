@@ -1,9 +1,7 @@
 use crate::api::{http::HttpClient, types::ApiResult};
 use reqwest::header::{HeaderMap, HeaderValue};
-use rrelayer_core::transaction::api::get_transaction_status::RelayTransactionStatusResult;
-use rrelayer_core::transaction::api::send_transaction::{
-    RelayTransactionRequest, SendTransactionResult,
-};
+use rrelayer_core::transaction::api::RelayTransactionStatusResult;
+use rrelayer_core::transaction::api::{RelayTransactionRequest, SendTransactionResult};
 use rrelayer_core::{
     RATE_LIMIT_HEADER_NAME,
     common_types::{PagingContext, PagingResult},

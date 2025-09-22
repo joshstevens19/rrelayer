@@ -1,12 +1,12 @@
 use alloy::network::AnyTransactionReceipt;
 use axum::{
     extract::{Path, State},
-    http::StatusCode,
     Json,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+use crate::shared::{internal_server_error, not_found, HttpError};
 use crate::{
     app_state::AppState,
     provider::find_provider_for_chain_id,
@@ -17,9 +17,6 @@ use crate::{
     },
 };
 
-/// Response structure for transaction status requests.
-///
-/// Contains the transaction hash, current status, and receipt if available.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RelayTransactionStatusResult {
     pub hash: Option<TransactionHash>,
@@ -28,25 +25,13 @@ pub struct RelayTransactionStatusResult {
 }
 
 /// API endpoint to retrieve transaction status and receipt information.
-///
-/// Fetches transaction status and optionally retrieves the transaction receipt
-/// from the blockchain provider for completed transactions.
-///
-/// # Arguments
-/// * `state` - The application state containing cache, database, and provider connections
-/// * `id` - The transaction ID path parameter
-///
-/// # Returns
-/// * `Ok(Json<RelayTransactionStatusResult>)` - Transaction status with hash and receipt
-/// * `Err(StatusCode)` - NOT_FOUND if transaction doesn't exist, INTERNAL_SERVER_ERROR on other failures
 pub async fn get_transaction_status(
     State(state): State<Arc<AppState>>,
     Path(id): Path<TransactionId>,
-) -> Result<Json<RelayTransactionStatusResult>, StatusCode> {
+) -> Result<Json<RelayTransactionStatusResult>, HttpError> {
     let transaction = get_transaction_by_id(&state.cache, &state.db, id)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .ok_or(StatusCode::NOT_FOUND)?;
+        .await?
+        .ok_or(not_found("Transaction id not found".to_string()))?;
 
     if matches!(
         transaction.status,
@@ -60,9 +45,8 @@ pub async fn get_transaction_status(
     }
 
     let relayer = get_relayer(&state.db, &state.cache, &transaction.relayer_id)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .ok_or(StatusCode::NOT_FOUND)?;
+        .await?
+        .ok_or(not_found("Relayer not found".to_string()))?;
 
     let hash = match transaction.known_transaction_hash {
         Some(hash) => hash,
@@ -77,10 +61,12 @@ pub async fn get_transaction_status(
 
     let provider = find_provider_for_chain_id(&state.evm_providers, &relayer.chain_id)
         .await
-        .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
+        .ok_or(internal_server_error(Some("Evm provider can not be found".to_string())))?;
 
-    let receipt =
-        provider.get_receipt(&hash).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let receipt = provider
+        .get_receipt(&hash)
+        .await
+        .map_err(|e| internal_server_error(Some(e.to_string())))?;
 
     Ok(Json(RelayTransactionStatusResult { hash: Some(hash), status: transaction.status, receipt }))
 }

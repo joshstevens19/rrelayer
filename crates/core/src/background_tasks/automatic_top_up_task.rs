@@ -8,7 +8,7 @@ use crate::{
     relayer::Relayer,
     safe_proxy::SafeProxyManager,
     shared::common_types::{EvmAddress, PagingContext},
-    transaction::queue_system::transactions_queues::TransactionsQueues,
+    transaction::queue_system::TransactionsQueues,
     yaml::{AutomaticTopUpConfig, Erc20TokenConfig, NativeTokenConfig, TopUpTargetAddresses},
     SetupConfig,
 };

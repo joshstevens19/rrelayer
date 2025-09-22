@@ -24,8 +24,7 @@ use crate::{
     transaction::{
         api::create_transactions_routes,
         queue_system::{
-            startup_transactions_queues, transactions_queues::TransactionsQueues,
-            StartTransactionsQueuesError,
+            startup_transactions_queues, StartTransactionsQueuesError, TransactionsQueues,
         },
     },
     ApiConfig, RateLimitConfig,

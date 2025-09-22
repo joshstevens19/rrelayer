@@ -1,5 +1,6 @@
 mod transactions_queue;
-pub mod transactions_queues;
+mod transactions_queues;
+pub use transactions_queues::TransactionsQueues;
 
 mod types;
 pub use types::{TransactionToSend, TransactionsQueueSetup};

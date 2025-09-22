@@ -9,11 +9,11 @@ use futures;
 use rrelayer_core::gas::types::GasPrice;
 use rrelayer_core::network::ChainId;
 use rrelayer_core::relayer::CreateRelayerResult;
-use rrelayer_core::transaction::api::get_transaction_status::RelayTransactionStatusResult;
+use rrelayer_core::transaction::api::RelayTransactionStatusResult;
 use rrelayer_core::transaction::types::Transaction;
 use rrelayer_core::{
     common_types::{EvmAddress, PagingContext},
-    transaction::api::send_transaction::RelayTransactionRequest,
+    transaction::api::RelayTransactionRequest,
     transaction::types::{
         TransactionData, TransactionId, TransactionSpeed, TransactionStatus, TransactionValue,
     },

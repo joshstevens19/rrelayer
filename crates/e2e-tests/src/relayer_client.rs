@@ -8,9 +8,9 @@ use rrelayer_core::transaction::types::Transaction;
 use rrelayer_core::{
     common_types::{EvmAddress, PagingContext},
     relayer::RelayerId,
-    transaction::api::get_transaction_status::RelayTransactionStatusResult,
-    transaction::api::send_transaction::{RelayTransactionRequest, SendTransactionResult},
-    transaction::api::types::TransactionSpeed,
+    transaction::api::RelayTransactionStatusResult,
+    transaction::api::TransactionSpeed,
+    transaction::api::{RelayTransactionRequest, SendTransactionResult},
     transaction::types::{TransactionData, TransactionId, TransactionValue},
 };
 use rrelayer_sdk::SDK;
