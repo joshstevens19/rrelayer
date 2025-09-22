@@ -24,6 +24,14 @@ pub enum AllowlistCommand {
         /// The unique identifier of the relayer
         #[clap(required = true)]
         relayer_id: RelayerId,
+
+        /// Number of results to return (default: 10)
+        #[clap(long, default_value = "10")]
+        limit: u32,
+
+        /// Number of results to skip (default: 0)
+        #[clap(long, default_value = "0")]
+        offset: u32,
     },
     /// Delete an address from the allowlist
     Delete {
@@ -42,7 +50,9 @@ pub async fn handle_allowlist(command: &AllowlistCommand, sdk: &SDK) -> Result<(
         AllowlistCommand::Add { relayer_id, address } => {
             handle_allowlist_add(relayer_id, address, sdk).await
         }
-        AllowlistCommand::List { relayer_id } => handle_allowlist_list(relayer_id, sdk).await,
+        AllowlistCommand::List { relayer_id, limit, offset } => {
+            handle_allowlist_list(relayer_id, *limit, *offset, sdk).await
+        }
         AllowlistCommand::Delete { relayer_id, address } => {
             handle_allowlist_delete(relayer_id, address, sdk).await
         }
@@ -61,22 +71,16 @@ async fn handle_allowlist_add(
     Ok(())
 }
 
-async fn handle_allowlist_list(relayer_id: &RelayerId, sdk: &SDK) -> Result<(), AllowlistError> {
-    let addresses = sdk
-        .relayer
-        .allowlist
-        .get_all(
-            relayer_id,
-            &PagingContext {
-                // TODO: handle paging later
-                limit: 1000,
-                offset: 0,
-            },
-        )
-        .await?
-        .items;
+async fn handle_allowlist_list(
+    relayer_id: &RelayerId,
+    limit: u32,
+    offset: u32,
+    sdk: &SDK,
+) -> Result<(), AllowlistError> {
+    let paging_context = PagingContext::new(limit, offset);
+    let result = sdk.relayer.allowlist.get_all(relayer_id, &paging_context).await?;
 
-    if addresses.is_empty() {
+    if result.items.is_empty() {
         println!(
             "No allowlisted contracts found for relayer {} - note this means everything is allowed",
             relayer_id
@@ -85,14 +89,18 @@ async fn handle_allowlist_list(relayer_id: &RelayerId, sdk: &SDK) -> Result<(), 
     }
 
     let mut rows = Vec::new();
-    for address in addresses.iter() {
+    for address in result.items.iter() {
         rows.push(vec![address.to_string()]);
     }
 
     let headers = vec!["Allowlist Address"];
 
-    let title = format!("{} Relayer Allowlist Addresses:", addresses.len());
+    let title = format!("{} Relayer Allowlist Addresses:", result.items.len());
     print_table(headers, rows, Some(&title), None);
+
+    if let Some(next) = &result.next {
+        println!("Use --limit {} --offset {} to see more results", next.limit, next.offset);
+    }
 
     Ok(())
 }

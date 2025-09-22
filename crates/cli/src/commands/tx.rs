@@ -37,6 +37,14 @@ pub enum TxCommand {
         /// Filter by status (pending, sent, failed, success)
         #[arg(long)]
         status: Option<TxStatus>,
+
+        /// Number of results to return (default: 10)
+        #[clap(long, default_value = "10")]
+        limit: u32,
+
+        /// Number of results to skip (default: 0)
+        #[clap(long, default_value = "0")]
+        offset: u32,
     },
     /// List pending and mempool transactions size
     Queue {
@@ -119,7 +127,9 @@ pub async fn handle_tx(command: &TxCommand, sdk: &SDK) -> Result<(), Transaction
             handle_withdraw(relayer_id, to, amount, sdk).await
         }
         TxCommand::Status { tx_id } => handle_status(tx_id, sdk).await,
-        TxCommand::List { relayer_id, status } => handle_list(relayer_id, status, sdk).await,
+        TxCommand::List { relayer_id, status, limit, offset } => {
+            handle_list(relayer_id, status, *limit, *offset, sdk).await
+        }
         TxCommand::Queue { relayer_id } => handle_queue(relayer_id, sdk).await,
         TxCommand::Cancel { tx_id } => handle_cancel(tx_id, sdk).await,
         TxCommand::Replace { tx_id, transaction } => handle_replace(tx_id, transaction, sdk).await,
@@ -193,21 +203,18 @@ async fn handle_list(
     relayer_id: &RelayerId,
     // TODO: handle status filtering
     _status: &Option<TxStatus>,
+    limit: u32,
+    offset: u32,
     sdk: &SDK,
 ) -> Result<(), TransactionError> {
-    let transactions = sdk
-        .transaction
-        .get_transactions(
-            relayer_id,
-            &PagingContext {
-                // TODO: handle paging later
-                limit: 1000,
-                offset: 0,
-            },
-        )
-        .await?;
+    let paging_context = PagingContext::new(limit, offset);
+    let transactions = sdk.transaction.get_transactions(relayer_id, &paging_context).await?;
 
     log_transactions(transactions.items)?;
+
+    if let Some(next) = &transactions.next {
+        println!("Use --limit {} --offset {} to see more results", next.limit, next.offset);
+    }
 
     Ok(())
 }

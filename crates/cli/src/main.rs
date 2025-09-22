@@ -104,7 +104,7 @@ async fn main() -> Result<(), CliError> {
 
             network::handle_network(command, &project_location, &sdk).await?;
         }
-        Commands::List { path, network } => {
+        Commands::List { path, network, limit, offset } => {
             let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;
             load_env_from_project_path(&resolved_path);
 
@@ -114,7 +114,7 @@ async fn main() -> Result<(), CliError> {
 
             check_authenticate(&sdk).await?;
 
-            list::handle_list(network, &project_location, &sdk).await?;
+            list::handle_list(network, *limit, *offset, &project_location, &sdk).await?;
         }
         Commands::Config { path, command } => {
             let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;

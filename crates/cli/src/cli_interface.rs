@@ -72,6 +72,14 @@ pub enum Commands {
 
         #[arg(long, short)]
         network: Option<String>,
+
+        /// Number of results to return (default: 10)
+        #[clap(long, default_value = "10")]
+        limit: u32,
+
+        /// Number of results to skip (default: 0)
+        #[clap(long, default_value = "0")]
+        offset: u32,
     },
     /// Configure operations for a specific relayer
     Config {
