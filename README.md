@@ -1,21 +1,24 @@
 # rrelayer
 
-// copy from docs
+## The last core feature to see how much scope gets added:
+- turnkey signer
+- cron job to hit a contract call with parameters every n minutes
+- send tx on event firing using rindexer
 
-# TODO LIST
+## TODO List
 
-The last feature to see how much scope gets added:
-  - turnkey signer
-  - cron job to hit a contract call with parameters every n minutes
-  - send tx on event firing using rindexer
-
-- Testing sending all tx flows with
+- Testing sending all tx flows with:
   - AWS key manager - already manually tested but need e2e
   - GCP key manager - already manually tested but need e2e
-  - KMS - not tested
+  - KMS - not tested and needs e2e
   - Privy - already manually tested but need e2e
-- Look over the gas logic again maybe add some max to protect over speeding huge amounts of ETH
+  - Testing loading up infura gas 
+  - Testing loading up tenderly gas
+  - Testing handling custom gas with http call
+  - Fix websockets delivery ID being repeated for some reason
+- Look over the gas logic again maybe add some max to protect over speeding huge amounts of ETH incase it gets its wrong
 - Change the TS sdk to work with the changes in the playground
+- Look over indexes required on all queries
 - AI write go and python SDK
 - Finish documentation
 - Internal documentation in the README.MD throughout
