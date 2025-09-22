@@ -309,7 +309,8 @@ impl PostgresClient {
                 id, webhook_endpoint, event_type, status, transaction_id, relayer_id, chain_id,
                 attempts, max_retries, payload, headers, first_attempt_at, last_attempt_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $12);
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $12)
+            ON CONFLICT (id) DO NOTHING;
         "#;
 
         let conn = self.pool.get().await?;

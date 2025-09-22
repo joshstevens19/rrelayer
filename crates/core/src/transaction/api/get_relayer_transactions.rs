@@ -26,7 +26,6 @@ use crate::{
 /// # Returns
 /// * `Ok(Json<PagingResult<Transaction>>)` - Paginated list of transactions
 /// * `Err(StatusCode)` - INTERNAL_SERVER_ERROR if database query fails
-// TODO! add paged caching
 pub async fn get_relayer_transactions(
     State(state): State<Arc<AppState>>,
     Path(relayer_id): Path<RelayerId>,

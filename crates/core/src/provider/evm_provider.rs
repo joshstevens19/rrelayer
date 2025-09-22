@@ -26,9 +26,10 @@ use reqwest::Url;
 use thiserror::Error;
 
 use crate::wallet::{
-    AwsKmsWalletManager, MnemonicWalletManager, PrivyWalletManager, WalletError, WalletManagerTrait,
+    AwsKmsWalletManager, MnemonicWalletManager, PrivyWalletManager, TurnkeyWalletManager,
+    WalletError, WalletManagerTrait,
 };
-use crate::yaml::AwsKmsSigningKey;
+use crate::yaml::{AwsKmsSigningKey, TurnkeySigningKey};
 use crate::{
     gas::{
         blob_gas_oracle::{BlobGasEstimatorResult, BlobGasPriceResult},
@@ -242,6 +243,31 @@ impl EvmProvider {
         gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
     ) -> Result<Self, EvmProviderNewError> {
         let wallet_manager = Arc::new(AwsKmsWalletManager::new(aws_kms_config));
+        Self::new_internal(network_setup_config, wallet_manager, gas_estimator).await
+    }
+
+    /// Creates a new EvmProvider using Turnkey for wallet management.
+    ///
+    /// This constructor initializes an EvmProvider with Turnkey wallet management service
+    /// for handling wallet operations and transaction signing through Turnkey's API.
+    ///
+    /// # Arguments
+    /// * `network_setup_config` - Network configuration including RPC URLs and chain settings
+    /// * `turnkey_config` - Turnkey configuration containing API credentials and wallet account mappings
+    /// * `gas_estimator` - Gas fee estimation service for transaction pricing
+    ///
+    /// # Returns
+    /// * `Ok(Self)` - Successfully initialized EvmProvider
+    /// * `Err(EvmProviderNewError)` - Error during provider initialization
+    pub async fn new_with_turnkey(
+        network_setup_config: &NetworkSetupConfig,
+        turnkey_config: TurnkeySigningKey,
+        gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
+    ) -> Result<Self, EvmProviderNewError> {
+        let turnkey_manager = TurnkeyWalletManager::new(turnkey_config)
+            .await
+            .map_err(|e| EvmProviderNewError::WalletManagerError(e.to_string()))?;
+        let wallet_manager = Arc::new(turnkey_manager);
         Self::new_internal(network_setup_config, wallet_manager, gas_estimator).await
     }
 

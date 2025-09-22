@@ -5,6 +5,7 @@ use alloy::providers::{Provider, ProviderBuilder};
 use alloy::rpc::types::TransactionRequest;
 use alloy::signers::local::PrivateKeySigner;
 use anyhow::{anyhow, Context, Result};
+use futures;
 use rrelayer_core::gas::types::GasPrice;
 use rrelayer_core::network::types::ChainId;
 use rrelayer_core::relayer::api::CreateRelayerResult;
@@ -24,7 +25,6 @@ use std::thread::sleep;
 use std::time::{Duration, Instant};
 use tokio::time::timeout;
 use tracing::{debug, error, info, warn};
-use futures;
 
 #[derive(Debug, Clone)]
 pub enum TestResult {
@@ -156,11 +156,11 @@ impl TestRunner {
         // Initialize webhook server with the shared secret from yaml
         let webhook_server = Some(WebhookTestServer::new("test-webhook-secret-123".to_string()));
 
-        Ok(Self { 
-            config, 
-            relayer_client, 
-            contract_interactor, 
-            anvil_manager, 
+        Ok(Self {
+            config,
+            relayer_client,
+            contract_interactor,
+            anvil_manager,
             webhook_server,
             relayer_counter: std::sync::atomic::AtomicUsize::new(0),
         })
@@ -660,29 +660,39 @@ impl TestRunner {
         Ok(relayer)
     }
 
-    pub async fn create_by_index_and_fund_relayer(&self, target_index: usize) -> Result<CreateRelayerResult> {
+    pub async fn create_by_index_and_fund_relayer(
+        &self,
+        target_index: usize,
+    ) -> Result<CreateRelayerResult> {
         let current_count = self.relayer_counter.load(std::sync::atomic::Ordering::SeqCst);
-        
+
         if target_index < current_count {
-            return Err(anyhow!("Target index {} is less than current relayer count {}", target_index, current_count));
+            return Err(anyhow!(
+                "Target index {} is less than current relayer count {}",
+                target_index,
+                current_count
+            ));
         }
 
         // Create relayers in concurrent batches of 10 (smaller batches to test deadlock fix)
         let batch_size = 10;
         let mut last_relayer = None;
         let total_to_create = target_index - current_count + 1;
-        
-        info!("Creating {} relayers from index {} to {} in batches of {}", total_to_create, current_count, target_index, batch_size);
-        
+
+        info!(
+            "Creating {} relayers from index {} to {} in batches of {}",
+            total_to_create, current_count, target_index, batch_size
+        );
+
         for batch_start in (current_count..=target_index).step_by(batch_size) {
             let batch_end = std::cmp::min(batch_start + batch_size - 1, target_index);
             info!("Creating relayers batch {}-{}", batch_start, batch_end);
-            
+
             // Check if this batch contains the target index
             if batch_start <= target_index && target_index <= batch_end {
                 // This batch contains the target index - handle it specially
                 let mut batch_results = Vec::new();
-                
+
                 for i in batch_start..=batch_end {
                     let relayer_name = format!("relayer_{}", i);
                     let relayer = if i == target_index {
@@ -692,7 +702,7 @@ impl TestRunner {
                         // Use regular create_relayer for all others
                         self.create_relayer(&relayer_name).await?
                     };
-                    
+
                     info!("Created relayer {} at index {}", relayer.id, i);
                     if i == target_index {
                         last_relayer = Some(relayer);
@@ -703,17 +713,14 @@ impl TestRunner {
                 }
             } else {
                 // Regular batch without target index - create all concurrently
-                let relayer_names: Vec<String> = (batch_start..=batch_end)
-                    .map(|i| format!("relayer_{}", i))
-                    .collect();
-                
-                let batch_futures: Vec<_> = relayer_names
-                    .iter()
-                    .map(|name| self.create_relayer(name))
-                    .collect();
-                
+                let relayer_names: Vec<String> =
+                    (batch_start..=batch_end).map(|i| format!("relayer_{}", i)).collect();
+
+                let batch_futures: Vec<_> =
+                    relayer_names.iter().map(|name| self.create_relayer(name)).collect();
+
                 let batch_results = futures::future::try_join_all(batch_futures).await?;
-                
+
                 for (i, relayer) in batch_results.into_iter().enumerate() {
                     let index = batch_start + i;
                     info!("Created relayer {} at index {}", relayer.id, index);
@@ -814,13 +821,15 @@ impl TestRunner {
         info!("Created relayer at index 80: {:?}", relayer);
 
         // Fund the Safe proxy contract with ETH so it can send transactions
-        let safe_proxy_address = EvmAddress::from_str("0xcfe267de230a234c5937f18f239617b7038ec271")?;
+        let safe_proxy_address =
+            EvmAddress::from_str("0xcfe267de230a234c5937f18f239617b7038ec271")?;
         info!("Funding Safe proxy contract at {} with 5 ETH", safe_proxy_address);
         self.fund_relayer(&safe_proxy_address, alloy::primitives::utils::parse_ether("5")?).await?;
         info!("Safe proxy contract funded successfully");
 
         let recipient = &self.config.anvil_accounts[1];
-        let recipient_balance_before = self.contract_interactor.get_eth_balance(&recipient.into_address()).await?;
+        let recipient_balance_before =
+            self.contract_interactor.get_eth_balance(&recipient.into_address()).await?;
         info!("Sending ETH transfer to {} using Safe proxy", recipient);
 
         let tx_response = self
@@ -841,62 +850,89 @@ impl TestRunner {
         self.relayer_client.sent_transaction_compare(tx_response.1, result.0)?;
 
         // Validate that the transaction went through the Safe proxy correctly
-        let expected_safe_address = EvmAddress::from_str("0xcfe267de230a234c5937f18f239617b7038ec271")?;
+        let expected_safe_address =
+            EvmAddress::from_str("0xcfe267de230a234c5937f18f239617b7038ec271")?;
         let expected_recipient = *recipient;
-        
+
         // 1. Verify the transaction was sent TO the Safe proxy contract
         if EvmAddress::new(result.1.to.unwrap()) != expected_safe_address {
-            return Err(anyhow!("Transaction was not sent to Safe proxy! Expected: {}, Got: {}", 
-                expected_safe_address, EvmAddress::new(result.1.to.unwrap())));
+            return Err(anyhow!(
+                "Transaction was not sent to Safe proxy! Expected: {}, Got: {}",
+                expected_safe_address,
+                EvmAddress::new(result.1.to.unwrap())
+            ));
         }
         info!("✅ Transaction correctly sent to Safe proxy: {}", expected_safe_address);
-        
+
         // 2. Verify the transaction was sent FROM the relayer (wallet index 80)
         if EvmAddress::new(result.1.from) != relayer.address {
-            return Err(anyhow!("Transaction was not sent from the expected relayer! Expected: {}, Got: {}", 
-                relayer.address, EvmAddress::new(result.1.from)));
+            return Err(anyhow!(
+                "Transaction was not sent from the expected relayer! Expected: {}, Got: {}",
+                relayer.address,
+                EvmAddress::new(result.1.from)
+            ));
         }
         info!("✅ Transaction correctly sent from relayer: {}", relayer.address);
-        
+
         // 3. Verify the transaction succeeded (status = true)
         if !result.1.status() {
             return Err(anyhow!("Safe proxy transaction failed on-chain"));
         }
         info!("✅ Safe proxy transaction succeeded on-chain");
-        
+
         // 4. Verify gas was consumed (indicating execution)
         if result.1.inner.gas_used > 0 {
-            info!("✅ Gas was consumed (gas used: {}), indicating transaction execution", result.1.inner.gas_used);
+            info!(
+                "✅ Gas was consumed (gas used: {}), indicating transaction execution",
+                result.1.inner.gas_used
+            );
         }
-        
+
         // 5. Check if there are any logs/events (Safe execution should emit events)
         if !result.1.inner.inner.logs().is_empty() {
-            info!("✅ Transaction emitted {} log(s), indicating Safe execution", result.1.inner.inner.logs().len());
+            info!(
+                "✅ Transaction emitted {} log(s), indicating Safe execution",
+                result.1.inner.inner.logs().len()
+            );
             for (i, log) in result.1.inner.inner.logs().iter().enumerate() {
                 info!("   Log {}: address={}, topics={}", i, log.address(), log.topics().len());
             }
         } else {
             info!("⚠️  No logs emitted - this might indicate the Safe execution didn't emit expected events");
         }
-        
+
         // 6. Verify the recipient actually received the ETH
-        let recipient_balance_after = self.contract_interactor.get_eth_balance(&expected_recipient.into_address()).await?;
+        let recipient_balance_after =
+            self.contract_interactor.get_eth_balance(&expected_recipient.into_address()).await?;
         if recipient_balance_before > recipient_balance_after {
-            return Err(anyhow!("Recipient did not receive the expected ETH! Balance before: {}, Balance now: {}",
-                alloy::primitives::utils::format_ether(recipient_balance_before), alloy::primitives::utils::format_ether(recipient_balance_after)));
+            return Err(anyhow!(
+                "Recipient did not receive the expected ETH! Balance before: {}, Balance now: {}",
+                alloy::primitives::utils::format_ether(recipient_balance_before),
+                alloy::primitives::utils::format_ether(recipient_balance_after)
+            ));
         }
-        info!("✅ Recipient {} balance after Safe transfer: {} ETH", 
-            expected_recipient, alloy::primitives::utils::format_ether(recipient_balance_after));
-        
+        info!(
+            "✅ Recipient {} balance after Safe transfer: {} ETH",
+            expected_recipient,
+            alloy::primitives::utils::format_ether(recipient_balance_after)
+        );
+
         // 7. Verify the Safe proxy balance decreased
-        let safe_balance_after = self.contract_interactor.get_eth_balance(&expected_safe_address.into_address()).await?;
+        let safe_balance_after =
+            self.contract_interactor.get_eth_balance(&expected_safe_address.into_address()).await?;
         let eth_balance_after = alloy::primitives::utils::format_ether(safe_balance_after);
         if safe_balance_after != alloy::primitives::utils::parse_ether("1")? {
-            return Err(anyhow!("Safe proxy balance increased after Safe transfer! Expected: <= 0.5 ETH, Got: {}", eth_balance_after));
+            return Err(anyhow!(
+                "Safe proxy balance increased after Safe transfer! Expected: <= 0.5 ETH, Got: {}",
+                eth_balance_after
+            ));
         }
-        info!("✅ Safe proxy {} balance after transfer: {} ETH",
-            expected_safe_address, alloy::primitives::utils::format_ether(safe_balance_after));
-        
+        info!(
+            "✅ Safe proxy {} balance after transfer: {} ETH",
+            expected_safe_address,
+            alloy::primitives::utils::format_ether(safe_balance_after)
+        );
+
         info!("🎉 All Safe proxy validations passed!");
 
         Ok(())
@@ -958,7 +994,10 @@ impl TestRunner {
         let contract_address =
             self.contract_interactor.contract_address().context("Test contract not deployed")?;
 
-        info!("Sending contract interaction to deployed contract at {} via Safe proxy", contract_address);
+        info!(
+            "Sending contract interaction to deployed contract at {} via Safe proxy",
+            contract_address
+        );
 
         let is_deployed = self.contract_interactor.verify_contract_deployed().await?;
         if !is_deployed {
@@ -975,7 +1014,8 @@ impl TestRunner {
 
         // Get Safe proxy address for validation
         let safe_proxy_address = Address::from_str("0xcfe267de230a234c5937f18f239617b7038ec271")?;
-        let safe_balance_before = self.contract_interactor.get_eth_balance(&safe_proxy_address).await?;
+        let safe_balance_before =
+            self.contract_interactor.get_eth_balance(&safe_proxy_address).await?;
         info!(
             "Safe proxy balance before transaction: {} ETH",
             alloy::primitives::utils::format_ether(safe_balance_before)
@@ -996,17 +1036,24 @@ impl TestRunner {
 
         self.relayer_client.sent_transaction_compare(tx_response.1, result.0)?;
 
-        let expected_safe_address = EvmAddress::from_str("0xcfe267de230a234c5937f18f239617b7038ec271")?;
+        let expected_safe_address =
+            EvmAddress::from_str("0xcfe267de230a234c5937f18f239617b7038ec271")?;
 
         if EvmAddress::new(result.1.to.unwrap()) != expected_safe_address {
-            return Err(anyhow!("Transaction was not sent to Safe proxy! Expected: {}, Got: {}",
-                expected_safe_address, EvmAddress::new(result.1.to.unwrap())));
+            return Err(anyhow!(
+                "Transaction was not sent to Safe proxy! Expected: {}, Got: {}",
+                expected_safe_address,
+                EvmAddress::new(result.1.to.unwrap())
+            ));
         }
         info!("✅ Transaction correctly sent to Safe proxy: {}", expected_safe_address);
 
         if EvmAddress::new(result.1.from) != relayer.address {
-            return Err(anyhow!("Transaction was not sent from the expected relayer! Expected: {}, Got: {}",
-                relayer.address, EvmAddress::new(result.1.from)));
+            return Err(anyhow!(
+                "Transaction was not sent from the expected relayer! Expected: {}, Got: {}",
+                relayer.address,
+                EvmAddress::new(result.1.from)
+            ));
         }
         info!("✅ Transaction correctly sent from relayer: {}", relayer.address);
 
@@ -1016,11 +1063,17 @@ impl TestRunner {
         info!("✅ Safe proxy transaction succeeded on-chain");
 
         if result.1.inner.gas_used > 0 {
-            info!("✅ Gas was consumed (gas used: {}), indicating transaction execution", result.1.inner.gas_used);
+            info!(
+                "✅ Gas was consumed (gas used: {}), indicating transaction execution",
+                result.1.inner.gas_used
+            );
         }
 
         if !result.1.inner.inner.logs().is_empty() {
-            info!("✅ Transaction emitted {} log(s), indicating Safe execution", result.1.inner.inner.logs().len());
+            info!(
+                "✅ Transaction emitted {} log(s), indicating Safe execution",
+                result.1.inner.inner.logs().len()
+            );
             for (i, log) in result.1.inner.inner.logs().iter().enumerate() {
                 info!("   Log {}: address={}, topics={}", i, log.address(), log.topics().len());
             }
@@ -4084,10 +4137,8 @@ impl TestRunner {
         );
 
         // Expected top-up amount is 500 tokens (as configured in YAML)
-        let expected_top_up = U256::from(500u64)
-            * U256::from(10u64).pow(U256::from(18u64));
-        let tolerance = U256::from(10u64)
-            * U256::from(10u64).pow(U256::from(18u64)); // 10 token tolerance
+        let expected_top_up = U256::from(500u64) * U256::from(10u64).pow(U256::from(18u64));
+        let tolerance = U256::from(10u64) * U256::from(10u64).pow(U256::from(18u64)); // 10 token tolerance
 
         // Verify that all relayers got topped up since they started with 0 balance
         if final_balance1.abs_diff(expected_top_up) > tolerance {
@@ -4147,21 +4198,34 @@ impl TestRunner {
         info!("  Relayer 2: {} ETH", alloy::primitives::utils::format_ether(initial_balance2));
 
         // Check the Safe proxy funding address balance (wallet index 80)
-        let safe_proxy_signer: alloy::primitives::Address = "0x1C073e63f70701BC545019D3c4f2a25A69eCA8Cf".parse()
-            .context("Failed to parse Safe proxy signer address")?;
-        let safe_signer_balance = self.contract_interactor.get_eth_balance(&safe_proxy_signer).await?;
-        info!("Safe proxy signer (wallet 80) balance: {} ETH", alloy::primitives::utils::format_ether(safe_signer_balance));
+        let safe_proxy_signer: alloy::primitives::Address =
+            "0x1C073e63f70701BC545019D3c4f2a25A69eCA8Cf"
+                .parse()
+                .context("Failed to parse Safe proxy signer address")?;
+        let safe_signer_balance =
+            self.contract_interactor.get_eth_balance(&safe_proxy_signer).await?;
+        info!(
+            "Safe proxy signer (wallet 80) balance: {} ETH",
+            alloy::primitives::utils::format_ether(safe_signer_balance)
+        );
 
         // We need to fund the Safe proxy signer (wallet index 80) since it's configured as the from_address
         // The automatic top-up configuration has from_address: 0x655B2B8861D7E911D283A05A5CAD042C157106DA
         // But for Safe proxy, the signing will be done by wallet index 80: 0x1C073e63f70701BC545019D3c4f2a25A69eCA8Cf
         let funding_amount = alloy::primitives::utils::parse_ether("20")?;
-        info!("Funding Safe proxy signer with {} ETH for testing...", alloy::primitives::utils::format_ether(funding_amount));
+        info!(
+            "Funding Safe proxy signer with {} ETH for testing...",
+            alloy::primitives::utils::format_ether(funding_amount)
+        );
 
         self.fund_relayer(&safe_proxy_signer.into(), funding_amount).await?;
 
-        let updated_safe_signer_balance = self.contract_interactor.get_eth_balance(&safe_proxy_signer).await?;
-        info!("Updated Safe proxy signer balance: {} ETH", alloy::primitives::utils::format_ether(updated_safe_signer_balance));
+        let updated_safe_signer_balance =
+            self.contract_interactor.get_eth_balance(&safe_proxy_signer).await?;
+        info!(
+            "Updated Safe proxy signer balance: {} ETH",
+            alloy::primitives::utils::format_ether(updated_safe_signer_balance)
+        );
 
         // Drain relayer balances to trigger automatic top-up
         let drain_amount = alloy::primitives::utils::parse_ether("90")?; // Leave about 10 ETH
@@ -4178,7 +4242,8 @@ impl TestRunner {
                 blobs: None,
             };
 
-            let tx_result = self.relayer_client
+            let tx_result = self
+                .relayer_client
                 .sdk
                 .transaction
                 .send_transaction(&relayer1.id, &tx_request, None)
@@ -4197,7 +4262,8 @@ impl TestRunner {
                 blobs: None,
             };
 
-            let tx_result = self.relayer_client
+            let tx_result = self
+                .relayer_client
                 .sdk
                 .transaction
                 .send_transaction(&relayer2.id, &tx_request, None)
@@ -4260,7 +4326,9 @@ impl TestRunner {
                 "Relayer 1 was not topped up within {} seconds. Current balance: {} ETH",
                 max_wait_time.as_secs(),
                 alloy::primitives::utils::format_ether(
-                    self.contract_interactor.get_eth_balance(&relayer1.address.into_address()).await?
+                    self.contract_interactor
+                        .get_eth_balance(&relayer1.address.into_address())
+                        .await?
                 )
             ));
         }
@@ -4270,7 +4338,9 @@ impl TestRunner {
                 "Relayer 2 was not topped up within {} seconds. Current balance: {} ETH",
                 max_wait_time.as_secs(),
                 alloy::primitives::utils::format_ether(
-                    self.contract_interactor.get_eth_balance(&relayer2.address.into_address()).await?
+                    self.contract_interactor
+                        .get_eth_balance(&relayer2.address.into_address())
+                        .await?
                 )
             ));
         }
@@ -4580,28 +4650,36 @@ impl TestRunner {
                 .map(|i| format!("concurrent_test_relayer_{}", i))
                 .collect();
 
-            let batch_futures: Vec<_> = relayer_names
-                .iter()
-                .map(|name| self.create_relayer(name))
-                .collect();
+            let batch_futures: Vec<_> =
+                relayer_names.iter().map(|name| self.create_relayer(name)).collect();
 
             let batch_results = futures::future::try_join_all(batch_futures).await?;
 
             for (i, relayer) in batch_results.into_iter().enumerate() {
                 let index = batch_start + i;
-                info!("Successfully created concurrent relayer {} at position {}", relayer.id, index);
+                info!(
+                    "Successfully created concurrent relayer {} at position {}",
+                    relayer.id, index
+                );
                 all_relayers.push(relayer);
             }
         }
 
         let duration = start_time.elapsed();
-        info!("Successfully created {} relayers in {:?} without deadlocks!", all_relayers.len(), duration);
+        info!(
+            "Successfully created {} relayers in {:?} without deadlocks!",
+            all_relayers.len(),
+            duration
+        );
 
         // Verify all relayers have unique addresses (which implies unique wallet indices)
         let mut addresses: std::collections::HashSet<EvmAddress> = std::collections::HashSet::new();
         for relayer in &all_relayers {
             if !addresses.insert(relayer.address) {
-                return Err(anyhow!("Duplicate address found: {}. This indicates a race condition!", relayer.address));
+                return Err(anyhow!(
+                    "Duplicate address found: {}. This indicates a race condition!",
+                    relayer.address
+                ));
             }
         }
 

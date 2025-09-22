@@ -54,6 +54,14 @@ pub struct PrivySigningKey {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TurnkeySigningKey {
+    pub api_public_key: String,
+    pub api_private_key: String,
+    pub organization_id: String,
+    pub wallet_id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AwsKmsSigningKey {
     /// AWS KMS key IDs mapped by wallet index
     /// Can be a single key ID string or an array of key IDs
@@ -92,6 +100,9 @@ pub struct SigningKey {
 
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub aws_kms: Option<AwsKmsSigningKey>,
+
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub turnkey: Option<TurnkeySigningKey>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -191,6 +202,29 @@ impl AwsKmsSigningKey {
     }
 }
 
+impl TurnkeySigningKey {
+    /// Validates the Turnkey signing key configuration.
+    ///
+    /// # Returns
+    /// * `Ok(())` - If the configuration is valid
+    /// * `Err(String)` - If the configuration is invalid
+    pub fn validate(&self) -> Result<(), String> {
+        if self.api_public_key.is_empty() {
+            return Err("Turnkey API public key cannot be empty".to_string());
+        }
+        if self.api_private_key.is_empty() {
+            return Err("Turnkey API private key cannot be empty".to_string());
+        }
+        if self.organization_id.is_empty() {
+            return Err("Turnkey organization ID cannot be empty".to_string());
+        }
+        if self.wallet_id.is_empty() {
+            return Err("Turnkey wallet ID cannot be empty".to_string());
+        }
+        Ok(())
+    }
+}
+
 impl SigningKey {
     /// Creates a new signing key configuration using raw authentication.
     ///
@@ -206,6 +240,7 @@ impl SigningKey {
             gcp_secret_manager: None,
             privy: None,
             aws_kms: None,
+            turnkey: None,
         }
     }
 
@@ -223,6 +258,25 @@ impl SigningKey {
             gcp_secret_manager: None,
             privy: None,
             aws_kms: Some(aws_kms),
+            turnkey: None,
+        }
+    }
+
+    /// Creates a new signing key configuration using Turnkey authentication.
+    ///
+    /// # Arguments
+    /// * `turnkey` - Turnkey configuration for wallet signing
+    ///
+    /// # Returns
+    /// * `SigningKey` - A signing key configured to use Turnkey authentication only
+    pub fn from_turnkey(turnkey: TurnkeySigningKey) -> Self {
+        Self {
+            raw: None,
+            aws_secret_manager: None,
+            gcp_secret_manager: None,
+            privy: None,
+            aws_kms: None,
+            turnkey: Some(turnkey),
         }
     }
 
@@ -281,6 +335,7 @@ impl SigningKey {
             self.gcp_secret_manager.is_some(),
             self.privy.is_some(),
             self.aws_kms.is_some(),
+            self.turnkey.is_some(),
         ]
         .iter()
         .filter(|&&x| x)
@@ -654,6 +709,11 @@ pub fn read(file_path: &PathBuf, raw_yaml: bool) -> Result<SetupConfig, ReadYaml
         // Additional validation for AWS KMS if present
         if let Some(aws_kms) = &signing_key.aws_kms {
             aws_kms.validate().map_err(ReadYamlError::SigningKeyYamlError)?;
+        }
+
+        // Additional validation for Turnkey if present
+        if let Some(turnkey) = &signing_key.turnkey {
+            turnkey.validate().map_err(ReadYamlError::SigningKeyYamlError)?;
         }
     }
 

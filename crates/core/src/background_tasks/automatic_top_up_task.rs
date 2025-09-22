@@ -533,7 +533,6 @@ impl AutomaticTopUpTask {
             (*target_address, native_config.top_up_amount, alloy::primitives::Bytes::new())
         };
 
-
         // Instead of sending directly, use the transaction queue system
         let transaction_to_send = crate::transaction::queue_system::TransactionToSend::new(
             final_to,
@@ -545,13 +544,25 @@ impl AutomaticTopUpTask {
         );
 
         // Find the relayer ID for the from_address
-        let relayer_id = if let Some(relayer) = self.relayer_cache.values().flatten().find(|relayer| &relayer.address == from_address) {
+        let relayer_id = if let Some(relayer) =
+            self.relayer_cache.values().flatten().find(|relayer| &relayer.address == from_address)
+        {
             relayer.id
         } else {
             match self.postgres_client.get_relayer_by_address(from_address, chain_id).await {
                 Ok(Some(relayer)) => relayer.id,
-                Ok(None) => return Err(format!("Relayer with address {} not found in database", from_address)),
-                Err(e) => return Err(format!("Database error while looking up relayer {}: {}", from_address, e)),
+                Ok(None) => {
+                    return Err(format!(
+                        "Relayer with address {} not found in database",
+                        from_address
+                    ))
+                }
+                Err(e) => {
+                    return Err(format!(
+                        "Database error while looking up relayer {}: {}",
+                        from_address, e
+                    ))
+                }
             }
         };
 
@@ -559,7 +570,15 @@ impl AutomaticTopUpTask {
         let mut transactions_queues = self.transactions_queues.lock().await;
         match transactions_queues.add_transaction(&relayer_id, &transaction_to_send).await {
             Ok(transaction) => {
-                info!("Top-up transaction queued successfully: {} (queue transaction ID: {})", transaction.known_transaction_hash.as_ref().map(|h| h.to_string()).unwrap_or_else(|| "pending".to_string()), transaction.id);
+                info!(
+                    "Top-up transaction queued successfully: {} (queue transaction ID: {})",
+                    transaction
+                        .known_transaction_hash
+                        .as_ref()
+                        .map(|h| h.to_string())
+                        .unwrap_or_else(|| "pending".to_string()),
+                    transaction.id
+                );
                 Ok(transaction.id.to_string())
             }
             Err(e) => {
@@ -912,17 +931,32 @@ impl AutomaticTopUpTask {
             crate::transaction::types::TransactionData::new(final_data),
             Some(crate::transaction::types::TransactionSpeed::Fast),
             None, // No blobs for ERC-20 transactions
-            Some(format!("automatic_top_up_erc20_{}_{}_{}", token_config.address, from_address, target_address)),
+            Some(format!(
+                "automatic_top_up_erc20_{}_{}_{}",
+                token_config.address, from_address, target_address
+            )),
         );
 
         // Find the relayer ID for the from_address
-        let relayer_id = if let Some(relayer) = self.relayer_cache.values().flatten().find(|relayer| &relayer.address == from_address) {
+        let relayer_id = if let Some(relayer) =
+            self.relayer_cache.values().flatten().find(|relayer| &relayer.address == from_address)
+        {
             relayer.id
         } else {
             match self.postgres_client.get_relayer_by_address(from_address, chain_id).await {
                 Ok(Some(relayer)) => relayer.id,
-                Ok(None) => return Err(format!("Relayer with address {} not found in database", from_address)),
-                Err(e) => return Err(format!("Database error while looking up relayer {}: {}", from_address, e)),
+                Ok(None) => {
+                    return Err(format!(
+                        "Relayer with address {} not found in database",
+                        from_address
+                    ))
+                }
+                Err(e) => {
+                    return Err(format!(
+                        "Database error while looking up relayer {}: {}",
+                        from_address, e
+                    ))
+                }
             }
         };
 
@@ -930,7 +964,15 @@ impl AutomaticTopUpTask {
         let mut transactions_queues = self.transactions_queues.lock().await;
         match transactions_queues.add_transaction(&relayer_id, &transaction_to_send).await {
             Ok(transaction) => {
-                info!("ERC-20 top-up transaction queued successfully: {} (queue transaction ID: {})", transaction.known_transaction_hash.as_ref().map(|h| h.to_string()).unwrap_or_else(|| "pending".to_string()), transaction.id);
+                info!(
+                    "ERC-20 top-up transaction queued successfully: {} (queue transaction ID: {})",
+                    transaction
+                        .known_transaction_hash
+                        .as_ref()
+                        .map(|h| h.to_string())
+                        .unwrap_or_else(|| "pending".to_string()),
+                    transaction.id
+                );
                 Ok(transaction.id.to_string())
             }
             Err(e) => {

@@ -52,7 +52,7 @@ pub async fn create_relayer(
 
     // Acquire mutex to prevent concurrent relayer creation deadlocks
     let _lock = state.relayer_creation_mutex.lock().await;
-    
+
     let relayer =
         state.db.create_relayer(&relayer.name, &chain_id, provider, None).await.map_err(|e| {
             rrelayer_error!("{}", e);

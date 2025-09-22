@@ -12,10 +12,10 @@
   - GCP key manager - already manually tested but need e2e
   - KMS - not tested and needs e2e
   - Privy - already manually tested but need e2e
+  - Turnkey - not tested and needs e2e
   - Testing loading up infura gas 
   - Testing loading up tenderly gas
   - Testing handling custom gas with http call
-  - Fix websockets delivery ID being repeated for some reason
 - Look over the gas logic again maybe add some max to protect over speeding huge amounts of ETH incase it gets its wrong
 - Change the TS sdk to work with the changes in the playground
 - Look over indexes required on all queries

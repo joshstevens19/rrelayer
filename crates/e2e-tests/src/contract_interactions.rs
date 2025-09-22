@@ -242,16 +242,21 @@ impl ContractInteractor {
         // Transfer tokens from deployer to the automatic top-up funding address
         // The deployer (anvil_accounts[0]) has all the tokens, but the funding address in YAML is different
         // Use the known funding address from the config (we know it's 0x655B2B8861D7E911D283A05A5CAD042C157106DA)
-        let funding_address: alloy::primitives::Address = "0x655B2B8861D7E911D283A05A5CAD042C157106DA".parse()
-            .context("Failed to parse funding address")?;
-        
+        let funding_address: alloy::primitives::Address =
+            "0x655B2B8861D7E911D283A05A5CAD042C157106DA"
+                .parse()
+                .context("Failed to parse funding address")?;
+
         // Transfer a large amount of tokens (e.g., 100,000 tokens) to the funding address
-        let transfer_amount = alloy::primitives::U256::from(100_000u64) 
+        let transfer_amount = alloy::primitives::U256::from(100_000u64)
             * alloy::primitives::U256::from(10u64).pow(alloy::primitives::U256::from(18u64));
 
-        info!("Transferring {} tokens from deployer to funding address {:?}", 
-              alloy::primitives::utils::format_units(transfer_amount, 18).unwrap_or("N/A".to_string()), 
-              funding_address);
+        info!(
+            "Transferring {} tokens from deployer to funding address {:?}",
+            alloy::primitives::utils::format_units(transfer_amount, 18)
+                .unwrap_or("N/A".to_string()),
+            funding_address
+        );
 
         self.transfer_tokens(&funding_address, transfer_amount, deployer_private_key)
             .await
@@ -359,7 +364,7 @@ impl ContractInteractor {
         let expected_address: Address = "0xcfe267de230a234c5937f18f239617b7038ec271"
             .parse()
             .context("Failed to parse expected Safe address")?;
-        
+
         if safe_address != expected_address {
             return Err(anyhow::anyhow!(
                 "Safe deployment address mismatch! Expected: {:?}, Got: {:?}",
@@ -367,7 +372,7 @@ impl ContractInteractor {
                 safe_address
             ));
         }
-        
+
         info!("✅ Safe proxy deployed to expected deterministic address: {:?}", safe_address);
 
         // Wait a moment to ensure deployment is fully settled before returning

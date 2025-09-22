@@ -86,6 +86,15 @@ pub async fn load_providers(
                     .map_err(|e| LoadProvidersError::GasEstimatorError(e.to_string()))?,
             )
             .await?
+        } else if let Some(turnkey) = &signing_key.turnkey {
+            EvmProvider::new_with_turnkey(
+                &config,
+                turnkey.clone(),
+                get_gas_estimator(&config.provider_urls, setup_config, config)
+                    .await
+                    .map_err(|e| LoadProvidersError::GasEstimatorError(e.to_string()))?,
+            )
+            .await?
         } else {
             let mnemonic = get_mnemonic_from_signing_key(project_path, signing_key)
                 .await
