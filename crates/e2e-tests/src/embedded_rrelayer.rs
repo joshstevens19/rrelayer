@@ -16,7 +16,7 @@ impl EmbeddedRRelayerServer {
 
     /// Start the RRelayer server in a background task
     pub async fn start(&mut self) -> Result<()> {
-        info!("🚀 Starting embedded RRelayer server...");
+        info!("[START] Starting embedded RRelayer server...");
 
         // Start Docker Compose services (PostgreSQL)
         self.start_docker_compose()?;
@@ -28,7 +28,7 @@ impl EmbeddedRRelayerServer {
 
         let handle = tokio::spawn(async move {
             if let Err(e) = Self::run_server(&project_path).await {
-                error!("❌ RRelayer server failed: {}", e);
+                error!("[ERROR] RRelayer server failed: {}", e);
             }
         });
 
@@ -40,7 +40,7 @@ impl EmbeddedRRelayerServer {
         // Give the server a moment to fully initialize after health check
         sleep(Duration::from_millis(500)).await;
 
-        info!("✅ Embedded RRelayer server is ready!");
+        info!("[SUCCESS] Embedded RRelayer server is ready!");
         Ok(())
     }
 
@@ -51,14 +51,14 @@ impl EmbeddedRRelayerServer {
         while retries > 0 {
             match reqwest::get("http://localhost:3000/health").await {
                 Ok(response) if response.status().is_success() => {
-                    info!("✅ RRelayer health check passed");
+                    info!("[SUCCESS] RRelayer health check passed");
                     return Ok(());
                 }
                 Ok(response) => {
-                    warn!("⚠️  Health check returned {}, retrying...", response.status());
+                    warn!("[WARNING]  Health check returned {}, retrying...", response.status());
                 }
                 Err(e) => {
-                    warn!("⚠️  Health check failed: {}, retrying...", e);
+                    warn!("[WARNING]  Health check failed: {}, retrying...", e);
                 }
             }
 
@@ -99,21 +99,21 @@ impl EmbeddedRRelayerServer {
                 for schema in &schemas_to_drop {
                     let drop_query = format!("DROP SCHEMA IF EXISTS {} CASCADE", schema);
                     match client.execute(&drop_query, &[]).await {
-                        Ok(_) => info!("✅ Dropped schema: {}", schema),
-                        Err(e) => warn!("⚠️  Failed to drop schema {}: {}", schema, e),
+                        Ok(_) => info!("[SUCCESS] Dropped schema: {}", schema),
+                        Err(e) => warn!("[WARNING]  Failed to drop schema {}: {}", schema, e),
                     }
                 }
 
                 // Recreate the public schema
                 match client.execute("CREATE SCHEMA public", &[]).await {
-                    Ok(_) => info!("✅ Recreated public schema"),
-                    Err(e) => warn!("⚠️  Failed to recreate public schema: {}", e),
+                    Ok(_) => info!("[SUCCESS] Recreated public schema"),
+                    Err(e) => warn!("[WARNING]  Failed to recreate public schema: {}", e),
                 }
 
-                info!("✅ Database reset complete");
+                info!("[SUCCESS] Database reset complete");
             }
             Err(e) => {
-                warn!("⚠️  Could not connect to database for reset: {}. Continuing anyway...", e);
+                warn!("[WARNING]  Could not connect to database for reset: {}. Continuing anyway...", e);
                 warn!("   Make sure PostgreSQL is running with the correct credentials");
             }
         }
@@ -173,12 +173,12 @@ impl EmbeddedRRelayerServer {
             if ps_status.status.success() {
                 let output = String::from_utf8_lossy(&ps_status.stdout);
                 if !output.contains("Exit") && output.contains("Up") {
-                    info!("✅ All containers are up and running");
+                    info!("[SUCCESS] All containers are up and running");
 
                     // Check if DATABASE_URL is set, but don't fail if it's not
                     // since E2E tests use hardcoded connection strings
                     if std::env::var("DATABASE_URL").is_ok() {
-                        info!("✅ DATABASE_URL environment variable is set");
+                        info!("[SUCCESS] DATABASE_URL environment variable is set");
                     } else {
                         info!("ℹ️  DATABASE_URL not set, using hardcoded connection for E2E tests");
                     }
@@ -193,7 +193,7 @@ impl EmbeddedRRelayerServer {
             retries += 1;
             thread::sleep(Duration::from_millis(200));
             info!(
-                "⏳ Waiting for Docker Compose containers to start... ({}/{})",
+                "[WAIT] Waiting for Docker Compose containers to start... ({}/{})",
                 retries, max_retries
             );
         }
@@ -206,7 +206,7 @@ impl EmbeddedRRelayerServer {
     /// Stop the embedded server
     pub async fn stop(&mut self) -> Result<()> {
         if let Some(handle) = self.server_handle.take() {
-            // info!("🛑 Stopping embedded RRelayer server...");
+            // info!("[STOP] Stopping embedded RRelayer server...");
             handle.abort();
 
             // Wait a moment for the abort to take effect
@@ -215,7 +215,7 @@ impl EmbeddedRRelayerServer {
             // Force kill any remaining RRelayer processes on port 3000
             self.force_kill_server_on_port(3000).await;
 
-            // info!("✅ Embedded RRelayer server stopped");
+            // info!("[SUCCESS] Embedded RRelayer server stopped");
         }
 
         // Optionally stop Docker Compose services
@@ -241,15 +241,15 @@ impl EmbeddedRRelayerServer {
         // Verify the port is now free
         sleep(Duration::from_millis(200)).await;
         match reqwest::get("http://localhost:3000/health").await {
-            Ok(_) => warn!("⚠️  Port {} may still have active connections", port),
-            Err(_) => info!("✅ Port {} is now free", port),
+            Ok(_) => warn!("[WARNING]  Port {} may still have active connections", port),
+            Err(_) => info!("[SUCCESS] Port {} is now free", port),
         }
     }
 
     /// Stop Docker Compose services (optional - not used by default)
     #[allow(dead_code)]
     fn stop_docker_compose(&self) -> Result<()> {
-        info!("🛑 Stopping Docker Compose services...");
+        info!("[STOP] Stopping Docker Compose services...");
 
         let status = Command::new("docker")
             .args(["compose", "down"])
@@ -264,9 +264,9 @@ impl EmbeddedRRelayerServer {
             })?;
 
         if status.success() {
-            info!("✅ Docker Compose services stopped");
+            info!("[SUCCESS] Docker Compose services stopped");
         } else {
-            warn!("⚠️  Docker Compose stop command failed");
+            warn!("[WARNING]  Docker Compose stop command failed");
         }
 
         Ok(())

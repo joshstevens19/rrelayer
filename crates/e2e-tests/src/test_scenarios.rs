@@ -41,10 +41,10 @@ impl TestResult {
 
     pub fn status_icon(&self) -> &'static str {
         match self {
-            TestResult::Passed => "✅",
-            TestResult::Failed(_) => "❌",
-            TestResult::Timeout => "⏰",
-            TestResult::Skipped(_) => "⏭️",
+            TestResult::Passed => "PASS",
+            TestResult::Failed(_) => "FAIL",
+            TestResult::Timeout => "TIMEOUT",
+            TestResult::Skipped(_) => "SKIP",
         }
     }
 }
@@ -135,7 +135,7 @@ impl TestRunner {
             .await
             .context("Failed to deploy test contract")?;
 
-        info!("✅ Test contract deployed at: {:?}", contract_address);
+        info!("Test contract deployed at: {:?}", contract_address);
 
         // Deploy the ERC-20 test token
         let token_address = contract_interactor
@@ -143,7 +143,7 @@ impl TestRunner {
             .await
             .context("Failed to deploy test token")?;
 
-        info!("✅ Test ERC-20 token deployed at: {:?}", token_address);
+        info!("[SUCCESS] Test ERC-20 token deployed at: {:?}", token_address);
 
         // Deploy the Safe contracts
         let safe_address = contract_interactor
@@ -151,7 +151,7 @@ impl TestRunner {
             .await
             .context("Failed to deploy Safe contracts")?;
 
-        info!("✅ Safe contracts deployed - Safe proxy at: {:?}", safe_address);
+        info!("[SUCCESS] Safe contracts deployed - Safe proxy at: {:?}", safe_address);
 
         // Initialize webhook server with the shared secret from yaml
         let webhook_server = Some(WebhookTestServer::new("test-webhook-secret-123".to_string()));
@@ -182,7 +182,7 @@ impl TestRunner {
 
             // Wait a moment for server to start
             tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-            info!("✅ Webhook test server started on port 8546");
+            info!("[SUCCESS] Webhook test server started on port 8546");
         }
         Ok(())
     }
@@ -191,7 +191,7 @@ impl TestRunner {
     pub fn stop_webhook_server(&self) {
         if let Some(webhook_server) = &self.webhook_server {
             webhook_server.stop();
-            info!("🛑 Webhook test server stopped");
+            info!("[STOP] Webhook test server stopped");
         }
     }
 
@@ -227,7 +227,7 @@ impl TestRunner {
             anyhow::bail!("Failed to mine {} blocks: HTTP {} - {}", num_blocks, status, body);
         }
 
-        info!("⛏️ Mined {} blocks", num_blocks);
+        info!("[MINING] Mined {} blocks", num_blocks);
         Ok(())
     }
 
@@ -240,7 +240,7 @@ impl TestRunner {
 
     /// Run all test scenarios with proper timeout and reporting
     pub async fn run_all_tests(&mut self) -> TestSuite {
-        println!("🚀 RRelayer E2E Test Suite");
+        println!("[START] RRelayer E2E Test Suite");
         println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
         self.start_webhook_server().await.unwrap();
@@ -252,19 +252,19 @@ impl TestRunner {
         .await
         .unwrap();
 
-        info!("🔍 Testing webhook server accessibility...");
+        info!("[CHECK] Testing webhook server accessibility...");
         let client = reqwest::Client::builder().timeout(Duration::from_secs(5)).build().unwrap();
 
         match client.get("http://localhost:8546/health").send().await {
             Ok(response) => {
                 if response.status().is_success() {
-                    info!("✅ Webhook server is accessible at http://localhost:8546");
+                    info!("[SUCCESS] Webhook server is accessible at http://localhost:8546");
                 } else {
-                    info!("⚠️ Webhook server responded with status: {}", response.status());
+                    info!("[WARNING] Webhook server responded with status: {}", response.status());
                 }
             }
             Err(e) => {
-                info!("❌ Webhook server not accessible: {}", e);
+                info!("[ERROR] Webhook server not accessible: {}", e);
                 info!("Continuing test without accessibility verification...");
             }
         }
@@ -341,7 +341,7 @@ impl TestRunner {
 
     /// Run a single test with timeout and proper error handling
     async fn run_single_test(&mut self, test_name: &str, description: &str) -> TestInfo {
-        print!("🧪 {} ... ", description);
+        print!("[TEST] {} ... ", description);
         let start = Instant::now();
 
         // BeforeTest hook: Restart Anvil to ensure clean state for each test
@@ -363,15 +363,15 @@ impl TestRunner {
 
         let test_result = match result {
             Ok(Ok(())) => {
-                println!("✅ PASS");
+                println!("[SUCCESS] PASS");
                 TestResult::Passed
             }
             Ok(Err(e)) => {
-                println!("❌ FAIL");
+                println!("[ERROR] FAIL");
                 TestResult::Failed(e.to_string())
             }
             Err(_) => {
-                println!("⏰ TIMEOUT");
+                println!("[TIMEOUT] TIMEOUT");
                 TestResult::Timeout
             }
         };
@@ -450,15 +450,15 @@ impl TestRunner {
 
         // Summary line
         if failed == 0 && timeout == 0 {
-            println!("✅ Test Suites: 1 passed, 1 total");
-            println!("✅ Tests:       {} passed, {} total", passed, total);
+            println!("[SUCCESS] Test Suites: 1 passed, 1 total");
+            println!("[SUCCESS] Tests:       {} passed, {} total", passed, total);
         } else {
             println!(
-                "❌ Test Suites: {} failed, 1 total",
+                "[ERROR] Test Suites: {} failed, 1 total",
                 if failed > 0 || timeout > 0 { 1 } else { 0 }
             );
             println!(
-                "❌ Tests:       {} failed, {} passed, {} total",
+                "[ERROR] Tests:       {} failed, {} passed, {} total",
                 failed + timeout,
                 passed,
                 total
@@ -466,10 +466,10 @@ impl TestRunner {
         }
 
         if skipped > 0 {
-            println!("⏭️ Skipped:     {}", skipped);
+            println!("[SKIP] Skipped:     {}", skipped);
         }
 
-        println!("⏱️ Time:        {:.2}s", suite.duration.as_secs_f64());
+        println!("[TIME] Time:        {:.2}s", suite.duration.as_secs_f64());
 
         // Failed tests details
         if failed > 0 || timeout > 0 {
@@ -477,9 +477,9 @@ impl TestRunner {
             println!("Failed Tests:");
             for test in &suite.tests {
                 if let TestResult::Failed(msg) = &test.result {
-                    println!("  ❌ {} - {}", test.name, msg);
+                    println!("  [ERROR] {} - {}", test.name, msg);
                 } else if let TestResult::Timeout = &test.result {
-                    println!("  ⏰ {} - Test timed out after 90 seconds", test.name);
+                    println!("  [TIMEOUT] {} - Test timed out after 90 seconds", test.name);
                 }
             }
         }
@@ -495,7 +495,7 @@ impl TestRunner {
 
     /// Run a single filtered test with the new reporting system
     pub async fn run_filtered_test(&mut self, test_name: &str) -> TestSuite {
-        println!("🚀 RRelayer E2E Test Suite - Single Test");
+        println!("[START] RRelayer E2E Test Suite - Single Test");
         println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
         self.start_webhook_server().await.unwrap();
@@ -507,19 +507,19 @@ impl TestRunner {
         .await
         .unwrap();
 
-        info!("🔍 Testing webhook server accessibility...");
+        info!("[CHECK] Testing webhook server accessibility...");
         let client = reqwest::Client::builder().timeout(Duration::from_secs(5)).build().unwrap();
 
         match client.get("http://localhost:8546/health").send().await {
             Ok(response) => {
                 if response.status().is_success() {
-                    info!("✅ Webhook server is accessible at http://localhost:8546");
+                    info!("[SUCCESS] Webhook server is accessible at http://localhost:8546");
                 } else {
-                    info!("⚠️ Webhook server responded with status: {}", response.status());
+                    info!("[WARNING] Webhook server responded with status: {}", response.status());
                 }
             }
             Err(e) => {
-                info!("❌ Webhook server not accessible: {}", e);
+                info!("[ERROR] Webhook server not accessible: {}", e);
                 info!("Continuing test without accessibility verification...");
             }
         }
@@ -862,7 +862,7 @@ impl TestRunner {
                 EvmAddress::new(result.1.to.unwrap())
             ));
         }
-        info!("✅ Transaction correctly sent to Safe proxy: {}", expected_safe_address);
+        info!("[SUCCESS] Transaction correctly sent to Safe proxy: {}", expected_safe_address);
 
         // 2. Verify the transaction was sent FROM the relayer (wallet index 80)
         if EvmAddress::new(result.1.from) != relayer.address {
@@ -872,18 +872,18 @@ impl TestRunner {
                 EvmAddress::new(result.1.from)
             ));
         }
-        info!("✅ Transaction correctly sent from relayer: {}", relayer.address);
+        info!("[SUCCESS] Transaction correctly sent from relayer: {}", relayer.address);
 
         // 3. Verify the transaction succeeded (status = true)
         if !result.1.status() {
             return Err(anyhow!("Safe proxy transaction failed on-chain"));
         }
-        info!("✅ Safe proxy transaction succeeded on-chain");
+        info!("[SUCCESS] Safe proxy transaction succeeded on-chain");
 
         // 4. Verify gas was consumed (indicating execution)
         if result.1.inner.gas_used > 0 {
             info!(
-                "✅ Gas was consumed (gas used: {}), indicating transaction execution",
+                "[SUCCESS] Gas was consumed (gas used: {}), indicating transaction execution",
                 result.1.inner.gas_used
             );
         }
@@ -891,14 +891,14 @@ impl TestRunner {
         // 5. Check if there are any logs/events (Safe execution should emit events)
         if !result.1.inner.inner.logs().is_empty() {
             info!(
-                "✅ Transaction emitted {} log(s), indicating Safe execution",
+                "[SUCCESS] Transaction emitted {} log(s), indicating Safe execution",
                 result.1.inner.inner.logs().len()
             );
             for (i, log) in result.1.inner.inner.logs().iter().enumerate() {
                 info!("   Log {}: address={}, topics={}", i, log.address(), log.topics().len());
             }
         } else {
-            info!("⚠️  No logs emitted - this might indicate the Safe execution didn't emit expected events");
+            info!("[WARNING]  No logs emitted - this might indicate the Safe execution didn't emit expected events");
         }
 
         // 6. Verify the recipient actually received the ETH
@@ -912,7 +912,7 @@ impl TestRunner {
             ));
         }
         info!(
-            "✅ Recipient {} balance after Safe transfer: {} ETH",
+            "[SUCCESS] Recipient {} balance after Safe transfer: {} ETH",
             expected_recipient,
             alloy::primitives::utils::format_ether(recipient_balance_after)
         );
@@ -928,7 +928,7 @@ impl TestRunner {
             ));
         }
         info!(
-            "✅ Safe proxy {} balance after transfer: {} ETH",
+            "[SUCCESS] Safe proxy {} balance after transfer: {} ETH",
             expected_safe_address,
             alloy::primitives::utils::format_ether(safe_balance_after)
         );
@@ -955,7 +955,7 @@ impl TestRunner {
         if !is_deployed {
             return Err(anyhow::anyhow!("Contract verification failed - no code at address"));
         }
-        info!("✅ Contract verified as deployed with code at {}", contract_address);
+        info!("[SUCCESS] Contract verified as deployed with code at {}", contract_address);
 
         let relayer_balance =
             self.contract_interactor.get_eth_balance(&relayer.address.into_address()).await?;
@@ -979,7 +979,7 @@ impl TestRunner {
 
         self.relayer_client.sent_transaction_compare(tx_response.1, result.0)?;
 
-        info!("✅ Contract interaction completed successfully");
+        info!("[SUCCESS] Contract interaction completed successfully");
         Ok(())
     }
 
@@ -1003,7 +1003,7 @@ impl TestRunner {
         if !is_deployed {
             return Err(anyhow::anyhow!("Contract verification failed - no code at address"));
         }
-        info!("✅ Contract verified as deployed with code at {}", contract_address);
+        info!("[SUCCESS] Contract verified as deployed with code at {}", contract_address);
 
         let relayer_balance =
             self.contract_interactor.get_eth_balance(&relayer.address.into_address()).await?;
@@ -1046,7 +1046,7 @@ impl TestRunner {
                 EvmAddress::new(result.1.to.unwrap())
             ));
         }
-        info!("✅ Transaction correctly sent to Safe proxy: {}", expected_safe_address);
+        info!("[SUCCESS] Transaction correctly sent to Safe proxy: {}", expected_safe_address);
 
         if EvmAddress::new(result.1.from) != relayer.address {
             return Err(anyhow!(
@@ -1055,30 +1055,30 @@ impl TestRunner {
                 EvmAddress::new(result.1.from)
             ));
         }
-        info!("✅ Transaction correctly sent from relayer: {}", relayer.address);
+        info!("[SUCCESS] Transaction correctly sent from relayer: {}", relayer.address);
 
         if !result.1.status() {
             return Err(anyhow!("Safe proxy transaction failed on-chain"));
         }
-        info!("✅ Safe proxy transaction succeeded on-chain");
+        info!("[SUCCESS] Safe proxy transaction succeeded on-chain");
 
         if result.1.inner.gas_used > 0 {
             info!(
-                "✅ Gas was consumed (gas used: {}), indicating transaction execution",
+                "[SUCCESS] Gas was consumed (gas used: {}), indicating transaction execution",
                 result.1.inner.gas_used
             );
         }
 
         if !result.1.inner.inner.logs().is_empty() {
             info!(
-                "✅ Transaction emitted {} log(s), indicating Safe execution",
+                "[SUCCESS] Transaction emitted {} log(s), indicating Safe execution",
                 result.1.inner.inner.logs().len()
             );
             for (i, log) in result.1.inner.inner.logs().iter().enumerate() {
                 info!("   Log {}: address={}, topics={}", i, log.address(), log.topics().len());
             }
         } else {
-            info!("⚠️  No logs emitted - this might indicate the Safe execution didn't emit expected events");
+            info!("[WARNING]  No logs emitted - this might indicate the Safe execution didn't emit expected events");
         }
 
         info!("🎉 All Safe proxy contract interaction validations passed!");
@@ -1218,7 +1218,7 @@ impl TestRunner {
                 )
                 .await?;
 
-            info!("✅ Sent batch transaction {}: {:?}", i + 1, tx_response);
+            info!("[SUCCESS] Sent batch transaction {}: {:?}", i + 1, tx_response);
             tx_ids.push(tx_response.0.id);
 
             self.mine_and_wait().await?;
@@ -1229,10 +1229,10 @@ impl TestRunner {
         for (i, tx_id) in tx_ids.iter().enumerate() {
             info!("Waiting for batch transaction {} to complete...", i + 1);
             self.wait_for_transaction_completion(tx_id).await?;
-            info!("✅ Batch transaction {} completed", i + 1);
+            info!("[SUCCESS] Batch transaction {} completed", i + 1);
         }
 
-        info!("✅ All batch transactions completed successfully");
+        info!("[SUCCESS] All batch transactions completed successfully");
         Ok(())
     }
 
@@ -1281,7 +1281,7 @@ impl TestRunner {
                 )
                 .await?;
 
-            info!("✅ Sent transaction {}: {:?}", i + 1, tx_response);
+            info!("[SUCCESS] Sent transaction {}: {:?}", i + 1, tx_response);
         }
 
         let pending_count = self
@@ -1578,7 +1578,7 @@ impl TestRunner {
             return Err(anyhow!("Should only bring back 0 disabled network"));
         }
 
-        info!("✅ Network management APIs work correctly");
+        info!("[SUCCESS] Network management APIs work correctly");
         Ok(())
     }
 
@@ -1611,7 +1611,7 @@ impl TestRunner {
             .await
             .context("Failed to get allowlist")?;
 
-        info!("✅ Allowlist has {} addresses", allowlist.items.len());
+        info!("[SUCCESS] Allowlist has {} addresses", allowlist.items.len());
 
         if allowlist.items.len() != 3 {
             return Err(anyhow::anyhow!(
@@ -1681,7 +1681,7 @@ impl TestRunner {
                 .context("Failed to send transaction to allowed address")?;
         }
 
-        info!("✅ Allowlist list operation works correctly");
+        info!("[SUCCESS] Allowlist list operation works correctly");
         Ok(())
     }
 
@@ -1710,7 +1710,7 @@ impl TestRunner {
             .await
             .context("Failed to remove address from allowlist")?;
 
-        info!("✅ Removed {} from allowlist", test_address.hex());
+        info!("[SUCCESS] Removed {} from allowlist", test_address.hex());
 
         let paging = PagingContext { limit: 10, offset: 0 };
         let updated_allowlist = self
@@ -1729,7 +1729,7 @@ impl TestRunner {
             return Err(anyhow::anyhow!("Address still found in allowlist after deletion"));
         }
 
-        info!("✅ Allowlist remove operation works correctly");
+        info!("[SUCCESS] Allowlist remove operation works correctly");
         Ok(())
     }
 
@@ -1753,7 +1753,7 @@ impl TestRunner {
 
         info!("Signed message. Signature: {}", sign_result.signature);
 
-        info!("✅ Got signature: {:?}", sign_result.signature);
+        info!("[SUCCESS] Got signature: {:?}", sign_result.signature);
 
         let paging = PagingContext { limit: 10, offset: 0 };
         let history = self
@@ -1769,13 +1769,13 @@ impl TestRunner {
         let signed_message = history.items.iter().find(|entry| entry.message == test_message);
 
         if let Some(entry) = signed_message {
-            info!("✅ Found signed message in history: {}", entry.message);
+            info!("[SUCCESS] Found signed message in history: {}", entry.message);
             info!("   Signature: {}", entry.signature);
         } else {
             return Err(anyhow::anyhow!("Signed message not found in history"));
         }
 
-        info!("✅ Text signing works correctly");
+        info!("[SUCCESS] Text signing works correctly");
         Ok(())
     }
 
@@ -1838,7 +1838,7 @@ impl TestRunner {
 
         info!("Signed typed data. Signature: {}", sign_result.signature);
 
-        info!("✅ Got typed data signature: {:?}", sign_result.signature);
+        info!("[SUCCESS] Got typed data signature: {:?}", sign_result.signature);
 
         let paging = PagingContext { limit: 10, offset: 0 };
         let history = self
@@ -1860,13 +1860,13 @@ impl TestRunner {
         });
 
         if let Some(entry) = signed_entry {
-            info!("✅ Found signed typed data in history: {:?}", entry.domain_data);
+            info!("[SUCCESS] Found signed typed data in history: {:?}", entry.domain_data);
             info!("   Signature: {}", entry.signature);
         } else {
             return Err(anyhow::anyhow!("Signed typed data not found in history"));
         }
 
-        info!("✅ Typed data signing works correctly");
+        info!("[SUCCESS] Typed data signing works correctly");
         Ok(())
     }
 
@@ -1911,7 +1911,7 @@ impl TestRunner {
             return Err(anyhow::anyhow!("Transaction not found"));
         }
 
-        info!("✅ Transaction get works correctly");
+        info!("[SUCCESS] Transaction get works correctly");
 
         Ok(())
     }
@@ -1952,7 +1952,7 @@ impl TestRunner {
             .await
             .context("Failed to get relayer transactions")?;
 
-        info!("✅ Found {} transactions for relayer", relayer_transactions.items.len());
+        info!("[SUCCESS] Found {} transactions for relayer", relayer_transactions.items.len());
 
         if relayer_transactions.items.len() != 3 {
             return Err(anyhow::anyhow!(
@@ -1961,7 +1961,7 @@ impl TestRunner {
             ));
         }
 
-        info!("✅ Transaction list operation works correctly");
+        info!("[SUCCESS] Transaction list operation works correctly");
         Ok(())
     }
 
@@ -2008,7 +2008,7 @@ impl TestRunner {
             .replace_transaction(transaction_id, &replacement_request)
             .await
             .context("Failed to replace transaction")?;
-        info!("✅ Transaction replacement result: {}", replace_result);
+        info!("[SUCCESS] Transaction replacement result: {}", replace_result);
 
         if !replace_result {
             return Err(anyhow::anyhow!("Replace transaction failed"));
@@ -2019,7 +2019,7 @@ impl TestRunner {
         let transaction = self.relayer_client.get_transaction(&send_result.id).await?;
         self.relayer_client.sent_transaction_compare(replacement_request, transaction)?;
 
-        info!("✅ Transaction replace operation works correctly");
+        info!("[SUCCESS] Transaction replace operation works correctly");
         Ok(())
     }
 
@@ -2072,7 +2072,7 @@ impl TestRunner {
             ));
         }
 
-        info!("✅ Transaction {} cancel operation works correctly", transaction_id);
+        info!("[SUCCESS] Transaction {} cancel operation works correctly", transaction_id);
 
         Ok(())
     }
@@ -2143,7 +2143,7 @@ impl TestRunner {
             }
         }
 
-        info!("✅ Transaction status operations work correctly");
+        info!("[SUCCESS] Transaction status operations work correctly");
         Ok(())
     }
 
@@ -2221,14 +2221,14 @@ impl TestRunner {
         let total_initial = initial_pending + initial_inmempool;
 
         if total_final >= total_initial {
-            info!("✅ Transaction counts increased as expected");
+            info!("[SUCCESS] Transaction counts increased as expected");
         } else {
             return Err(anyhow!(
                 "Transaction counts may have decreased (transactions completed quickly)"
             ));
         }
 
-        info!("✅ Transaction count operations work correctly");
+        info!("[SUCCESS] Transaction count operations work correctly");
         Ok(())
     }
 
@@ -2284,7 +2284,7 @@ impl TestRunner {
             ));
         }
 
-        info!("✅ Transaction stays in Pending state without mining");
+        info!("[SUCCESS] Transaction stays in Pending state without mining");
         Ok(())
     }
 
@@ -2331,7 +2331,7 @@ impl TestRunner {
                 if status.receipt.is_some() {
                     return Err(anyhow::anyhow!("InMempool transaction should not have receipt"));
                 }
-                info!("✅ Transaction successfully reached InMempool state");
+                info!("[SUCCESS] Transaction successfully reached InMempool state");
                 return Ok(());
             }
 
@@ -2407,7 +2407,7 @@ impl TestRunner {
                     return Err(anyhow::anyhow!("Mined transaction should have a success as true"));
                 }
 
-                info!("✅ Transaction successfully reached Mined state");
+                info!("[SUCCESS] Transaction successfully reached Mined state");
                 return Ok(());
             }
 
@@ -2477,7 +2477,7 @@ impl TestRunner {
                 if status.receipt.is_none() {
                     return Err(anyhow::anyhow!("Confirmed transaction should have receipt"));
                 }
-                info!("✅ Transaction successfully reached Confirmed state");
+                info!("[SUCCESS] Transaction successfully reached Confirmed state");
                 return Ok(());
             }
 
@@ -2526,7 +2526,7 @@ impl TestRunner {
             }
             Err(_) => {
                 info!(
-                    "✅ Transaction was rejected at gas estimation (also valid failure scenario)"
+                    "[SUCCESS] Transaction was rejected at gas estimation (also valid failure scenario)"
                 );
                 Ok(())
             }
@@ -2587,7 +2587,7 @@ impl TestRunner {
             ));
         }
 
-        info!("✅ Allowlist restrictions working correctly");
+        info!("[SUCCESS] Allowlist restrictions working correctly");
         Ok(())
     }
 
@@ -2649,7 +2649,7 @@ impl TestRunner {
             ));
         }
 
-        info!("✅ Allowlist edge cases handled correctly");
+        info!("[SUCCESS] Allowlist edge cases handled correctly");
         Ok(())
     }
 
@@ -2680,7 +2680,7 @@ impl TestRunner {
         match created_relayer {
             Ok(_) => Err(anyhow::anyhow!("Relayer should have been deleted")),
             Err(_) => {
-                info!("✅ Relayer delete functionality working correctly");
+                info!("[SUCCESS] Relayer delete functionality working correctly");
                 Ok(())
             }
         }
@@ -2751,7 +2751,7 @@ impl TestRunner {
             .await
             .context("Failed to get relayer transactions")?;
 
-        info!("✅ Found {} transactions for first relayer", first_relayer_transactions.items.len());
+        info!("[SUCCESS] Found {} transactions for first relayer", first_relayer_transactions.items.len());
 
         let cloned_relayer_transactions = self
             .relayer_client
@@ -2762,7 +2762,7 @@ impl TestRunner {
             .context("Failed to get relayer transactions")?;
 
         info!(
-            "✅ Found {} transactions for cloned relayer",
+            "[SUCCESS] Found {} transactions for cloned relayer",
             cloned_relayer_transactions.items.len()
         );
 
@@ -2780,7 +2780,7 @@ impl TestRunner {
             ));
         }
 
-        info!("✅ Relayer clone functionality working correctly");
+        info!("[SUCCESS] Relayer clone functionality working correctly");
 
         Ok(())
     }
@@ -2861,7 +2861,7 @@ impl TestRunner {
             ));
         }
 
-        info!("✅ Relayer pause/unpause functionality working correctly");
+        info!("[SUCCESS] Relayer pause/unpause functionality working correctly");
         Ok(())
     }
 
@@ -2943,7 +2943,7 @@ impl TestRunner {
             return Err(anyhow::anyhow!("Relayer should have a config"));
         }
 
-        info!("✅ Gas configuration changes working correctly");
+        info!("[SUCCESS] Gas configuration changes working correctly");
         Ok(())
     }
 
@@ -3039,7 +3039,7 @@ impl TestRunner {
             return Err(anyhow::anyhow!("Relayer should have a config"));
         }
 
-        info!("✅ Allowlist toggle functionality working correctly");
+        info!("[SUCCESS] Allowlist toggle functionality working correctly");
         Ok(())
     }
 
@@ -3129,7 +3129,7 @@ impl TestRunner {
             self.mine_and_wait().await?;
         }
 
-        info!("✅ Nonce management working correctly with sequential assignment");
+        info!("[SUCCESS] Nonce management working correctly with sequential assignment");
         Ok(())
     }
 
@@ -3241,7 +3241,7 @@ impl TestRunner {
             return Err(anyhow::anyhow!("Transaction failed after gas bumping"));
         }
 
-        info!("✅ Gas price bumping mechanism verified");
+        info!("[SUCCESS] Gas price bumping mechanism verified");
         Ok(())
     }
 
@@ -3282,18 +3282,18 @@ impl TestRunner {
         info!("📨 Initial webhooks received: {}", initial_webhooks.len());
 
         if initial_webhooks.is_empty() {
-            info!("⚠️ No initial webhooks received, checking all webhooks...");
+            info!("[WARNING] No initial webhooks received, checking all webhooks...");
             let all_webhooks = webhook_server.get_received_webhooks();
-            info!("📊 Total webhooks received so far: {}", all_webhooks.len());
+            info!("[INFO] Total webhooks received so far: {}", all_webhooks.len());
             for webhook in &all_webhooks {
                 info!("  - Event: {}, TxID: {}", webhook.event_type, webhook.transaction_id);
             }
         }
 
-        info!("⏳ Waiting for transaction {} to complete fully...", send_result.id);
+        info!("[WAIT] Waiting for transaction {} to complete fully...", send_result.id);
         let (completed_tx, _receipt) =
             self.wait_for_transaction_completion(&send_result.id).await?;
-        info!("✅ Transaction completed with status: {:?}", completed_tx.status);
+        info!("[SUCCESS] Transaction completed with status: {:?}", completed_tx.status);
 
         let eth_transfer_webhooks =
             webhook_server.get_webhooks_for_transaction(&send_result.id.to_string());
@@ -3352,7 +3352,7 @@ impl TestRunner {
             return Err(anyhow!("No webhooks were received during testing"));
         }
 
-        info!("📊 All webhooks received during test: {}", all_webhooks.len());
+        info!("[INFO] All webhooks received during test: {}", all_webhooks.len());
 
         for (i, webhook) in all_webhooks.iter().enumerate() {
             info!(
@@ -3395,7 +3395,7 @@ impl TestRunner {
                 return Err(anyhow!("Webhook payload missing timestamp"));
             }
 
-            info!("✅ Webhook validation passed for event: {}", webhook.event_type);
+            info!("[SUCCESS] Webhook validation passed for event: {}", webhook.event_type);
         }
 
         info!("📤 Test 4: Transaction lifecycle webhook sequence");
@@ -3431,7 +3431,7 @@ impl TestRunner {
         }
 
         info!("📤 Test 5: Transaction confirmation webhook (15 blocks)");
-        info!("⛏️ Mining 15 blocks to confirm the ETH transfer transaction...");
+        info!("[MINING] Mining 15 blocks to confirm the ETH transfer transaction...");
         self.mine_and_wait().await?;
         self.mine_and_wait().await?;
         self.mine_and_wait().await?;
@@ -3448,7 +3448,7 @@ impl TestRunner {
         self.mine_and_wait().await?;
         self.mine_and_wait().await?;
 
-        info!("⏳ Waiting for confirmation processing...");
+        info!("[WAIT] Waiting for confirmation processing...");
 
         let mut confirmed_webhooks = Vec::new();
         for attempt in 1..=10 {
@@ -3456,7 +3456,7 @@ impl TestRunner {
             if !confirmed_webhooks.is_empty() {
                 break;
             }
-            info!("⏳ Attempt {}/10: Waiting for transaction_confirmed webhook...", attempt);
+            info!("[WAIT] Attempt {}/10: Waiting for transaction_confirmed webhook...", attempt);
             tokio::time::sleep(Duration::from_secs(1)).await;
         }
 
@@ -3466,7 +3466,7 @@ impl TestRunner {
             ));
         }
 
-        info!("✅ Received 'transaction_confirmed' webhook event");
+        info!("[SUCCESS] Received 'transaction_confirmed' webhook event");
 
         info!("📤 Test 6: Transaction cancelled webhook");
 
@@ -3505,7 +3505,7 @@ impl TestRunner {
         self.mine_and_wait().await?;
         self.mine_and_wait().await?;
 
-        info!("⏳ Waiting for cancellation processing...");
+        info!("[WAIT] Waiting for cancellation processing...");
 
         info!("📤 Test 7: Transaction replacement webhook");
 
@@ -3545,7 +3545,7 @@ impl TestRunner {
         //     .replace_transaction(transaction_id, &replacement_request)
         //     .await
         //     .context("Failed to replace transaction")?;
-        // info!("✅ Transaction replacement result: {}", replace_result);
+        // info!("[SUCCESS] Transaction replacement result: {}", replace_result);
         //
         // if !replace_result {
         //     return Err(anyhow::anyhow!("Replace transaction failed"));
@@ -3555,7 +3555,7 @@ impl TestRunner {
         self.mine_and_wait().await?;
         self.mine_and_wait().await?;
 
-        info!("⏳ Waiting for replace transaction processing...");
+        info!("[WAIT] Waiting for replace transaction processing...");
 
         info!("📤 Test 8: Comprehensive webhook event verification");
         let final_all_webhooks = webhook_server.get_received_webhooks();
@@ -3577,7 +3577,7 @@ impl TestRunner {
         for event in &webhook_events {
             let count = final_webhook_events.iter().filter(|&e| e == event).count();
             if count > 0 {
-                info!("✅ Received '{}' webhook event ({} occurrences)", event, count);
+                info!("[SUCCESS] Received '{}' webhook event ({} occurrences)", event, count);
             } else {
                 return Err(anyhow!("Missing '{}' webhook event", event));
             }
@@ -3593,13 +3593,13 @@ impl TestRunner {
         webhook_server.clear_webhooks();
 
         // Test text signing webhook
-        info!("🔐 Testing text signing webhook...");
+        info!("[SECURE] Testing text signing webhook...");
         let text_to_sign = "Hello, RRelayer webhook test!";
 
         let sign_text_result =
             self.relayer_client.sdk.sign.sign_text(&relayer.id, text_to_sign, None).await?;
 
-        info!("✅ Text signed successfully, signature: {:?}", sign_text_result.signature);
+        info!("[SUCCESS] Text signed successfully, signature: {:?}", sign_text_result.signature);
 
         // Wait a moment for webhook delivery
         tokio::time::sleep(Duration::from_millis(500)).await;
@@ -3609,7 +3609,7 @@ impl TestRunner {
             return Err(anyhow!("No 'text_signed' webhook received"));
         }
 
-        info!("✅ Received {} text_signed webhook(s)", text_signing_webhooks.len());
+        info!("[SUCCESS] Received {} text_signed webhook(s)", text_signing_webhooks.len());
 
         // Validate text signing webhook payload
         let text_webhook = &text_signing_webhooks[0];
@@ -3637,9 +3637,9 @@ impl TestRunner {
             ));
         }
 
-        info!("✅ Text signing webhook payload validation passed");
+        info!("[SUCCESS] Text signing webhook payload validation passed");
 
-        info!("🔐 Testing typed data signing webhook...");
+        info!("[SECURE] Testing typed data signing webhook...");
 
         use serde_json::json;
         let typed_data = json!({
@@ -3676,7 +3676,7 @@ impl TestRunner {
             .await?;
 
         info!(
-            "✅ Typed data signed successfully, signature: {:?}",
+            "[SUCCESS] Typed data signed successfully, signature: {:?}",
             sign_typed_data_result.signature
         );
 
@@ -3687,7 +3687,7 @@ impl TestRunner {
             return Err(anyhow!("No 'typed_data_signed' webhook received"));
         }
 
-        info!("✅ Received {} typed_data_signed webhook(s)", typed_data_signing_webhooks.len());
+        info!("[SUCCESS] Received {} typed_data_signed webhook(s)", typed_data_signing_webhooks.len());
 
         let typed_data_webhook = &typed_data_signing_webhooks[0];
         if !typed_data_webhook.payload.get("signing").is_some() {
@@ -3717,7 +3717,7 @@ impl TestRunner {
             ));
         }
 
-        info!("✅ Typed data signing webhook payload validation passed");
+        info!("[SUCCESS] Typed data signing webhook payload validation passed");
 
         for signing_webhook in [&text_signing_webhooks[0], &typed_data_signing_webhooks[0]] {
             if !signing_webhook.headers.contains_key("x-rrelayer-signature") {
@@ -3741,24 +3741,24 @@ impl TestRunner {
             }
         }
 
-        info!("✅ Signing webhook structure validation passed");
-        info!("📊 Signing tests summary:");
-        info!("   🔐 Text signing webhook: ✅ received and validated");
-        info!("   📝 Typed data signing webhook: ✅ received and validated");
-        info!("   🔍 Payload structure: ✅ all required fields present");
-        info!("   🔒 HMAC signature validation: ✅ headers present");
+        info!("[SUCCESS] Signing webhook structure validation passed");
+        info!("[INFO] Signing tests summary:");
+        info!("   [SECURE] Text signing webhook: [SUCCESS] received and validated");
+        info!("   [NOTE] Typed data signing webhook: [SUCCESS] received and validated");
+        info!("   [CHECK] Payload structure: [SUCCESS] all required fields present");
+        info!("   [LOCKED] HMAC signature validation: [SUCCESS] headers present");
 
-        info!("✅ Comprehensive webhook delivery testing completed successfully!");
-        info!("   📊 Total webhooks received: {}", final_all_webhooks.len());
+        info!("[SUCCESS] Comprehensive webhook delivery testing completed successfully!");
+        info!("   [INFO] Total webhooks received: {}", final_all_webhooks.len());
         info!("   📋 Core events tested: queued, sent, mined, confirmed");
-        info!("   🔒 Signature validation: passed");
-        info!("   📝 Payload structure: validated");
-        info!("   🔄 Lifecycle sequence: verified");
+        info!("   [LOCKED] Signature validation: passed");
+        info!("   [NOTE] Payload structure: validated");
+        info!("   [RETRY] Lifecycle sequence: verified");
         info!("   📤 Contract interactions: tested");
-        info!("   ✅ Transaction confirmations: tested (15 blocks)");
-        info!("   🔐 Text signing webhooks: tested and validated");
+        info!("   [SUCCESS] Transaction confirmations: tested (15 blocks)");
+        info!("   [SECURE] Text signing webhooks: tested and validated");
         info!("   📜 Typed data signing webhooks: tested and validated");
-        info!("   🔍 Webhook consistency: all calls non-blocking");
+        info!("   [CHECK] Webhook consistency: all calls non-blocking");
 
         Ok(())
     }
@@ -4020,7 +4020,7 @@ impl TestRunner {
                     alloy::primitives::utils::format_ether(final_balance1)
                 ));
             }
-            info!("✅ Relayer 1 successfully topped up to ~100 ETH");
+            info!("[SUCCESS] Relayer 1 successfully topped up to ~100 ETH");
         }
 
         if drained_balance2 < expected_top_up {
@@ -4030,7 +4030,7 @@ impl TestRunner {
                     alloy::primitives::utils::format_ether(final_balance2)
                 ));
             }
-            info!("✅ Relayer 2 successfully topped up to ~100 ETH");
+            info!("[SUCCESS] Relayer 2 successfully topped up to ~100 ETH");
         }
 
         // Relayer 3 should remain unchanged if it wasn't drained
@@ -4043,10 +4043,10 @@ impl TestRunner {
                     alloy::primitives::utils::format_ether(final_balance3)
                 ));
             }
-            info!("✅ Relayer 3 balance remained stable (no top-up needed)");
+            info!("[SUCCESS] Relayer 3 balance remained stable (no top-up needed)");
         }
 
-        info!("✅ Automatic top-up mechanism working correctly");
+        info!("[SUCCESS] Automatic top-up mechanism working correctly");
         Ok(())
     }
 
@@ -4147,7 +4147,7 @@ impl TestRunner {
                 alloy::primitives::utils::format_units(final_balance1, 18)?
             ));
         }
-        info!("✅ Relayer 1 successfully topped up to ~500 tokens");
+        info!("[SUCCESS] Relayer 1 successfully topped up to ~500 tokens");
 
         if final_balance2.abs_diff(expected_top_up) > tolerance {
             return Err(anyhow::anyhow!(
@@ -4155,7 +4155,7 @@ impl TestRunner {
                 alloy::primitives::utils::format_units(final_balance2, 18)?
             ));
         }
-        info!("✅ Relayer 2 successfully topped up to ~500 tokens");
+        info!("[SUCCESS] Relayer 2 successfully topped up to ~500 tokens");
 
         if final_balance3.abs_diff(expected_top_up) > tolerance {
             return Err(anyhow::anyhow!(
@@ -4163,9 +4163,9 @@ impl TestRunner {
                 alloy::primitives::utils::format_units(final_balance3, 18)?
             ));
         }
-        info!("✅ Relayer 3 successfully topped up to ~500 tokens");
+        info!("[SUCCESS] Relayer 3 successfully topped up to ~500 tokens");
 
-        info!("✅ Automatic ERC-20 token top-up mechanism working correctly");
+        info!("[SUCCESS] Automatic ERC-20 token top-up mechanism working correctly");
         Ok(())
     }
 
@@ -4310,12 +4310,12 @@ impl TestRunner {
             info!("  Relayer 2: {} ETH", alloy::primitives::utils::format_ether(current_balance2));
 
             if current_balance1 > min_expected_balance && !relayer1_topped_up {
-                info!("✅ Relayer 1 successfully topped up via Safe proxy!");
+                info!("[SUCCESS] Relayer 1 successfully topped up via Safe proxy!");
                 relayer1_topped_up = true;
             }
 
             if current_balance2 > min_expected_balance && !relayer2_topped_up {
-                info!("✅ Relayer 2 successfully topped up via Safe proxy!");
+                info!("[SUCCESS] Relayer 2 successfully topped up via Safe proxy!");
                 relayer2_topped_up = true;
             }
         }
@@ -4345,7 +4345,7 @@ impl TestRunner {
             ));
         }
 
-        info!("✅ Automatic Safe proxy top-up mechanism working correctly");
+        info!("[SUCCESS] Automatic Safe proxy top-up mechanism working correctly");
         Ok(())
     }
 
@@ -4446,7 +4446,7 @@ impl TestRunner {
             self.mine_and_wait().await?;
         }
 
-        info!("✅ Concurrent transaction handling verified");
+        info!("[SUCCESS] Concurrent transaction handling verified");
         Ok(())
     }
 
@@ -4475,7 +4475,7 @@ impl TestRunner {
             return Err(anyhow::anyhow!("SDK should not be able to get relayers"));
         }
 
-        info!("✅ Unauthenticated checked");
+        info!("[SUCCESS] Unauthenticated checked");
         Ok(())
     }
 
@@ -4562,7 +4562,7 @@ impl TestRunner {
             ));
         }
 
-        info!("✅ Transaction data validation working");
+        info!("[SUCCESS] Transaction data validation working");
         Ok(())
     }
 
@@ -4622,7 +4622,7 @@ impl TestRunner {
             ));
         }
 
-        info!("✅ Balance edge cases handled correctly");
+        info!("[SUCCESS] Balance edge cases handled correctly");
         Ok(())
     }
 
@@ -4683,8 +4683,8 @@ impl TestRunner {
             }
         }
 
-        info!("✅ All {} relayers have unique addresses", all_relayers.len());
-        info!("✅ Concurrent relayer creation deadlock fix verified successfully!");
+        info!("[SUCCESS] All {} relayers have unique addresses", all_relayers.len());
+        info!("[SUCCESS] Concurrent relayer creation deadlock fix verified successfully!");
 
         Ok(())
     }

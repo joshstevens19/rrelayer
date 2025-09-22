@@ -73,7 +73,7 @@ impl WebhookTestServer {
 
         let (_, server_future) =
             warp::serve(routes).bind_with_graceful_shutdown(([127, 0, 0, 1], port), async {
-                info!("⏳ Webhook server waiting for shutdown signal...");
+                info!("[WAIT] Webhook server waiting for shutdown signal...");
                 shutdown_rx.await.ok();
                 info!("📡 Webhook server received shutdown signal");
             });
@@ -87,13 +87,13 @@ impl WebhookTestServer {
 
     /// Stop the webhook server
     pub fn stop(&self) {
-        info!("🛑 stop() called on webhook server");
+        info!("[STOP] stop() called on webhook server");
         let mut tx = self.shutdown_tx.lock().unwrap();
         if let Some(sender) = tx.take() {
-            info!("🛑 Sending shutdown signal to webhook server");
+            info!("[STOP] Sending shutdown signal to webhook server");
             let _ = sender.send(());
         } else {
-            info!("⚠️ No shutdown sender available - server may already be stopped");
+            info!("[WARNING] No shutdown sender available - server may already be stopped");
         }
     }
 

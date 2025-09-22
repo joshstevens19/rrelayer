@@ -131,7 +131,7 @@ impl ContractInteractor {
         let _ = tx.send(()).await;
         mining_task.abort();
 
-        info!("✅ Test contract deployed to: {:?}", contract_address);
+        info!("[SUCCESS] Test contract deployed to: {:?}", contract_address);
 
         // Wait longer to ensure deployment is fully settled and nonce is incremented
         tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
@@ -237,7 +237,7 @@ impl ContractInteractor {
         let total_supply =
             token_contract.totalSupply().call().await.context("Failed to verify token contract")?;
 
-        info!("✅ Test ERC-20 token verified - Total supply: {}", total_supply._0);
+        info!("[SUCCESS] Test ERC-20 token verified - Total supply: {}", total_supply._0);
 
         // Transfer tokens from deployer to the automatic top-up funding address
         // The deployer (anvil_accounts[0]) has all the tokens, but the funding address in YAML is different
@@ -373,7 +373,7 @@ impl ContractInteractor {
             ));
         }
 
-        info!("✅ Safe proxy deployed to expected deterministic address: {:?}", safe_address);
+        info!("[SUCCESS] Safe proxy deployed to expected deterministic address: {:?}", safe_address);
 
         // Wait a moment to ensure deployment is fully settled before returning
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;

@@ -37,9 +37,9 @@ async fn main() -> Result<()> {
     let test_filter = std::env::var("RRELAYER_TEST_FILTER").ok();
 
     if let Some(filter) = &test_filter {
-        info!("🧪 Running single test scenario: {}", filter);
+        info!("[TEST] Running single test scenario: {}", filter);
     } else {
-        info!("🧪 Running all E2E test scenarios...");
+        info!("[TEST] Running all E2E test scenarios...");
     }
 
     // Load test configuration
@@ -49,13 +49,13 @@ async fn main() -> Result<()> {
     info!("🔥 Starting Anvil blockchain...");
     let mut anvil_manager = AnvilManager::new(config.anvil_port).await?;
     anvil_manager.start().await?;
-    info!("✅ Anvil is ready!");
+    info!("[SUCCESS] Anvil is ready!");
 
     // Mine blocks to establish gas price history for proper gas computation
     anvil_manager.mine_blocks_with_transactions(50).await?;
 
     // Start embedded RRelayer server
-    info!("🚀 Starting embedded RRelayer server...");
+    info!("[START] Starting embedded RRelayer server...");
     let current_dir = std::env::current_dir()?;
     let mut rrelayer_server = EmbeddedRRelayerServer::new(current_dir);
     rrelayer_server.start().await?;
@@ -76,9 +76,9 @@ async fn main() -> Result<()> {
     rrelayer_server.stop().await?;
 
     // Stop Anvil
-    info!("🛑 Stopping Anvil blockchain...");
+    info!("[STOP] Stopping Anvil blockchain...");
     anvil_manager.stop().await?;
-    info!("✅ Anvil stopped");
+    info!("[SUCCESS] Anvil stopped");
 
     // Exit with appropriate code based on test results
     let failed_count = test_suite.failed_count() + test_suite.timeout_count();

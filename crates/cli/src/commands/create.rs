@@ -19,7 +19,7 @@ pub async fn handle_create(
 
     let result = sdk.relayer.create(chain_id, name).await?;
 
-    println!("\n✅  Relayer created successfully!");
+    println!("\n[SUCCESS]  Relayer created successfully!");
     println!("┌─────────────────────────────────────────────────");
     println!("│ Name:      {}", name);
     println!("│ ID:        {}", result.id);

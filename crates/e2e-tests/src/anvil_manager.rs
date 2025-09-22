@@ -232,7 +232,7 @@ impl AnvilManager {
     pub async fn mine_blocks_with_transactions(&self, num_blocks: u64) -> Result<()> {
         use reqwest::Client;
 
-        info!("⛏️  Mining {} blocks with transactions for gas estimation data", num_blocks);
+        info!("[MINING]  Mining {} blocks with transactions for gas estimation data", num_blocks);
 
         let client = Client::new();
         let url = format!("http://127.0.0.1:{}", self.port);
@@ -370,7 +370,7 @@ impl AnvilManager {
             }
         }
 
-        info!("✅ Successfully mined {} blocks with gas price history (transactions in recent blocks)", num_blocks);
+        info!("[SUCCESS] Successfully mined {} blocks with gas price history (transactions in recent blocks)", num_blocks);
         Ok(())
     }
 
