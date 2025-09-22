@@ -779,6 +779,20 @@ impl TransactionsQueues {
                                     RpcError::Transport(TransportErrorKind::Custom(error.into())),
                                 ))
                             }
+                            TransactionQueueSendTransactionError::SafeProxyError(error) => {
+                                self.db
+                                    .update_transaction_failed(&transaction.id, &error.to_string())
+                                    .await
+                                    .map_err(ProcessPendingTransactionError::DbError)?;
+
+                                transactions_queue.move_next_pending_to_failed().await;
+
+                                self.invalidate_transaction_cache(&transaction.id).await;
+
+                                Err(ProcessPendingTransactionError::TransactionEstimateGasError(
+                                    RpcError::Transport(TransportErrorKind::Custom(error.into())),
+                                ))
+                            }
                         };
                     }
                 }

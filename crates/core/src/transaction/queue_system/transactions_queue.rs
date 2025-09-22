@@ -735,10 +735,8 @@ impl TransactionsQueue {
                     transaction.id, safe_address, self.relayer.name
                 );
 
-                // TODO: safe_nonce!!!!
-                // Get the safe's current nonce (this would need to be implemented)
-                // For now, using a placeholder - this should get the actual safe nonce
-                let safe_nonce = alloy::primitives::U256::ZERO;
+                let safe_nonce =
+                    safe_proxy_manager.get_safe_nonce(&self.evm_provider, &safe_address).await?;
 
                 let (safe_addr, safe_tx) = safe_proxy_manager
                     .wrap_transaction_for_safe(

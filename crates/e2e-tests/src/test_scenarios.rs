@@ -2409,7 +2409,9 @@ impl TestRunner {
                 }
                 let hash = status.hash.unwrap();
                 if hash != send_result.hash {
-                    return Err(anyhow::anyhow!("InMempool transaction should match the sent transaction hash"));
+                    return Err(anyhow::anyhow!(
+                        "InMempool transaction should match the sent transaction hash"
+                    ));
                 }
 
                 if status.receipt.is_some() {
@@ -2485,7 +2487,9 @@ impl TestRunner {
 
                 let hash = status.hash.unwrap();
                 if hash != send_result.hash {
-                    return Err(anyhow::anyhow!("Mined transaction should match the sent transaction hash"));
+                    return Err(anyhow::anyhow!(
+                        "Mined transaction should match the sent transaction hash"
+                    ));
                 }
 
                 if status.receipt.is_none() {
@@ -2566,7 +2570,9 @@ impl TestRunner {
                 }
                 let hash = status.hash.unwrap();
                 if hash != send_result.hash {
-                    return Err(anyhow::anyhow!("Confirmed transaction should match the sent transaction hash"));
+                    return Err(anyhow::anyhow!(
+                        "Confirmed transaction should match the sent transaction hash"
+                    ));
                 }
                 if status.receipt.is_none() {
                     return Err(anyhow::anyhow!("Confirmed transaction should have receipt"));

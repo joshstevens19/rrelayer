@@ -1,7 +1,7 @@
 use alloy::transports::{RpcError, TransportErrorKind};
 use thiserror::Error;
 
-use crate::{postgres::PostgresError, provider::SendTransactionError};
+use crate::{postgres::PostgresError, provider::SendTransactionError, SafeProxyError};
 
 #[derive(Error, Debug)]
 pub enum SendTransactionGasPriceError {
@@ -37,4 +37,7 @@ pub enum TransactionQueueSendTransactionError {
 
     #[error("Transaction conversion error: {0}")]
     TransactionConversionError(String),
+
+    #[error("Safe proxy error: {0}")]
+    SafeProxyError(#[from] SafeProxyError),
 }
