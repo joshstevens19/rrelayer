@@ -3,6 +3,9 @@
 debug/
 target/
 
+*log
+*pid
+
 .idea
 src/.DS_Store
 .DS_Store

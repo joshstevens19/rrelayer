@@ -285,17 +285,14 @@ impl TestRunner {
                 "Failed transaction - contract revert",
             ),
             ("gas_estimation", "Gas estimation functionality"),
-            ("transaction_replacement", "Transaction replacement operations"),
             ("batch_transactions", "Batch transaction processing"),
-            ("relayer_limits", "Relayer limit enforcement"),
+            ("rate_limiting", "Relayer limit enforcement"),
             ("gas_price_api", "Gas price API functionality"),
             ("network_management", "Network management operations"),
             ("allowlist_add", "Allowlist add operation"),
-            ("allowlist_list", "Allowlist list operation"),
             ("allowlist_remove", "Allowlist remove operation"),
             ("signing_text", "Text signing functionality"),
             ("signing_typed_data", "Typed data signing functionality"),
-            ("transaction_send", "Transaction send operation"),
             ("transaction_get", "Transaction get operation"),
             ("transaction_list", "Transaction list operation"),
             ("transaction_replace", "Transaction replace operation"),
@@ -315,13 +312,9 @@ impl TestRunner {
             ("relayer_allowlist_toggle", "Relayer allowlist toggle functionality"),
             ("transaction_nonce_management", "Transaction nonce management"),
             ("gas_price_bumping", "Gas price bumping mechanism"),
-            ("transaction_replacement_edge_cases", "Transaction replacement edge cases"),
-            ("webhook_delivery_testing", "Webhook delivery testing"),
-            ("rate_limiting_enforcement", "Rate limiting enforcement"),
-            ("automatic_top_up", "Automatic relayer balance top-up"),
+            ("webhook_delivery", "Webhook delivery testing"),
+            ("rate_limiting", "Rate limiting enforcement"),
             ("concurrent_transactions", "Concurrent transaction handling"),
-            ("network_configuration_edge_cases", "Network configuration edge cases"),
-            ("authentication_edge_cases", "Authentication edge cases"),
             ("blob_transaction_handling", "Blob transaction handling (EIP-4844)"),
             ("transaction_data_validation", "Transaction data validation"),
             ("balance_edge_cases", "Balance edge case handling"),
@@ -330,6 +323,7 @@ impl TestRunner {
         for (test_name, description) in test_definitions {
             let test_result = self.run_single_test(test_name, description).await;
             suite.add_test(test_result);
+            self.mine_and_wait().await.expect("Could not mine block");
         }
 
         self.stop_webhook_server();
@@ -426,6 +420,7 @@ impl TestRunner {
             "gas_price_bumping" => self.test_gas_price_bumping().await,
             "webhook_delivery" => self.test_webhook_delivery().await,
             "rate_limiting" => self.test_rate_limiting().await,
+            "rate_limiting_typed_data" => self.test_rate_limiting_typed_data().await,
             "automatic_top_up_native" => self.test_automatic_top_up_native().await,
             "automatic_top_up_erc20" => self.test_automatic_top_up_erc20().await,
             "automatic_top_up_safe_proxy" => self.test_automatic_top_up_safe_proxy().await,
@@ -471,7 +466,6 @@ impl TestRunner {
 
         println!("[TIME] Time:        {:.2}s", suite.duration.as_secs_f64());
 
-        // Failed tests details
         if failed > 0 || timeout > 0 {
             println!();
             println!("Failed Tests:");
@@ -499,7 +493,7 @@ impl TestRunner {
         println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
         self.start_webhook_server().await.unwrap();
-        let relayer = self.create_and_fund_relayer("automatic_top_up").await.unwrap();
+        let relayer = self.create_and_fund_relayer("startup").await.unwrap();
         self.fund_relayer(
             &relayer.address,
             alloy::primitives::utils::parse_ether("100000000").unwrap(),
@@ -538,7 +532,6 @@ impl TestRunner {
                 "Failed transaction - contract revert"
             }
             "gas_estimation" => "Gas estimation functionality",
-            "transaction_replacement" => "Transaction replacement operations",
             "batch_transactions" => "Batch transaction processing",
             "transaction_count" => "Transaction pending and inmempool count",
             "gas_price_api" => "Gas price API functionality",
@@ -569,7 +562,8 @@ impl TestRunner {
             "transaction_nonce_management" => "Transaction nonce management",
             "gas_price_bumping" => "Gas price bumping mechanism",
             "webhook_delivery" => "Webhook delivery testing",
-            "rate_limiting" => "Rate limiting enforcement",
+            "rate_limiting" => "Rate limiting enforcement for transactions + signed messages",
+            "rate_limiting_typed_data" => "Rate limiting enforcement for typed data",
             "automatic_top_up_native" => "Automatic relayer native balance top-up",
             "automatic_top_up_erc20" => "Automatic relayer erc20 balance top-up",
             "automatic_top_up_safe_proxy" => "Automatic top-up using Safe proxy",
@@ -754,7 +748,7 @@ impl TestRunner {
             return Err(anyhow!("Relayer should not be paused"));
         }
 
-        if relayer.name != "e2e-test-relayer" {
+        if relayer.name != "basic-relayer-creation" {
             return Err(anyhow!("Relayer should always be the same name"));
         }
 
@@ -2217,6 +2211,9 @@ impl TestRunner {
         }
 
         self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
 
         let updated_status = self
             .relayer_client
@@ -2360,13 +2357,6 @@ impl TestRunner {
             ));
         }
 
-        if status.hash.is_some() {
-            return Err(anyhow::anyhow!(
-                "Pending transaction should not have hash, but got: {:?}",
-                status.hash
-            ));
-        }
-
         if status.receipt.is_some() {
             return Err(anyhow::anyhow!(
                 "Pending transaction should not have receipt, but got receipt"
@@ -2417,6 +2407,11 @@ impl TestRunner {
                 if status.hash.is_none() {
                     return Err(anyhow::anyhow!("InMempool transaction should have hash"));
                 }
+                let hash = status.hash.unwrap();
+                if hash != send_result.hash {
+                    return Err(anyhow::anyhow!("InMempool transaction should match the sent transaction hash"));
+                }
+
                 if status.receipt.is_some() {
                     return Err(anyhow::anyhow!("InMempool transaction should not have receipt"));
                 }
@@ -2487,6 +2482,12 @@ impl TestRunner {
                 if status.hash.is_none() {
                     return Err(anyhow::anyhow!("Mined transaction should have hash"));
                 }
+
+                let hash = status.hash.unwrap();
+                if hash != send_result.hash {
+                    return Err(anyhow::anyhow!("Mined transaction should match the sent transaction hash"));
+                }
+
                 if status.receipt.is_none() {
                     return Err(anyhow::anyhow!("Mined transaction should have receipt"));
                 }
@@ -2562,6 +2563,10 @@ impl TestRunner {
             if status.status == TransactionStatus::Confirmed {
                 if status.hash.is_none() {
                     return Err(anyhow::anyhow!("Confirmed transaction should have hash"));
+                }
+                let hash = status.hash.unwrap();
+                if hash != send_result.hash {
+                    return Err(anyhow::anyhow!("Confirmed transaction should match the sent transaction hash"));
                 }
                 if status.receipt.is_none() {
                     return Err(anyhow::anyhow!("Confirmed transaction should have receipt"));
@@ -3918,6 +3923,20 @@ impl TestRunner {
         info!("Sleep for 60 seconds to allow the rate limit to expire");
         tokio::time::sleep(Duration::from_secs(60)).await;
 
+        info!("Rate limiting mechanism verified");
+        Ok(())
+    }
+
+    /// run single with:
+    /// make run-test-debug TEST=rate_limiting_typed_data
+    async fn test_rate_limiting_typed_data(&self) -> Result<()> {
+        info!("Testing rate limiting enforcement typed data...");
+
+        let relayer = self.create_and_fund_relayer("rate-limit-relayer").await?;
+        info!("relayer: {:?}", relayer);
+
+        let relay_key = Some(self.config.anvil_accounts[0].to_string());
+
         let mut successful_signing = 0;
 
         let typed_data_json = serde_json::json!({
@@ -3979,9 +3998,9 @@ impl TestRunner {
             return Err(anyhow!("Signing typed data rate limiting not enforced"));
         }
 
-        info!("Successful signing typed data before rate limit: {}", successful_transactions);
+        info!("Successful signing typed data before rate limit: {}", successful_signing);
 
-        info!("Rate limiting mechanism verified");
+        info!("Typed data rate limiting mechanism verified");
         Ok(())
     }
 

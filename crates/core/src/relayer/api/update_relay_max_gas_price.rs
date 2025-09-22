@@ -8,6 +8,7 @@ use axum::{
 use crate::relayer::get_relayer::relayer_exists;
 use crate::shared::{not_found, HttpError};
 use crate::{app_state::AppState, gas::GasPrice, relayer::types::RelayerId};
+use crate::relayer::cache::invalidate_relayer_cache;
 
 /// Updates the maximum gas price limit for a relayer.
 pub async fn update_relay_max_gas_price(
@@ -17,10 +18,9 @@ pub async fn update_relay_max_gas_price(
     let max_gas_price = if cap.into_u128() > 0 { Some(cap) } else { None };
 
     let exists = relayer_exists(&state.db, &state.cache, &relayer_id).await?;
-    {}
     if exists {
         state.db.update_relayer_max_gas_price(&relayer_id, max_gas_price).await?;
-
+        invalidate_relayer_cache(&state.cache, &relayer_id).await;
         if let Ok(queue) =
             state.transactions_queues.lock().await.get_transactions_queue_unsafe(&relayer_id)
         {

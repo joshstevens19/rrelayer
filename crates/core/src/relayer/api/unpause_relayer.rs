@@ -19,6 +19,7 @@ pub async fn unpause_relayer(
 ) -> Result<StatusCode, HttpError> {
     let exists = relayer_exists(&state.db, &state.cache, &relayer_id).await?;
     if exists {
+        state.db.unpause_relayer(&relayer_id).await?;
         invalidate_relayer_cache(&state.cache, &relayer_id).await;
         if let Ok(queue) =
             state.transactions_queues.lock().await.get_transactions_queue_unsafe(&relayer_id)

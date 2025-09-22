@@ -27,7 +27,7 @@ pub async fn get_allowlist_addresses(
     Query(query): Query<GetAllowlistAddressesQuery>,
 ) -> Result<Json<PagingResult<EvmAddress>>, HttpError> {
     let exists = relayer_exists(&state.db, &state.cache, &relayer_id).await?;
-    if !exists {
+    if exists {
         let result = state
             .db
             .relayer_get_allowlist_addresses(

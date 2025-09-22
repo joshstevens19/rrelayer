@@ -41,6 +41,7 @@ pub async fn create_relayer(
     let _lock = state.relayer_creation_mutex.lock().await;
 
     let relayer = state.db.create_relayer(&relayer.name, &chain_id, provider, None).await?;
+    invalidate_relayer_cache(&state.cache, &relayer.id).await;
 
     let current_nonce = provider.get_nonce(&relayer.wallet_index).await?;
 
