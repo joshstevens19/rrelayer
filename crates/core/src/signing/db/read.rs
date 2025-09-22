@@ -29,15 +29,6 @@ pub struct SignedTypedDataHistory {
 }
 
 impl PostgresClient {
-    /// Retrieves signed text message history with pagination for a specific relayer.
-    ///
-    /// # Arguments
-    /// * `relayer_id` - The relayer ID to filter by
-    /// * `paging_context` - Pagination parameters (limit and offset)
-    ///
-    /// # Returns
-    /// * `Ok(PagingResult<SignedTextHistory>)` - Paginated list of signed text messages
-    /// * `Err(PostgresError)` - If the database operation fails
     pub async fn get_signed_text_history(
         &self,
         relayer_id: &RelayerId,
@@ -73,15 +64,6 @@ impl PostgresClient {
         Ok(PagingResult::new(results, paging_context.next(result_count), paging_context.previous()))
     }
 
-    /// Retrieves signed typed data message history with pagination for a specific relayer.
-    ///
-    /// # Arguments
-    /// * `relayer_id` - The relayer ID to filter by
-    /// * `paging_context` - Pagination parameters (limit and offset)
-    ///
-    /// # Returns
-    /// * `Ok(PagingResult<SignedTypedDataHistory>)` - Paginated list of signed typed data messages
-    /// * `Err(PostgresError)` - If the database operation fails
     pub async fn get_signed_typed_data_history(
         &self,
         relayer_id: &RelayerId,

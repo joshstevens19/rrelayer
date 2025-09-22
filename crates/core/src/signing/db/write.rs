@@ -24,14 +24,6 @@ pub struct RecordSignedTextRequest {
 }
 
 impl PostgresClient {
-    /// Records a signed text message in the database.
-    ///
-    /// # Arguments
-    /// * `request` - The signed text record to save
-    ///
-    /// # Returns
-    /// * `Ok(Uuid)` - The ID of the created record
-    /// * `Err(PostgresError)` - If the database operation fails
     pub async fn record_signed_text(
         &self,
         request: &RecordSignedTextRequest,
@@ -51,14 +43,6 @@ impl PostgresClient {
         Ok(())
     }
 
-    /// Records a signed typed data (EIP-712) message in the database.
-    ///
-    /// # Arguments
-    /// * `request` - The signed typed data record to save
-    ///
-    /// # Returns
-    /// * `Ok(Uuid)` - The ID of the created record
-    /// * `Err(PostgresError)` - If the database operation fails
     pub async fn record_signed_typed_data(
         &self,
         request: &RecordSignedTypedDataRequest,

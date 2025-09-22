@@ -7,10 +7,10 @@ use axum::{
 
 use crate::app_state::AppState;
 
-pub mod get_signed_text_history;
-pub mod get_signed_typed_data_history;
-pub mod sign_text;
-pub mod sign_typed_data;
+mod get_signed_text_history;
+mod get_signed_typed_data_history;
+mod sign_text;
+mod sign_typed_data;
 
 // Re-export public types for backward compatibility
 pub use get_signed_text_history::GetSigningHistoryQuery;

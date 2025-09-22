@@ -1,6 +1,7 @@
 use super::types::TransactionSpeed;
 use crate::rate_limiting::RateLimiter;
 use crate::shared::utils::convert_blob_strings_to_blobs;
+use crate::shared::HttpError;
 use crate::{
     app_state::AppState,
     rate_limiting::{RateLimitError, RateLimitOperation},
@@ -82,7 +83,7 @@ pub async fn send_transaction(
     Path(relayer_id): Path<RelayerId>,
     headers: HeaderMap,
     Json(transaction): Json<RelayTransactionRequest>,
-) -> Result<Json<SendTransactionResult>, StatusCode> {
+) -> Result<Json<SendTransactionResult>, HttpError> {
     let rate_limit_reservation = RateLimiter::check_and_reserve_rate_limit(
         &state,
         &headers,

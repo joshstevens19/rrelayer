@@ -1,16 +1,15 @@
 use crate::rate_limiting::RateLimiter;
+use crate::shared::{not_found, HttpError};
 use crate::{
     app_state::AppState,
-    rate_limiting::{RateLimitError, RateLimitOperation},
-    relayer::{get_relayer, get_relayer_provider_context_by_relayer_id, RelayerId},
-    rrelayer_error,
+    rate_limiting::RateLimitOperation,
+    relayer::{get_relayer_provider_context_by_relayer_id, RelayerId},
     signing::db::write::RecordSignedTextRequest,
 };
 use alloy::primitives::PrimitiveSignature;
 use axum::http::HeaderMap;
 use axum::{
     extract::{Path, State},
-    http::StatusCode,
     Json,
 };
 use google_secretmanager1::client::serde_with::serde_derive::Serialize;
@@ -30,27 +29,12 @@ pub struct SignTextResult {
 }
 
 /// Signs a plain text message using the relayer's private key.
-///
-/// This endpoint signs a text message using the relayer's wallet, producing a signature
-/// that can be used for authentication or verification purposes. The signature follows
-/// Ethereum's personal message signing standard.
-///
-/// # Arguments
-/// * `state` - Application state containing database and provider connections
-/// * `relayer_id` - The unique identifier of the relayer to use for signing
-/// * `headers` - The request headers
-/// * `sign` - Request body containing the text message to sign
-///
-/// # Returns
-/// * `Ok(Json<SignTextResult>)` - The original message and its signature
-/// * `Err(StatusCode::NOT_FOUND)` - If relayer doesn't exist or no provider found
-/// * `Err(StatusCode::INTERNAL_SERVER_ERROR)` - If signing operation fails
 pub async fn sign_text(
     State(state): State<Arc<AppState>>,
     Path(relayer_id): Path<RelayerId>,
     headers: HeaderMap,
     Json(sign): Json<SignTextDto>,
-) -> Result<Json<SignTextResult>, StatusCode> {
+) -> Result<Json<SignTextResult>, HttpError> {
     let rate_limit_reservation = RateLimiter::check_and_reserve_rate_limit(
         &state,
         &headers,
@@ -65,15 +49,13 @@ pub async fn sign_text(
         &state.evm_providers,
         &relayer_id,
     )
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-    .ok_or(StatusCode::NOT_FOUND)?;
+    .await?
+    .ok_or(not_found("Relayer does not exist".to_string()))?;
 
     let signature = relayer_provider_context
         .provider
         .sign_text(&relayer_provider_context.relayer.wallet_index, &sign.text)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .await?;
 
     let record_request = RecordSignedTextRequest {
         relayer_id: relayer_id.into(),
@@ -82,11 +64,8 @@ pub async fn sign_text(
         chain_id: relayer_provider_context.provider.chain_id.into(),
     };
 
-    if let Err(e) = state.db.record_signed_text(&record_request).await {
-        rrelayer_error!("Failed to record signed text: {}", e);
-    }
+    state.db.record_signed_text(&record_request).await?;
 
-    // Fire webhook for text signing event
     if let Some(ref webhook_manager) = state.webhook_manager {
         let webhook_manager = webhook_manager.clone();
         let relayer_id_clone = relayer_id.clone();

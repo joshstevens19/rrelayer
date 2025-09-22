@@ -1,17 +1,16 @@
 use crate::rate_limiting::RateLimiter;
+use crate::shared::{not_found, HttpError};
+use crate::signing::db::RecordSignedTypedDataRequest;
 use crate::{
     app_state::AppState,
-    rate_limiting::{RateLimitError, RateLimitOperation},
-    relayer::{get_relayer, get_relayer_provider_context_by_relayer_id, RelayerId},
-    rrelayer_error,
-    signing::db::write::RecordSignedTypedDataRequest,
+    rate_limiting::RateLimitOperation,
+    relayer::{get_relayer_provider_context_by_relayer_id, RelayerId},
 };
 use alloy::dyn_abi::TypedData;
 use alloy::primitives::PrimitiveSignature;
 use axum::http::HeaderMap;
 use axum::{
     extract::{Path, State},
-    http::StatusCode,
     Json,
 };
 use google_secretmanager1::client::serde_with::serde_derive::Serialize;
@@ -24,27 +23,12 @@ pub struct SignTypedDataResult {
 }
 
 /// Signs structured typed data using the relayer's private key (EIP-712).
-///
-/// This endpoint signs structured typed data according to EIP-712 standard using the
-/// relayer's wallet. This is commonly used for signing permit transactions, meta-transactions,
-/// and other structured data that requires domain separation.
-///
-/// # Arguments
-/// * `state` - Application state containing database and provider connections
-/// * `relayer_id` - The unique identifier of the relayer to use for signing
-/// * `headers` - The request headers
-/// * `typed_data` - The structured typed data to sign following EIP-712 format
-///
-/// # Returns
-/// * `Ok(Json<SignTypedDataResult>)` - The signature of the typed data
-/// * `Err(StatusCode::NOT_FOUND)` - If relayer doesn't exist or no provider found
-/// * `Err(StatusCode::INTERNAL_SERVER_ERROR)` - If signing operation fails
 pub async fn sign_typed_data(
     State(state): State<Arc<AppState>>,
     Path(relayer_id): Path<RelayerId>,
     headers: HeaderMap,
     Json(typed_data): Json<TypedData>,
-) -> Result<Json<SignTypedDataResult>, StatusCode> {
+) -> Result<Json<SignTypedDataResult>, HttpError> {
     let rate_limit_reservation = RateLimiter::check_and_reserve_rate_limit(
         &state,
         &headers,
@@ -59,15 +43,13 @@ pub async fn sign_typed_data(
         &state.evm_providers,
         &relayer_id,
     )
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-    .ok_or(StatusCode::NOT_FOUND)?;
+    .await?
+    .ok_or(not_found("Relayer does not exist".to_string()))?;
 
     let signature = relayer_provider_context
         .provider
         .sign_typed_data(&relayer_provider_context.relayer.wallet_index, &typed_data)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .await?;
 
     let record_request = RecordSignedTypedDataRequest {
         relayer_id: relayer_id.into(),
@@ -78,9 +60,7 @@ pub async fn sign_typed_data(
         chain_id: relayer_provider_context.provider.chain_id.into(),
     };
 
-    if let Err(e) = state.db.record_signed_typed_data(&record_request).await {
-        rrelayer_error!("Failed to record signed typed data: {}", e);
-    }
+    state.db.record_signed_typed_data(&record_request).await?;
 
     if let Some(ref webhook_manager) = state.webhook_manager {
         let webhook_manager = webhook_manager.clone();

@@ -5,12 +5,13 @@ use super::{
 use crate::app_state::AppState;
 use crate::relayer::get_relayer;
 use crate::relayer::RelayerId;
+use crate::shared::{not_found, too_many_requests, HttpError};
 use crate::{
     common_types::EvmAddress,
     yaml::{RateLimitConfig, RateLimits},
     GlobalRateLimits,
 };
-use axum::http::{HeaderMap, StatusCode};
+use axum::http::HeaderMap;
 use std::{
     collections::HashMap,
     sync::Arc,
@@ -49,15 +50,14 @@ impl RateLimiter {
         headers: &HeaderMap,
         relayer_id: &RelayerId,
         operation: RateLimitOperation,
-    ) -> Result<Option<RateLimitReservation<'a>>, StatusCode> {
+    ) -> Result<Option<RateLimitReservation<'a>>, HttpError> {
         let Some(ref rate_limiter) = state.user_rate_limiter else {
             return Ok(None);
         };
 
         let relayer = get_relayer(&state.db, &state.cache, relayer_id)
-            .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-            .ok_or(StatusCode::NOT_FOUND)?;
+            .await?
+            .ok_or(not_found("Relayer does not exist".to_string()))?;
 
         match rate_limiter.check_and_reserve(headers, &relayer.address, operation).await {
             Ok(reservation) => Ok(Some(reservation)),
@@ -66,7 +66,7 @@ impl RateLimiter {
                     "Rate limit exceeded: {}/{} {} in {}s",
                     current, limit, operation, window_seconds
                 );
-                Err(StatusCode::TOO_MANY_REQUESTS)
+                Err(too_many_requests())
             }
             Err(RateLimitError::NoRateLimitKey) => {
                 // do nothing it's ok to have no key

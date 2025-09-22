@@ -1,4 +1,5 @@
 use crate::rate_limiting::{RateLimitOperation, RateLimiter};
+use crate::shared::HttpError;
 use crate::{
     app_state::AppState,
     transaction::{get_transaction_by_id, types::TransactionId},
@@ -27,7 +28,7 @@ pub async fn cancel_transaction(
     State(state): State<Arc<AppState>>,
     Path(transaction_id): Path<TransactionId>,
     headers: HeaderMap,
-) -> Result<Json<bool>, StatusCode> {
+) -> Result<Json<bool>, HttpError> {
     let transaction = get_transaction_by_id(&state.cache, &state.db, transaction_id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?

@@ -15,6 +15,7 @@ pub use mnemonic_signing_key_providers::get_mnemonic_from_signing_key;
 mod aws_kms_wallet_manager;
 mod privy_wallet_manager;
 mod turnkey_wallet_manager;
+use crate::shared::{internal_server_error, HttpError};
 pub use aws_kms_wallet_manager::AwsKmsWalletManager;
 pub use turnkey_wallet_manager::TurnkeyWalletManager;
 
@@ -73,6 +74,12 @@ pub enum WalletError {
 
     #[error("EIP712 signing error: {0}")]
     Eip712Error(String),
+}
+
+impl From<WalletError> for HttpError {
+    fn from(value: WalletError) -> Self {
+        internal_server_error(Some(value.to_string()))
+    }
 }
 
 impl From<alloy::signers::Error> for WalletError {

@@ -16,6 +16,10 @@ pub fn not_found(message: String) -> HttpError {
     (StatusCode::NOT_FOUND, message)
 }
 
+pub fn too_many_requests() -> HttpError {
+    (StatusCode::TOO_MANY_REQUESTS, "Too many requests".to_string())
+}
+
 impl From<PostgresError> for HttpError {
     fn from(error: PostgresError) -> HttpError {
         error!("Postgres error occurred - {:?}", error);
