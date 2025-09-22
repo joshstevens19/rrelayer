@@ -24,7 +24,6 @@ pub enum BasicAuthError {
     MissingServerCredentials,
 }
 
-/// Simple basic auth credentials extracted from HTTP headers
 #[derive(Debug, Clone)]
 pub struct BasicAuthCredentials {
     pub username: String,
@@ -32,7 +31,7 @@ pub struct BasicAuthCredentials {
 }
 
 impl BasicAuthCredentials {
-    /// Extracts basic auth credentials from HTTP headers
+    /// Extracts the authentication from headers
     pub fn from_headers(headers: &HeaderMap) -> Result<Self, BasicAuthError> {
         let auth_header = headers
             .get("Authorization")
@@ -75,7 +74,7 @@ impl BasicAuthCredentials {
     }
 }
 
-/// Simple authenticated marker - just indicates that basic auth passed
+/// Authenticated marker - just indicates that basic auth passed
 #[derive(Debug)]
 pub struct Authenticated;
 

@@ -300,11 +300,7 @@ impl PostgresClient {
                         failed_reason = $3
                     WHERE id = $1;
                 ",
-                &[
-                    &transaction_id,
-                    &TransactionStatus::Failed,
-                    &truncated_reason,
-                ],
+                &[&transaction_id, &TransactionStatus::Failed, &truncated_reason],
             )
             .await?;
 
