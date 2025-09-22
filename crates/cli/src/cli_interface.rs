@@ -3,10 +3,6 @@ use rrelayer_core::{common_types::EvmAddress, relayer::RelayerId};
 
 use crate::commands::{allowlist, auth::AuthCommand, config, network::NetworkCommands, sign, tx};
 
-/// Main CLI structure for the rrelayer command-line interface.
-///
-/// This struct defines the top-level CLI parser using clap, which handles
-/// command-line argument parsing and subcommand routing.
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 #[command(propagate_version = true)]
@@ -15,10 +11,6 @@ pub struct Cli {
     pub command: Commands,
 }
 
-/// Enumeration of all available CLI commands.
-///
-/// Each variant represents a different subcommand that can be executed,
-/// with their respective arguments and options defined inline.
 #[derive(Subcommand)]
 pub enum Commands {
     /// Initialize a new relayer project
@@ -29,6 +21,7 @@ pub enum Commands {
     },
     /// Clone an existing relayer private key to another network
     Clone {
+        /// optional - The path to create the project in, default will be where the command is run.
         #[clap(long, short)]
         path: Option<String>,
 
@@ -46,6 +39,7 @@ pub enum Commands {
     },
     /// Authenticate with rrelayer
     Auth {
+        /// optional - The path to create the project in, default will be where the command is run.
         #[clap(long, short)]
         path: Option<String>,
 
@@ -54,11 +48,13 @@ pub enum Commands {
     },
     /// Start the relayer service
     Start {
+        /// optional - The path to create the project in, default will be where the command is run.
         #[clap(long, short)]
         path: Option<String>,
     },
     /// Manage network configurations and settings
     Network {
+        /// optional - The path to create the project in, default will be where the command is run.
         #[clap(long, short)]
         path: Option<String>,
 
@@ -67,9 +63,11 @@ pub enum Commands {
     },
     /// List all configured relayers
     List {
+        /// optional - The path to create the project in, default will be where the command is run.
         #[clap(long, short)]
         path: Option<String>,
 
+        /// Network to get the list back
         #[arg(long, short)]
         network: Option<String>,
 
@@ -83,6 +81,7 @@ pub enum Commands {
     },
     /// Configure operations for a specific relayer
     Config {
+        /// optional - The path to create the project in, default will be where the command is run.
         #[clap(long, short)]
         path: Option<String>,
 
@@ -91,6 +90,7 @@ pub enum Commands {
     },
     /// Check the balance of a relayer's account
     Balance {
+        /// optional - The path to create the project in, default will be where the command is run.
         #[clap(long, short)]
         path: Option<String>,
 
@@ -104,6 +104,7 @@ pub enum Commands {
     },
     /// Manage allowlist addresses for restricted access
     Allowlist {
+        /// optional - The path to create the project in, default will be where the command is run.
         #[clap(long, short)]
         path: Option<String>,
 
@@ -112,6 +113,7 @@ pub enum Commands {
     },
     /// Create a new relayer client instance
     Create {
+        /// optional - The path to create the project in, default will be where the command is run.
         #[clap(long, short)]
         path: Option<String>,
 
@@ -125,6 +127,7 @@ pub enum Commands {
     },
     /// Sign messages and transactions
     Sign {
+        /// optional - The path to create the project in, default will be where the command is run.
         #[clap(long, short)]
         path: Option<String>,
 
@@ -133,6 +136,7 @@ pub enum Commands {
     },
     /// Manage and monitor transactions
     Tx {
+        /// optional - The path to create the project in, default will be where the command is run.
         #[clap(long, short)]
         path: Option<String>,
 

@@ -2,22 +2,9 @@ use clap::Subcommand;
 
 #[derive(Subcommand)]
 pub enum AuthCommand {
-    /// Check authentication status
     Status,
 }
 
-/// Handles authentication command routing and execution.
-///
-/// Routes the authentication command to the appropriate handler function
-/// based on the command type.
-///
-/// # Arguments
-/// * `cmd` - The authentication command to execute
-/// * `project_path` - Path to the project directory
-///
-/// # Returns
-/// * `Ok(())` - Command executed successfully
-/// * `Err(AuthError)` - Command execution failed
 pub async fn handle_auth_command(cmd: &AuthCommand) -> () {
     match cmd {
         AuthCommand::Status => {
@@ -28,14 +15,6 @@ pub async fn handle_auth_command(cmd: &AuthCommand) -> () {
     ()
 }
 
-/// Shows the current authentication status for basic auth.
-///
-/// Displays information about the configured basic auth credentials
-/// without revealing the actual password.
-///
-/// # Returns
-/// * `Ok(())` - Status displayed successfully
-/// * `Err(AuthError)` - Failed to check authentication status
 async fn status() -> () {
     use std::env;
 

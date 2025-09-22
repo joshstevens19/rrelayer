@@ -16,6 +16,11 @@ colored = "2.0"
 tokio = "1.35.1"
 serde = { version = "1.0.204", features = ["derive"] }
 serde_json = "1.0.120"
+serde_yaml = "0.9.34+deprecated"
+thiserror = "1.0"
+prettytable = "0.10.0"
+chrono = "0.4.41"
+hex = "0.4.3"
 
 alloy = { workspace = true, features = ["full", "signer-mnemonic", "eips", "eip712", "signer-keystore"] }
 alloy-rlp = { workspace = true }
@@ -24,13 +29,7 @@ alloy-eips = { workspace = true }
 # build
 tikv-jemalloc-ctl = { version = "0.6.0", optional = true }
 tikv-jemallocator = { version = "0.6.0", optional = true }
-serde_yaml = "0.9.34+deprecated"
-hex = "0.4.3"
-rand = "0.8.5"
-dirs = "6.0.0"
-thiserror = "1.0"
-prettytable = "0.10.0"
-chrono = "0.4.41"
+
 
 [profile.release]
 lto = "fat"

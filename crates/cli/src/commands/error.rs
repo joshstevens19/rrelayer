@@ -15,7 +15,6 @@ pub enum ProjectLocationError {
     Yaml(#[from] serde_yaml::Error),
 }
 
-/// Errors that can occur during network operations
 #[derive(Error, Debug)]
 pub enum NetworkError {
     #[error("Invalid network configuration: {0}")]
@@ -86,7 +85,6 @@ impl From<crate::error::CliError> for TransactionError {
     }
 }
 
-/// Errors that can occur during balance operations
 #[derive(Error, Debug)]
 pub enum BalanceError {
     #[error("Failed to query balance: {0}")]
@@ -111,7 +109,6 @@ impl From<crate::error::CliError> for BalanceError {
     }
 }
 
-/// Errors that can occur during signing operations
 #[derive(Error, Debug)]
 pub enum SigningError {
     #[error("Signing failed: {0}")]
@@ -139,7 +136,6 @@ impl From<crate::error::CliError> for SigningError {
     }
 }
 
-/// Errors that can occur during API key operations
 #[derive(Error, Debug)]
 pub enum ApiKeyError {
     #[error("SDK API error: {0}")]
@@ -152,7 +148,6 @@ impl From<crate::error::CliError> for ApiKeyError {
     }
 }
 
-/// Errors that can occur during user management operations
 #[derive(Error, Debug)]
 pub enum UserError {
     #[error("SDK API error: {0}")]
@@ -165,7 +160,6 @@ impl From<crate::error::CliError> for UserError {
     }
 }
 
-/// Errors that can occur during allowlist operations
 #[derive(Error, Debug)]
 pub enum AllowlistError {
     #[error("SDK API error: {0}")]
@@ -178,7 +172,6 @@ impl From<crate::error::CliError> for AllowlistError {
     }
 }
 
-/// Errors that can occur during project initialization  
 #[derive(Error, Debug)]
 pub enum InitError {
     #[error("Invalid project configuration: {0}")]
@@ -206,7 +199,6 @@ impl From<ProjectLocationError> for InitError {
     }
 }
 
-/// Errors that can occur during configuration operations
 #[derive(Error, Debug)]
 pub enum ConfigError {
     #[error("Invalid configuration: {0}")]
@@ -234,7 +226,6 @@ impl From<rrelayer_sdk::ApiSdkError> for ConfigError {
     }
 }
 
-/// Errors that can occur during project startup operations
 #[derive(Error, Debug)]
 pub enum ProjectStartupError {
     #[error("Project not initialized: {0}")]
@@ -258,7 +249,7 @@ pub enum ProjectStartupError {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
-    #[error("PostgreSQL connection error: {0}")]
+    #[error("Postgres connection error: {0}")]
     PostgresConnection(#[from] rrelayer_core::PostgresConnectionError),
 }
 
@@ -268,7 +259,6 @@ impl From<&str> for ProjectStartupError {
     }
 }
 
-/// Errors that can occur during relayer management operations (list, create, clone)
 #[derive(Error, Debug)]
 pub enum RelayerManagementError {
     #[error("Failed to create relayer: {0}")]

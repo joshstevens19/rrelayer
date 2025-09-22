@@ -17,21 +17,12 @@ mod authentication;
 mod cli_interface;
 mod commands;
 mod console;
+use crate::commands::error::ProjectLocationError;
 pub use console::{print_error_message, print_success_message};
+
 mod error;
 mod project_location;
 
-/// Resolves a path from an optional string input to an absolute canonical path.
-///
-/// If no override path is provided, uses the current working directory.
-/// The resolved path is canonicalized to ensure it exists and is valid.
-///
-/// # Arguments
-/// * `override_path` - Optional path string to resolve, defaults to current directory if None
-///
-/// # Returns
-/// * `Ok(PathBuf)` - Canonicalized absolute path
-/// * `Err(String)` - Error message if path resolution or canonicalization fails
 fn resolve_path(override_path: &Option<String>) -> Result<PathBuf, String> {
     let path = match override_path {
         Some(path) => {
@@ -43,31 +34,18 @@ fn resolve_path(override_path: &Option<String>) -> Result<PathBuf, String> {
     path.canonicalize().map_err(|e| format!("Failed to resolve path '{}': {}", path.display(), e))
 }
 
-/// Creates an SDK instance with basic auth credentials from environment variables.
-///
-/// # Arguments
-/// * `server_url` - The server URL to connect to
-///
-/// # Returns
-/// * `Ok(SDK)` - Configured SDK instance with basic auth
-/// * `Err(String)` - Error message if environment variables are missing
-fn create_sdk_with_basic_auth(server_url: String) -> Result<SDK, String> {
-    let username = env::var("RRELAYER_AUTH_USERNAME")
-        .map_err(|_| "Missing RRELAYER_AUTH_USERNAME environment variable".to_string())?;
-    let password = env::var("RRELAYER_AUTH_PASSWORD")
-        .map_err(|_| "Missing RRELAYER_AUTH_PASSWORD environment variable".to_string())?;
+fn create_sdk_with_basic_auth(
+    project_location: &ProjectLocation,
+) -> Result<SDK, ProjectLocationError> {
+    let setup_config = project_location.setup_config(false)?;
 
-    Ok(SDK::new(server_url, username, password))
+    Ok(SDK::new(
+        project_location.get_api_url()?,
+        setup_config.api_config.authentication_username,
+        setup_config.api_config.authentication_password,
+    ))
 }
 
-/// Main entry point for the rrelayer CLI application.
-///
-/// Parses command line arguments and routes to appropriate command handlers.
-/// Sets up logging and handles path resolution for each command.
-///
-/// # Returns
-/// * `Ok(())` - Command executed successfully
-/// * `Err(CliError)` - Command execution failed with specific error details
 #[tokio::main]
 async fn main() -> Result<(), CliError> {
     let cli = Cli::parse();
@@ -97,8 +75,7 @@ async fn main() -> Result<(), CliError> {
             load_env_from_project_path(&resolved_path);
 
             let project_location = ProjectLocation::new(resolved_path);
-            let sdk = create_sdk_with_basic_auth(project_location.get_api_url()?)
-                .map_err(|e| CliError::Authentication(e))?;
+            let sdk = create_sdk_with_basic_auth(&project_location)?;
 
             check_authenticate(&sdk).await?;
 
@@ -109,8 +86,7 @@ async fn main() -> Result<(), CliError> {
             load_env_from_project_path(&resolved_path);
 
             let project_location = ProjectLocation::new(resolved_path);
-            let sdk = create_sdk_with_basic_auth(project_location.get_api_url()?)
-                .map_err(|e| CliError::Authentication(e))?;
+            let sdk = create_sdk_with_basic_auth(&project_location)?;
 
             check_authenticate(&sdk).await?;
 
@@ -121,8 +97,7 @@ async fn main() -> Result<(), CliError> {
             load_env_from_project_path(&resolved_path);
 
             let project_location = ProjectLocation::new(resolved_path);
-            let sdk = create_sdk_with_basic_auth(project_location.get_api_url()?)
-                .map_err(|e| CliError::Authentication(e))?;
+            let sdk = create_sdk_with_basic_auth(&project_location)?;
 
             check_authenticate(&sdk).await?;
 
@@ -133,8 +108,7 @@ async fn main() -> Result<(), CliError> {
             load_env_from_project_path(&resolved_path);
 
             let project_location = ProjectLocation::new(resolved_path);
-            let sdk = create_sdk_with_basic_auth(project_location.get_api_url()?)
-                .map_err(|e| CliError::Authentication(e))?;
+            let sdk = create_sdk_with_basic_auth(&project_location)?;
 
             check_authenticate(&sdk).await?;
 
@@ -145,8 +119,7 @@ async fn main() -> Result<(), CliError> {
             load_env_from_project_path(&resolved_path);
 
             let project_location = ProjectLocation::new(resolved_path);
-            let sdk = create_sdk_with_basic_auth(project_location.get_api_url()?)
-                .map_err(|e| CliError::Authentication(e))?;
+            let sdk = create_sdk_with_basic_auth(&project_location)?;
 
             check_authenticate(&sdk).await?;
 
@@ -157,8 +130,7 @@ async fn main() -> Result<(), CliError> {
             load_env_from_project_path(&resolved_path);
 
             let project_location = ProjectLocation::new(resolved_path);
-            let sdk = create_sdk_with_basic_auth(project_location.get_api_url()?)
-                .map_err(|e| CliError::Authentication(e))?;
+            let sdk = create_sdk_with_basic_auth(&project_location)?;
 
             check_authenticate(&sdk).await?;
 
@@ -169,8 +141,7 @@ async fn main() -> Result<(), CliError> {
             load_env_from_project_path(&resolved_path);
 
             let project_location = ProjectLocation::new(resolved_path);
-            let sdk = create_sdk_with_basic_auth(project_location.get_api_url()?)
-                .map_err(|e| CliError::Authentication(e))?;
+            let sdk = create_sdk_with_basic_auth(&project_location)?;
 
             check_authenticate(&sdk).await?;
 
@@ -181,8 +152,7 @@ async fn main() -> Result<(), CliError> {
             load_env_from_project_path(&resolved_path);
 
             let project_location = ProjectLocation::new(resolved_path);
-            let sdk = create_sdk_with_basic_auth(project_location.get_api_url()?)
-                .map_err(|e| CliError::Authentication(e))?;
+            let sdk = create_sdk_with_basic_auth(&project_location)?;
 
             check_authenticate(&sdk).await?;
 
@@ -193,8 +163,7 @@ async fn main() -> Result<(), CliError> {
             load_env_from_project_path(&resolved_path);
 
             let project_location = ProjectLocation::new(resolved_path);
-            let sdk = create_sdk_with_basic_auth(project_location.get_api_url()?)
-                .map_err(|e| CliError::Authentication(e))?;
+            let sdk = create_sdk_with_basic_auth(&project_location)?;
 
             check_authenticate(&sdk).await?;
 

@@ -1,37 +1,14 @@
 use colored::Colorize;
 use prettytable::{Cell, Row, Table, format};
 
-/// Prints an error message to the console in red color.
-///
-/// Uses colored output to highlight error messages for better visibility.
-///
-/// # Arguments
-/// * `error_message` - The error message to display
 pub fn print_error_message(error_message: &str) {
     println!("{}", error_message.red());
 }
 
-/// Prints a success message to the console in green color.
-///
-/// # Arguments
-/// * `success_message` - The success message to display
 pub fn print_success_message(success_message: &str) {
     println!("{}", success_message.green());
 }
 
-/// Prints a formatted table to the console with optional title and footer.
-///
-/// Creates a nicely formatted table using prettytable with bold headers
-/// and optional title/footer text.
-///
-/// # Arguments
-/// * `headers` - Column headers for the table
-/// * `rows` - Data rows, each containing a vector of cell values
-/// * `title` - Optional title text to display above the table
-/// * `footer` - Optional footer text to display below the table
-///
-/// # Type Parameters
-/// * `T` - Type that can be converted to string reference (AsRef<str>)
 pub fn print_table<T: AsRef<str>>(
     headers: Vec<T>,
     rows: Vec<Vec<String>>,
