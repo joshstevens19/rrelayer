@@ -41,12 +41,10 @@ impl PrivyWalletManager {
         Ok(manager)
     }
 
-    /// Loads all wallets from the Privy API using pagination.
     async fn load_wallets(&self) -> Result<(), WalletError> {
         let mut all_wallets = Vec::new();
         let mut cursor: Option<String> = None;
 
-        // Paginate through all wallets
         loop {
             let mut url = "https://api.privy.io/v1/wallets".to_string();
             if let Some(ref cursor_value) = cursor {
@@ -156,6 +154,67 @@ impl WalletManagerTrait for PrivyWalletManager {
             .get(&wallet_index)
             .ok_or(WalletError::WalletNotFound { index: wallet_index })?;
 
+        let privy_transaction = match transaction {
+            TypedTransaction::Legacy(tx) => {
+                let to_addr = match &tx.to {
+                    alloy::primitives::TxKind::Call(addr) => Some(format!("0x{:x}", addr)),
+                    alloy::primitives::TxKind::Create => None,
+                };
+                serde_json::json!({
+                    "type": 0,
+                    "to": to_addr,
+                    "value": format!("0x{:x}", tx.value),
+                    "data": format!("0x{}", hex::encode(&tx.input)),
+                    "gas_limit": tx.gas_limit,
+                    "gas_price": format!("0x{:x}", tx.gas_price),
+                    "nonce": tx.nonce
+                })
+            },
+            TypedTransaction::Eip2930(tx) => {
+                let to_addr = match &tx.to {
+                    alloy::primitives::TxKind::Call(addr) => Some(format!("0x{:x}", addr)),
+                    alloy::primitives::TxKind::Create => None,
+                };
+                serde_json::json!({
+                    "type": 1,
+                    "to": to_addr,
+                    "value": format!("0x{:x}", tx.value),
+                    "data": format!("0x{}", hex::encode(&tx.input)),
+                    "gas_limit": tx.gas_limit,
+                    "gas_price": format!("0x{:x}", tx.gas_price),
+                    "nonce": tx.nonce,
+                    "chain_id": tx.chain_id
+                })
+            },
+            TypedTransaction::Eip1559(tx) => {
+                let to_addr = match &tx.to {
+                    alloy::primitives::TxKind::Call(addr) => Some(format!("0x{:x}", addr)),
+                    alloy::primitives::TxKind::Create => None,
+                };
+                serde_json::json!({
+                    "type": 2,
+                    "to": to_addr,
+                    "value": format!("0x{:x}", tx.value),
+                    "data": format!("0x{}", hex::encode(&tx.input)),
+                    "gas_limit": tx.gas_limit,
+                    "max_fee_per_gas": tx.max_fee_per_gas,
+                    "max_priority_fee_per_gas": format!("0x{:x}", tx.max_priority_fee_per_gas),
+                    "nonce": tx.nonce,
+                    "chain_id": tx.chain_id
+                })
+            },
+            TypedTransaction::Eip4844(_) => {
+                return Err(WalletError::UnsupportedTransactionType {
+                    tx_type: "EIP-4844 blob transactions are not supported by Privy wallet API".to_string(),
+                })
+            }
+            _ => {
+                return Err(WalletError::UnsupportedTransactionType {
+                    tx_type: format!("Unsupported transaction type for Privy: {:?}", transaction),
+                })
+            }
+        };
+
         let response = self
             .client
             .post(&format!("https://api.privy.io/v1/wallets/{}/rpc", wallet.id))
@@ -165,7 +224,7 @@ impl WalletManagerTrait for PrivyWalletManager {
             .json(&serde_json::json!({
                 "method": "eth_signTransaction",
                 "params": {
-                    "transaction": serde_json::to_value(transaction)?
+                    "transaction": privy_transaction
                 }
             }))
             .send()
@@ -310,5 +369,9 @@ impl WalletManagerTrait for PrivyWalletManager {
 
         let signature = PrimitiveSignature::from_str(signature_hex)?;
         Ok(signature)
+    }
+
+    fn supports_blobs(&self) -> bool {
+        false
     }
 }
