@@ -4,11 +4,15 @@
         start-postgres stop-postgres reset-db \
         start-anvil stop-anvil \
         start-rrelayer start-rrelayer-debug stop-rrelayer \
-        test-full test-quick run-tests run-tests-debug \
+        test-full test-quick run-tests run-tests-debug run-tests-debug-all \
+        run-tests-debug-raw run-tests-debug-aws-secret-manager run-tests-debug-aws-kms \
+        run-tests-debug-gcp-secret-manager run-tests-debug-privy run-tests-debug-turnkey \
         test-core test-comprehensive test-status-states test-allowlist test-config test-edge-cases \
         run-test run-test-debug \
         test-basic test-basic-debug test-transfer test-transfer-debug \
         test-contract test-contract-debug test-failed test-failed-debug \
+        test-multi-provider test-multi-provider-debug test-specific-providers test-specific-providers-debug \
+        test-multi-provider-single test-multi-provider-single-debug \
         logs logs-live logs-rrelayer logs-anvil logs-clear check-services
 
 help: ## Show this help message
@@ -134,71 +138,51 @@ stop-rrelayer: ## Stop RRelayer service
 # TEST RUNNERS - MAIN TARGETS
 # =============================================================================
 
-test-full: start-postgres start-anvil start-rrelayer run-tests stop-rrelayer stop-anvil stop-postgres ## Run complete test suite with all services
-
 test-quick: ## Run tests assuming services are already running
 	@echo "Running E2E tests (assuming services are running)..."
 	@RUST_LOG=info,rrelayer_core=info cargo run --bin e2e-runner
 
-run-tests: ## Run all E2E tests with clean Jest-like output
+run-tests:
 	@echo "Running E2E tests with clean output..."
 	@make reset-db
 	@RUST_LOG=error cargo run --bin e2e-runner
 
-run-tests-debug: ## Run all E2E tests with debug output
+run-tests-debug:
 	@echo "Running E2E tests with debug output..."
 	@make reset-db
 	@RUST_LOG=info cargo run --bin e2e-runner
 
-# =============================================================================
-# TEST CATEGORIES - GROUPED BY FUNCTIONALITY
-# =============================================================================
+run-tests-debug-all:
+	@echo "Running E2E tests for all providers with debug output..."
+	@RRELAYER_MULTI_PROVIDER=1 RUST_LOG=info cargo run --bin e2e-runner
 
-test-core: ## Run core functionality tests
-	@echo "Running core functionality tests..."
-	@make run-test TEST=basic_relayer_creation
-	@make run-test TEST=simple_eth_transfer
-	@make run-test TEST=contract_interaction
-	@make run-test TEST=gas_estimation
-	@make run-test TEST=transaction_replacement
+run-tests-debug-raw:
+	@echo "Running E2E tests for raw provider with debug output..."
+	@RRELAYER_MULTI_PROVIDER=1 RRELAYER_PROVIDERS="raw" RUST_LOG=info cargo run --bin e2e-runner
 
-test-status-states: ## Run all transaction status state tests
-	@echo "Running all transaction status state tests..."
-	@make run-test TEST=transaction_status_pending
-	@make run-test TEST=transaction_status_inmempool
-	@make run-test TEST=transaction_status_mined
-	@make run-test TEST=transaction_status_confirmed
-	@make run-test TEST=transaction_status_failed
-	@make run-test TEST=transaction_status_expired
+run-tests-debug-aws-secret-manager:
+	@echo "Running E2E tests for aws_secret_manager provider with debug output..."
+	@RRELAYER_MULTI_PROVIDER=1 RRELAYER_PROVIDERS="aws_secret_manager" RUST_LOG=info cargo run --bin e2e-runner
 
-test-allowlist: ## Run all allowlist tests
-	@echo "Running all allowlist tests..."
-	@make run-test TEST=allowlist_restrictions
-	@make run-test TEST=allowlist_edge_cases
-	@make run-test TEST=allowlist_management
+run-tests-debug-aws-kms:
+	@echo "Running E2E tests for aws_kms provider with debug output..."
+	@RRELAYER_MULTI_PROVIDER=1 RRELAYER_PROVIDERS="aws_kms" RUST_LOG=info cargo run --bin e2e-runner
 
-test-config: ## Run all relayer configuration tests
-	@echo "Running all relayer configuration tests..."
-	@make run-test TEST=relayer_pause_unpause
-	@make run-test TEST=relayer_gas_configuration
-	@make run-test TEST=relayer_allowlist_toggle
+run-tests-debug-gcp-secret-manager:
+	@echo "Running E2E tests for gcp_secret_manager provider with debug output..."
+	@RRELAYER_MULTI_PROVIDER=1 RRELAYER_PROVIDERS="gcp_secret_manager" RUST_LOG=info cargo run --bin e2e-runner
 
-test-edge-cases: ## Run all API edge cases and comprehensive tests
-	@echo "Running all API edge cases..."
-	@make run-test TEST=transaction_nonce_management
-	@make run-test TEST=gas_price_bumping
-	@make run-test TEST=concurrent_transactions
-	@make run-test TEST=rate_limiting_enforcement
-	@make run-test TEST=webhook_delivery_testing
-	@make run-test TEST=blob_transaction_handling
-	@make run-test TEST=balance_edge_cases
+run-tests-debug-privy:
+	@echo "Running E2E tests for privy provider with debug output..."
+	@RRELAYER_MULTI_PROVIDER=1 RRELAYER_PROVIDERS="privy" RUST_LOG=info cargo run --bin e2e-runner
 
-test-comprehensive: ## Run all comprehensive tests (status + allowlist + config + edge cases)
-	@echo "Running comprehensive test suite..."
-	@make test-status-states
-	@make test-allowlist
-	@make test-config
-	@make test-edge-cases
+run-tests-debug-turnkey:
+	@echo "Running E2E tests for turnkey provider with debug output..."
+	@RRELAYER_MULTI_PROVIDER=1 RRELAYER_PROVIDERS="turnkey" RUST_LOG=info cargo run --bin e2e-runner
+
+run-tests-debug-raw-and-aws-secret-manager:
+	@echo "Running E2E tests for raw provider with debug output..."
+	@RRELAYER_MULTI_PROVIDER=1 RRELAYER_PROVIDERS="raw,aws_secret_manager" RUST_LOG=error cargo run --bin e2e-runner
 
 # =============================================================================
 # INDIVIDUAL TEST RUNNER - HELPER TARGET
@@ -223,36 +207,6 @@ run-test-debug: start-postgres ## Internal target to run a single test with debu
 	@make reset-db
 	@RUST_LOG=info, RRELAYER_TEST_FILTER=$(TEST) cargo run --bin e2e-runner
 	@make stop-postgres
-
-# =============================================================================
-# CONVENIENCE TARGETS FOR COMMON INDIVIDUAL TESTS
-# =============================================================================
-
-test-basic: ## Run basic relayer creation test (clean output)
-	@make run-test TEST=basic_relayer_creation
-
-test-basic-debug: ## Run basic relayer creation test (debug output)
-	@make run-test-debug TEST=basic_relayer_creation
-
-test-transfer: ## Run simple ETH transfer test (clean output)
-	@make run-test TEST=simple_eth_transfer
-
-test-transfer-debug: ## Run simple ETH transfer test (debug output)
-	@make run-test-debug TEST=simple_eth_transfer
-
-test-contract: ## Run smart contract interaction test (clean output)
-	@make run-test TEST=contract_interaction
-
-test-contract-debug: ## Run smart contract interaction test (debug output)
-	@make run-test-debug TEST=contract_interaction
-
-test-failed: ## Run failed transaction tests (clean output)
-	@make run-test TEST=failed_transaction_handling_not_enough_funds
-	@make run-test TEST=failed_transaction_handling_revert_execution
-
-test-failed-debug: ## Run failed transaction tests (debug output)
-	@make run-test-debug TEST=failed_transaction_handling_not_enough_funds
-	@make run-test-debug TEST=failed_transaction_handling_revert_execution
 
 # =============================================================================
 # DEBUG AND DEVELOPMENT TARGETS

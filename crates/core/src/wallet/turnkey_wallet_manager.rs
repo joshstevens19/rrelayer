@@ -9,7 +9,10 @@ use alloy_rlp::{Decodable, Encodable};
 use async_trait::async_trait;
 use base64::{engine::general_purpose, Engine as _};
 use hex;
-use p256::{ecdsa::{SigningKey, Signature, signature::Signer}, SecretKey};
+use p256::{
+    ecdsa::{signature::Signer, Signature, SigningKey},
+    SecretKey,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -213,8 +216,8 @@ impl TurnkeyWalletManager {
             "scheme": "SIGNATURE_SCHEME_TK_API_P256"
         });
 
-        let stamp_json = serde_json::to_string(&stamp_obj).map_err(|e| {
-            WalletError::ApiError { message: format!("Failed to serialize stamp: {}", e) }
+        let stamp_json = serde_json::to_string(&stamp_obj).map_err(|e| WalletError::ApiError {
+            message: format!("Failed to serialize stamp: {}", e),
         })?;
 
         let encoded_stamp = general_purpose::URL_SAFE_NO_PAD.encode(stamp_json);
@@ -261,17 +264,19 @@ impl TurnkeyWalletManager {
         }
 
         let result: ListAccountsResponse = response.json().await?;
-        
+
         let mut accounts = self.accounts.lock().await;
-        
+
         for account in result.accounts {
             if let Some(index) = self.extract_wallet_index_from_path(&account.path) {
-                info!("Loaded existing Turnkey account: index {}, address {}, path {}", 
-                      index, account.address, account.path);
+                info!(
+                    "Loaded existing Turnkey account: index {}, address {}, path {}",
+                    index, account.address, account.path
+                );
                 accounts.insert(index, account);
             }
         }
-        
+
         info!("Loaded {} existing Turnkey accounts", accounts.len());
 
         Ok(())
@@ -285,7 +290,6 @@ impl TurnkeyWalletManager {
             None
         }
     }
-
 }
 
 #[async_trait]
@@ -355,11 +359,7 @@ impl WalletManagerTrait for TurnkeyWalletManager {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await?;
-            error!(
-                "Turnkey create_wallet failed - status: {}, error: {}",
-                status,
-                error_text
-            );
+            error!("Turnkey create_wallet failed - status: {}, error: {}", status, error_text);
             return Err(WalletError::ApiError {
                 message: format!("Failed to create wallet account: {}", error_text),
             });
@@ -384,13 +384,13 @@ impl WalletManagerTrait for TurnkeyWalletManager {
             .next()
             .ok_or(WalletError::ApiError { message: "No account created".to_string() })?;
 
-        let address = EvmAddress::from_str(&address_str).map_err(|e| {
-            WalletError::ApiError { message: format!("Invalid address format: {}", e) }
+        let address = EvmAddress::from_str(&address_str).map_err(|e| WalletError::ApiError {
+            message: format!("Invalid address format: {}", e),
         })?;
 
         let path = format!("m/44'/60'/{}'/0/{}", wallet_index, 0);
         let account_id = format!("{}_{}", self.wallet_id, wallet_index);
-        
+
         let new_account = TurnkeyAccount {
             address: address_str.clone(),
             wallet_id: self.wallet_id.clone(),
@@ -428,15 +428,16 @@ impl WalletManagerTrait for TurnkeyWalletManager {
         transaction: &TypedTransaction,
         chain_id: &ChainId,
     ) -> Result<PrimitiveSignature, WalletError> {
-        info!("Turnkey sign_transaction called - wallet_index: {}, chain_id: {}", wallet_index, chain_id);
-        
+        info!(
+            "Turnkey sign_transaction called - wallet_index: {}, chain_id: {}",
+            wallet_index, chain_id
+        );
+
         let accounts = self.accounts.lock().await;
-        let account = accounts
-            .get(&wallet_index)
-            .ok_or_else(|| {
-                error!("Turnkey sign_transaction: wallet not found for index {}", wallet_index);
-                WalletError::WalletNotFound { index: wallet_index }
-            })?;
+        let account = accounts.get(&wallet_index).ok_or_else(|| {
+            error!("Turnkey sign_transaction: wallet not found for index {}", wallet_index);
+            WalletError::WalletNotFound { index: wallet_index }
+        })?;
         let account_id = account.account_id.clone();
         let account_address = account.address.clone();
         drop(accounts);
@@ -459,7 +460,7 @@ impl WalletManagerTrait for TurnkeyWalletManager {
 
                 let encoded = alloy_rlp::encode(&unsigned_tx);
                 format!("0x02{}", hex::encode(&encoded))
-            },
+            }
             TypedTransaction::Legacy(tx) => {
                 let unsigned_tx = alloy::consensus::TxLegacy {
                     chain_id: tx.chain_id,
@@ -473,7 +474,7 @@ impl WalletManagerTrait for TurnkeyWalletManager {
 
                 let encoded = alloy_rlp::encode(&unsigned_tx);
                 format!("0x{}", hex::encode(&encoded))
-            },
+            }
             TypedTransaction::Eip2930(tx) => {
                 let unsigned_tx = alloy::consensus::TxEip2930 {
                     chain_id: tx.chain_id,
@@ -488,12 +489,14 @@ impl WalletManagerTrait for TurnkeyWalletManager {
 
                 let encoded = alloy_rlp::encode(&unsigned_tx);
                 format!("0x01{}", hex::encode(&encoded))
-            },
+            }
             TypedTransaction::Eip4844(tx_variant) => {
                 info!("Turnkey sign_transaction: handling EIP-4844 blob transaction");
 
                 let tx = match tx_variant {
-                    alloy::consensus::TxEip4844Variant::TxEip4844WithSidecar(tx_with_sidecar) => &tx_with_sidecar.tx,
+                    alloy::consensus::TxEip4844Variant::TxEip4844WithSidecar(tx_with_sidecar) => {
+                        &tx_with_sidecar.tx
+                    }
                     alloy::consensus::TxEip4844Variant::TxEip4844(tx) => tx,
                 };
 
@@ -513,7 +516,7 @@ impl WalletManagerTrait for TurnkeyWalletManager {
 
                 let encoded = alloy_rlp::encode(&unsigned_tx);
                 format!("0x03{}", hex::encode(&encoded))
-            },
+            }
             _ => {
                 error!("Turnkey sign_transaction: unsupported transaction type");
                 return Err(WalletError::UnsupportedTransactionType {
@@ -557,11 +560,18 @@ impl WalletManagerTrait for TurnkeyWalletManager {
             .await?;
 
         let status = response.status();
-        info!("Turnkey sign_transaction: response status: {}, headers: {:?}", status, response.headers());
+        info!(
+            "Turnkey sign_transaction: response status: {}, headers: {:?}",
+            status,
+            response.headers()
+        );
 
         if !status.is_success() {
             let error_text = response.text().await?;
-            error!("Turnkey sign_transaction: API error - status: {}, body: {}", status, error_text);
+            error!(
+                "Turnkey sign_transaction: API error - status: {}, body: {}",
+                status, error_text
+            );
             return Err(WalletError::ApiError {
                 message: format!("Turnkey API error: {}", error_text),
             });
@@ -572,7 +582,10 @@ impl WalletManagerTrait for TurnkeyWalletManager {
         info!("Turnkey sign_transaction: activity status: {}", result.activity.status);
 
         if result.activity.status != "ACTIVITY_STATUS_COMPLETED" {
-            error!("Turnkey sign_transaction: signing failed with status: {}", result.activity.status);
+            error!(
+                "Turnkey sign_transaction: signing failed with status: {}",
+                result.activity.status
+            );
             return Err(WalletError::ApiError {
                 message: format!(
                     "Transaction signing failed with status: {}",
@@ -594,12 +607,14 @@ impl WalletManagerTrait for TurnkeyWalletManager {
             error!("Turnkey sign_transaction: failed to decode signed transaction hex: {}", e);
             WalletError::ApiError { message: format!("Failed to decode signed transaction: {}", e) }
         })?;
-        
+
         info!("Turnkey sign_transaction: decoded {} bytes from signed transaction", tx_bytes.len());
 
         let tx_envelope = TxEnvelope::decode(&mut tx_bytes.as_slice()).map_err(|e| {
             error!("Turnkey sign_transaction: failed to decode transaction envelope: {}", e);
-            WalletError::ApiError { message: format!("Failed to decode transaction envelope: {}", e) }
+            WalletError::ApiError {
+                message: format!("Failed to decode transaction envelope: {}", e),
+            }
         })?;
 
         info!("Turnkey sign_transaction: successfully decoded transaction envelope");
@@ -608,24 +623,26 @@ impl WalletManagerTrait for TurnkeyWalletManager {
             TxEnvelope::Eip1559(signed_tx) => {
                 info!("Turnkey sign_transaction: extracted signature from EIP1559 transaction");
                 signed_tx.signature().clone()
-            },
+            }
             TxEnvelope::Legacy(signed_tx) => {
                 info!("Turnkey sign_transaction: extracted signature from Legacy transaction");
                 signed_tx.signature().clone()
-            },
+            }
             TxEnvelope::Eip2930(signed_tx) => {
                 info!("Turnkey sign_transaction: extracted signature from EIP2930 transaction");
                 signed_tx.signature().clone()
-            },
+            }
             TxEnvelope::Eip4844(signed_tx) => {
-                info!("Turnkey sign_transaction: extracted signature from EIP4844 blob transaction");
+                info!(
+                    "Turnkey sign_transaction: extracted signature from EIP4844 blob transaction"
+                );
                 signed_tx.signature().clone()
-            },
+            }
             _ => {
                 error!("Turnkey sign_transaction: unsupported transaction envelope type");
                 return Err(WalletError::UnsupportedTransactionType {
                     tx_type: "Unknown transaction envelope type".to_string(),
-                })
+                });
             }
         };
 
@@ -639,14 +656,12 @@ impl WalletManagerTrait for TurnkeyWalletManager {
         text: &str,
     ) -> Result<PrimitiveSignature, WalletError> {
         info!("Turnkey sign_text called - wallet_index: {}, text: '{}'", wallet_index, text);
-        
+
         let accounts = self.accounts.lock().await;
-        let account = accounts
-            .get(&wallet_index)
-            .ok_or_else(|| {
-                error!("Turnkey sign_text: wallet not found for index {}", wallet_index);
-                WalletError::WalletNotFound { index: wallet_index }
-            })?;
+        let account = accounts.get(&wallet_index).ok_or_else(|| {
+            error!("Turnkey sign_text: wallet not found for index {}", wallet_index);
+            WalletError::WalletNotFound { index: wallet_index }
+        })?;
         let account_id = account.account_id.clone();
         let account_address = account.address.clone();
         drop(accounts);
@@ -704,11 +719,12 @@ impl WalletManagerTrait for TurnkeyWalletManager {
 
         let response_text = response.text().await?;
         info!("Turnkey sign_text: raw response body: {}", response_text);
-        
-        let result: TurnkeyCreateAccountResponse = serde_json::from_str(&response_text).map_err(|e| {
-            error!("Turnkey sign_text: failed to parse response '{}': {}", response_text, e);
-            WalletError::ApiError { message: format!("Failed to parse response: {}", e) }
-        })?;
+
+        let result: TurnkeyCreateAccountResponse =
+            serde_json::from_str(&response_text).map_err(|e| {
+                error!("Turnkey sign_text: failed to parse response '{}': {}", response_text, e);
+                WalletError::ApiError { message: format!("Failed to parse response: {}", e) }
+            })?;
 
         info!("Turnkey sign_text: activity status: {}", result.activity.status);
 
@@ -725,39 +741,43 @@ impl WalletManagerTrait for TurnkeyWalletManager {
                 WalletError::ApiError { message: "No sign result in response".to_string() }
             })?;
 
-        info!("Turnkey sign_text: signature result: r={}, s={}, v={}", sign_result.r, sign_result.s, sign_result.v);
+        info!(
+            "Turnkey sign_text: signature result: r={}, s={}, v={}",
+            sign_result.r, sign_result.s, sign_result.v
+        );
 
         let r_bytes = hex::decode(sign_result.r.trim_start_matches("0x")).map_err(|e| {
             error!("Turnkey sign_text: failed to decode r value '{}': {}", sign_result.r, e);
             WalletError::ApiError { message: format!("Failed to decode r value: {}", e) }
         })?;
-        
+
         let s_bytes = hex::decode(sign_result.s.trim_start_matches("0x")).map_err(|e| {
             error!("Turnkey sign_text: failed to decode s value '{}': {}", sign_result.s, e);
             WalletError::ApiError { message: format!("Failed to decode s value: {}", e) }
         })?;
-        
-        let v_value = u64::from_str_radix(sign_result.v.trim_start_matches("0x"), 16).map_err(|e| {
-            error!("Turnkey sign_text: failed to decode v value '{}': {}", sign_result.v, e);
-            WalletError::ApiError { message: format!("Failed to decode v value: {}", e) }
-        })?;
+
+        let v_value =
+            u64::from_str_radix(sign_result.v.trim_start_matches("0x"), 16).map_err(|e| {
+                error!("Turnkey sign_text: failed to decode v value '{}': {}", sign_result.v, e);
+                WalletError::ApiError { message: format!("Failed to decode v value: {}", e) }
+            })?;
 
         let r_bytes_32: [u8; 32] = r_bytes.try_into().map_err(|_| {
             error!("Turnkey sign_text: r value is not 32 bytes");
             WalletError::ApiError { message: "r value is not 32 bytes".to_string() }
         })?;
-        
+
         let s_bytes_32: [u8; 32] = s_bytes.try_into().map_err(|_| {
             error!("Turnkey sign_text: s value is not 32 bytes");
             WalletError::ApiError { message: "s value is not 32 bytes".to_string() }
         })?;
-        
+
         let signature = PrimitiveSignature::new(
             alloy::primitives::U256::from_be_bytes(r_bytes_32),
             alloy::primitives::U256::from_be_bytes(s_bytes_32),
             v_value != 0,
         );
-        
+
         info!("Turnkey sign_text: successfully parsed signature");
         Ok(signature)
     }
@@ -772,18 +792,16 @@ impl WalletManagerTrait for TurnkeyWalletManager {
             .get(&wallet_index)
             .ok_or(WalletError::WalletNotFound { index: wallet_index })?;
 
-        let typed_data_json = serde_json::to_string(typed_data).map_err(|e| WalletError::ApiError {
-            message: format!("Failed to serialize typed data: {}", e),
+        let typed_data_json = serde_json::to_string(typed_data).map_err(|e| {
+            WalletError::ApiError { message: format!("Failed to serialize typed data: {}", e) }
         })?;
 
         let timestamp = Self::get_timestamp_ms();
         let accounts = self.accounts.lock().await;
-        let account = accounts
-            .get(&wallet_index)
-            .ok_or_else(|| {
-                error!("Turnkey sign_typed_data: wallet not found for index {}", wallet_index);
-                WalletError::WalletNotFound { index: wallet_index }
-            })?;
+        let account = accounts.get(&wallet_index).ok_or_else(|| {
+            error!("Turnkey sign_typed_data: wallet not found for index {}", wallet_index);
+            WalletError::WalletNotFound { index: wallet_index }
+        })?;
         let account_address = account.address.clone();
         drop(accounts);
 
@@ -837,39 +855,46 @@ impl WalletManagerTrait for TurnkeyWalletManager {
                 WalletError::ApiError { message: "No sign result in response".to_string() },
             )?;
 
-        info!("Turnkey sign_typed_data: signature result: r={}, s={}, v={}", sign_result.r, sign_result.s, sign_result.v);
+        info!(
+            "Turnkey sign_typed_data: signature result: r={}, s={}, v={}",
+            sign_result.r, sign_result.s, sign_result.v
+        );
 
         let r_bytes = hex::decode(sign_result.r.trim_start_matches("0x")).map_err(|e| {
             error!("Turnkey sign_typed_data: failed to decode r value '{}': {}", sign_result.r, e);
             WalletError::ApiError { message: format!("Failed to decode r value: {}", e) }
         })?;
-        
+
         let s_bytes = hex::decode(sign_result.s.trim_start_matches("0x")).map_err(|e| {
             error!("Turnkey sign_typed_data: failed to decode s value '{}': {}", sign_result.s, e);
             WalletError::ApiError { message: format!("Failed to decode s value: {}", e) }
         })?;
-        
-        let v_value = u64::from_str_radix(sign_result.v.trim_start_matches("0x"), 16).map_err(|e| {
-            error!("Turnkey sign_typed_data: failed to decode v value '{}': {}", sign_result.v, e);
-            WalletError::ApiError { message: format!("Failed to decode v value: {}", e) }
-        })?;
+
+        let v_value =
+            u64::from_str_radix(sign_result.v.trim_start_matches("0x"), 16).map_err(|e| {
+                error!(
+                    "Turnkey sign_typed_data: failed to decode v value '{}': {}",
+                    sign_result.v, e
+                );
+                WalletError::ApiError { message: format!("Failed to decode v value: {}", e) }
+            })?;
 
         let r_bytes_32: [u8; 32] = r_bytes.try_into().map_err(|_| {
             error!("Turnkey sign_typed_data: r value is not 32 bytes");
             WalletError::ApiError { message: "r value is not 32 bytes".to_string() }
         })?;
-        
+
         let s_bytes_32: [u8; 32] = s_bytes.try_into().map_err(|_| {
             error!("Turnkey sign_typed_data: s value is not 32 bytes");
             WalletError::ApiError { message: "s value is not 32 bytes".to_string() }
         })?;
-        
+
         let signature = PrimitiveSignature::new(
             alloy::primitives::U256::from_be_bytes(r_bytes_32),
             alloy::primitives::U256::from_be_bytes(s_bytes_32),
             v_value != 0,
         );
-        
+
         info!("Turnkey sign_typed_data: successfully parsed signature");
         Ok(signature)
     }

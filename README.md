@@ -9,9 +9,9 @@
 - Testing sending all tx flows with:
   - AWS key manager - already manually tested but need e2e
   - GCP key manager - already manually tested but need e2e
-  - KMS - not tested and needs e2e
+  - KMS - tested and needs e2e
   - Privy - already manually tested but need e2e
-  - Turnkey - not tested and needs e2e
+  - Turnkey - tested and needs e2e
   - Testing loading up infura gas 
   - Testing loading up tenderly gas
   - Testing handling custom gas with http call

@@ -169,7 +169,7 @@ impl WalletManagerTrait for PrivyWalletManager {
                     "gas_price": format!("0x{:x}", tx.gas_price),
                     "nonce": tx.nonce
                 })
-            },
+            }
             TypedTransaction::Eip2930(tx) => {
                 let to_addr = match &tx.to {
                     alloy::primitives::TxKind::Call(addr) => Some(format!("0x{:x}", addr)),
@@ -185,7 +185,7 @@ impl WalletManagerTrait for PrivyWalletManager {
                     "nonce": tx.nonce,
                     "chain_id": tx.chain_id
                 })
-            },
+            }
             TypedTransaction::Eip1559(tx) => {
                 let to_addr = match &tx.to {
                     alloy::primitives::TxKind::Call(addr) => Some(format!("0x{:x}", addr)),
@@ -202,10 +202,11 @@ impl WalletManagerTrait for PrivyWalletManager {
                     "nonce": tx.nonce,
                     "chain_id": tx.chain_id
                 })
-            },
+            }
             TypedTransaction::Eip4844(_) => {
                 return Err(WalletError::UnsupportedTransactionType {
-                    tx_type: "EIP-4844 blob transactions are not supported by Privy wallet API".to_string(),
+                    tx_type: "EIP-4844 blob transactions are not supported by Privy wallet API"
+                        .to_string(),
                 })
             }
             _ => {

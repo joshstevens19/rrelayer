@@ -389,7 +389,8 @@ impl TransactionsQueues {
         // Check if this is a blob transaction and if the wallet manager supports blobs
         if transaction_to_send.blobs.is_some() && !transactions_queue.supports_blobs() {
             return Err(AddTransactionError::UnsupportedTransactionType {
-                message: "EIP-4844 blob transactions are not supported by this wallet manager".to_string(),
+                message: "EIP-4844 blob transactions are not supported by this wallet manager"
+                    .to_string(),
             });
         }
 

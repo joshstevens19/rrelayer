@@ -8,6 +8,6 @@ pub mod registry;
 pub mod relayers;
 mod signing;
 pub mod test_runner;
-mod test_suite;
+pub mod test_suite;
 pub mod transactions;
 mod webhook;

@@ -12,31 +12,24 @@ pub async fn get_aws_secret(config: &AwsSecretManager) -> Result<String, WalletE
 
     let client = Client::new(&aws_config);
 
-    let resp = client
-        .get_secret_value()
-        .secret_id(config.id.clone())
-        .send()
-        .await
-        .map_err(|e| {
+    let resp =
+        client.get_secret_value().secret_id(config.id.clone()).send().await.map_err(|e| {
             let service_error = e.into_service_error();
             WalletError::ApiError {
                 message: format!(
                     "AWS Secrets Manager error: {} (Secret: '{}')",
-                    service_error,
-                    config.id
+                    service_error, config.id
                 ),
             }
         })?;
 
-    let secret_string = resp
-        .secret_string()
-        .ok_or(WalletError::ApiError {
-            message: format!("Secret '{}' does not contain a string value", config.id)
-        })?;
+    let secret_string = resp.secret_string().ok_or(WalletError::ApiError {
+        message: format!("Secret '{}' does not contain a string value", config.id),
+    })?;
 
-    let secret_json: serde_json::Value = serde_json::from_str(secret_string)
-        .map_err(|e| WalletError::ApiError {
-            message: format!("Failed to parse secret '{}' as JSON: {}", config.id, e)
+    let secret_json: serde_json::Value =
+        serde_json::from_str(secret_string).map_err(|e| WalletError::ApiError {
+            message: format!("Failed to parse secret '{}' as JSON: {}", config.id, e),
         })?;
 
     let key_value = secret_json.get(&config.key).and_then(|v| v.as_str()).ok_or(
@@ -45,7 +38,10 @@ pub async fn get_aws_secret(config: &AwsSecretManager) -> Result<String, WalletE
                 "Key '{}' not found in secret '{}' or is not a string. Available keys: {:?}",
                 config.key,
                 config.id,
-                secret_json.as_object().map(|obj| obj.keys().collect::<Vec<_>>()).unwrap_or_default()
+                secret_json
+                    .as_object()
+                    .map(|obj| obj.keys().collect::<Vec<_>>())
+                    .unwrap_or_default()
             ),
         },
     )?;

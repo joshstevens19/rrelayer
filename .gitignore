@@ -31,3 +31,5 @@ documentation/vocs.config.ts*
 node_modules
 playground/**/keystores
 crates/e2e-tests/gcp-service-account.json
+crates/e2e-tests/__TEST_RESULTS__
+crates/e2e-tests/rrelayer.yaml

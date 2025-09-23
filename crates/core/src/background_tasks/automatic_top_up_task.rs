@@ -101,7 +101,6 @@ impl AutomaticTopUpTask {
 
                 match self.get_all_relayers_for_chain(&chain_id).await {
                     Ok(relayers) => {
-                        info!("Cached {} relayers for chain {}", relayers.len(), chain_id);
                         self.relayer_cache.insert(chain_id, relayers);
                     }
                     Err(e) => {
@@ -892,18 +891,19 @@ impl AutomaticTopUpTask {
                         warn!(
                             "Failed to decode balanceOf response for token {} and address {}: {}. \
                             Raw response length: {} bytes. Returning zero balance.",
-                            token_address, wallet_address, e, result.len()
+                            token_address,
+                            wallet_address,
+                            e,
+                            result.len()
                         );
                         Ok(U256::ZERO)
                     }
                 }
-            },
-            Err(e) => {
-                Err(format!(
-                    "Failed to call balanceOf on token contract {} for address {}: {}",
-                    token_address, wallet_address, e
-                ))
             }
+            Err(e) => Err(format!(
+                "Failed to call balanceOf on token contract {} for address {}: {}",
+                token_address, wallet_address, e
+            )),
         }
     }
 }
