@@ -14,14 +14,10 @@ impl EmbeddedRRelayerServer {
         Self { project_path, server_handle: None }
     }
 
-    /// Start the RRelayer server in a background task
     pub async fn start(&mut self) -> Result<()> {
         info!("[START] Starting embedded RRelayer server...");
 
-        // Start Docker Compose services (PostgreSQL)
         self.start_docker_compose()?;
-
-        // Drop all database schemas for a fresh start
         self.reset_database().await?;
 
         let project_path = self.project_path.clone();
@@ -34,7 +30,6 @@ impl EmbeddedRRelayerServer {
 
         self.server_handle = Some(handle);
 
-        // Wait for the server to be ready
         self.wait_for_ready().await?;
 
         // Give the server a moment to fully initialize after health check
@@ -44,7 +39,6 @@ impl EmbeddedRRelayerServer {
         Ok(())
     }
 
-    /// Wait for the server to be ready by checking the health endpoint
     async fn wait_for_ready(&self) -> Result<()> {
         let mut retries = 30;
 
@@ -69,27 +63,22 @@ impl EmbeddedRRelayerServer {
         Err(anyhow::anyhow!("RRelayer server did not become ready after 60 seconds"))
     }
 
-    /// The actual server startup logic - uses rrelayer_core::start
     async fn run_server(project_path: &PathBuf) -> Result<(), StartError> {
         info!("Starting up the embedded RRelayer server");
         start(project_path).await
     }
 
-    /// Reset database by dropping all schemas for a fresh start
     async fn reset_database(&self) -> Result<()> {
         info!("🗑️  Resetting database schemas for fresh E2E test run...");
 
-        // Database connection settings for E2E tests
         let connection_string =
             std::env::var("DATABASE_URL").expect("DATABASE_URL needs to be set");
 
         let schemas_to_drop =
             vec!["public", "rate_limit", "signing", "network", "relayer", "webhooks"];
 
-        // Try to connect and drop schemas
         match tokio_postgres::connect(&connection_string, tokio_postgres::NoTls).await {
             Ok((client, connection)) => {
-                // Spawn the connection task
                 tokio::spawn(async move {
                     if let Err(e) = connection.await {
                         error!("Database connection error: {}", e);
@@ -104,7 +93,6 @@ impl EmbeddedRRelayerServer {
                     }
                 }
 
-                // Recreate the public schema
                 match client.execute("CREATE SCHEMA public", &[]).await {
                     Ok(_) => info!("[SUCCESS] Recreated public schema"),
                     Err(e) => warn!("[WARNING]  Failed to recreate public schema: {}", e),
@@ -124,7 +112,6 @@ impl EmbeddedRRelayerServer {
         Ok(())
     }
 
-    /// Start Docker Compose services for E2E tests
     fn start_docker_compose(&self) -> Result<()> {
         info!("🐳 Starting Docker Compose services...");
 
@@ -158,7 +145,6 @@ impl EmbeddedRRelayerServer {
         self.check_docker_compose_status(200)
     }
 
-    /// Check Docker Compose status with retries
     fn check_docker_compose_status(&self, max_retries: u32) -> Result<()> {
         let mut retries = 0;
 
@@ -209,13 +195,10 @@ impl EmbeddedRRelayerServer {
     /// Stop the embedded server
     pub async fn stop(&mut self) -> Result<()> {
         if let Some(handle) = self.server_handle.take() {
-            // info!("[STOP] Stopping embedded RRelayer server...");
             handle.abort();
 
-            // Wait a moment for the abort to take effect
             sleep(Duration::from_millis(100)).await;
 
-            // Force kill any remaining RRelayer processes on port 3000
             self.force_kill_server_on_port(3000).await;
 
             // info!("[SUCCESS] Embedded RRelayer server stopped");
@@ -228,9 +211,7 @@ impl EmbeddedRRelayerServer {
         Ok(())
     }
 
-    /// Force kill any process listening on the given port
     async fn force_kill_server_on_port(&self, port: u16) {
-        // Try to find and kill processes on the port
         if let Ok(output) = Command::new("lsof").args(["-ti", &format!("tcp:{}", port)]).output() {
             let pids = String::from_utf8_lossy(&output.stdout);
             for pid in pids.lines() {
@@ -241,15 +222,13 @@ impl EmbeddedRRelayerServer {
             }
         }
 
-        // Verify the port is now free
         sleep(Duration::from_millis(200)).await;
         match reqwest::get("http://localhost:3000/health").await {
             Ok(_) => warn!("[WARNING]  Port {} may still have active connections", port),
             Err(_) => info!("[SUCCESS] Port {} is now free", port),
         }
     }
-
-    /// Stop Docker Compose services (optional - not used by default)
+    
     #[allow(dead_code)]
     fn stop_docker_compose(&self) -> Result<()> {
         info!("[STOP] Stopping Docker Compose services...");

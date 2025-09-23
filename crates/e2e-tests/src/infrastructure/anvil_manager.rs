@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use std::time::Duration;
 use tokio::process::{Child, Command};
 use tracing::info;
 
@@ -15,10 +16,8 @@ impl AnvilManager {
     pub async fn start(&mut self) -> Result<()> {
         info!("Starting Anvil on port {}", self.port);
 
-        // Kill any existing process on this port first
         self.kill_existing_process_on_port().await?;
 
-        // Check if anvil is available
         let output = Command::new("anvil").arg("--version").output().await.context(
             "Failed to execute anvil. Make sure foundry is installed and anvil is in PATH",
         )?;
@@ -29,7 +28,6 @@ impl AnvilManager {
             );
         }
 
-        // Start anvil with deterministic accounts and no auto-mining
         let child = Command::new("anvil")
             .env("FOUNDRY_DISABLE_NIGHTLY_WARNING", "true")
             .args([
@@ -40,7 +38,7 @@ impl AnvilManager {
                 "--accounts",
                 "10",
                 "--balance",
-                "10000000000", // 10 billion ETH per account
+                "10000000000",
                 "--mnemonic",
                 "test test test test test test test test test test test junk",
                 "--no-mining", // Don't auto-mine empty blocks
@@ -52,12 +50,11 @@ impl AnvilManager {
                 "1000000000",
                 "--chain-id",
                 "31337",
-                // Enable EIP-1559 fee market behavior
                 "--hardfork",
                 "cancun",
             ])
-            .stdout(std::process::Stdio::null()) // Suppress stdout
-            .stderr(std::process::Stdio::null()) // Suppress stderr
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
             .kill_on_drop(true)
             .spawn()
             .context("Failed to start anvil process")?;
@@ -66,9 +63,8 @@ impl AnvilManager {
         info!("Anvil started successfully on port {}", self.port);
 
         // Wait a moment for anvil to fully start
-        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        tokio::time::sleep(Duration::from_secs(1)).await;
 
-        // Verify anvil is responding
         self.verify_anvil_ready().await?;
 
         Ok(())
@@ -79,7 +75,6 @@ impl AnvilManager {
         {
             use tokio::process::Command;
 
-            // Find process using the port
             let output =
                 Command::new("lsof").args(["-ti", &format!(":{}", self.port)]).output().await;
 
@@ -136,13 +131,11 @@ impl AnvilManager {
         self.kill_existing_process_on_port().await
     }
 
-    /// Restarts Anvil with a completely fresh state
     pub async fn restart(&mut self) -> Result<()> {
         info!("Restarting Anvil to ensure clean state");
         self.stop().await.context("Failed to stop Anvil during restart")?;
 
-        // Add a small delay to ensure the process is fully stopped and port is released
-        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+        tokio::time::sleep(Duration::from_millis(500)).await;
 
         self.start().await.context("Failed to start Anvil during restart")?;
 
@@ -156,7 +149,6 @@ impl AnvilManager {
         let client = Client::new();
         let url = format!("http://127.0.0.1:{}", self.port);
 
-        // Try to make a simple JSON-RPC call to verify anvil is responding
         let request_body = serde_json::json!({
             "jsonrpc": "2.0",
             "method": "eth_chainId",
@@ -184,14 +176,13 @@ impl AnvilManager {
             }
 
             if attempt < 5 {
-                tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                tokio::time::sleep(Duration::from_millis(500)).await;
             }
         }
 
         anyhow::bail!("Failed to verify anvil is ready after 5 attempts");
     }
 
-    /// Get the current transaction count (nonce) for an account
     async fn get_transaction_count(&self, account: &str) -> Result<u64> {
         use reqwest::Client;
 
@@ -223,12 +214,10 @@ impl AnvilManager {
         let nonce_str =
             json["result"].as_str().context("Transaction count result is not a string")?;
 
-        // Remove 0x prefix and parse as hex
         let nonce_str = nonce_str.strip_prefix("0x").unwrap_or(nonce_str);
         u64::from_str_radix(nonce_str, 16).context("Failed to parse transaction count as hex")
     }
 
-    /// Mine blocks with transactions to provide gas estimation data and create realistic conditions  
     pub async fn mine_blocks_with_transactions(&self, num_blocks: u64) -> Result<()> {
         use reqwest::Client;
 
@@ -240,14 +229,11 @@ impl AnvilManager {
         let base_gas_price = 1_000_000_000_u64; // 1 gwei
         let sender_account = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"; // First Anvil account
 
-        // Get the initial nonce for the sender account
         let mut current_nonce = self.get_transaction_count(sender_account).await?;
 
-        // Mine blocks incrementally with transactions, mining after each transaction
         for block_i in 0..num_blocks.min(20) {
-            // Send 1-2 transactions per block
             for tx_i in 0..2 {
-                let gas_multiplier = 1 + ((block_i + tx_i) % 5); // Vary gas prices
+                let gas_multiplier = 1 + ((block_i + tx_i) % 5);
                 let gas_price = format!("0x{:x}", base_gas_price * gas_multiplier);
 
                 let tx_request = serde_json::json!({
@@ -255,12 +241,12 @@ impl AnvilManager {
                     "method": "eth_sendTransaction",
                     "params": [{
                         "from": sender_account,
-                        "to": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",   // Second Anvil account
-                        "value": "0x1000000000000000", // 0.001 ETH
+                        "to": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                        "value": "0x1000000000000000",
                         "maxFeePerGas": gas_price,
-                        "maxPriorityFeePerGas": format!("0x{:x}", base_gas_price / 2), // 0.5 gwei priority fee
-                        "gas": "0x5208", // Standard transfer gas
-                        "nonce": format!("0x{:x}", current_nonce) // Explicitly set nonce
+                        "maxPriorityFeePerGas": format!("0x{:x}", base_gas_price / 2),
+                        "gas": "0x5208",
+                        "nonce": format!("0x{:x}", current_nonce)
                     }],
                     "id": block_i * 10 + tx_i + 10
                 });
@@ -281,18 +267,16 @@ impl AnvilManager {
                         tx_i, block_i, current_nonce, status, body
                     );
                 } else {
-                    // Increment nonce only on successful transaction
                     current_nonce += 1;
                 }
 
                 // Small delay to ensure transaction is in mempool before mining
-                tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+                tokio::time::sleep(Duration::from_millis(50)).await;
 
-                // Mine 1 block after each transaction to ensure it gets included
                 let mine_request = serde_json::json!({
                     "jsonrpc": "2.0",
                     "method": "anvil_mine",
-                    "params": [1], // Mine 1 block at a time
+                    "params": [1],
                     "id": 1000 + block_i * 10 + tx_i
                 });
 
@@ -313,11 +297,10 @@ impl AnvilManager {
                     );
                 }
 
-                // Verify the transaction was included by checking the latest block
                 let latest_block_request = serde_json::json!({
                     "jsonrpc": "2.0",
                     "method": "eth_getBlockByNumber",
-                    "params": ["latest", true], // Get full transaction details
+                    "params": ["latest", true],
                     "id": 2000 + block_i * 10 + tx_i
                 });
 
@@ -340,12 +323,10 @@ impl AnvilManager {
                     );
                 }
 
-                // Small delay between transactions
-                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                tokio::time::sleep(Duration::from_millis(100)).await;
             }
         }
-
-        // Mine remaining blocks if needed (these will be empty but that's ok)
+        
         if num_blocks > 20 {
             let remaining = num_blocks - 20;
             let mine_request = serde_json::json!({
@@ -374,7 +355,6 @@ impl AnvilManager {
         Ok(())
     }
 
-    /// Mine a single block to confirm pending transactions
     pub async fn mine_block(&self) -> Result<()> {
         use reqwest::Client;
 
@@ -400,6 +380,12 @@ impl AnvilManager {
             anyhow::bail!("Failed to mine block: {}", response.status());
         }
 
+        Ok(())
+    }
+
+    pub async fn mine_and_wait(&self) -> Result<()> {
+        self.mine_block().await?;
+        tokio::time::sleep(Duration::from_millis(100)).await;
         Ok(())
     }
 }

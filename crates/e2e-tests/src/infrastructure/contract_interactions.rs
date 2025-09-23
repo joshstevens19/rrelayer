@@ -15,7 +15,6 @@ use rrelayer_core::common_types::EvmAddress;
 use std::str::FromStr;
 use tracing::info;
 
-// Define a simple test contract using the sol! macro
 sol! {
     #[allow(missing_docs)]
     #[sol(rpc, bytecode="6080806040523460135760df908160198239f35b600080fdfe6080806040526004361015601257600080fd5b60003560e01c9081633fb5c1cb1460925781638381f58a146079575063d09de08a14603c57600080fd5b3460745760003660031901126074576000546000198114605e57600101600055005b634e487b7160e01b600052601160045260246000fd5b600080fd5b3460745760003660031901126074576020906000548152f35b34607457602036600319011260745760043560005500fea2646970667358221220e978270883b7baed10810c4079c941512e93a7ba1cd1108c781d4bc738d9090564736f6c634300081a0033")]
@@ -32,7 +31,6 @@ sol! {
     }
 }
 
-// Define contract interface for the pre-deployed TestToken contract
 sol! {
     #[allow(missing_docs)]
     #[sol(rpc)]
@@ -59,14 +57,11 @@ impl ContractInteractor {
         Ok(Self { provider, contract_address: None, token_address: None })
     }
 
-    /// Deploy the test contract using Alloy's sol! macro
     pub async fn deploy_test_contract(&mut self, deployer_private_key: &str) -> Result<Address> {
-        // Create signer with the provided private key
         let signer: PrivateKeySigner =
             deployer_private_key.parse().context("Invalid private key")?;
         let wallet = EthereumWallet::from(signer);
 
-        // Create provider with wallet for deployment
         let provider_url_str = self.provider.client().transport().url();
         let deploy_provider = ProviderBuilder::new()
             .with_recommended_fillers()
@@ -75,7 +70,6 @@ impl ContractInteractor {
 
         info!("Deploying test contract...");
 
-        // Start continuous mining in background to allow deployment to complete
         let mining_url = provider_url_str.to_string();
         let (tx, mut rx) = tokio::sync::mpsc::channel(1);
 
@@ -106,7 +100,6 @@ impl ContractInteractor {
             }
         });
 
-        // Deploy the contract using Alloy's generated deploy method
         let contract = TestContract::deploy(&deploy_provider)
             .await
             .context("Failed to deploy test contract")?;
@@ -115,11 +108,9 @@ impl ContractInteractor {
         self.contract_address = Some(contract_address.into());
         info!("Test contract deployed to: {:?}", contract_address);
 
-        // Set a random initial value to test the contract works
         let random_value = rand::random::<u32>() % 1000;
         info!("Setting initial random value: {}", random_value);
 
-        // Create contract instance at the deployed address
         let deployed_contract = TestContract::new(contract_address, &deploy_provider);
         let set_value_call = deployed_contract.setNumber(U256::from(random_value));
         let pending_tx = set_value_call.send().await.context("Failed to set initial value")?;
@@ -127,7 +118,6 @@ impl ContractInteractor {
         let tx_hash = *pending_tx.tx_hash();
         info!("Initial setValue transaction sent: {:?}", tx_hash);
 
-        // Stop mining task
         let _ = tx.send(()).await;
         mining_task.abort();
 
@@ -139,14 +129,11 @@ impl ContractInteractor {
         Ok(contract_address)
     }
 
-    /// Deploy the ERC-20 test token contract using Forge
     pub async fn deploy_test_token(&mut self, deployer_private_key: &str) -> Result<Address> {
         info!("Deploying ERC-20 test token using Forge...");
 
-        // Get the RPC URL from the provider
         let rpc_url = self.provider.client().transport().url().to_string();
 
-        // Verify contracts directory exists
         let contracts_dir = std::path::Path::new("contracts");
         if !contracts_dir.exists() {
             return Err(anyhow::anyhow!(
@@ -160,7 +147,6 @@ impl ContractInteractor {
         // Wait longer to ensure any previous transactions are settled and nonces are updated
         tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
 
-        // Enable auto-mining temporarily for forge deployment
         let client = reqwest::Client::new();
         let auto_mine_enable = serde_json::json!({
             "jsonrpc": "2.0",
@@ -178,7 +164,6 @@ impl ContractInteractor {
 
         info!("Enabled auto-mining for forge deployment");
 
-        // Run the Forge deployment script with timeout
         let deployer_key = deployer_private_key.to_string();
         let rpc_url_clone = rpc_url.clone();
         let forge_task = tokio::task::spawn_blocking(move || {
@@ -194,14 +179,12 @@ impl ContractInteractor {
                 .output()
         });
 
-        // Wait for forge command with timeout
         let output = tokio::time::timeout(tokio::time::Duration::from_secs(30), forge_task)
             .await
             .context("Forge deployment timed out")?
             .context("Failed to execute forge task")?
             .context("Failed to run forge script")?;
 
-        // Disable auto-mining after deployment
         let auto_mine_disable = serde_json::json!({
             "jsonrpc": "2.0",
             "method": "anvil_setAutomine",
@@ -223,7 +206,6 @@ impl ContractInteractor {
             return Err(anyhow::anyhow!("Forge deployment failed: {}", stderr));
         }
 
-        // Parse the output to extract the deployed contract address
         let stdout = String::from_utf8_lossy(&output.stdout);
         let token_address = self
             .extract_deployed_address(&stdout)
@@ -232,7 +214,6 @@ impl ContractInteractor {
         self.token_address = Some(token_address.into());
         info!("ERC-20 test token deployed to: {:?}", token_address);
 
-        // Verify the token contract exists and is working
         let token_contract = TestToken::new(token_address, &self.provider);
         let total_supply =
             token_contract.totalSupply().call().await.context("Failed to verify token contract")?;
@@ -242,14 +223,13 @@ impl ContractInteractor {
         // Transfer tokens from deployer to the automatic top-up funding address
         // The deployer (anvil_accounts[0]) has all the tokens, but the funding address in YAML is different
         // Use the known funding address from the config (we know it's 0x655B2B8861D7E911D283A05A5CAD042C157106DA)
-        let funding_address: alloy::primitives::Address =
+        let funding_address: Address =
             "0x655B2B8861D7E911D283A05A5CAD042C157106DA"
                 .parse()
                 .context("Failed to parse funding address")?;
 
-        // Transfer a large amount of tokens (e.g., 100,000 tokens) to the funding address
-        let transfer_amount = alloy::primitives::U256::from(100_000u64)
-            * alloy::primitives::U256::from(10u64).pow(alloy::primitives::U256::from(18u64));
+        let transfer_amount = U256::from(100_000u64)
+            * U256::from(10u64).pow(U256::from(18u64));
 
         info!(
             "Transferring {} tokens from deployer to funding address {:?}",
@@ -262,20 +242,17 @@ impl ContractInteractor {
             .await
             .context("Failed to transfer tokens to funding address")?;
 
-        // Wait a moment to ensure deployment is fully settled before returning
+        // Wait to ensure deployment is fully settled before returning
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
         Ok(token_address)
     }
 
-    /// Deploy the Safe contracts using Forge
     pub async fn deploy_safe_contracts(&mut self, deployer_private_key: &str) -> Result<Address> {
         info!("Deploying Safe contracts using Forge...");
 
-        // Get the RPC URL from the provider
         let rpc_url = self.provider.client().transport().url().to_string();
 
-        // Verify contracts directory exists
         let contracts_dir = std::path::Path::new("contracts");
         if !contracts_dir.exists() {
             return Err(anyhow::anyhow!(
@@ -289,7 +266,6 @@ impl ContractInteractor {
         // Wait to ensure any previous transactions are settled
         tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
 
-        // Enable auto-mining temporarily for forge deployment
         let client = reqwest::Client::new();
         let auto_mine_enable = serde_json::json!({
             "jsonrpc": "2.0",
@@ -307,7 +283,6 @@ impl ContractInteractor {
 
         info!("Enabled auto-mining for Safe deployment");
 
-        // Run the Forge deployment script for Safe contracts
         let deployer_key = deployer_private_key.to_string();
         let rpc_url_clone = rpc_url.clone();
         let forge_task = tokio::task::spawn_blocking(move || {
@@ -323,14 +298,12 @@ impl ContractInteractor {
                 .output()
         });
 
-        // Wait for forge command with timeout
         let output = tokio::time::timeout(tokio::time::Duration::from_secs(30), forge_task)
             .await
             .context("Safe deployment timed out")?
             .context("Failed to execute Safe forge task")?
             .context("Failed to run Safe forge script")?;
 
-        // Disable auto-mining after deployment
         let auto_mine_disable = serde_json::json!({
             "jsonrpc": "2.0",
             "method": "anvil_setAutomine",
@@ -352,7 +325,6 @@ impl ContractInteractor {
             return Err(anyhow::anyhow!("Safe deployment failed: {}", stderr));
         }
 
-        // Parse the output to extract the deployed Safe proxy address
         let stdout = String::from_utf8_lossy(&output.stdout);
         let safe_address = self
             .extract_safe_address(&stdout)
@@ -360,7 +332,6 @@ impl ContractInteractor {
 
         info!("Safe contracts deployed - Safe proxy address: {:?}", safe_address);
 
-        // Verify the Safe address matches our expected deterministic address
         let expected_address: Address = "0xcfe267de230a234c5937f18f239617b7038ec271"
             .parse()
             .context("Failed to parse expected Safe address")?;
@@ -378,15 +349,12 @@ impl ContractInteractor {
             safe_address
         );
 
-        // Wait a moment to ensure deployment is fully settled before returning
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
         Ok(safe_address)
     }
 
-    /// Extract the deployed Safe proxy address from forge script output
     fn extract_safe_address(&self, forge_output: &str) -> Result<Address> {
-        // Look for "Safe Proxy deployed to: 0x..." in the output
         for line in forge_output.lines() {
             if line.contains("Safe Proxy deployed to:") {
                 if let Some(addr_str) = line.split("Safe Proxy deployed to: ").nth(1) {
@@ -399,19 +367,15 @@ impl ContractInteractor {
         Err(anyhow::anyhow!("Could not find deployed Safe address in forge output"))
     }
 
-    /// Update the rrelayer.yaml config file with the deployed Safe address
     async fn update_yaml_config_with_safe_address(&self, safe_address: Address) -> Result<()> {
         let config_path = std::path::Path::new("rrelayer.yaml");
 
-        // Read the current config
         let config_content =
             tokio::fs::read_to_string(config_path).await.context("Failed to read rrelayer.yaml")?;
 
-        // Replace the placeholder Safe address with the actual deployed address
         let updated_content = config_content
             .replace("0x0000000000000000000000000000000000000001", &format!("{:?}", safe_address));
 
-        // Write the updated config back
         tokio::fs::write(config_path, updated_content)
             .await
             .context("Failed to write updated rrelayer.yaml")?;
@@ -420,9 +384,7 @@ impl ContractInteractor {
         Ok(())
     }
 
-    /// Extract the deployed contract address from forge script output
     fn extract_deployed_address(&self, forge_output: &str) -> Result<Address> {
-        // Look for "TestToken deployed to: 0x..." in the output
         for line in forge_output.lines() {
             if line.contains("TestToken deployed to:") {
                 if let Some(addr_str) = line.split("TestToken deployed to: ").nth(1) {
@@ -435,19 +397,15 @@ impl ContractInteractor {
         Err(anyhow::anyhow!("Could not find deployed contract address in forge output"))
     }
 
-    /// Update the rrelayer.yaml config file with the deployed token address
     async fn update_yaml_config_with_token_address(&self, token_address: Address) -> Result<()> {
         let config_path = std::path::Path::new("rrelayer.yaml");
 
-        // Read the current config
         let config_content =
             tokio::fs::read_to_string(config_path).await.context("Failed to read rrelayer.yaml")?;
 
-        // Replace the placeholder address with the actual deployed address
         let updated_content = config_content
             .replace("0x0000000000000000000000000000000000000000", &format!("{:?}", token_address));
 
-        // Write the updated config back
         tokio::fs::write(config_path, updated_content)
             .await
             .context("Failed to write updated rrelayer.yaml")?;
@@ -456,7 +414,6 @@ impl ContractInteractor {
         Ok(())
     }
 
-    /// Transfer tokens to an address (for funding relayers during tests)
     pub async fn transfer_tokens(
         &self,
         to_address: &Address,
@@ -483,7 +440,6 @@ impl ContractInteractor {
         Ok(())
     }
 
-    /// Get ERC-20 token balance
     pub async fn get_token_balance(&self, address: &Address) -> Result<U256> {
         let token_address = self.token_address.context("Token not deployed yet")?;
 
@@ -497,40 +453,31 @@ impl ContractInteractor {
         Ok(balance._0)
     }
 
-    /// Generate calldata for a simple function call (e.g., setNumber)
     pub fn encode_simple_call(&self, value: u32) -> Result<String> {
         let call = TestContract::setNumberCall { newNumber: U256::from(value) };
         let encoded = call.abi_encode();
         Ok(format!("0x{}", alloy::hex::encode(encoded)))
     }
 
-    /// Generate calldata for a function that always reverts
     pub fn encode_always_revert(&self) -> Result<String> {
-        // Function selector for a revert function
         Ok("0xabcd1234".to_string())
     }
 
-    /// Generate calldata for a gas-intensive operation  
     pub fn encode_gas_intensive_operation(&self, iterations: u32) -> Result<String> {
-        // Function selector + iterations parameter
         Ok(format!("0xef123456{:064x}", iterations))
     }
 
-    /// Get the contract address
     pub fn contract_address(&self) -> Option<EvmAddress> {
         self.contract_address
     }
 
-    /// Get the token address
     pub fn token_address(&self) -> Option<EvmAddress> {
         self.token_address
     }
 
-    /// Wait for a transaction to be mined and get its receipt
     pub async fn wait_for_transaction(&self, tx_hash: &str) -> Result<Option<TransactionReceipt>> {
         let hash: FixedBytes<32> = tx_hash.parse().context("Invalid transaction hash")?;
 
-        // Poll for transaction receipt
         for _ in 0..30 {
             if let Ok(Some(receipt)) = self.provider.get_transaction_receipt(hash).await {
                 return Ok(Some(receipt));
@@ -541,7 +488,6 @@ impl ContractInteractor {
         Ok(None)
     }
 
-    /// Verify a contract is deployed at the expected address
     pub async fn verify_contract_deployed(&self) -> Result<bool> {
         if let Some(address) = self.contract_address {
             let code = self.provider.get_code_at(address.into()).await?;
@@ -550,8 +496,7 @@ impl ContractInteractor {
             Ok(false)
         }
     }
-
-    /// Get ETH balance for an address
+    
     pub async fn get_eth_balance(&self, address: &Address) -> Result<U256> {
         self.provider.get_balance(*address).await.context("Failed to get ETH balance")
     }

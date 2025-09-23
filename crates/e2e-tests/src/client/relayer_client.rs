@@ -1,4 +1,4 @@
-use crate::test_config::E2ETestConfig;
+use super::test_config::E2ETestConfig;
 use alloy::network::AnyTransactionReceipt;
 use alloy::primitives::U256;
 use anyhow::{anyhow, Context, Result};
@@ -25,13 +25,11 @@ pub struct RelayerClient {
 
 impl RelayerClient {
     pub fn new(config: &E2ETestConfig) -> Self {
-        // Get auth credentials from environment
         let username = std::env::var("RRELAYER_AUTH_USERNAME")
             .expect("RRELAYER_AUTH_USERNAME needs to be set");
         let password = std::env::var("RRELAYER_AUTH_PASSWORD")
             .expect("RRELAYER_AUTH_PASSWORD needs to be set");
 
-        // Create SDK with auth
         let sdk = SDK::new(config.rrelayer_base_url.clone(), username, password);
 
         Self { sdk }
@@ -103,7 +101,6 @@ impl RelayerClient {
         Ok(())
     }
 
-    /// Send a transaction through the relayer
     pub async fn send_transaction(
         &self,
         relayer_id: &RelayerId,
@@ -149,7 +146,6 @@ impl RelayerClient {
         Ok((result, request))
     }
 
-    /// Get transaction status
     pub async fn get_transaction_status(
         &self,
         transaction_id: &TransactionId,

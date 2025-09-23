@@ -13,7 +13,6 @@ use warp::{
     Filter, Rejection, Reply,
 };
 
-/// Webhook event received from RRelayer
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReceivedWebhook {
     pub event_type: String,
@@ -24,19 +23,14 @@ pub struct ReceivedWebhook {
     pub headers: HashMap<String, String>,
 }
 
-/// Webhook server for E2E testing
 #[derive(Clone)]
 pub struct WebhookTestServer {
-    /// Received webhooks storage
     received_webhooks: Arc<Mutex<Vec<ReceivedWebhook>>>,
-    /// Expected shared secret for verification
     shared_secret: String,
-    /// Server shutdown signal
     shutdown_tx: Arc<Mutex<Option<oneshot::Sender<()>>>>,
 }
 
 impl WebhookTestServer {
-    /// Create a new webhook test server
     pub fn new(shared_secret: String) -> Self {
         Self {
             received_webhooks: Arc::new(Mutex::new(Vec::new())),
@@ -45,7 +39,6 @@ impl WebhookTestServer {
         }
     }
 
-    /// Start the webhook server on the specified port
     pub async fn start(&self, port: u16) -> Result<()> {
         let server = self.clone();
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
@@ -58,7 +51,6 @@ impl WebhookTestServer {
 
         info!("Starting webhook test server on port {}", port);
 
-        // Create webhook endpoint
         let webhook_route = warp::path("webhook")
             .and(warp::post())
             .and(warp::header::headers_cloned())
@@ -66,7 +58,6 @@ impl WebhookTestServer {
             .and(warp::any().map(move || server.clone()))
             .and_then(handle_webhook);
 
-        // Health check endpoint
         let health_route = warp::path("health").and(warp::get()).map(|| "OK");
 
         let routes = webhook_route.or(health_route);
@@ -85,7 +76,6 @@ impl WebhookTestServer {
         Ok(())
     }
 
-    /// Stop the webhook server
     pub fn stop(&self) {
         info!("[STOP] stop() called on webhook server");
         let mut tx = self.shutdown_tx.lock().unwrap();
@@ -97,12 +87,10 @@ impl WebhookTestServer {
         }
     }
 
-    /// Get all received webhooks
     pub fn get_received_webhooks(&self) -> Vec<ReceivedWebhook> {
         self.received_webhooks.lock().unwrap().clone()
     }
 
-    /// Get webhooks for a specific transaction
     pub fn get_webhooks_for_transaction(&self, transaction_id: &str) -> Vec<ReceivedWebhook> {
         self.received_webhooks
             .lock()
@@ -113,7 +101,6 @@ impl WebhookTestServer {
             .collect()
     }
 
-    /// Get webhooks by event type
     pub fn get_webhooks_by_event(&self, event_type: &str) -> Vec<ReceivedWebhook> {
         self.received_webhooks
             .lock()
@@ -124,12 +111,10 @@ impl WebhookTestServer {
             .collect()
     }
 
-    /// Clear all received webhooks
     pub fn clear_webhooks(&self) {
         self.received_webhooks.lock().unwrap().clear();
     }
 
-    /// Count webhooks by event type
     pub fn count_webhooks_by_event(&self, event_type: &str) -> usize {
         self.received_webhooks
             .lock()
@@ -139,7 +124,6 @@ impl WebhookTestServer {
             .count()
     }
 
-    /// Wait for a webhook with timeout
     pub async fn wait_for_webhook(
         &self,
         transaction_id: &str,
@@ -160,7 +144,6 @@ impl WebhookTestServer {
         None
     }
 
-    /// Verify HMAC signature
     fn verify_signature(&self, payload: &serde_json::Value, signature: &str) -> bool {
         use hmac::{Hmac, Mac};
         use sha2::Sha256;
@@ -178,7 +161,6 @@ impl WebhookTestServer {
         signature == expected
     }
 
-    /// Record a received webhook
     fn record_webhook(&self, webhook: ReceivedWebhook) {
         info!(
             "Received webhook: {} for transaction {} with event {}",
@@ -188,7 +170,6 @@ impl WebhookTestServer {
     }
 }
 
-/// Handle incoming webhook requests
 async fn handle_webhook(
     headers: warp::hyper::HeaderMap,
     payload: serde_json::Value,
@@ -217,16 +198,13 @@ async fn handle_webhook(
 
     let actual_payload = payload.get("payload").unwrap_or(&payload);
 
-    // Handle both transaction and signing webhooks
     let (transaction_id, relayer_id) = if let Some(transaction) = actual_payload.get("transaction")
     {
-        // Transaction webhook
         let tx_id = transaction["id"].as_str().unwrap_or("unknown").to_string();
         let rel_id = transaction["relayerId"].as_str().unwrap_or("unknown").to_string();
         (tx_id, rel_id)
     } else if let Some(signing) = actual_payload.get("signing") {
-        // Signing webhook
-        let tx_id = "signing-operation".to_string(); // No transaction ID for signing
+        let tx_id = "signing-operation".to_string();
         let rel_id = signing["relayerId"].as_str().unwrap_or("unknown").to_string();
         (tx_id, rel_id)
     } else {

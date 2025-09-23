@@ -21,7 +21,7 @@ pub struct CreateRelayerRequest {
     pub name: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CreateRelayerResult {
     pub id: RelayerId,
     pub address: EvmAddress,

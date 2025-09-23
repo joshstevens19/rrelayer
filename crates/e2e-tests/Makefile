@@ -147,7 +147,7 @@ run-tests: ## Run all E2E tests with clean Jest-like output
 
 run-tests-debug: ## Run all E2E tests with debug output
 	@echo "Running E2E tests with debug output..."
-	@make reset-db  
+	@make reset-db
 	@RUST_LOG=info cargo run --bin e2e-runner
 
 # =============================================================================

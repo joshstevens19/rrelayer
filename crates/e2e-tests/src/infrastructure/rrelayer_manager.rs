@@ -16,7 +16,6 @@ impl RRelayerManager {
         let temp_dir = tempfile::tempdir().context("Failed to create temp directory")?;
         let config_path = temp_dir.path().join("rrelayer.yaml");
 
-        // Create test configuration
         let test_config = Self::create_test_config(anvil_port);
         tokio::fs::write(&config_path, test_config).await.context("Failed to write test config")?;
 
@@ -30,7 +29,6 @@ impl RRelayerManager {
 
         let project_path = self.temp_dir.path().to_path_buf();
 
-        // Start RRelayer in a separate task so it doesn't block
         let _config_path = self.config_path.clone();
         tokio::spawn(async move {
             if let Err(e) = start(&project_path).await {
@@ -38,7 +36,6 @@ impl RRelayerManager {
             }
         });
 
-        // Wait for RRelayer to be ready
         self.wait_for_ready().await?;
 
         Ok(())
@@ -50,7 +47,6 @@ impl RRelayerManager {
         let client = reqwest::Client::new();
 
         for attempt in 1..=30 {
-            // Wait up to 60 seconds
             match client.get("http://localhost:3000/health").send().await {
                 Ok(response) => {
                     if response.status().is_success() {
@@ -70,7 +66,6 @@ impl RRelayerManager {
     }
 
     fn create_test_config(anvil_port: u16) -> String {
-        // Create a minimal config that matches the expected structure
         format!(
             r#"# RRelayer E2E Test Configuration
 name: "e2e-test"
