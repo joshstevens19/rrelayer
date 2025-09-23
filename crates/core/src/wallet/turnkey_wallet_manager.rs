@@ -498,4 +498,8 @@ impl WalletManagerTrait for TurnkeyWalletManager {
         let signature = PrimitiveSignature::from_str(&sign_result.signature)?;
         Ok(signature)
     }
+
+    fn supports_blobs(&self) -> bool {
+        true
+    }
 }

@@ -93,6 +93,9 @@ pub enum AddTransactionError {
 
     #[error("Conversion error: {0}")]
     TransactionConversionError(#[from] TransactionConversionError),
+
+    #[error("Unsupported transaction type: {message}")]
+    UnsupportedTransactionType { message: String },
 }
 
 impl From<AddTransactionError> for HttpError {
@@ -106,6 +109,10 @@ impl From<AddTransactionError> for HttpError {
         }
 
         if matches!(value, AddTransactionError::RelayerNotAllowedToSendTransactionTo(_, _)) {
+            return bad_request(value.to_string());
+        }
+
+        if matches!(value, AddTransactionError::UnsupportedTransactionType { .. }) {
             return bad_request(value.to_string());
         }
 

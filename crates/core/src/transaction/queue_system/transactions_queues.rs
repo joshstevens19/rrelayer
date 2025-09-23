@@ -71,7 +71,6 @@ pub struct TransactionsQueues {
 }
 
 impl TransactionsQueues {
-    /// Creates a new TransactionsQueues instance with the given relayer setups.
     pub async fn new(
         setups: Vec<TransactionRelayerSetup>,
         gas_oracle_cache: Arc<Mutex<GasOracleCache>>,
@@ -385,6 +384,13 @@ impl TransactionsQueues {
                 *relayer_id,
                 transaction_to_send.to,
             ));
+        }
+
+        // Check if this is a blob transaction and if the wallet manager supports blobs
+        if transaction_to_send.blobs.is_some() && !transactions_queue.supports_blobs() {
+            return Err(AddTransactionError::UnsupportedTransactionType {
+                message: "EIP-4844 blob transactions are not supported by this wallet manager".to_string(),
+            });
         }
 
         let assigned_nonce = transactions_queue.nonce_manager.get_and_increment().await;

@@ -147,7 +147,6 @@ async fn activity_logger(req: Request<Body>, next: Next) -> Result<Response, Sta
     }
 }
 
-/// Starts the HTTP API server with all configured routes and middleware.
 async fn start_api(
     api_config: ApiConfig,
     rate_limit_config: Option<RateLimitConfig>,
@@ -251,7 +250,6 @@ pub enum StartError {
     IoError(#[from] std::io::Error),
 }
 
-/// Starts the RRelayer service with full initialization.
 pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
     setup_info_logger();
     dotenv().ok();

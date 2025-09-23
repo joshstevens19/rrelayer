@@ -426,4 +426,9 @@ impl EvmProvider {
             timestamp: chrono::Utc::now().timestamp() as u64,
         })
     }
+
+    /// Returns whether the wallet manager supports EIP-4844 blob transactions
+    pub fn supports_blobs(&self) -> bool {
+        self.wallet_manager.supports_blobs()
+    }
 }

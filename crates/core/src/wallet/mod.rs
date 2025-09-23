@@ -131,4 +131,7 @@ pub trait WalletManagerTrait: Send + Sync {
         wallet_index: u32,
         typed_data: &TypedData,
     ) -> Result<PrimitiveSignature, WalletError>;
+
+    /// Returns whether this wallet manager supports EIP-4844 blob transactions
+    fn supports_blobs(&self) -> bool;
 }

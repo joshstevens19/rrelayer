@@ -172,4 +172,8 @@ impl WalletManagerTrait for AwsKmsWalletManager {
         let signature = signer.sign_hash(&hash).await?;
         Ok(signature)
     }
+
+    fn supports_blobs(&self) -> bool {
+        true
+    }
 }

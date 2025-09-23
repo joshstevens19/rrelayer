@@ -482,6 +482,11 @@ impl TransactionsQueue {
         self.relayer.chain_id
     }
 
+    /// Returns whether the wallet manager supports EIP-4844 blob transactions
+    pub fn supports_blobs(&self) -> bool {
+        self.evm_provider.supports_blobs()
+    }
+
     fn within_gas_price_bounds(&self, gas: &GasPriceResult) -> bool {
         if let Some(max) = &self.max_gas_price() {
             let within_bounds = if self.relayer.eip_1559_enabled {

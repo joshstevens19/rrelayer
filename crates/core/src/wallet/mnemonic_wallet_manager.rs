@@ -129,6 +129,10 @@ impl WalletManagerTrait for MnemonicWalletManager {
         let signature = wallet.sign_dynamic_typed_data(typed_data).await?;
         Ok(signature)
     }
+
+    fn supports_blobs(&self) -> bool {
+        true
+    }
 }
 
 /// Generates a new 24-word BIP39 mnemonic seed phrase.
