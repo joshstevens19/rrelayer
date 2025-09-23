@@ -116,30 +116,21 @@ impl WebhookSender {
         &self,
         delivery: &WebhookDelivery,
     ) -> Result<Response, reqwest::Error> {
-        let signature =
-            self.generate_signature(&delivery.payload, &delivery.webhook_config.shared_secret);
+        let webhook_envelope = serde_json::json!({
+            "delivery_id": delivery.id.to_string(),
+            "event_type": delivery.event_type,
+            "timestamp": delivery.created_at.duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
+            "attempt": delivery.attempts + 1,
+            "payload": delivery.payload
+        });
 
-        // TODO: look at why we need these headers at all
         self.client
             .post(&delivery.webhook_config.endpoint)
             .header("Content-Type", "application/json")
-            .header("User-Agent", "RRelayer-Webhooks/1.0")
-            .header(
-                "X-RRelayer-Event",
-                serde_json::to_string(&delivery.event_type).unwrap_or_default(),
-            )
-            .header("X-RRelayer-Signature", signature)
-            .header("X-RRelayer-Delivery", delivery.id.to_string())
-            .header(
-                "X-RRelayer-Timestamp",
-                delivery
-                    .created_at
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_secs()
-                    .to_string(),
-            )
-            .json(&delivery.payload)
+            .header("x-rrelayer-shared-secret", &delivery.webhook_config.shared_secret)
+            .json(&webhook_envelope)
             .send()
             .await
     }
@@ -172,7 +163,6 @@ impl WebhookSender {
             );
             delivery.mark_failed(error.clone());
 
-            // Log permanent failure to database
             self.log_webhook_failure(
                 delivery,
                 &error,
@@ -211,21 +201,6 @@ impl WebhookSender {
             * self.config.retry_multiplier.powi(attempt as i32);
 
         (delay as u64).min(self.config.max_retry_delay_ms)
-    }
-
-    fn generate_signature(&self, payload: &Value, secret: &str) -> String {
-        use hmac::{Hmac, Mac};
-        use sha2::Sha256;
-
-        type HmacSha256 = Hmac<Sha256>;
-
-        let payload_bytes = serde_json::to_vec(payload).unwrap_or_default();
-        let mut mac =
-            HmacSha256::new_from_slice(secret.as_bytes()).expect("HMAC can take key of any size");
-        mac.update(&payload_bytes);
-
-        let result = mac.finalize();
-        format!("sha256={}", hex::encode(result.into_bytes()))
     }
 
     pub async fn send_multiple_webhooks(
@@ -275,9 +250,7 @@ impl WebhookSender {
             max_retries: delivery.max_retries as i32,
             payload: delivery.payload.clone(),
             headers: Some(serde_json::json!({
-                "X-RRelayer-Event": serde_json::to_string(&delivery.event_type).unwrap_or_default(),
-                "X-RRelayer-Delivery": delivery.id.to_string(),
-                "X-RRelayer-Timestamp": delivery.created_at.duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs().to_string()
+                "x-rrelayer-shared-secret": "***"
             })),
             first_attempt_at: Utc::now(),
         };

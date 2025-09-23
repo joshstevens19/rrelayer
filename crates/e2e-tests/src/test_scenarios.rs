@@ -3475,25 +3475,25 @@ impl TestRunner {
                 return Err(anyhow!("Webhook missing event_type"));
             }
 
-            // Validate required headers
-            if !webhook.headers.contains_key("x-rrelayer-signature") {
-                return Err(anyhow!("Webhook missing signature header"));
-            }
-            if !webhook.headers.contains_key("x-rrelayer-event") {
-                return Err(anyhow!("Webhook missing event header"));
-            }
-            if !webhook.headers.contains_key("x-rrelayer-delivery") {
-                return Err(anyhow!("Webhook missing delivery header"));
+            if !webhook.headers.contains_key("x-rrelayer-shared-secret") {
+                return Err(anyhow!("Webhook missing shared secret header"));
             }
 
-            if !webhook.payload.get("transaction").is_some() {
-                return Err(anyhow!("Webhook payload missing transaction data"));
+            let has_transaction =
+                webhook.payload.get("payload").and_then(|p| p.get("transaction")).is_some();
+            let has_signing =
+                webhook.payload.get("payload").and_then(|p| p.get("signing")).is_some();
+            if !has_transaction && !has_signing {
+                return Err(anyhow!("Webhook payload missing nested transaction or signing data"));
             }
             if !webhook.payload.get("event_type").is_some() {
-                return Err(anyhow!("Webhook payload missing event_type"));
+                return Err(anyhow!("Webhook payload missing event_type at root"));
             }
             if !webhook.payload.get("timestamp").is_some() {
-                return Err(anyhow!("Webhook payload missing timestamp"));
+                return Err(anyhow!("Webhook payload missing timestamp at root"));
+            }
+            if !webhook.payload.get("delivery_id").is_some() {
+                return Err(anyhow!("Webhook payload missing delivery_id at root"));
             }
 
             info!("[SUCCESS] Webhook validation passed for event: {}", webhook.event_type);
@@ -3714,11 +3714,12 @@ impl TestRunner {
 
         // Validate text signing webhook payload
         let text_webhook = &text_signing_webhooks[0];
-        if !text_webhook.payload.get("signing").is_some() {
-            return Err(anyhow!("Text signing webhook missing 'signing' data"));
+        let nested_payload = text_webhook.payload.get("payload");
+        if !nested_payload.and_then(|p| p.get("signing")).is_some() {
+            return Err(anyhow!("Text signing webhook missing 'signing' data in nested payload"));
         }
 
-        let signing_data = text_webhook.payload.get("signing").unwrap();
+        let signing_data = nested_payload.unwrap().get("signing").unwrap();
         if !signing_data.get("message").is_some() {
             return Err(anyhow!("Text signing webhook missing 'message' field"));
         }
@@ -3794,11 +3795,14 @@ impl TestRunner {
         );
 
         let typed_data_webhook = &typed_data_signing_webhooks[0];
-        if !typed_data_webhook.payload.get("signing").is_some() {
-            return Err(anyhow!("Typed data signing webhook missing 'signing' data"));
+        let typed_nested_payload = typed_data_webhook.payload.get("payload");
+        if !typed_nested_payload.and_then(|p| p.get("signing")).is_some() {
+            return Err(anyhow!(
+                "Typed data signing webhook missing 'signing' data in nested payload"
+            ));
         }
 
-        let typed_signing_data = typed_data_webhook.payload.get("signing").unwrap();
+        let typed_signing_data = typed_nested_payload.unwrap().get("signing").unwrap();
         if !typed_signing_data.get("domainData").is_some() {
             return Err(anyhow!("Typed data signing webhook missing 'domainData' field"));
         }
@@ -3824,14 +3828,8 @@ impl TestRunner {
         info!("[SUCCESS] Typed data signing webhook payload validation passed");
 
         for signing_webhook in [&text_signing_webhooks[0], &typed_data_signing_webhooks[0]] {
-            if !signing_webhook.headers.contains_key("x-rrelayer-signature") {
-                return Err(anyhow!("Signing webhook missing signature header"));
-            }
-            if !signing_webhook.headers.contains_key("x-rrelayer-event") {
-                return Err(anyhow!("Signing webhook missing event header"));
-            }
-            if !signing_webhook.headers.contains_key("x-rrelayer-delivery") {
-                return Err(anyhow!("Signing webhook missing delivery header"));
+            if !signing_webhook.headers.contains_key("x-rrelayer-shared-secret") {
+                return Err(anyhow!("Signing webhook missing shared secret header"));
             }
 
             if !signing_webhook.payload.get("event_type").is_some() {
@@ -3840,8 +3838,11 @@ impl TestRunner {
             if !signing_webhook.payload.get("timestamp").is_some() {
                 return Err(anyhow!("Signing webhook payload missing timestamp"));
             }
-            if !signing_webhook.payload.get("api_version").is_some() {
-                return Err(anyhow!("Signing webhook payload missing api_version"));
+            if !signing_webhook.payload.get("payload").and_then(|p| p.get("api_version")).is_some()
+            {
+                return Err(anyhow!(
+                    "Signing webhook payload missing api_version in nested payload"
+                ));
             }
         }
 

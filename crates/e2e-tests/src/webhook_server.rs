@@ -194,7 +194,6 @@ async fn handle_webhook(
     payload: serde_json::Value,
     server: WebhookTestServer,
 ) -> Result<impl Reply, Rejection> {
-    // Extract headers
     let mut header_map = HashMap::new();
     for (key, value) in headers.iter() {
         if let Ok(value_str) = value.to_str() {
@@ -202,35 +201,49 @@ async fn handle_webhook(
         }
     }
 
-    // Get required headers
-    let event_type = header_map
-        .get("x-rrelayer-event")
-        .unwrap_or(&"unknown".to_string())
-        .trim_matches('"')
-        .to_string();
-
-    let signature = header_map.get("x-rrelayer-signature").map(|s| s.as_str()).unwrap_or("");
+    let event_type =
+        payload.get("event_type").and_then(|v| v.as_str()).unwrap_or("unknown").to_string();
 
     let delivery_id =
-        header_map.get("x-rrelayer-delivery").unwrap_or(&"unknown".to_string()).clone();
+        payload.get("delivery_id").and_then(|v| v.as_str()).unwrap_or("unknown").to_string();
 
-    // Verify signature
-    if !server.verify_signature(&payload, signature) {
-        info!("Webhook signature verification failed for delivery {}", delivery_id);
-        return Ok(reply::with_status("Invalid signature", StatusCode::UNAUTHORIZED));
+    let shared_secret =
+        header_map.get("x-rrelayer-shared-secret").map(|s| s.as_str()).unwrap_or("");
+
+    if shared_secret != server.shared_secret {
+        info!("Webhook shared secret verification failed for delivery {}", delivery_id);
+        return Ok(reply::with_status("Invalid shared secret", StatusCode::UNAUTHORIZED));
     }
 
-    // Extract transaction data
-    let transaction_id = payload["transaction"]["id"].as_str().unwrap_or("unknown").to_string();
+    let actual_payload = payload.get("payload").unwrap_or(&payload);
 
-    let relayer_id = payload["transaction"]["relayerId"].as_str().unwrap_or("unknown").to_string();
+    // Handle both transaction and signing webhooks
+    let (transaction_id, relayer_id) = if let Some(transaction) = actual_payload.get("transaction")
+    {
+        // Transaction webhook
+        let tx_id = transaction["id"].as_str().unwrap_or("unknown").to_string();
+        let rel_id = transaction["relayerId"].as_str().unwrap_or("unknown").to_string();
+        (tx_id, rel_id)
+    } else if let Some(signing) = actual_payload.get("signing") {
+        // Signing webhook
+        let tx_id = "signing-operation".to_string(); // No transaction ID for signing
+        let rel_id = signing["relayerId"].as_str().unwrap_or("unknown").to_string();
+        (tx_id, rel_id)
+    } else {
+        ("unknown".to_string(), "unknown".to_string())
+    };
 
-    // Record the webhook
+    let timestamp = payload
+        .get("timestamp")
+        .and_then(|v| v.as_u64())
+        .map(|secs| SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(secs))
+        .unwrap_or_else(SystemTime::now);
+
     let webhook = ReceivedWebhook {
         event_type,
         transaction_id,
         relayer_id,
-        timestamp: SystemTime::now(),
+        timestamp,
         payload,
         headers: header_map,
     };
