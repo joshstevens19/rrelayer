@@ -48,9 +48,8 @@ impl RelayerApi {
         self.client.get_with_query("relayers", Some(&query)).await
     }
 
-    // TODO: handle 404s here and also rework test_relayer_delete when doing it
     pub async fn get(&self, id: &RelayerId) -> ApiResult<Option<GetRelayerResult>> {
-        self.client.get(&format!("relayers/{}", id)).await
+        self.client.get_or_none(&format!("relayers/{}", id)).await
     }
 
     pub async fn create(&self, chain_id: u64, name: &str) -> ApiResult<CreateRelayerResult> {

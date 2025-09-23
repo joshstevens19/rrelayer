@@ -20,12 +20,11 @@ impl TransactionApi {
         Self { client }
     }
 
-    // TODO: handle 404s here
     pub async fn get_transaction(
         &self,
         transaction_id: &TransactionId,
     ) -> ApiResult<Option<Transaction>> {
-        self.client.get(&format!("transactions/{}", transaction_id)).await
+        self.client.get_or_none(&format!("transactions/{}", transaction_id)).await
     }
 
     pub async fn get_transactions(
@@ -72,12 +71,11 @@ impl TransactionApi {
         self.client.put(&format!("transactions/replace/{}", transaction_id), replacement).await
     }
 
-    // TODO: handle 404s here
     pub async fn get_transaction_status(
         &self,
         transaction_id: &TransactionId,
     ) -> ApiResult<Option<RelayTransactionStatusResult>> {
-        self.client.get(&format!("transactions/status/{}", transaction_id)).await
+        self.client.get_or_none(&format!("transactions/status/{}", transaction_id)).await
     }
 
     pub async fn get_transactions_inmempool_count(&self, relayer_id: &RelayerId) -> ApiResult<u32> {

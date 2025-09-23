@@ -58,6 +58,24 @@ impl HttpClient {
         Ok(response.json::<T>().await?)
     }
 
+    pub async fn get_or_none<T>(&self, endpoint: &str) -> ApiResult<Option<T>>
+    where
+        T: DeserializeOwned,
+    {
+        let url = self.build_url(endpoint);
+        let headers = self.build_headers(None);
+
+        let response = self.client.get(&url).headers(headers).send().await?;
+
+        if response.status() == 404 {
+            return Ok(None);
+        }
+
+        let response = response.error_for_status()?;
+        let data = response.json::<T>().await?;
+        Ok(Some(data))
+    }
+
     pub async fn get_with_query<T, Q>(&self, endpoint: &str, query: Option<Q>) -> ApiResult<T>
     where
         T: DeserializeOwned,

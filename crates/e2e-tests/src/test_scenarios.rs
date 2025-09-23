@@ -2774,15 +2774,14 @@ impl TestRunner {
 
         self.relayer_client.sdk.relayer.delete(&relayer.id).await?;
 
-        let created_relayer = self.relayer_client.sdk.relayer.get(&relayer.id).await;
+        let created_relayer = self.relayer_client.sdk.relayer.get(&relayer.id).await?;
 
-        match created_relayer {
-            Ok(_) => Err(anyhow::anyhow!("Relayer should have been deleted")),
-            Err(_) => {
-                info!("[SUCCESS] Relayer delete functionality working correctly");
-                Ok(())
-            }
+        if created_relayer.is_some() {
+            return Err(anyhow::anyhow!("Relayer has not have been deleted"));
         }
+
+        info!("[SUCCESS] Relayer delete functionality working correctly");
+        Ok(())
     }
 
     /// run single with:
