@@ -35,7 +35,6 @@ impl TestRunner {
         let anvil_url = format!("http://127.0.0.1:{}", config.anvil_port);
         let mut contract_interactor = ContractInteractor::new(&anvil_url).await?;
 
-        // Deploy the test contract using the first Anvil private key
         let deployer_private_key = &config.anvil_private_keys[0];
         let contract_address = contract_interactor
             .deploy_test_contract(deployer_private_key)
@@ -44,7 +43,6 @@ impl TestRunner {
 
         info!("Test contract deployed at: {:?}", contract_address);
 
-        // Deploy the ERC-20 test token
         let token_address = contract_interactor
             .deploy_test_token(deployer_private_key)
             .await
@@ -52,7 +50,6 @@ impl TestRunner {
 
         info!("[SUCCESS] Test ERC-20 token deployed at: {:?}", token_address);
 
-        // Deploy the Safe contracts
         let safe_address = contract_interactor
             .deploy_safe_contracts(deployer_private_key)
             .await
@@ -60,7 +57,6 @@ impl TestRunner {
 
         info!("[SUCCESS] Safe contracts deployed - Safe proxy at: {:?}", safe_address);
 
-        // Initialize webhook server with the shared secret from yaml
         let webhook_server = Some(WebhookTestServer::new("test-webhook-secret-123".to_string()));
 
         Ok(Self {
@@ -468,7 +464,6 @@ impl TestRunner {
         let skipped = suite.skipped_count();
         let total = suite.total_count();
 
-        // Summary line
         if failed == 0 && timeout == 0 {
             println!("[SUCCESS] Test Suites: 1 passed, 1 total");
             println!("[SUCCESS] Tests:       {} passed, {} total", passed, total);
