@@ -881,11 +881,29 @@ impl AutomaticTopUpTask {
         });
 
         match provider.rpc_client().call(&call_tx).await {
-            Ok(result) => match IERC20::balanceOfCall::abi_decode_returns(&result, false) {
-                Ok(balance) => Ok(balance._0),
-                Err(e) => Err(format!("Failed to decode balanceOf response: {}", e)),
+            Ok(result) => {
+                if result.is_empty() {
+                    return Ok(U256::ZERO);
+                }
+
+                match IERC20::balanceOfCall::abi_decode_returns(&result, false) {
+                    Ok(balance) => Ok(balance._0),
+                    Err(e) => {
+                        warn!(
+                            "Failed to decode balanceOf response for token {} and address {}: {}. \
+                            Raw response length: {} bytes. Returning zero balance.",
+                            token_address, wallet_address, e, result.len()
+                        );
+                        Ok(U256::ZERO)
+                    }
+                }
             },
-            Err(e) => Err(format!("Failed to call balanceOf on token contract: {}", e)),
+            Err(e) => {
+                Err(format!(
+                    "Failed to call balanceOf on token contract {} for address {}: {}",
+                    token_address, wallet_address, e
+                ))
+            }
         }
     }
 }
