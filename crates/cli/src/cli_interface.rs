@@ -25,16 +25,16 @@ pub enum Commands {
         #[clap(long, short)]
         path: Option<String>,
 
-        /// The unique identifier of the relayer
-        #[clap(required = true)]
-        relayer: RelayerId,
+        /// The unique identifier of the relayer to clone from
+        #[arg(long, short = 'r')]
+        relayer_id: RelayerId,
 
         /// The new relayer name
-        #[clap(required = true)]
+        #[arg(long, short = 'n')]
         name: String,
 
         /// Network to assign it to
-        #[arg(required = true)]
+        #[arg(long)]
         network: String,
     },
     /// Authenticate with rrelayer
@@ -95,8 +95,8 @@ pub enum Commands {
         path: Option<String>,
 
         /// The unique identifier of the relayer
-        #[clap(required = true)]
-        relayer: RelayerId,
+        #[arg(long, short = 'r')]
+        relayer_id: RelayerId,
 
         /// The token address if you want an erc20/721 balance
         #[arg(long)]
@@ -118,11 +118,11 @@ pub enum Commands {
         path: Option<String>,
 
         /// The relayer name
-        #[clap(required = true)]
+        #[arg(long, short = 'n')]
         name: String,
 
         /// Network to assign it to
-        #[arg(required = true)]
+        #[arg(long)]
         network: String,
     },
     /// Sign messages and transactions

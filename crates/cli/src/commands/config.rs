@@ -6,15 +6,16 @@ use crate::commands::error::ConfigError;
 
 #[derive(Subcommand)]
 pub enum GasCommand {
-    /// Add an address to allowlist
+    /// Set maximum gas price cap
+    #[command(name = "max-price")]
     MaxPrice {
         /// Maximum gas price in wei
-        #[clap(required = true)]
-        cap: u128,
+        #[arg(long, short = 'p')]
+        price: u128,
     },
-    /// Enable legacy transactions gas support which will be none 1559
+    /// Enable legacy transactions gas support (non-EIP-1559)
     Legacy,
-    /// Enable the latest gas standard for transactions which is 1559
+    /// Enable EIP-1559 gas standard for transactions
     Latest,
 }
 
@@ -23,24 +24,25 @@ pub enum ConfigCommand {
     /// Get detailed information about the relayer
     Get {
         /// The unique identifier of the relayer
-        #[clap(required = true)]
+        #[arg(long, short = 'r')]
         relayer_id: RelayerId,
     },
     /// Pause operations for a specific relayer
     Pause {
         /// The unique identifier of the relayer
-        #[clap(required = true)]
+        #[arg(long, short = 'r')]
         relayer_id: RelayerId,
     },
     /// Resume operations for a paused relayer
     Unpause {
         /// The unique identifier of the relayer
-        #[clap(required = true)]
+        #[arg(long, short = 'r')]
         relayer_id: RelayerId,
     },
+    /// Manage gas settings for a relayer
     Gas {
         /// The unique identifier of the relayer
-        #[clap(required = true)]
+        #[arg(long, short = 'r')]
         relayer_id: RelayerId,
 
         #[command(subcommand)]
@@ -54,8 +56,8 @@ pub async fn handle_config(command: &ConfigCommand, sdk: &SDK) -> Result<(), Con
         ConfigCommand::Pause { relayer_id } => handle_pause(relayer_id, sdk).await,
         ConfigCommand::Unpause { relayer_id } => handle_unpause(relayer_id, sdk).await,
         ConfigCommand::Gas { relayer_id, command } => match command {
-            GasCommand::MaxPrice { cap } => {
-                handle_update_max_gas_price(relayer_id, *cap, sdk).await
+            GasCommand::MaxPrice { price } => {
+                handle_update_max_gas_price(relayer_id, *price, sdk).await
             }
             GasCommand::Legacy => handle_update_eip1559_status(relayer_id, false, sdk).await,
             GasCommand::Latest => handle_update_eip1559_status(relayer_id, true, sdk).await,

@@ -10,56 +10,56 @@ pub enum SignCommand {
     /// Sign a text message
     Text {
         /// The unique identifier of the relayer
-        #[clap(required = true)]
+        #[arg(long, short = 'r')]
         relayer_id: RelayerId,
 
         /// The message to sign
-        #[clap(required = true)]
+        #[arg(long, short = 'm')]
         message: String,
     },
     /// Sign typed data
-    #[clap(name = "typed-data")]
+    #[command(name = "typed-data")]
     TypedData {
         /// The unique identifier of the relayer
-        #[clap(required = true)]
+        #[arg(long, short = 'r')]
         relayer_id: RelayerId,
 
         /// The typed data to sign as a JSON string it can also be a file location
-        #[clap(required = true)]
-        typed_data: String,
+        #[arg(long, short = 'd')]
+        data: String,
 
         /// Read typed data from a file instead of a string
-        #[clap(long)]
+        #[arg(long, short = 'f')]
         file: bool,
     },
     /// View signing text history for a relayer
-    #[clap(name = "text-history")]
+    #[command(name = "text-history")]
     TextHistory {
         /// The unique identifier of the relayer
-        #[clap(required = true)]
+        #[arg(long, short = 'r')]
         relayer_id: RelayerId,
 
         /// Number of results to return (default: 10)
-        #[clap(long, default_value = "10")]
+        #[arg(long, default_value = "10")]
         limit: u32,
 
         /// Number of results to skip (default: 0)
-        #[clap(long, default_value = "0")]
+        #[arg(long, default_value = "0")]
         offset: u32,
     },
     /// View signing typed data history for a relayer
-    #[clap(name = "typed-data-history")]
+    #[command(name = "typed-data-history")]
     TypedDataHistory {
         /// The unique identifier of the relayer
-        #[clap(required = true)]
+        #[arg(long, short = 'r')]
         relayer_id: RelayerId,
 
         /// Number of results to return (default: 10)
-        #[clap(long, default_value = "10")]
+        #[arg(long, default_value = "10")]
         limit: u32,
 
         /// Number of results to skip (default: 0)
-        #[clap(long, default_value = "0")]
+        #[arg(long, default_value = "0")]
         offset: u32,
     },
 }
@@ -129,8 +129,8 @@ pub async fn handle_sign(command: &SignCommand, sdk: &SDK) -> Result<(), Signing
         SignCommand::Text { relayer_id, message } => {
             handle_sign_text(relayer_id, message, sdk).await
         }
-        SignCommand::TypedData { relayer_id, typed_data, file } => {
-            handle_sign_typed_data(relayer_id, typed_data, *file, sdk).await
+        SignCommand::TypedData { relayer_id, data, file } => {
+            handle_sign_typed_data(relayer_id, data, *file, sdk).await
         }
         SignCommand::TextHistory { relayer_id, limit, offset } => {
             handle_text_history(relayer_id, *limit, *offset, sdk).await

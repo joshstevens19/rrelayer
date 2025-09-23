@@ -12,35 +12,35 @@ pub enum AllowlistCommand {
     /// Add an address to allowlist
     Add {
         /// The unique identifier of the relayer
-        #[clap(required = true)]
+        #[arg(long, short = 'r')]
         relayer_id: RelayerId,
 
         /// The address to allow this relayer to send transactions to
-        #[clap(required = true)]
+        #[arg(long, short = 'a')]
         address: EvmAddress,
     },
     /// List all allowlisted addresses
     List {
         /// The unique identifier of the relayer
-        #[clap(required = true)]
+        #[arg(long, short = 'r')]
         relayer_id: RelayerId,
 
         /// Number of results to return (default: 10)
-        #[clap(long, default_value = "10")]
+        #[arg(long, default_value = "10")]
         limit: u32,
 
         /// Number of results to skip (default: 0)
-        #[clap(long, default_value = "0")]
+        #[arg(long, default_value = "0")]
         offset: u32,
     },
     /// Delete an address from the allowlist
     Delete {
         /// The unique identifier of the relayer
-        #[clap(required = true)]
+        #[arg(long, short = 'r')]
         relayer_id: RelayerId,
 
         /// The address to remove from the allowlist
-        #[clap(required = true)]
+        #[arg(long, short = 'a')]
         address: EvmAddress,
     },
 }

@@ -17,18 +17,18 @@ pub enum NetworkCommands {
     /// Enable network
     Enable {
         /// The network name
-        #[clap(required = true)]
+        #[arg(long, short = 'n')]
         name: String,
     },
     /// Disable network
     Disable {
         /// The network name
-        #[clap(required = true)]
+        #[arg(long, short = 'n')]
         name: String,
     },
     Gas {
         /// The network name
-        #[clap(required = true)]
+        #[arg(long, short = 'n')]
         name: String,
     },
 }

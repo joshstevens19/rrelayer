@@ -103,7 +103,7 @@ async fn main() -> Result<(), CliError> {
 
             config::handle_config(command, &sdk).await?;
         }
-        Commands::Balance { path, relayer, token } => {
+        Commands::Balance { path, relayer_id, token } => {
             let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;
             load_env_from_project_path(&resolved_path);
 
@@ -112,7 +112,7 @@ async fn main() -> Result<(), CliError> {
 
             check_authenticate(&sdk).await?;
 
-            balance::handle_balance(relayer, token, &sdk).await?;
+            balance::handle_balance(relayer_id, token, &sdk).await?;
         }
         Commands::Allowlist { path, command } => {
             let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;
@@ -136,7 +136,7 @@ async fn main() -> Result<(), CliError> {
 
             create::handle_create(name, network, &project_location, &sdk).await?;
         }
-        Commands::Clone { path, relayer, name, network } => {
+        Commands::Clone { path, relayer_id, name, network } => {
             let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;
             load_env_from_project_path(&resolved_path);
 
@@ -145,7 +145,7 @@ async fn main() -> Result<(), CliError> {
 
             check_authenticate(&sdk).await?;
 
-            clone::handle_clone(relayer, name, network, &project_location, &sdk).await?;
+            clone::handle_clone(relayer_id, name, network, &project_location, &sdk).await?;
         }
         Commands::Sign { path, command } => {
             let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;
