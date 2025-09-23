@@ -326,7 +326,7 @@ impl AnvilManager {
                 tokio::time::sleep(Duration::from_millis(100)).await;
             }
         }
-        
+
         if num_blocks > 20 {
             let remaining = num_blocks - 20;
             let mine_request = serde_json::json!({

@@ -7,13 +7,10 @@ signing_key:
     secret_name: "Testing-Josh-Relayer"
     service_account_key_path: "./gcp-service-account.json"
     secret_key: "seed"
-#   aws_secret_manager:
-#     secret_key: "seed"
-#     access_key_id: ""
-#     secret_access_key: ""
-#     region: "us-east-1"  # or your preferred region
-#     secret_name: "testing-josh-relayer"
-#     session_token: ""
+  aws_secret_manager:
+   id: "testing-josh-relayer"
+   key: "seed"
+   region: "us-east-1"
 #  privy:
 #    app_id: "cmeim2cey01hal40bvtk2ji3z"
 #    app_secret: "2jwEdV9rURx2Fhy8qGHWYVoWFQTyHDjM3ZeEXhmRHZFsNvVX71DZPAvnWTeA6uFce93E8a7e16ybzYbXs9vB6SN4"

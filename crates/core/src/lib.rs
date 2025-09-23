@@ -13,9 +13,8 @@ pub mod relayer;
 pub mod safe_proxy;
 pub use safe_proxy::{SafeProxyError, SafeProxyManager, SafeTransaction};
 pub use yaml::{
-    read, ApiConfig, AwsKmsSigningKey, GasProviders, GlobalRateLimits, KmsKeyIds,
-    NetworkSetupConfig, RateLimitConfig, RateLimits, RawSigningKey, SafeProxyConfig, SetupConfig,
-    SigningKey,
+    read, ApiConfig, AwsKmsSigningKey, GasProviders, GlobalRateLimits, NetworkSetupConfig,
+    RateLimitConfig, RateLimits, RawSigningKey, SafeProxyConfig, SetupConfig, SigningKey,
 };
 mod shared;
 pub use shared::common_types;

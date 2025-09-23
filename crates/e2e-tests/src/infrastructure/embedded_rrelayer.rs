@@ -228,7 +228,7 @@ impl EmbeddedRRelayerServer {
             Err(_) => info!("[SUCCESS] Port {} is now free", port),
         }
     }
-    
+
     #[allow(dead_code)]
     fn stop_docker_compose(&self) -> Result<()> {
         info!("[STOP] Stopping Docker Compose services...");

@@ -1,12 +1,12 @@
 use crate::wallet::WalletError;
-use crate::yaml::GcpSigningKey;
+use crate::yaml::GcpSecretManager;
 use google_secretmanager1::{hyper, hyper_rustls, oauth2, SecretManager};
 use std::path::PathBuf;
 
 /// Retrieves a secret value from Google Cloud Secret Manager.
 pub async fn get_gcp_secret(
     project_path: &PathBuf,
-    config: &GcpSigningKey,
+    config: &GcpSecretManager,
 ) -> Result<String, WalletError> {
     let key_path = project_path.join(&config.service_account_key_path);
 
@@ -40,8 +40,7 @@ pub async fn get_gcp_secret(
     let client = SecretManager::new(hyper::Client::builder().build(https), auth);
 
     let version = config.version.as_deref().unwrap_or("latest");
-    let secret_path =
-        format!("projects/{}/secrets/{}/versions/{}", project_id, config.secret_name, version);
+    let secret_path = format!("projects/{}/secrets/{}/versions/{}", project_id, config.id, version);
 
     let result =
         client.projects().secrets_versions_access(&secret_path).doit().await.map_err(|e| {
@@ -56,7 +55,7 @@ pub async fn get_gcp_secret(
 
     let secret_string = String::from_utf8(secret_data)?;
 
-    let secret_key = config.secret_key.clone();
+    let secret_key = config.key.clone();
     let secret_json: serde_json::Value = serde_json::from_str(&secret_string)?;
 
     let key_value = secret_json.get(&secret_key).and_then(|v| v.as_str()).ok_or(

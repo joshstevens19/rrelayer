@@ -16,23 +16,30 @@ use crate::network::ChainId;
 use crate::{create_retry_client, rrelayer_error, shared::common_types::EvmAddress};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct GcpSigningKey {
-    pub secret_name: String,
+pub struct GcpSecretManager {
+    pub id: String,
+    pub key: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub version: Option<String>,
     pub service_account_key_path: String,
-    pub secret_key: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AwsSigningKey {
-    pub secret_name: String,
-    pub access_key_id: String,
-    pub secret_access_key: String,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub session_token: Option<String>,
+pub struct AwsSecretManager {
+    pub id: String,
+    pub key: String,
     pub region: String,
-    pub secret_key: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct KmsKeyConfig {
+    pub key_id: String,
+    pub region: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AwsKmsSigningKey {
+    pub key_configs: Vec<KmsKeyConfig>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -55,36 +62,15 @@ pub struct TurnkeySigningKey {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AwsKmsSigningKey {
-    /// AWS KMS key IDs mapped by wallet index
-    /// Can be a single key ID string or an array of key IDs
-    pub key_ids: KmsKeyIds,
-    pub region: String,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub access_key_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub secret_access_key: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub session_token: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(untagged)]
-pub enum KmsKeyIds {
-    Single(String),
-    Multiple(Vec<String>),
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SigningKey {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub raw: Option<RawSigningKey>,
 
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub aws_secret_manager: Option<AwsSigningKey>,
+    pub aws_secret_manager: Option<AwsSecretManager>,
 
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub gcp_secret_manager: Option<GcpSigningKey>,
+    pub gcp_secret_manager: Option<GcpSecretManager>,
 
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub privy: Option<PrivySigningKey>,
@@ -126,52 +112,33 @@ pub struct GlobalRateLimits {
     pub max_signing_operations_per_minute: Option<u64>,
 }
 
-impl KmsKeyIds {
+impl AwsKmsSigningKey {
     pub fn validate(&self) -> Result<(), String> {
-        match self {
-            KmsKeyIds::Single(key_id) => {
-                if key_id.is_empty() {
-                    return Err("Single KMS key ID cannot be empty".to_string());
-                }
+        if self.key_configs.is_empty() {
+            return Err("AWS KMS key configs cannot be empty".to_string());
+        }
+
+        for (index, config) in self.key_configs.iter().enumerate() {
+            if config.key_id.is_empty() {
+                return Err(format!("KMS key ID at index {} cannot be empty", index));
             }
-            KmsKeyIds::Multiple(key_ids) => {
-                if key_ids.is_empty() {
-                    return Err("Multiple KMS key IDs cannot be empty".to_string());
-                }
-                for (index, key_id) in key_ids.iter().enumerate() {
-                    if key_id.is_empty() {
-                        return Err(format!("KMS key ID at index {} cannot be empty", index));
-                    }
-                }
+            if config.region.is_empty() {
+                return Err(format!("KMS region at index {} cannot be empty", index));
             }
         }
         Ok(())
     }
 
-    pub fn get_key_for_index(&self, wallet_index: u32) -> Result<&str, String> {
-        match self {
-            KmsKeyIds::Single(key_id) => Ok(key_id),
-            KmsKeyIds::Multiple(key_ids) => {
-                let index = wallet_index as usize;
-                if index >= key_ids.len() {
-                    return Err(format!(
-                        "Wallet index {} is out of bounds for {} KMS keys",
-                        wallet_index,
-                        key_ids.len()
-                    ));
-                }
-                Ok(&key_ids[index])
-            }
+    pub fn get_key_config_for_index(&self, wallet_index: u32) -> Result<&KmsKeyConfig, String> {
+        let index = wallet_index as usize;
+        if index >= self.key_configs.len() {
+            return Err(format!(
+                "Wallet index {} is out of bounds for {} KMS key configs",
+                wallet_index,
+                self.key_configs.len()
+            ));
         }
-    }
-}
-
-impl AwsKmsSigningKey {
-    pub fn validate(&self) -> Result<(), String> {
-        if self.region.is_empty() {
-            return Err("AWS region cannot be empty".to_string());
-        }
-        self.key_ids.validate()
+        Ok(&self.key_configs[index])
     }
 }
 
@@ -228,24 +195,12 @@ impl SigningKey {
     }
 
     pub fn from_aws_kms_single(key_id: String, region: String) -> Self {
-        let aws_kms = AwsKmsSigningKey {
-            key_ids: KmsKeyIds::Single(key_id),
-            region,
-            access_key_id: None,
-            secret_access_key: None,
-            session_token: None,
-        };
+        let aws_kms = AwsKmsSigningKey { key_configs: vec![KmsKeyConfig { key_id, region }] };
         Self::from_aws_kms(aws_kms)
     }
 
-    pub fn from_aws_kms_multiple(key_ids: Vec<String>, region: String) -> Self {
-        let aws_kms = AwsKmsSigningKey {
-            key_ids: KmsKeyIds::Multiple(key_ids),
-            region,
-            access_key_id: None,
-            secret_access_key: None,
-            session_token: None,
-        };
+    pub fn from_aws_kms_multiple(key_configs: Vec<KmsKeyConfig>) -> Self {
+        let aws_kms = AwsKmsSigningKey { key_configs };
         Self::from_aws_kms(aws_kms)
     }
 }
@@ -582,7 +537,6 @@ pub struct SetupConfig {
     pub rate_limits: Option<RateLimitConfig>,
 }
 
-/// Substitutes environment variables in YAML content.
 fn substitute_env_variables(contents: &str) -> Result<String, regex::Error> {
     let re = Regex::new(r"\$\{([^}]+)\}")?;
     let result = re.replace_all(contents, |caps: &Captures| {

@@ -1,7 +1,7 @@
 use crate::common_types::EvmAddress;
 use crate::network::ChainId;
 use crate::wallet::{WalletError, WalletManagerTrait};
-use crate::yaml::AwsKmsSigningKey;
+use crate::yaml::{AwsKmsSigningKey, KmsKeyConfig};
 use alloy::consensus::TypedTransaction;
 use alloy::dyn_abi::TypedData;
 use alloy::network::TxSigner;
@@ -9,7 +9,7 @@ use alloy::primitives::PrimitiveSignature;
 use alloy::signers::{aws::AwsSigner, Signer};
 use async_trait::async_trait;
 use aws_config::{BehaviorVersion, Region};
-use aws_sdk_kms::{config::Credentials, Client};
+use aws_sdk_kms::Client;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -26,13 +26,19 @@ impl AwsKmsWalletManager {
         Self { config, signers: Arc::new(RwLock::new(HashMap::new())) }
     }
 
-    /// Gets the KMS key ID for the specified wallet index.
-    fn get_key_id_for_index(&self, wallet_index: u32) -> Result<String, WalletError> {
-        self.config
-            .key_ids
-            .get_key_for_index(wallet_index)
-            .map(|key| key.to_string())
-            .map_err(|e| WalletError::ConfigurationError { message: e })
+    /// Gets the KMS key config for the specified wallet index.
+    fn get_key_config_for_index(&self, wallet_index: u32) -> Result<&KmsKeyConfig, WalletError> {
+        let index = wallet_index as usize;
+        if index >= self.config.key_configs.len() {
+            return Err(WalletError::ConfigurationError {
+                message: format!(
+                    "Wallet index {} is out of bounds for {} KMS key configs",
+                    wallet_index,
+                    self.config.key_configs.len()
+                ),
+            });
+        }
+        Ok(&self.config.key_configs[index])
     }
 
     /// Gets or initializes an AWS KMS signer for the specified wallet index and chain ID.
@@ -51,8 +57,8 @@ impl AwsKmsWalletManager {
             }
         }
 
-        let key_id = self.get_key_id_for_index(wallet_index)?;
-        let signer = self.initialize_aws_kms_signer(&key_id, Some(chain_id_u64)).await?;
+        let key_config = self.get_key_config_for_index(wallet_index)?;
+        let signer = self.initialize_aws_kms_signer(key_config, Some(chain_id_u64)).await?;
 
         {
             let mut signers = self.signers.write().await;
@@ -62,34 +68,25 @@ impl AwsKmsWalletManager {
         Ok(signer)
     }
 
-    /// Initializes an AWS KMS signer instance from the configuration.
+    /// Initializes an AWS KMS signer instance from the key configuration.
     async fn initialize_aws_kms_signer(
         &self,
-        key_id: &str,
+        key_config: &KmsKeyConfig,
         chain_id: Option<u64>,
     ) -> Result<AwsSigner, WalletError> {
-        let mut aws_config_builder = aws_config::defaults(BehaviorVersion::latest())
-            .region(Region::new(self.config.region.clone()));
+        let aws_config = aws_config::defaults(BehaviorVersion::latest())
+            .region(Region::new(key_config.region.clone()))
+            .load()
+            .await;
 
-        if let (Some(access_key), Some(secret_key)) =
-            (&self.config.access_key_id, &self.config.secret_access_key)
-        {
-            let credentials = Credentials::new(
-                access_key.clone(),
-                secret_key.clone(),
-                self.config.session_token.clone(),
-                None,
-                "rrelayer-aws-kms",
-            );
-            aws_config_builder = aws_config_builder.credentials_provider(credentials);
-        }
+        let client = Client::new(&aws_config);
 
-        let shared_config = aws_config_builder.load().await;
-        let client = Client::new(&shared_config);
-
-        let signer = AwsSigner::new(client, key_id.to_string(), chain_id).await.map_err(|e| {
-            WalletError::ApiError { message: format!("Failed to initialize AWS KMS signer: {}", e) }
-        })?;
+        let signer =
+            AwsSigner::new(client, key_config.key_id.clone(), chain_id).await.map_err(|e| {
+                WalletError::ApiError {
+                    message: format!("Failed to initialize AWS KMS signer: {}", e),
+                }
+            })?;
 
         Ok(signer)
     }

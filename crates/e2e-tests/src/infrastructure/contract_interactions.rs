@@ -223,13 +223,11 @@ impl ContractInteractor {
         // Transfer tokens from deployer to the automatic top-up funding address
         // The deployer (anvil_accounts[0]) has all the tokens, but the funding address in YAML is different
         // Use the known funding address from the config (we know it's 0x655B2B8861D7E911D283A05A5CAD042C157106DA)
-        let funding_address: Address =
-            "0x655B2B8861D7E911D283A05A5CAD042C157106DA"
-                .parse()
-                .context("Failed to parse funding address")?;
+        let funding_address: Address = "0x655B2B8861D7E911D283A05A5CAD042C157106DA"
+            .parse()
+            .context("Failed to parse funding address")?;
 
-        let transfer_amount = U256::from(100_000u64)
-            * U256::from(10u64).pow(U256::from(18u64));
+        let transfer_amount = U256::from(100_000u64) * U256::from(10u64).pow(U256::from(18u64));
 
         info!(
             "Transferring {} tokens from deployer to funding address {:?}",
@@ -496,7 +494,7 @@ impl ContractInteractor {
             Ok(false)
         }
     }
-    
+
     pub async fn get_eth_balance(&self, address: &Address) -> Result<U256> {
         self.provider.get_balance(*address).await.context("Failed to get ETH balance")
     }
