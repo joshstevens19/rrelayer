@@ -15,7 +15,6 @@
   - Testing loading up infura gas 
   - Testing loading up tenderly gas
   - Testing handling custom gas with http call
-- Look over the gas logic again maybe add some max to protect over speeding huge amounts of ETH incase it gets its wrong
 - Change the TS sdk to work with the changes in the playground
 - AI write go and python SDK
 - Finish documentation
@@ -23,3 +22,7 @@
 - Create CI to run E2E tests
 - Create CI to build CLI binary (copy from rindexer)
 - Publish NPM packages for TS package + Go + Python + Rust
+
+## BUG
+
+- Look over the gas logic again maybe add some max to protect over speeding huge amounts of ETH incase it gets its wrong (also legacy and EIP-1559)
