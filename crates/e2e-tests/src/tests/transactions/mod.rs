@@ -15,6 +15,7 @@ mod send_eth;
 mod send_eth_safe_proxy;
 mod status;
 mod validation;
+mod send_eth_legacy;
 
 use crate::tests::registry::{TestDefinition, TestModule};
 
@@ -25,6 +26,9 @@ impl TestModule for TransactionTests {
         vec![
             TestDefinition::new("transaction_send_eth", "Send ETH transaction", |runner| {
                 Box::pin(runner.transaction_send_eth())
+            }),
+            TestDefinition::new("transaction_send_eth_legacy", "Send ETH transaction", |runner| {
+                Box::pin(runner.transaction_send_eth_legacy())
             }),
             TestDefinition::new(
                 "transaction_send_eth_safe_proxy",

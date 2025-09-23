@@ -46,6 +46,7 @@ hyper = "0.14"
 hyper-rustls = "0.24"
 hmac = "0.12"
 sha2 = "0.10"
+p256 = { version = "0.13", features = ["ecdsa"] }
 
 [profile.maxperf]
 inherits = "release"
