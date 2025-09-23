@@ -195,13 +195,41 @@ impl EmbeddedRRelayerServer {
     /// Stop the embedded server
     pub async fn stop(&mut self) -> Result<()> {
         if let Some(handle) = self.server_handle.take() {
+            info!("[STOP] Gracefully shutting down RRelayer server...");
+
+            // First, signal the server to shutdown gracefully
+            // The RRelayer server should handle shutdown signals properly
             handle.abort();
 
-            sleep(Duration::from_millis(100)).await;
+            // Wait for the server to stop responding to health checks
+            // This indicates it's shutting down gracefully
+            let mut retries = 30; // 30 seconds max wait
 
-            self.force_kill_server_on_port(3000).await;
+            while retries > 0 {
+                match reqwest::get("http://localhost:3000/health").await {
+                    Err(_) => {
+                        info!("[SUCCESS] RRelayer server has stopped responding - graceful shutdown complete");
+                        break;
+                    }
+                    Ok(_) => {
+                        info!(
+                            "[WAIT] Waiting for RRelayer to finish shutdown... ({} retries left)",
+                            retries
+                        );
+                        sleep(Duration::from_secs(1)).await;
+                        retries -= 1;
+                    }
+                }
+            }
 
-            // info!("[SUCCESS] Embedded RRelayer server stopped");
+            if retries == 0 {
+                warn!("[WARNING] RRelayer did not shutdown gracefully, force killing...");
+                self.force_kill_server_on_port(3000).await;
+            } else {
+                // Give it a bit more time to fully clean up
+                sleep(Duration::from_millis(500)).await;
+                info!("[SUCCESS] Embedded RRelayer server stopped gracefully");
+            }
         }
 
         // Optionally stop Docker Compose services
