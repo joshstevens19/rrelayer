@@ -91,7 +91,7 @@ async fn handle_add(project_path: &ProjectLocation) -> Result<(), NetworkError> 
             .allow_empty(true)
             .interact_text()?;
 
-        let provider = create_retry_client(&url).map_err(|e| {
+        let provider = create_retry_client(&url).await.map_err(|e| {
             NetworkError::InvalidConfig(format!(
                 "RPC provider is not valid as cannot get chain ID: {}",
                 e
@@ -299,6 +299,7 @@ pub async fn get_chain_id_for_network(
         .clone();
 
     let provider = create_retry_client(&provider_url)
+        .await
         .map_err(|e| format!("RPC provider is not valid as cannot get chain ID: {}", e))?;
     let chain_id = provider
         .get_chain_id()

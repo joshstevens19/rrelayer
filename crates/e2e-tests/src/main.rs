@@ -65,6 +65,13 @@ async fn is_rrelayer_ready() -> bool {
 }
 
 async fn run_single_provider(test_filter: Option<String>) -> Result<(u32, u32, TestSuite)> {
+    run_single_provider_with_cleanup(test_filter, false).await
+}
+
+async fn run_single_provider_with_cleanup(
+    test_filter: Option<String>,
+    cleanup_docker: bool,
+) -> Result<(u32, u32, TestSuite)> {
     let config = E2ETestConfig::default();
 
     info!("Starting Anvil blockchain...");
@@ -89,11 +96,15 @@ async fn run_single_provider(test_filter: Option<String>) -> Result<(u32, u32, T
 
     let mut anvil_manager = test_runner.into_anvil_manager();
 
-    rrelayer_server.stop().await?;
+    if cleanup_docker {
+        rrelayer_server.stop_with_docker_cleanup(true).await?;
+    } else {
+        rrelayer_server.stop().await?;
+    }
 
-    // Wait a bit for RRelayer to fully shutdown
-    info!("Waiting for RRelayer to fully shutdown...");
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    // Wait for RRelayer to fully shutdown and clear all in-memory state
+    info!("Waiting for RRelayer to fully shutdown and clear transaction queues...");
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
 
     info!("[STOP] Stopping Anvil blockchain...");
     anvil_manager.stop().await?;
@@ -120,7 +131,6 @@ async fn main() -> Result<()> {
     let specific_providers = env::var("RRELAYER_PROVIDERS").ok();
     let test_filter = env::var("RRELAYER_TEST_FILTER").ok();
 
-    // Ensure we have a default config file
     config_manager::ensure_default_config()?;
 
     if multi_provider_mode {
@@ -182,7 +192,7 @@ async fn run_multi_provider_tests(
             continue;
         }
 
-        match run_single_provider(test_filter.clone()).await {
+        match run_single_provider_with_cleanup(test_filter.clone(), true).await {
             Ok((passed, failed, test_suite)) => {
                 total_passed += passed;
                 total_failed += failed;
@@ -216,6 +226,12 @@ async fn run_multi_provider_tests(
 
                 save_provider_results(*provider, 0, 1, &vec![format!("Runtime error: {}", e)]);
             }
+        }
+
+        // Add a pause between providers to ensure complete isolation
+        if i < providers.len() - 1 {
+            info!("⏳ Waiting 10 seconds before testing next provider to ensure complete isolation...");
+            tokio::time::sleep(std::time::Duration::from_secs(10)).await;
         }
     }
 

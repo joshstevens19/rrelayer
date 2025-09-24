@@ -1,24 +1,72 @@
 use anyhow::Result;
 use rrelayer_core::{start, StartError};
-use std::{path::PathBuf, process::Command, thread, time::Duration};
+use std::{
+    path::PathBuf,
+    process::{Child, Command, Stdio},
+    thread,
+    time::Duration,
+};
 use tokio::time::sleep;
 use tracing::{error, info, warn};
 
 pub struct EmbeddedRRelayerServer {
     project_path: PathBuf,
     server_handle: Option<tokio::task::JoinHandle<()>>,
+    server_process: Option<Child>,
+    use_separate_process: bool,
 }
 
 impl EmbeddedRRelayerServer {
     pub fn new(project_path: PathBuf) -> Self {
-        Self { project_path, server_handle: None }
+        Self {
+            project_path,
+            server_handle: None,
+            server_process: None,
+            use_separate_process: true, // Default to separate process for better isolation
+        }
     }
 
     pub async fn start(&mut self) -> Result<()> {
-        info!("[START] Starting embedded RRelayer server...");
+        info!("[START] Starting RRelayer server...");
 
         self.start_docker_compose()?;
         self.reset_database().await?;
+
+        if self.use_separate_process {
+            self.start_as_separate_process().await?;
+        } else {
+            self.start_as_embedded().await?;
+        }
+
+        self.wait_for_ready().await?;
+
+        // Give the server a moment to fully initialize after health check
+        sleep(Duration::from_millis(500)).await;
+
+        info!("[SUCCESS] RRelayer server is ready!");
+        Ok(())
+    }
+
+    async fn start_as_separate_process(&mut self) -> Result<()> {
+        info!("[START] Starting RRelayer as separate process for complete isolation...");
+
+        // Start RRelayer as a separate process using cargo run
+        let mut child = Command::new("cargo")
+            .args(["run", "--bin", "rrelayer"])
+            .current_dir(&self.project_path)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .map_err(|e| anyhow::anyhow!("Failed to start RRelayer process: {}", e))?;
+
+        // Store the process handle for later termination
+        self.server_process = Some(child);
+
+        Ok(())
+    }
+
+    async fn start_as_embedded(&mut self) -> Result<()> {
+        info!("[START] Starting RRelayer as embedded server...");
 
         let project_path = self.project_path.clone();
 
@@ -30,12 +78,6 @@ impl EmbeddedRRelayerServer {
 
         self.server_handle = Some(handle);
 
-        self.wait_for_ready().await?;
-
-        // Give the server a moment to fully initialize after health check
-        sleep(Duration::from_millis(500)).await;
-
-        info!("[SUCCESS] Embedded RRelayer server is ready!");
         Ok(())
     }
 
@@ -194,49 +236,111 @@ impl EmbeddedRRelayerServer {
 
     /// Stop the embedded server
     pub async fn stop(&mut self) -> Result<()> {
-        if let Some(handle) = self.server_handle.take() {
-            info!("[STOP] Gracefully shutting down RRelayer server...");
+        self.stop_with_docker_cleanup(false).await
+    }
 
-            // First, signal the server to shutdown gracefully
-            // The RRelayer server should handle shutdown signals properly
-            handle.abort();
+    pub async fn stop_with_docker_cleanup(&mut self, cleanup_docker: bool) -> Result<()> {
+        info!("[STOP] Shutting down RRelayer server...");
 
-            // Wait for the server to stop responding to health checks
-            // This indicates it's shutting down gracefully
-            let mut retries = 30; // 30 seconds max wait
+        if self.use_separate_process {
+            self.stop_separate_process().await?;
+        } else {
+            self.stop_embedded_server().await?;
+        }
 
-            while retries > 0 {
-                match reqwest::get("http://localhost:3000/health").await {
-                    Err(_) => {
-                        info!("[SUCCESS] RRelayer server has stopped responding - graceful shutdown complete");
-                        break;
-                    }
-                    Ok(_) => {
-                        info!(
-                            "[WAIT] Waiting for RRelayer to finish shutdown... ({} retries left)",
-                            retries
-                        );
-                        sleep(Duration::from_secs(1)).await;
-                        retries -= 1;
-                    }
+        // Optionally stop Docker Compose services and perform additional cleanup
+        if cleanup_docker {
+            info!("[CLEANUP] Stopping Docker Compose services for multi-provider isolation...");
+            self.stop_docker_compose()?;
+
+            // Give Docker time to fully stop
+            sleep(Duration::from_secs(2)).await;
+        } else {
+            // Note: We don't stop Docker by default in E2E tests as other tests might be using it
+        }
+
+        Ok(())
+    }
+
+    async fn stop_separate_process(&mut self) -> Result<()> {
+        if let Some(mut process) = self.server_process.take() {
+            info!("[STOP] Terminating RRelayer process for complete isolation...");
+
+            // Try graceful termination first (SIGTERM)
+            if let Err(e) = process.kill() {
+                warn!("[WARNING] Failed to terminate RRelayer process gracefully: {}", e);
+            }
+
+            // Wait for process to exit
+            match process.wait() {
+                Ok(status) => {
+                    info!("[SUCCESS] RRelayer process exited with status: {}", status);
+                }
+                Err(e) => {
+                    warn!("[WARNING] Error waiting for RRelayer process: {}", e);
                 }
             }
 
-            if retries == 0 {
-                warn!("[WARNING] RRelayer did not shutdown gracefully, force killing...");
-                self.force_kill_server_on_port(3000).await;
-            } else {
-                // Give it a bit more time to fully clean up
-                sleep(Duration::from_millis(500)).await;
-                info!("[SUCCESS] Embedded RRelayer server stopped gracefully");
+            // Verify the server has stopped by checking health endpoint
+            self.wait_for_server_stop().await;
+
+            info!("[SUCCESS] RRelayer process shutdown complete");
+        }
+        Ok(())
+    }
+
+    async fn stop_embedded_server(&mut self) -> Result<()> {
+        if let Some(handle) = self.server_handle.take() {
+            info!("[STOP] Shutting down embedded RRelayer server...");
+
+            // Since RRelayer doesn't have a built-in graceful shutdown mechanism,
+            // we need to give the background transaction queue tasks time to finish
+            // their current operations before forcefully terminating them.
+
+            // First attempt: Wait a few seconds for any in-flight transactions to complete
+            info!("[WAIT] Allowing transaction queues to finish current operations...");
+            sleep(Duration::from_secs(3)).await;
+
+            // Signal the server to shutdown
+            handle.abort();
+
+            // Wait for the server to stop responding to health checks
+            self.wait_for_server_stop().await;
+
+            // Additional wait to ensure background tasks have time to clean up
+            // The transaction queue background tasks need time to finish their loops
+            info!("[WAIT] Allowing background transaction processing tasks to clean up...");
+            sleep(Duration::from_secs(5)).await;
+
+            info!("[SUCCESS] Embedded RRelayer server shutdown complete");
+        }
+        Ok(())
+    }
+
+    async fn wait_for_server_stop(&self) {
+        let mut retries = 30; // 30 seconds max wait
+
+        while retries > 0 {
+            match reqwest::get("http://localhost:3000/health").await {
+                Err(_) => {
+                    info!("[SUCCESS] RRelayer server has stopped responding");
+                    break;
+                }
+                Ok(_) => {
+                    info!(
+                        "[WAIT] Waiting for RRelayer server to stop... ({} retries left)",
+                        retries
+                    );
+                    sleep(Duration::from_secs(1)).await;
+                    retries -= 1;
+                }
             }
         }
 
-        // Optionally stop Docker Compose services
-        // Note: We don't stop Docker by default in E2E tests as other tests might be using it
-        // self.stop_docker_compose()?;
-
-        Ok(())
+        if retries == 0 {
+            warn!("[WARNING] RRelayer server did not stop gracefully, force killing...");
+            self.force_kill_server_on_port(3000).await;
+        }
     }
 
     async fn force_kill_server_on_port(&self, port: u16) {
@@ -257,7 +361,6 @@ impl EmbeddedRRelayerServer {
         }
     }
 
-    #[allow(dead_code)]
     fn stop_docker_compose(&self) -> Result<()> {
         info!("[STOP] Stopping Docker Compose services...");
 
@@ -287,6 +390,9 @@ impl Drop for EmbeddedRRelayerServer {
     fn drop(&mut self) {
         if let Some(handle) = &self.server_handle {
             handle.abort();
+        }
+        if let Some(mut process) = self.server_process.take() {
+            let _ = process.kill();
         }
     }
 }

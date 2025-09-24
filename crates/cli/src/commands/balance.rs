@@ -21,6 +21,7 @@ pub async fn handle_balance(
                     create_retry_client(relayer_result.provider_urls.get(0).ok_or_else(|| {
                         BalanceError::Provider("No provider URLs found for relayer".to_string())
                     })?)
+                    .await
                     .map_err(|e| BalanceError::CoreProvider(e.to_string()))?;
 
                 let relayer_address = relayer_result.relayer.address.into_address();
@@ -89,6 +90,7 @@ pub async fn handle_balance(
                     create_retry_client(relayer_result.provider_urls.get(0).ok_or_else(|| {
                         BalanceError::Provider("No provider URLs found for relayer".to_string())
                     })?)
+                    .await
                     .map_err(|e| BalanceError::CoreProvider(e.to_string()))?;
 
                 let balance = provider

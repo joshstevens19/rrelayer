@@ -137,6 +137,6 @@ pub async fn get_gas_estimator(
         }
     }
 
-    let provider = create_retry_client(&provider_urls[0])?;
+    let provider = create_retry_client(&provider_urls[0]).await?;
     Ok(Arc::new(FallbackGasFeeEstimator::new(provider.clone())))
 }

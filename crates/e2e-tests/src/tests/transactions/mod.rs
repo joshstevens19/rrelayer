@@ -27,9 +27,11 @@ impl TestModule for TransactionTests {
             TestDefinition::new("transaction_send_eth", "Send ETH transaction", |runner| {
                 Box::pin(runner.transaction_send_eth())
             }),
-            TestDefinition::new("transaction_send_eth_legacy", "Send ETH transaction legacy", |runner| {
-                Box::pin(runner.transaction_send_eth_legacy())
-            }),
+            TestDefinition::new(
+                "transaction_send_eth_legacy",
+                "Send ETH transaction legacy",
+                |runner| Box::pin(runner.transaction_send_eth_legacy()),
+            ),
             TestDefinition::new(
                 "transaction_send_eth_safe_proxy",
                 "Send ETH transaction via Safe proxy",

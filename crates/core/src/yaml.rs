@@ -252,6 +252,7 @@ impl NetworkSetupConfig {
         let provider_url = self.provider_urls[0].clone();
 
         let provider = create_retry_client(&provider_url)
+            .await
             .map_err(|e| format!("RPC provider is not valid as cannot get chain ID: {}", e))?;
         let chain_id = provider
             .get_chain_id()

@@ -17,7 +17,7 @@ serde_json = { workspace = true }
 serde_yaml = "0.9.30"
 async-trait = "0.1"
 reqwest = { version = "0.12", features = ["json"] }
-alloy = { workspace = true, features = ["full", "signer-mnemonic", "eips", "eip712", "signer-keystore", "signer-aws"] }
+alloy = { workspace = true, features = ["full", "signer-mnemonic", "eips", "eip712", "signer-keystore", "signer-aws", "json-rpc"] }
 alloy-rlp = { workspace = true }
 alloy-eips = { workspace = true }
 uuid = { version = "1.0", features = ["v4", "serde"] }
@@ -47,6 +47,7 @@ hyper-rustls = "0.24"
 hmac = "0.12"
 sha2 = "0.10"
 p256 = { version = "0.13", features = ["ecdsa"] }
+tower = "0.5.2"
 
 [profile.maxperf]
 inherits = "release"

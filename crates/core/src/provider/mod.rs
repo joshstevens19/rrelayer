@@ -5,6 +5,7 @@ use thiserror::Error;
 use crate::{gas::get_gas_estimator, network::ChainId, SetupConfig, SigningKey, WalletError};
 
 mod evm_provider;
+mod layer_extensions;
 
 use self::evm_provider::EvmProviderNewError;
 use crate::gas::GasEstimatorError;
