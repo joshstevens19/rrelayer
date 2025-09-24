@@ -6,7 +6,12 @@ use tracing::info;
 
 impl TestRunner {
     /// run single with:
-    /// make run-test-debug TEST=transaction_validation_not_enough_funds
+    /// RRELAYER_PROVIDERS="raw" make run-test-debug TEST=transaction_validation_not_enough_funds
+    /// RRELAYER_PROVIDERS="privy" make run-test-debug TEST=transaction_validation_not_enough_funds
+    /// RRELAYER_PROVIDERS="aws_secret_manager" make run-test-debug TEST=transaction_validation_not_enough_funds
+    /// RRELAYER_PROVIDERS="aws_kms" make run-test-debug TEST=transaction_validation_not_enough_funds
+    /// RRELAYER_PROVIDERS="gcp_secret_manager" make run-test-debug TEST=transaction_validation_not_enough_funds
+    /// RRELAYER_PROVIDERS="turnkey" make run-test-debug TEST=transaction_validation_not_enough_funds
     pub async fn transaction_validation_not_enough_funds(&self) -> anyhow::Result<()> {
         info!("Testing failed transaction handling not enough funds...");
 

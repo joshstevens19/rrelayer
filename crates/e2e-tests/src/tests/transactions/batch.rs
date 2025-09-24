@@ -4,7 +4,12 @@ use tracing::info;
 
 impl TestRunner {
     /// run single with:
-    /// make run-test-debug TEST=transaction_batch
+    /// RRELAYER_PROVIDERS="raw" make run-test-debug TEST=transaction_batch
+    /// RRELAYER_PROVIDERS="privy" make run-test-debug TEST=transaction_batch  
+    /// RRELAYER_PROVIDERS="aws_secret_manager" make run-test-debug TEST=transaction_batch
+    /// RRELAYER_PROVIDERS="aws_kms" make run-test-debug TEST=transaction_batch
+    /// RRELAYER_PROVIDERS="gcp_secret_manager" make run-test-debug TEST=transaction_batch
+    /// RRELAYER_PROVIDERS="turnkey" make run-test-debug TEST=transaction_batch
     pub async fn transaction_batch(&self) -> anyhow::Result<()> {
         info!("Testing batch transactions...");
 

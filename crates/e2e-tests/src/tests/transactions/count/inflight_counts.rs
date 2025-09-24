@@ -7,7 +7,12 @@ use tracing::info;
 
 impl TestRunner {
     /// run single with:
-    /// make run-test-debug TEST=transaction_inflight_counts
+    /// RRELAYER_PROVIDERS="raw" make run-test-debug TEST=transaction_inflight_counts
+    /// RRELAYER_PROVIDERS="privy" make run-test-debug TEST=transaction_inflight_counts
+    /// RRELAYER_PROVIDERS="aws_secret_manager" make run-test-debug TEST=transaction_inflight_counts
+    /// RRELAYER_PROVIDERS="aws_kms" make run-test-debug TEST=transaction_inflight_counts
+    /// RRELAYER_PROVIDERS="gcp_secret_manager" make run-test-debug TEST=transaction_inflight_counts
+    /// RRELAYER_PROVIDERS="turnkey" make run-test-debug TEST=transaction_inflight_counts
     pub async fn transaction_inflight_counts(&self) -> anyhow::Result<()> {
         info!("Testing transaction count operations...");
 

@@ -10,10 +10,10 @@ impl TestRunner {
     /// run single with:
     /// RRELAYER_PROVIDERS="raw" make run-test-debug TEST=transaction_send_eth_safe_proxy
     /// RRELAYER_PROVIDERS="privy" make run-test-debug TEST=transaction_send_eth_safe_proxy
-    /// RELAYER_PROVIDERS="aws_secret_manager" make run-test-debug TEST=transaction_send_eth_safe_proxy
-    /// RELAYER_PROVIDERS="aws_kms" make run-test-debug TEST=transaction_send_eth_safe_proxy
-    /// RELAYER_PROVIDERS="gcp_secret_manager" make run-test-debug TEST=transaction_send_eth_safe_proxy
-    /// RELAYER_PROVIDERS="turnkey" make run-test-debug TEST=transaction_send_eth_safe_proxy
+    /// RRELAYER_PROVIDERS="aws_secret_manager" make run-test-debug TEST=transaction_send_eth_safe_proxy
+    /// RRELAYER_PROVIDERS="aws_kms" make run-test-debug TEST=transaction_send_eth_safe_proxy
+    /// RRELAYER_PROVIDERS="gcp_secret_manager" make run-test-debug TEST=transaction_send_eth_safe_proxy
+    /// RRELAYER_PROVIDERS="turnkey" make run-test-debug TEST=transaction_send_eth_safe_proxy
     pub async fn transaction_send_eth_safe_proxy(&self) -> anyhow::Result<()> {
         info!("Testing simple eth transfer using Safe proxy...");
 

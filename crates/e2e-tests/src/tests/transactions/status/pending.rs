@@ -6,7 +6,12 @@ use tracing::info;
 
 impl TestRunner {
     /// run single with:
-    /// make run-test-debug TEST=transaction_status_pending
+    /// RRELAYER_PROVIDERS="raw" make run-test-debug TEST=transaction_status_pending
+    /// RRELAYER_PROVIDERS="privy" make run-test-debug TEST=transaction_status_pending  
+    /// RRELAYER_PROVIDERS="aws_secret_manager" make run-test-debug TEST=transaction_status_pending
+    /// RRELAYER_PROVIDERS="aws_kms" make run-test-debug TEST=transaction_status_pending
+    /// RRELAYER_PROVIDERS="gcp_secret_manager" make run-test-debug TEST=transaction_status_pending
+    /// RRELAYER_PROVIDERS="turnkey" make run-test-debug TEST=transaction_status_pending
     pub async fn transaction_status_pending(&self) -> anyhow::Result<()> {
         info!("Testing transaction pending state...");
 

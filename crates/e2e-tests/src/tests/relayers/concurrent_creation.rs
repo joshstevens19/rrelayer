@@ -5,7 +5,13 @@ use tracing::info;
 use crate::tests::test_runner::TestRunner;
 
 impl TestRunner {
-    /// make run-test-debug TEST=relayer_concurrent_creation
+    /// run single with:
+    /// RRELAYER_PROVIDERS="raw" make run-test-debug TEST=relayer_concurrent_creation
+    /// RRELAYER_PROVIDERS="privy" make run-test-debug TEST=relayer_concurrent_creation
+    /// RRELAYER_PROVIDERS="aws_secret_manager" make run-test-debug TEST=relayer_concurrent_creation
+    /// RRELAYER_PROVIDERS="aws_kms" make run-test-debug TEST=relayer_concurrent_creation
+    /// RRELAYER_PROVIDERS="gcp_secret_manager" make run-test-debug TEST=relayer_concurrent_creation
+    /// RRELAYER_PROVIDERS="turnkey" make run-test-debug TEST=relayer_concurrent_creation
     pub async fn relayer_concurrent_creation(&self) -> Result<()> {
         info!("Testing concurrent relayer creation to verify deadlock fix...");
 

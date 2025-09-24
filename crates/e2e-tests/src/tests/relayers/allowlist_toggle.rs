@@ -5,7 +5,13 @@ use tracing::info;
 use crate::tests::test_runner::TestRunner;
 
 impl TestRunner {
-    /// make run-test-debug TEST=relayer_allowlist_toggle
+    /// run single with:
+    /// RRELAYER_PROVIDERS="raw" make run-test-debug TEST=relayer_allowlist_toggle
+    /// RRELAYER_PROVIDERS="privy" make run-test-debug TEST=relayer_allowlist_toggle
+    /// RRELAYER_PROVIDERS="aws_secret_manager" make run-test-debug TEST=relayer_allowlist_toggle
+    /// RRELAYER_PROVIDERS="aws_kms" make run-test-debug TEST=relayer_allowlist_toggle
+    /// RRELAYER_PROVIDERS="gcp_secret_manager" make run-test-debug TEST=relayer_allowlist_toggle
+    /// RRELAYER_PROVIDERS="turnkey" make run-test-debug TEST=relayer_allowlist_toggle
     pub async fn relayer_allowlist_toggle(&self) -> Result<()> {
         info!("Testing relayer allowlist toggle...");
 

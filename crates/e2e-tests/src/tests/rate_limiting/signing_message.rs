@@ -7,7 +7,12 @@ use tracing::info;
 
 impl TestRunner {
     /// run single with:
-    /// make run-test-debug TEST=rate_limiting_signing_message
+    /// RRELAYER_PROVIDERS="raw" make run-test-debug TEST=rate_limiting_signing_message
+    /// RRELAYER_PROVIDERS="privy" make run-test-debug TEST=rate_limiting_signing_message
+    /// RRELAYER_PROVIDERS="aws_secret_manager" make run-test-debug TEST=rate_limiting_signing_message
+    /// RRELAYER_PROVIDERS="aws_kms" make run-test-debug TEST=rate_limiting_signing_message
+    /// RRELAYER_PROVIDERS="gcp_secret_manager" make run-test-debug TEST=rate_limiting_signing_message
+    /// RRELAYER_PROVIDERS="turnkey" make run-test-debug TEST=rate_limiting_signing_message
     pub async fn rate_limiting_signing_message(&self) -> anyhow::Result<()> {
         info!("Testing rate limiting signing message enforcement...");
 

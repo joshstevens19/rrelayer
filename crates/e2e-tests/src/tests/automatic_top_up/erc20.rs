@@ -5,7 +5,12 @@ use tracing::info;
 
 impl TestRunner {
     /// run single with:
-    /// make run-test-debug TEST=automatic_top_up_erc20
+    /// RRELAYER_PROVIDERS="raw" make run-test-debug TEST=automatic_top_up_erc20
+    /// RRELAYER_PROVIDERS="privy" make run-test-debug TEST=automatic_top_up_erc20  
+    /// RRELAYER_PROVIDERS="aws_secret_manager" make run-test-debug TEST=automatic_top_up_erc20
+    /// RRELAYER_PROVIDERS="aws_kms" make run-test-debug TEST=automatic_top_up_erc20
+    /// RRELAYER_PROVIDERS="gcp_secret_manager" make run-test-debug TEST=automatic_top_up_erc20
+    /// RRELAYER_PROVIDERS="turnkey" make run-test-debug TEST=automatic_top_up_erc20
     pub async fn automatic_top_up_erc20(&self) -> anyhow::Result<()> {
         info!("Testing automatic ERC-20 token top-up...");
 

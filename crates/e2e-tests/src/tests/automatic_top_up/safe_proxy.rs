@@ -5,7 +5,12 @@ impl TestRunner {
     // TODO: automatic_top_up_safe_proxy last part
 
     /// run single with:
-    /// make run-test-debug TEST=automatic_top_up_safe_proxy
+    /// RRELAYER_PROVIDERS="raw" make run-test-debug TEST=automatic_top_up_safe_proxy
+    /// RRELAYER_PROVIDERS="privy" make run-test-debug TEST=automatic_top_up_safe_proxy  
+    /// RRELAYER_PROVIDERS="aws_secret_manager" make run-test-debug TEST=automatic_top_up_safe_proxy
+    /// RRELAYER_PROVIDERS="aws_kms" make run-test-debug TEST=automatic_top_up_safe_proxy
+    /// RRELAYER_PROVIDERS="gcp_secret_manager" make run-test-debug TEST=automatic_top_up_safe_proxy
+    /// RRELAYER_PROVIDERS="turnkey" make run-test-debug TEST=automatic_top_up_safe_proxy
     pub async fn automatic_top_up_safe_proxy(&self) -> anyhow::Result<()> {
         info!("Testing automatic top-up using Safe proxy...");
 

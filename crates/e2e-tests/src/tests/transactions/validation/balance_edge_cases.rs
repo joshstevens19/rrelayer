@@ -4,7 +4,12 @@ use tracing::info;
 
 impl TestRunner {
     /// run single with:
-    /// make run-test-debug TEST=transaction_validation_balance_edge_cases
+    /// RRELAYER_PROVIDERS="raw" make run-test-debug TEST=transaction_validation_balance_edge_cases
+    /// RRELAYER_PROVIDERS="privy" make run-test-debug TEST=transaction_validation_balance_edge_cases
+    /// RRELAYER_PROVIDERS="aws_secret_manager" make run-test-debug TEST=transaction_validation_balance_edge_cases
+    /// RRELAYER_PROVIDERS="aws_kms" make run-test-debug TEST=transaction_validation_balance_edge_cases
+    /// RRELAYER_PROVIDERS="gcp_secret_manager" make run-test-debug TEST=transaction_validation_balance_edge_cases
+    /// RRELAYER_PROVIDERS="turnkey" make run-test-debug TEST=transaction_validation_balance_edge_cases
     pub async fn transaction_validation_balance_edge_cases(&self) -> anyhow::Result<()> {
         info!("Testing balance edge cases...");
 

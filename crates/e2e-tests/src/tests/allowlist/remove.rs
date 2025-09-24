@@ -5,7 +5,12 @@ use tracing::info;
 
 impl TestRunner {
     /// run single with:
-    /// make run-test-debug TEST=allowlist_remove
+    /// RRELAYER_PROVIDERS="raw" make run-test-debug TEST=allowlist_remove
+    /// RRELAYER_PROVIDERS="privy" make run-test-debug TEST=allowlist_remove  
+    /// RRELAYER_PROVIDERS="aws_secret_manager" make run-test-debug TEST=allowlist_remove
+    /// RRELAYER_PROVIDERS="aws_kms" make run-test-debug TEST=allowlist_remove
+    /// RRELAYER_PROVIDERS="gcp_secret_manager" make run-test-debug TEST=allowlist_remove
+    /// RRELAYER_PROVIDERS="turnkey" make run-test-debug TEST=allowlist_remove
     pub async fn allowlist_remove(&self) -> anyhow::Result<()> {
         info!("Testing allowlist remove operation...");
 

@@ -5,7 +5,13 @@ use tracing::info;
 use crate::tests::test_runner::TestRunner;
 
 impl TestRunner {
-    /// make run-test-debug TEST=relayer_pause_unpause
+    /// run single with:
+    /// RRELAYER_PROVIDERS="raw" make run-test-debug TEST=relayer_pause_unpause
+    /// RRELAYER_PROVIDERS="privy" make run-test-debug TEST=relayer_pause_unpause
+    /// RRELAYER_PROVIDERS="aws_secret_manager" make run-test-debug TEST=relayer_pause_unpause
+    /// RRELAYER_PROVIDERS="aws_kms" make run-test-debug TEST=relayer_pause_unpause
+    /// RRELAYER_PROVIDERS="gcp_secret_manager" make run-test-debug TEST=relayer_pause_unpause
+    /// RRELAYER_PROVIDERS="turnkey" make run-test-debug TEST=relayer_pause_unpause
     pub async fn relayer_pause_unpause(&self) -> Result<()> {
         info!("Testing relayer pause/unpause...");
 

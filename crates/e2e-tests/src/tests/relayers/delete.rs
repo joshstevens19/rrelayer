@@ -4,7 +4,13 @@ use tracing::info;
 use crate::tests::test_runner::TestRunner;
 
 impl TestRunner {
-    /// make run-test-debug TEST=relayer_delete
+    /// run single with:
+    /// RRELAYER_PROVIDERS="raw" make run-test-debug TEST=relayer_delete
+    /// RRELAYER_PROVIDERS="privy" make run-test-debug TEST=relayer_delete
+    /// RRELAYER_PROVIDERS="aws_secret_manager" make run-test-debug TEST=relayer_delete
+    /// RRELAYER_PROVIDERS="aws_kms" make run-test-debug TEST=relayer_delete
+    /// RRELAYER_PROVIDERS="gcp_secret_manager" make run-test-debug TEST=relayer_delete
+    /// RRELAYER_PROVIDERS="turnkey" make run-test-debug TEST=relayer_delete
     pub async fn relayer_delete(&self) -> Result<()> {
         info!("Testing relayer delete...");
 

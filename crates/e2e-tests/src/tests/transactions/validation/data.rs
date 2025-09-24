@@ -5,7 +5,12 @@ use tracing::info;
 
 impl TestRunner {
     /// run single with:
-    /// make run-test-debug TEST=transaction_data_validation
+    /// RRELAYER_PROVIDERS="raw" make run-test-debug TEST=transaction_data_validation
+    /// RRELAYER_PROVIDERS="privy" make run-test-debug TEST=transaction_data_validation
+    /// RRELAYER_PROVIDERS="aws_secret_manager" make run-test-debug TEST=transaction_data_validation
+    /// RRELAYER_PROVIDERS="aws_kms" make run-test-debug TEST=transaction_data_validation
+    /// RRELAYER_PROVIDERS="gcp_secret_manager" make run-test-debug TEST=transaction_data_validation
+    /// RRELAYER_PROVIDERS="turnkey" make run-test-debug TEST=transaction_data_validation
     pub async fn transaction_data_validation(&self) -> anyhow::Result<()> {
         info!("Testing transaction data validation...");
 

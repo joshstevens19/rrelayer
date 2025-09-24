@@ -6,11 +6,11 @@ use tracing::info;
 impl TestRunner {
     /// run single with:
     /// RRELAYER_PROVIDERS="raw" make run-test-debug TEST=signing_text
-    /// RRELAYER_PROVIDERS="privy" make run-test-debug TEST=signing_text
-    /// RELAYER_PROVIDERS="aws_secret_manager" make run-test-debug TEST=signing_text
-    /// RELAYER_PROVIDERS="aws_kms" make run-test-debug TEST=signing_text
-    /// RELAYER_PROVIDERS="gcp_secret_manager" make run-test-debug TEST=signing_text
-    /// RELAYER_PROVIDERS="turnkey" make run-test-debug TEST=signing_text
+    /// RRELAYER_PROVIDERS="privy" make run-test-debug TEST=signing_text  
+    /// RRELAYER_PROVIDERS="aws_secret_manager" make run-test-debug TEST=signing_text
+    /// RRELAYER_PROVIDERS="aws_kms" make run-test-debug TEST=signing_text
+    /// RRELAYER_PROVIDERS="gcp_secret_manager" make run-test-debug TEST=signing_text
+    /// RRELAYER_PROVIDERS="turnkey" make run-test-debug TEST=signing_text
     pub async fn signing_text(&self) -> anyhow::Result<()> {
         info!("Testing text signing...");
 

@@ -4,7 +4,12 @@ use tracing::info;
 
 impl TestRunner {
     /// run single with:
-    /// make run-test-debug TEST=gas_price
+    /// RRELAYER_PROVIDERS="raw" make run-test-debug TEST=gas_price
+    /// RRELAYER_PROVIDERS="privy" make run-test-debug TEST=gas_price
+    /// RRELAYER_PROVIDERS="aws_secret_manager" make run-test-debug TEST=gas_price
+    /// RRELAYER_PROVIDERS="aws_kms" make run-test-debug TEST=gas_price
+    /// RRELAYER_PROVIDERS="gcp_secret_manager" make run-test-debug TEST=gas_price
+    /// RRELAYER_PROVIDERS="turnkey" make run-test-debug TEST=gas_price
     pub async fn gas_price(&self) -> anyhow::Result<()> {
         info!("Testing gas price API...");
 

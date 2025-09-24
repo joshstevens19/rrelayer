@@ -4,7 +4,12 @@ use tracing::info;
 
 impl TestRunner {
     /// run single with:
-    /// make run-test-debug TEST=transaction_gas_estimation
+    /// RRELAYER_PROVIDERS="raw" make run-test-debug TEST=transaction_gas_estimation
+    /// RRELAYER_PROVIDERS="privy" make run-test-debug TEST=transaction_gas_estimation  
+    /// RRELAYER_PROVIDERS="aws_secret_manager" make run-test-debug TEST=transaction_gas_estimation
+    /// RRELAYER_PROVIDERS="aws_kms" make run-test-debug TEST=transaction_gas_estimation
+    /// RRELAYER_PROVIDERS="gcp_secret_manager" make run-test-debug TEST=transaction_gas_estimation
+    /// RRELAYER_PROVIDERS="turnkey" make run-test-debug TEST=transaction_gas_estimation
     pub async fn transaction_gas_estimation(&self) -> anyhow::Result<()> {
         info!("Testing gas estimation and cost validation...");
         let relayer = self.create_and_fund_relayer("gas-test-relayer").await?;

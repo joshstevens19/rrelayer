@@ -8,7 +8,12 @@ use tracing::info;
 
 impl TestRunner {
     /// run single with:
-    /// make run-test-debug TEST=transaction_gas_price_bumping
+    /// RRELAYER_PROVIDERS="raw" make run-test-debug TEST=transaction_gas_price_bumping
+    /// RRELAYER_PROVIDERS="privy" make run-test-debug TEST=transaction_gas_price_bumping  
+    /// RRELAYER_PROVIDERS="aws_secret_manager" make run-test-debug TEST=transaction_gas_price_bumping
+    /// RRELAYER_PROVIDERS="aws_kms" make run-test-debug TEST=transaction_gas_price_bumping
+    /// RRELAYER_PROVIDERS="gcp_secret_manager" make run-test-debug TEST=transaction_gas_price_bumping
+    /// RRELAYER_PROVIDERS="turnkey" make run-test-debug TEST=transaction_gas_price_bumping
     pub async fn transaction_gas_price_bumping(&self) -> anyhow::Result<()> {
         info!("Testing gas price bumping...");
 
