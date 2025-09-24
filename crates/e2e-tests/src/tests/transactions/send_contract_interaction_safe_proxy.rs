@@ -5,11 +5,18 @@ use anyhow::{anyhow, Context};
 use rrelayer_core::common_types::EvmAddress;
 use rrelayer_core::transaction::types::{TransactionData, TransactionValue};
 use std::str::FromStr;
+use std::thread;
+use std::time::Duration;
 use tracing::info;
 
 impl TestRunner {
     /// run single with:
-    /// make run-test-debug TEST=transaction_send_contract_interaction_safe_proxy
+    /// RRELAYER_PROVIDERS="raw" make run-test-debug TEST=transaction_send_contract_interaction_safe_proxy
+    /// RRELAYER_PROVIDERS="privy" make run-test-debug TEST=transaction_send_contract_interaction_safe_proxy
+    /// RELAYER_PROVIDERS="aws_secret_manager" make run-test-debug TEST=transaction_send_contract_interaction_safe_proxy
+    /// RELAYER_PROVIDERS="aws_kms" make run-test-debug TEST=transaction_send_contract_interaction_safe_proxy
+    /// RELAYER_PROVIDERS="gcp_secret_manager" make run-test-debug TEST=transaction_send_contract_interaction_safe_proxy
+    /// RELAYER_PROVIDERS="turnkey" make run-test-debug TEST=transaction_send_contract_interaction_safe_proxy
     pub async fn transaction_send_contract_interaction_safe_proxy(&self) -> anyhow::Result<()> {
         info!("Testing contract interaction via Safe proxy...");
 
@@ -37,8 +44,7 @@ impl TestRunner {
             alloy::primitives::utils::format_ether(relayer_balance)
         );
 
-        // Get Safe proxy address for validation
-        let safe_proxy_address = Address::from_str("0xcfe267de230a234c5937f18f239617b7038ec271")?;
+        let safe_proxy_address = self.contract_interactor.get_expected_safe_address_for_provider()?;
         let safe_balance_before =
             self.contract_interactor.get_eth_balance(&safe_proxy_address).await?;
         info!(
@@ -61,8 +67,7 @@ impl TestRunner {
 
         self.relayer_client.sent_transaction_compare(tx_response.1, result.0)?;
 
-        let expected_safe_address =
-            EvmAddress::from_str("0xcfe267de230a234c5937f18f239617b7038ec271")?;
+        let expected_safe_address = EvmAddress::new(safe_proxy_address);
 
         if EvmAddress::new(result.1.to.unwrap()) != expected_safe_address {
             return Err(anyhow!(

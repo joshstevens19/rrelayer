@@ -38,22 +38,19 @@ impl TestRunner {
         let deployer_private_key = &config.anvil_private_keys[0];
         let contract_address = contract_interactor
             .deploy_test_contract(deployer_private_key)
-            .await
-            .context("Failed to deploy test contract")?;
+            .await?;
 
         info!("Test contract deployed at: {:?}", contract_address);
 
         let token_address = contract_interactor
             .deploy_test_token(deployer_private_key)
-            .await
-            .context("Failed to deploy test token")?;
+            .await?;
 
         info!("[SUCCESS] Test ERC-20 token deployed at: {:?}", token_address);
 
         let safe_address = contract_interactor
             .deploy_safe_contracts(deployer_private_key)
-            .await
-            .context("Failed to deploy Safe contracts")?;
+            .await?;
 
         info!("[SUCCESS] Safe contracts deployed - Safe proxy at: {:?}", safe_address);
 

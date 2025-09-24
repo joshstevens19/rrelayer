@@ -185,22 +185,6 @@ impl ContractInteractor {
             .context("Failed to execute forge task")?
             .context("Failed to run forge script")?;
 
-        let auto_mine_disable = serde_json::json!({
-            "jsonrpc": "2.0",
-            "method": "anvil_setAutomine",
-            "params": [false],
-            "id": 2
-        });
-
-        let _ = client
-            .post(&rpc_url)
-            .header("Content-Type", "application/json")
-            .json(&auto_mine_disable)
-            .send()
-            .await;
-
-        info!("Disabled auto-mining after forge deployment");
-
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(anyhow::anyhow!("Forge deployment failed: {}", stderr));
@@ -220,28 +204,47 @@ impl ContractInteractor {
 
         info!("[SUCCESS] Test ERC-20 token verified - Total supply: {}", total_supply._0);
 
-        // Transfer tokens from deployer to the automatic top-up funding address
-        // The deployer (anvil_accounts[0]) has all the tokens, but the funding address in YAML is different
-        // Use the known funding address from the config (we know it's 0x655B2B8861D7E911D283A05A5CAD042C157106DA)
-        let funding_address: Address = "0x655B2B8861D7E911D283A05A5CAD042C157106DA"
-            .parse()
-            .context("Failed to parse funding address")?;
+        let fund_addresses = vec!["0x655B2B8861D7E911D283A05A5CAD042C157106DA", "0xa93e13Db16BF70b3D6B828bC0185A9F3AdD44BA9"];
 
-        let transfer_amount = U256::from(100_000u64) * U256::from(10u64).pow(U256::from(18u64));
+        for item in fund_addresses {
+            // Transfer tokens from deployer to the automatic top-up funding address
+            // The deployer (anvil_accounts[0]) has all the tokens, but the funding address in YAML is different
+            // Use the known funding address from the config
+            let funding_address: Address = item
+                .parse()
+                .context("Failed to parse funding address")?;
 
-        info!(
-            "Transferring {} tokens from deployer to funding address {:?}",
-            alloy::primitives::utils::format_units(transfer_amount, 18)
-                .unwrap_or("N/A".to_string()),
-            funding_address
-        );
+            let transfer_amount = U256::from(100_000u64) * U256::from(10u64).pow(U256::from(18u64));
 
-        self.transfer_tokens(&funding_address, transfer_amount, deployer_private_key)
-            .await
-            .context("Failed to transfer tokens to funding address")?;
+            info!(
+                "Transferring {} tokens from deployer to funding address {:?}",
+                alloy::primitives::utils::format_units(transfer_amount, 18)
+                    .unwrap_or("N/A".to_string()),
+                funding_address
+            );
 
-        // Wait to ensure deployment is fully settled before returning
+            self.transfer_tokens(&funding_address, transfer_amount, deployer_private_key)
+                .await
+                .context("Failed to transfer tokens to funding address")?;
+        }
+
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+        let auto_mine_disable = serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "anvil_setAutomine",
+            "params": [false],
+            "id": 2
+        });
+
+        let _ = client
+            .post(&rpc_url)
+            .header("Content-Type", "application/json")
+            .json(&auto_mine_disable)
+            .send()
+            .await;
+
+        info!("Disabled auto-mining after forge deployment");
 
         Ok(token_address)
     }
@@ -330,10 +333,9 @@ impl ContractInteractor {
 
         info!("Safe contracts deployed - Safe proxy address: {:?}", safe_address);
 
-        let expected_address: Address = "0xcfe267de230a234c5937f18f239617b7038ec271"
-            .parse()
-            .context("Failed to parse expected Safe address")?;
-
+        // Validate the Safe deployed to the expected address based on the provider
+        let expected_address = self.get_expected_safe_address_for_provider()?;
+        
         if safe_address != expected_address {
             return Err(anyhow::anyhow!(
                 "Safe deployment address mismatch! Expected: {:?}, Got: {:?}",
@@ -363,6 +365,32 @@ impl ContractInteractor {
             }
         }
         Err(anyhow::anyhow!("Could not find deployed Safe address in forge output"))
+    }
+
+    pub fn get_expected_safe_address_for_provider(&self) -> Result<Address> {
+        // Check the SAFE_OWNER_ADDRESS environment variable to determine which provider is being used
+        let safe_owner_address = std::env::var("SAFE_OWNER_ADDRESS")
+            .unwrap_or_else(|_| "0x1C073e63f70701BC545019D3c4f2a25A69eCA8Cf".to_string());
+        
+        // Map owner addresses to their expected Safe deployment addresses
+        let expected_address = match safe_owner_address.to_lowercase().as_str() {
+            "0x1c073e63f70701bc545019d3c4f2a25a69eca8cf" => {
+                // Raw provider
+                "0xcfe267de230a234c5937f18f239617b7038ec271"
+            },
+            "0xde3d9699427d15d0a1419736141997e352f10f61" => {
+                // Privy provider
+                "0xd9fa512bc7ec216f0c01f4de4232629f3ec3bac7"
+            },
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "Unknown Safe owner address: {}. Cannot determine expected Safe address.",
+                    safe_owner_address
+                ));
+            }
+        };
+        
+        expected_address.parse().context("Failed to parse expected Safe address")
     }
 
     async fn update_yaml_config_with_safe_address(&self, safe_address: Address) -> Result<()> {

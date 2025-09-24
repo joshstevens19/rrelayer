@@ -22,7 +22,7 @@ impl EmbeddedRRelayerServer {
             project_path,
             server_handle: None,
             server_process: None,
-            use_separate_process: true, // Default to separate process for better isolation
+            use_separate_process: false, // Default to embedded mode for debugging
         }
     }
 
@@ -30,6 +30,7 @@ impl EmbeddedRRelayerServer {
         info!("[START] Starting RRelayer server...");
 
         self.start_docker_compose()?;
+        self.wait_for_postgres().await?;
         self.reset_database().await?;
 
         if self.use_separate_process {
@@ -234,6 +235,48 @@ impl EmbeddedRRelayerServer {
         ))
     }
 
+    async fn wait_for_postgres(&self) -> Result<()> {
+        info!("Waiting for PostgreSQL to be ready...");
+        
+        let connection_string = "postgres://postgres:rrelayer@localhost:5447/postgres";
+        let mut retries = 30; // 30 attempts with 1 second each = 30 seconds max
+
+        while retries > 0 {
+            match tokio_postgres::connect(connection_string, tokio_postgres::NoTls).await {
+                Ok((client, connection)) => {
+                    // Spawn the connection task
+                    let connection_task = tokio::spawn(async move {
+                        if let Err(e) = connection.await {
+                            error!("PostgreSQL connection error: {}", e);
+                        }
+                    });
+
+                    // Try to execute a simple query
+                    match client.execute("SELECT 1", &[]).await {
+                        Ok(_) => {
+                            info!("[SUCCESS] PostgreSQL is ready!");
+                            // Clean up the connection
+                            connection_task.abort();
+                            return Ok(());
+                        }
+                        Err(e) => {
+                            warn!("PostgreSQL query failed: {}, retrying...", e);
+                            connection_task.abort();
+                        }
+                    }
+                }
+                Err(e) => {
+                    info!("Attempt {}/30 - PostgreSQL not ready yet... ({})", 31 - retries, e);
+                }
+            }
+
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            retries -= 1;
+        }
+
+        Err(anyhow::anyhow!("PostgreSQL did not become ready after 30 seconds"))
+    }
+
     /// Stop the embedded server
     pub async fn stop(&mut self) -> Result<()> {
         self.stop_with_docker_cleanup(false).await
@@ -293,24 +336,15 @@ impl EmbeddedRRelayerServer {
         if let Some(handle) = self.server_handle.take() {
             info!("[STOP] Shutting down embedded RRelayer server...");
 
-            // Since RRelayer doesn't have a built-in graceful shutdown mechanism,
-            // we need to give the background transaction queue tasks time to finish
-            // their current operations before forcefully terminating them.
-
-            // First attempt: Wait a few seconds for any in-flight transactions to complete
-            info!("[WAIT] Allowing transaction queues to finish current operations...");
-            sleep(Duration::from_secs(3)).await;
-
-            // Signal the server to shutdown
+            // Immediately abort the server handle to stop all tasks
             handle.abort();
 
             // Wait for the server to stop responding to health checks
             self.wait_for_server_stop().await;
 
-            // Additional wait to ensure background tasks have time to clean up
-            // The transaction queue background tasks need time to finish their loops
-            info!("[WAIT] Allowing background transaction processing tasks to clean up...");
-            sleep(Duration::from_secs(5)).await;
+            // Force kill any remaining processes on port 3000 to ensure complete cleanup
+            info!("[CLEANUP] Force killing any remaining processes on port 3000...");
+            self.force_kill_server_on_port(3000).await;
 
             info!("[SUCCESS] Embedded RRelayer server shutdown complete");
         }
@@ -318,13 +352,13 @@ impl EmbeddedRRelayerServer {
     }
 
     async fn wait_for_server_stop(&self) {
-        let mut retries = 30; // 30 seconds max wait
+        let mut retries = 5; // Only wait 5 seconds for E2E tests
 
         while retries > 0 {
             match reqwest::get("http://localhost:3000/health").await {
                 Err(_) => {
                     info!("[SUCCESS] RRelayer server has stopped responding");
-                    break;
+                    return;
                 }
                 Ok(_) => {
                     info!(
@@ -337,10 +371,7 @@ impl EmbeddedRRelayerServer {
             }
         }
 
-        if retries == 0 {
-            warn!("[WARNING] RRelayer server did not stop gracefully, force killing...");
-            self.force_kill_server_on_port(3000).await;
-        }
+        warn!("[WARNING] RRelayer server did not stop gracefully after 5 seconds");
     }
 
     async fn force_kill_server_on_port(&self, port: u16) {

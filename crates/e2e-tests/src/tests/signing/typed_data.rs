@@ -6,7 +6,12 @@ use tracing::info;
 
 impl TestRunner {
     /// run single with:
-    /// make run-test-debug TEST=signing_typed_data
+    /// RRELAYER_PROVIDERS="raw" make run-test-debug TEST=signing_typed_data
+    /// RRELAYER_PROVIDERS="privy" make run-test-debug TEST=signing_typed_data
+    /// RELAYER_PROVIDERS="aws_secret_manager" make run-test-debug TEST=signing_typed_data
+    /// RELAYER_PROVIDERS="aws_kms" make run-test-debug TEST=signing_typed_data
+    /// RELAYER_PROVIDERS="gcp_secret_manager" make run-test-debug TEST=signing_typed_data
+    /// RELAYER_PROVIDERS="turnkey" make run-test-debug TEST=signing_typed_data
     pub async fn signing_typed_data(&self) -> anyhow::Result<()> {
         info!("Testing typed data signing...");
 

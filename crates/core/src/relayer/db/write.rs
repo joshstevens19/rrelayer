@@ -40,6 +40,7 @@ impl From<CreateRelayerError> for HttpError {
 }
 
 impl PostgresClient {
+    /// TODO: got to handle edge case of address not being populated yet and then querying it...
     pub async fn create_relayer(
         &self,
         name: &str,

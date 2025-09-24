@@ -198,6 +198,23 @@ impl PostgresClient {
         Ok(row)
     }
 
+    /// Executes multiple operations within a single transaction.
+    /// The function receives a transaction object that can be used for multiple queries/executions.
+    pub async fn run_in_transaction<F, Fut, T>(&self, f: F) -> Result<T, PostgresError>
+    where
+        F: FnOnce(&tokio_postgres::Transaction<'_>) -> Fut + Send,
+        Fut: Future<Output = Result<T, PostgresError>> + Send,
+    {
+        let mut conn = self.pool.get().await.map_err(PostgresError::ConnectionPoolError)?;
+        let transaction = conn.transaction().await.map_err(PostgresError::PgError)?;
+
+        let result = f(&transaction).await?;
+
+        transaction.commit().await.map_err(PostgresError::PgError)?;
+
+        Ok(result)
+    }
+
     /// Executes a query that may return zero or one row.
     pub async fn query_one_or_none<T>(
         &self,

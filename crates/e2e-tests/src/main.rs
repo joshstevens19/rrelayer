@@ -96,15 +96,28 @@ async fn run_single_provider_with_cleanup(
 
     let mut anvil_manager = test_runner.into_anvil_manager();
 
-    if cleanup_docker {
-        rrelayer_server.stop_with_docker_cleanup(true).await?;
-    } else {
-        rrelayer_server.stop().await?;
-    }
+    // Add timeout to shutdown process to prevent hanging
+    let shutdown_future = async {
+        if cleanup_docker {
+            rrelayer_server.stop_with_docker_cleanup(true).await
+        } else {
+            rrelayer_server.stop().await
+        }
+    };
 
-    // Wait for RRelayer to fully shutdown and clear all in-memory state
-    info!("Waiting for RRelayer to fully shutdown and clear transaction queues...");
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    match tokio::time::timeout(std::time::Duration::from_secs(15), shutdown_future).await {
+        Ok(result) => {
+            result?;
+            info!("[SUCCESS] RRelayer shutdown completed within timeout");
+        }
+        Err(_) => {
+            error!("[ERROR] RRelayer shutdown timed out after 15 seconds, forcing exit");
+            // Force kill any remaining processes as a last resort
+            let _ = std::process::Command::new("pkill")
+                .args(["-f", "rrelayer"])
+                .output();
+        }
+    }
 
     info!("[STOP] Stopping Anvil blockchain...");
     anvil_manager.stop().await?;
@@ -127,9 +140,11 @@ async fn main() -> Result<()> {
 
     dotenv().ok();
 
-    let multi_provider_mode = env::var("RRELAYER_MULTI_PROVIDER").is_ok();
+    let explicit_multi_provider_mode = env::var("RRELAYER_MULTI_PROVIDER").is_ok();
     let specific_providers = env::var("RRELAYER_PROVIDERS").ok();
     let test_filter = env::var("RRELAYER_TEST_FILTER").ok();
+
+    let multi_provider_mode = explicit_multi_provider_mode || specific_providers.is_some();
 
     config_manager::ensure_default_config()?;
 

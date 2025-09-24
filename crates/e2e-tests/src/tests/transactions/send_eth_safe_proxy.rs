@@ -8,7 +8,12 @@ use tracing::info;
 
 impl TestRunner {
     /// run single with:
-    /// make run-test-debug TEST=transaction_send_eth_safe_proxy
+    /// RRELAYER_PROVIDERS="raw" make run-test-debug TEST=transaction_send_eth_safe_proxy
+    /// RRELAYER_PROVIDERS="privy" make run-test-debug TEST=transaction_send_eth_safe_proxy
+    /// RELAYER_PROVIDERS="aws_secret_manager" make run-test-debug TEST=transaction_send_eth_safe_proxy
+    /// RELAYER_PROVIDERS="aws_kms" make run-test-debug TEST=transaction_send_eth_safe_proxy
+    /// RELAYER_PROVIDERS="gcp_secret_manager" make run-test-debug TEST=transaction_send_eth_safe_proxy
+    /// RELAYER_PROVIDERS="turnkey" make run-test-debug TEST=transaction_send_eth_safe_proxy
     pub async fn transaction_send_eth_safe_proxy(&self) -> anyhow::Result<()> {
         info!("Testing simple eth transfer using Safe proxy...");
 
@@ -16,7 +21,7 @@ impl TestRunner {
         info!("Created relayer at index 80: {:?}", relayer);
 
         let safe_proxy_address =
-            EvmAddress::from_str("0xcfe267de230a234c5937f18f239617b7038ec271")?;
+            EvmAddress::new(self.contract_interactor.get_expected_safe_address_for_provider()?);
         info!("Funding Safe proxy contract at {} with 5 ETH", safe_proxy_address);
         self.fund_relayer(&safe_proxy_address, alloy::primitives::utils::parse_ether("5")?).await?;
         info!("Safe proxy contract funded successfully");
@@ -43,8 +48,7 @@ impl TestRunner {
 
         self.relayer_client.sent_transaction_compare(tx_response.1, result.0)?;
 
-        let expected_safe_address =
-            EvmAddress::from_str("0xcfe267de230a234c5937f18f239617b7038ec271")?;
+        let expected_safe_address = safe_proxy_address;
         let expected_recipient = *recipient;
 
         if EvmAddress::new(result.1.to.unwrap()) != expected_safe_address {
