@@ -204,7 +204,13 @@ impl ContractInteractor {
 
         info!("[SUCCESS] Test ERC-20 token verified - Total supply: {}", total_supply._0);
 
-        let fund_addresses = vec!["0x655B2B8861D7E911D283A05A5CAD042C157106DA", "0xa93e13Db16BF70b3D6B828bC0185A9F3AdD44BA9"];
+        let fund_addresses = vec![
+            // raw, aws secret manager and gcp secret manager
+            "0x655B2B8861D7E911D283A05A5CAD042C157106DA",
+            // privy
+            "0xa93e13Db16BF70b3D6B828bC0185A9F3AdD44BA9",
+            // KMS
+            "0x33993A4F4AA617DA4558A0CFD0C39A7989B67720"];
 
         for item in fund_addresses {
             // Transfer tokens from deployer to the automatic top-up funding address
