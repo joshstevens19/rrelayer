@@ -16,6 +16,7 @@ use crate::{
 mod authentication;
 mod cli_interface;
 mod commands;
+mod credentials;
 mod console;
 use crate::commands::error::ProjectLocationError;
 pub use console::{print_error_message, print_success_message};
@@ -37,13 +38,42 @@ fn resolve_path(override_path: &Option<String>) -> Result<PathBuf, String> {
 fn create_sdk_with_basic_auth(
     project_location: &ProjectLocation,
 ) -> Result<SDK, ProjectLocationError> {
-    let setup_config = project_location.setup_config(false)?;
+    use std::env;
 
-    Ok(SDK::new(
-        project_location.get_api_url()?,
-        setup_config.api_config.authentication_username,
-        setup_config.api_config.authentication_password,
-    ))
+    // Try environment variables first (for backward compatibility)
+    if let (Ok(username), Ok(password)) = (
+        env::var("RRELAYER_AUTH_USERNAME"),
+        env::var("RRELAYER_AUTH_PASSWORD"),
+    ) {
+        return Ok(SDK::new(
+            project_location.get_api_url()?,
+            username,
+            password,
+        ));
+    }
+
+    // Try to read from rrelayer.yaml file
+    if let Ok(setup_config) = project_location.setup_config(false) {
+        return Ok(SDK::new(
+            project_location.get_api_url()?,
+            setup_config.api_config.authentication_username,
+            setup_config.api_config.authentication_password,
+        ));
+    }
+
+    // Try stored credentials as fallback
+    let default_profile = credentials::get_default_profile();
+    match credentials::load_credentials(&default_profile) {
+        Ok(creds) => Ok(SDK::new(creds.api_url, creds.username, creds.password)),
+        Err(_) => {
+            return Err(ProjectLocationError::ProjectConfig(
+                "No authentication credentials found. Please either:\n\
+                1. Set RRELAYER_AUTH_USERNAME and RRELAYER_AUTH_PASSWORD environment variables\n\
+                2. Ensure rrelayer.yaml exists with authentication config\n\
+                3. Run 'rrelayer auth login' to store credentials securely".to_string()
+            ));
+        }
+    }
 }
 
 #[tokio::main]
@@ -62,7 +92,7 @@ async fn main() -> Result<(), CliError> {
             let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;
             load_env_from_project_path(&resolved_path);
 
-            auth::handle_auth_command(command).await;
+            auth::handle_auth_command(command).await?;
         }
         Commands::Start { path } => {
             let resolved_path = resolve_path(&path).inspect_err(|e| print_error_message(e))?;

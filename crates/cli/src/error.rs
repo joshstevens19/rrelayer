@@ -80,6 +80,15 @@ pub enum CliError {
     #[error("Authentication error: {0}")]
     Authentication(String),
 
+    #[error("Input error: {0}")]
+    Input(String),
+
+    #[error("Storage error: {0}")]
+    Storage(String),
+
+    #[error("Not found: {0}")]
+    NotFound(String),
+
     #[error("Internal error: {0}")]
     Internal(String),
 }

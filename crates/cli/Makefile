@@ -5,29 +5,31 @@ init:
 start:
 	RUST_BACKTRACE=1 cargo run -- start --path $(CURDIR)/../../playground/example
 
+auth_login:
+	cargo run -- auth login
+auth_logout:
+	cargo run -- auth logout
+auth_list:
+	cargo run -- auth list
 auth_status:
 	cargo run -- auth --path $(CURDIR)/../../playground/example status
 
 network_list:
 	cargo run -- network --path $(CURDIR)/../../playground/example list
-network_list_disabled:
-	cargo run -- network --path $(CURDIR)/../../playground/example list --filter disabled
-network_list_enabled:
-	cargo run -- network --path $(CURDIR)/../../playground/example list --filter enabled
 network_add:
 	cargo run -- network --path $(CURDIR)/../../playground/example add
-network_enable:
-	cargo run -- network --path $(CURDIR)/../../playground/example enable --name sepolia_ethereum
-network_disable:
-	cargo run -- network --path $(CURDIR)/../../playground/example disable --name sepolia_ethereum
 network_gas:
 	cargo run -- network --path $(CURDIR)/../../playground/example gas --name sepolia_ethereum
 
 list:
 	cargo run -- list --path $(CURDIR)/../../playground/example
+list_auth:
+	cargo run -- list
 
 create:
 	cargo run -- create --path $(CURDIR)/../../playground/example --name relayer1 --network sepolia_ethereum
+create_auth:
+	cargo run -- create --name relayer1 --network sepolia_ethereum
 
 clone:
 	cargo run -- clone --path $(CURDIR)/../../playground/example --relayer-id 7c73fbbb-04b1-4a9a-9597-b6b83d891a8f --name relayer2 --network sepolia_ethereum
@@ -54,12 +56,8 @@ balance:
 balance_token:
 	cargo run -- balance --path $(CURDIR)/../../playground/example --relayer-id 7ed18611-1739-4a5f-99e3-e70356029984 --token 0x73d219B3881E481394DA6B5008A081d623992200
 
-allowlist_create:
-	cargo run -- allowlist --path $(CURDIR)/../../playground/example add --relayer-id 7ed18611-1739-4a5f-99e3-e70356029984 --address 0x73d219B3881E481394DA6B5008A081d623992200
 allowlist__list:
 	cargo run -- allowlist --path $(CURDIR)/../../playground/example list --relayer-id 7ed18611-1739-4a5f-99e3-e70356029984
-allowlist_delete:
-	cargo run -- allowlist --path $(CURDIR)/../../playground/example delete --relayer-id 7ed18611-1739-4a5f-99e3-e70356029984 --address 0x73d219B3881E481394DA6B5008A081d623992200
 
 sign_text:
 	cargo run -- sign --path $(CURDIR)/../../playground/example text --relayer-id 7ed18611-1739-4a5f-99e3-e70356029984 --message "hello baby"

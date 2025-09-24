@@ -1,5 +1,5 @@
 name: example
-signing_key:
+signing_provider:
   raw:
     mnemonic: ${RAW_DANGEROUS_MNEMONIC}
 networks:
