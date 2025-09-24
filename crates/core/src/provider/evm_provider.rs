@@ -1,5 +1,4 @@
-use std::sync::Arc;
-
+use crate::provider::layer_extensions::{RpcLoggingLayer, RpcLoggingService};
 use crate::wallet::{
     AwsKmsWalletManager, MnemonicWalletManager, PrivyWalletManager, TurnkeyWalletManager,
     WalletError, WalletManagerTrait,
@@ -17,6 +16,11 @@ use crate::{
 };
 use alloy::consensus::{SignableTransaction, TxEnvelope};
 use alloy::network::{AnyNetwork, AnyTransactionReceipt};
+use alloy::providers::fillers::{
+    BlobGasFiller, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
+};
+use alloy::providers::{Identity, IpcConnect};
+use alloy::rpc::client::RpcClient;
 use alloy::rpc::types::serde_helpers::WithOtherFields;
 use alloy::{
     consensus::TypedTransaction,
@@ -30,7 +34,10 @@ use alloy::{
     rpc::{client::ClientBuilder, types::TransactionRequest},
     signers::local::LocalSignerError,
     transports::{
-        http::{Client, Http},
+        http::{
+            reqwest::{header::HeaderMap, Error as ReqwestError},
+            Client, Http,
+        },
         layers::{RetryBackoffLayer, RetryBackoffService},
         RpcError, TransportErrorKind,
     },
@@ -38,10 +45,13 @@ use alloy::{
 use alloy_eips::eip2718::Encodable2718;
 use rand::{thread_rng, Rng};
 use reqwest::Url;
+use std::sync::Arc;
+use std::time::Duration;
 use thiserror::Error;
 use tracing::info;
 
-pub type RelayerProvider = RootProvider<RetryBackoffService<Http<Client>>, AnyNetwork>;
+pub type RelayerProvider =
+    RootProvider<RetryBackoffService<RpcLoggingService<Http<Client>>>, AnyNetwork>;
 
 #[derive(Clone)]
 pub struct EvmProvider {
@@ -102,21 +112,27 @@ async fn calculate_block_time_difference(
 
 #[derive(Error, Debug)]
 pub enum RetryClientError {
-    #[error("http provider cant be created for {0}: {1}")]
+    #[error("http provider can't be created for {0}: {1}")]
     HttpProviderCantBeCreated(String, String),
+
+    #[error("Could not build client: {0}")]
+    CouldNotBuildClient(#[from] ReqwestError),
 }
 
 /// Creates a retry-enabled HTTP client for RPC communications.
-pub fn create_retry_client(rpc_url: &str) -> Result<Arc<RelayerProvider>, RetryClientError> {
-    let url = Url::parse(rpc_url).map_err(|e| {
+pub async fn create_retry_client(rpc_url: &str) -> Result<Arc<RelayerProvider>, RetryClientError> {
+    let rpc_url = Url::parse(rpc_url).map_err(|e| {
         RetryClientError::HttpProviderCantBeCreated(rpc_url.to_string(), e.to_string())
     })?;
 
-    // TODO: check this config
-    let retry_layer = RetryBackoffLayer::new(5000, 500, 660);
-    let client = ClientBuilder::default().layer(retry_layer).http(url.clone());
+    let client_with_auth = Client::builder().timeout(Duration::from_secs(15)).build()?;
 
-    let provider = ProviderBuilder::new().network::<AnyNetwork>().on_client(client);
+    let logging_layer = RpcLoggingLayer::new(rpc_url.to_string());
+    let http = Http::with_client(client_with_auth, rpc_url);
+    let retry_layer = RetryBackoffLayer::new(5000, 1000, 660);
+    let rpc_client =
+        RpcClient::builder().layer(retry_layer).layer(logging_layer).transport(http, false);
+    let provider = ProviderBuilder::new().network::<AnyNetwork>().on_client(rpc_client.clone());
 
     Ok(Arc::new(provider))
 }
@@ -198,7 +214,7 @@ impl EvmProvider {
         gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
     ) -> Result<Self, EvmProviderNewError> {
         let provider =
-            create_retry_client(&network_setup_config.provider_urls[0]).map_err(|e| {
+            create_retry_client(&network_setup_config.provider_urls[0]).await.map_err(|e| {
                 EvmProviderNewError::HttpProviderCantBeCreated(
                     network_setup_config.provider_urls[0].clone(),
                     e.to_string(),
@@ -211,7 +227,7 @@ impl EvmProvider {
 
         let mut providers: Vec<Arc<RelayerProvider>> = vec![provider.clone()];
         for url in network_setup_config.provider_urls.iter().skip(1) {
-            providers.push(create_retry_client(url).map_err(|e| {
+            providers.push(create_retry_client(url).await.map_err(|e| {
                 EvmProviderNewError::HttpProviderCantBeCreated(url.clone(), e.to_string())
             })?);
         }
