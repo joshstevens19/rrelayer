@@ -188,25 +188,21 @@ run-tests-debug-raw-and-aws-secret-manager:
 # INDIVIDUAL TEST RUNNER - HELPER TARGET
 # =============================================================================
 
-run-test: start-postgres ## Internal target to run a single test with clean output (use TEST=test_name)
+run-test: ## Internal target to run a single test with clean output (use TEST=test_name)
 	@if [ -z "$(TEST)" ]; then \
 		echo "❌ Error: TEST variable must be set. Usage: make run-test TEST=test_name"; \
 		exit 1; \
 	fi
 	@echo "🧪 Running single test: $(TEST) (clean output)..."
-	@make reset-db
 	@RUST_LOG=error, RRELAYER_TEST_FILTER=$(TEST) cargo run --bin e2e-runner
-	@make stop-postgres
 
-run-test-debug: start-postgres ## Internal target to run a single test with debug output (use TEST=test_name)
+run-test-debug: ## Internal target to run a single test with debug output (use TEST=test_name)
 	@if [ -z "$(TEST)" ]; then \
 		echo "❌ Error: TEST variable must be set. Usage: make run-test-debug TEST=test_name"; \
 		exit 1; \
 	fi
 	@echo "🧪 Running single test: $(TEST) (debug output)..."
-	@make reset-db
 	@RUST_LOG=info, RRELAYER_TEST_FILTER=$(TEST) cargo run --bin e2e-runner
-	@make stop-postgres
 
 # =============================================================================
 # DEBUG AND DEVELOPMENT TARGETS

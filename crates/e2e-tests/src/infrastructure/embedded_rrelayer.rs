@@ -156,18 +156,23 @@ impl EmbeddedRRelayerServer {
     }
 
     fn start_docker_compose(&self) -> Result<()> {
-        info!("🐳 Starting Docker Compose services...");
+        info!("🐳 Starting Docker Compose services from: {:?}", self.project_path);
 
         if !self.project_path.exists() {
             return Err(anyhow::anyhow!("Project path does not exist: {:?}", self.project_path));
         }
 
-        let status = Command::new("docker")
+        // Check if docker-compose.yml exists
+        let compose_file = self.project_path.join("docker-compose.yml");
+        if !compose_file.exists() {
+            return Err(anyhow::anyhow!("docker-compose.yml not found at: {:?}", compose_file));
+        }
+
+        info!("🐳 Running: docker compose up -d");
+        let output = Command::new("docker")
             .args(["compose", "up", "-d"])
             .current_dir(&self.project_path)
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .status()
+            .output()
             .map_err(|e| {
                 let error = format!(
                     "Docker command could not be executed. Make sure Docker is running: {}",
@@ -177,15 +182,22 @@ impl EmbeddedRRelayerServer {
                 anyhow::anyhow!(error)
             })?;
 
-        if !status.success() {
-            let error = "Docker Compose could not start PostgreSQL container. Please make sure Docker is running.";
+        if !output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let error = format!(
+                "Docker Compose failed to start containers.\nSTDOUT: {}\nSTDERR: {}", 
+                stdout, stderr
+            );
             error!("{}", error);
             return Err(anyhow::anyhow!(error));
         }
 
-        info!("🐳 Docker starting up PostgreSQL container...");
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        info!("🐳 Docker Compose output: {}", stdout);
 
-        self.check_docker_compose_status(200)
+        info!("🐳 Checking if PostgreSQL container is running...");
+        self.check_docker_compose_status(50)
     }
 
     fn check_docker_compose_status(&self, max_retries: u32) -> Result<()> {
@@ -204,6 +216,8 @@ impl EmbeddedRRelayerServer {
 
             if ps_status.status.success() {
                 let output = String::from_utf8_lossy(&ps_status.stdout);
+                info!("🐳 Docker Compose status:\n{}", output);
+
                 if !output.contains("Exit") && output.contains("Up") {
                     info!("[SUCCESS] All containers are up and running");
 
@@ -216,9 +230,14 @@ impl EmbeddedRRelayerServer {
                     }
 
                     return Ok(());
+                } else if output.contains("Exit") {
+                    warn!("[WARNING] Some containers have exited: {}", output);
+                } else {
+                    info!("[WAIT] Containers are still starting...");
                 }
             } else {
-                let error = format!("docker compose ps exited with status: {}", ps_status.status);
+                let stderr = String::from_utf8_lossy(&ps_status.stderr);
+                let error = format!("docker compose ps failed: {}", stderr);
                 warn!("{}", error);
             }
 
@@ -231,7 +250,7 @@ impl EmbeddedRRelayerServer {
         }
 
         Err(anyhow::anyhow!(
-            "Docker containers did not start successfully within the given retries"
+            "Docker containers did not start successfully within {} retries", max_retries
         ))
     }
 
