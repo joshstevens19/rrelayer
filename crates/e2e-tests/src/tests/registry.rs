@@ -28,6 +28,7 @@ impl TestRegistry {
     pub fn get_all_tests() -> Vec<TestDefinition> {
         let mut tests = Vec::new();
 
+        // do not move this one as it always needs to use this relayer
         tests.extend(crate::tests::allowlist::AllowlistTests::get_tests());
         tests.extend(crate::tests::authentication::AuthenticationTests::get_tests());
         tests.extend(crate::tests::automatic_top_up::AutomaticTopUpTests::get_tests());

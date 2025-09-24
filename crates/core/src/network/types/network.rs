@@ -9,5 +9,4 @@ pub struct Network {
     pub chain_id: ChainId,
     #[serde(rename = "providerUrls")]
     pub provider_urls: Vec<String>,
-    pub disabled: bool,
 }

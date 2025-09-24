@@ -20,6 +20,10 @@ pub fn too_many_requests() -> HttpError {
     (StatusCode::TOO_MANY_REQUESTS, "Too many requests".to_string())
 }
 
+pub fn unauthorized(message: Option<String>) -> HttpError {
+    (StatusCode::UNAUTHORIZED, message.unwrap_or("Unauthorized".to_string()))
+}
+
 impl From<PostgresError> for HttpError {
     fn from(error: PostgresError) -> HttpError {
         error!("Postgres error occurred - {:?}", error);

@@ -6,13 +6,13 @@ use tracing::info;
 
 impl TestRunner {
     /// run single with:
-    /// RRELAYER_PROVIDERS="raw" make run-test-debug TEST=rate_limiting_transaction
-    /// RRELAYER_PROVIDERS="privy" make run-test-debug TEST=rate_limiting_transaction
-    /// RRELAYER_PROVIDERS="aws_secret_manager" make run-test-debug TEST=rate_limiting_transaction
-    /// RRELAYER_PROVIDERS="aws_kms" make run-test-debug TEST=rate_limiting_transaction
-    /// RRELAYER_PROVIDERS="gcp_secret_manager" make run-test-debug TEST=rate_limiting_transaction
-    /// RRELAYER_PROVIDERS="turnkey" make run-test-debug TEST=rate_limiting_transaction
-    pub async fn rate_limiting_transaction(&self) -> anyhow::Result<()> {
+    /// RRELAYER_PROVIDERS="raw" make run-test-debug TEST=rate_limiting_transaction_user_limits
+    /// RRELAYER_PROVIDERS="privy" make run-test-debug TEST=rate_limiting_transaction_user_limits
+    /// RRELAYER_PROVIDERS="aws_secret_manager" make run-test-debug TEST=rate_limiting_transaction_user_limits
+    /// RRELAYER_PROVIDERS="aws_kms" make run-test-debug TEST=rate_limiting_transaction_user_limits
+    /// RRELAYER_PROVIDERS="gcp_secret_manager" make run-test-debug TEST=rate_limiting_transaction_user_limits
+    /// RRELAYER_PROVIDERS="turnkey" make run-test-debug TEST=rate_limiting_transaction_user_limits
+    pub async fn rate_limiting_transaction_user_limits(&self) -> anyhow::Result<()> {
         info!("Testing rate limiting transaction enforcement...");
 
         let relayer = self.create_and_fund_relayer("rate-limit-relayer").await?;
@@ -68,6 +68,9 @@ impl TestRunner {
                 ));
             }
         }
+
+        info!("Sleep for 60 seconds to allow the rate limit to expire so doesnt hurt next test");
+        tokio::time::sleep(Duration::from_secs(60)).await;
 
         info!("Rate limiting mechanism verified");
         Ok(())

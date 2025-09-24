@@ -1,19 +1,13 @@
 mod automatic_top_up_task;
-mod network_cache_task;
 mod webhook_manager_task;
 
+use crate::background_tasks::webhook_manager_task::run_webhook_manager_task;
 use crate::gas::{blob_gas_oracle, gas_oracle, BlobGasOracleCache, GasOracleCache};
 use crate::{
-    background_tasks::{
-        automatic_top_up_task::run_automatic_top_up_task,
-        network_cache_task::run_network_cache_task, webhook_manager_task::run_webhook_manager_task,
-    },
-    provider::EvmProvider,
-    rate_limiting::RateLimiter,
-    shared::cache::Cache,
-    transaction::queue_system::TransactionsQueues,
-    webhooks::WebhookManager,
-    PostgresClient, SetupConfig,
+    background_tasks::automatic_top_up_task::run_automatic_top_up_task, provider::EvmProvider,
+    rate_limiting::RateLimiter, shared::cache::Cache,
+    transaction::queue_system::TransactionsQueues, webhooks::WebhookManager, PostgresClient,
+    SafeProxyManager, SetupConfig,
 };
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -28,6 +22,7 @@ pub async fn run_background_tasks(
     cache: Arc<Cache>,
     webhook_manager: Option<Arc<Mutex<WebhookManager>>>,
     transactions_queues: Arc<Mutex<TransactionsQueues>>,
+    safe_proxy_manager: Arc<SafeProxyManager>,
 ) {
     info!("Starting background tasks");
 
@@ -38,9 +33,8 @@ pub async fn run_background_tasks(
         postgres_client.clone(),
         providers.clone(),
         transactions_queues,
+        safe_proxy_manager,
     );
-
-    run_network_cache_task(postgres_client, cache).await;
 
     if let Some(webhook_manager) = webhook_manager {
         run_webhook_manager_task(webhook_manager, providers.clone()).await;

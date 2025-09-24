@@ -8,6 +8,7 @@ use super::{transactions_queues::TransactionsQueues, types::TransactionRelayerSe
 use crate::transaction::queue_system::types::{
     ProcessInmempoolTransactionError, ProcessMinedTransactionError, ProcessPendingTransactionError,
 };
+use crate::webhooks::WebhookManager;
 use crate::{
     gas::{BlobGasOracleCache, GasOracleCache},
     postgres::{PostgresClient, PostgresConnectionError, PostgresError},
@@ -271,8 +272,8 @@ pub async fn startup_transactions_queues(
     blob_gas_oracle_cache: Arc<Mutex<BlobGasOracleCache>>,
     providers: Arc<Vec<EvmProvider>>,
     cache: Arc<Cache>,
-    webhook_manager: Option<Arc<Mutex<crate::webhooks::WebhookManager>>>,
-    safe_proxy_manager: Option<SafeProxyManager>,
+    webhook_manager: Option<Arc<Mutex<WebhookManager>>>,
+    safe_proxy_manager: Arc<SafeProxyManager>,
 ) -> Result<Arc<Mutex<TransactionsQueues>>, StartTransactionsQueuesError> {
     let postgres = PostgresClient::new()
         .await

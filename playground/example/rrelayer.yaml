@@ -4,6 +4,7 @@ signing_key:
     mnemonic: ${RAW_DANGEROUS_MNEMONIC}
 networks:
 - name: sepolia_ethereum
+  chain_id: 11155111
   provider_urls:
   - https://sepolia.gateway.tenderly.co
   block_explorer_url: https://sepolia.etherscan.io

@@ -92,7 +92,6 @@ pub async fn handle_get(relayer_id: &RelayerId, sdk: &SDK) -> Result<(), ConfigE
             println!("│ Status:              {}", status);
             println!("│ Max Gas Price:       {}", max_gas);
             println!("│ Wallet Index:        {}", relayer.wallet_index);
-            println!("│ Allowlisted Only:    {}", relayer.allowlisted_only);
             println!("│ EIP-1559 Enabled:    {}", relayer.eip_1559_enabled);
             println!("│ Created At:          {}", created_at);
 

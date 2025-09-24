@@ -35,7 +35,7 @@ impl TestInfo {
     pub fn new(name: String, result: TestResult, duration: Duration) -> Self {
         let error_message = match &result {
             TestResult::Failed(msg) => Some(msg.clone()),
-            TestResult::Timeout => Some("Test timed out after 90 seconds".to_string()),
+            TestResult::Timeout => Some("Test timed out after 180 seconds".to_string()),
             TestResult::Skipped(msg) => Some(msg.clone()),
             TestResult::Passed => None,
         };

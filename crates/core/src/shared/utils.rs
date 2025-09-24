@@ -1,13 +1,14 @@
-use crate::rrelayer_error;
+use crate::network::ChainId;
 use crate::shared::{bad_request, HttpError};
 use crate::transaction::types::TransactionBlob;
+use crate::{create_retry_client, rrelayer_error};
 use alloy::primitives::U256;
+use alloy::providers::Provider;
 use alloy_eips::eip4844::Blob;
 use axum::http::StatusCode;
 use std::time::Duration;
 use tokio::time::sleep;
 
-/// Returns Some(value) if condition is true, otherwise None.
 pub fn option_if<T>(condition: bool, value: T) -> Option<T> {
     if condition {
         Some(value)
@@ -16,12 +17,10 @@ pub fn option_if<T>(condition: bool, value: T) -> Option<T> {
     }
 }
 
-/// Asynchronously sleeps for the specified number of milliseconds.
 pub async fn sleep_ms(ms: &u64) {
     sleep(Duration::from_millis(*ms)).await
 }
 
-/// Converts optional blob strings to optional blob objects.
 pub fn convert_blob_strings_to_blobs(
     blob_strings: Option<Vec<String>>,
 ) -> Result<Option<Vec<TransactionBlob>>, HttpError> {
@@ -42,7 +41,6 @@ pub fn convert_blob_strings_to_blobs(
     }
 }
 
-/// Formats a Wei amount to a human-readable ETH string.
 pub fn format_wei_to_eth(wei: &U256) -> String {
     let eth_divisor = U256::from(10u64.pow(18));
     let whole_eth = wei / eth_divisor;
@@ -62,4 +60,16 @@ pub fn format_token_amount(amount: &U256) -> String {
     // For now, use the same formatting as ETH (18 decimals)
     // This can be enhanced to support different token decimals
     format_wei_to_eth(amount)
+}
+
+pub async fn get_chain_id(provider_url: &str) -> Result<ChainId, String> {
+    let provider = create_retry_client(&provider_url)
+        .await
+        .map_err(|e| format!("RPC provider is not valid as cannot get chain ID: {}", e))?;
+    let chain_id = provider
+        .get_chain_id()
+        .await
+        .map_err(|e| format!("RPC provider is not valid as cannot get chain ID: {}", e))?;
+
+    Ok(ChainId::new(chain_id))
 }

@@ -6,6 +6,7 @@ use alloy::sol_types::{SolCall, SolStruct};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::network::ChainId;
 use crate::{
     provider::EvmProvider,
     shared::common_types::EvmAddress,
@@ -94,15 +95,17 @@ impl SafeProxyManager {
         Self { configs }
     }
 
-    /// Check if a relayer should use safe proxy and return the safe address
-    pub fn get_safe_proxy_for_relayer(&self, relayer_address: &EvmAddress) -> Option<EvmAddress> {
+    pub fn get_safe_proxy_for_relayer(
+        &self,
+        relayer_address: &EvmAddress,
+        chain_id: ChainId,
+    ) -> Option<EvmAddress> {
         self.configs
             .iter()
-            .find(|config| config.relayers.contains(relayer_address))
+            .find(|config| config.relayers.contains(relayer_address) && config.chain_id == chain_id)
             .map(|config| config.address)
     }
 
-    /// Validate that a relayer is authorized to use a specific safe
     pub fn is_relayer_authorized(
         &self,
         relayer_address: &EvmAddress,
@@ -117,13 +120,14 @@ impl SafeProxyManager {
     pub fn wrap_transaction_for_safe(
         &self,
         relayer_address: &EvmAddress,
+        chain_id: ChainId,
         original_to: EvmAddress,
         original_value: TransactionValue,
         original_data: TransactionData,
         safe_nonce: U256,
     ) -> Result<(EvmAddress, SafeTransaction), SafeProxyError> {
         let safe_address = self
-            .get_safe_proxy_for_relayer(relayer_address)
+            .get_safe_proxy_for_relayer(relayer_address, chain_id)
             .ok_or_else(|| SafeProxyError::SafeProxyNotFound(*relayer_address))?;
 
         let value = original_value.into_inner();
@@ -350,16 +354,21 @@ mod tests {
         let relayer2 = EvmAddress::new(address!("36988BA8250E009DCC5DF543D78E2277E2AA900B"));
         let safe_address = EvmAddress::new(address!("46988BA8250E009DCC5DF543D78E2277E2AA900B"));
 
-        let config = SafeProxyConfig { address: safe_address, relayers: vec![relayer1, relayer2] };
+        let config = SafeProxyConfig {
+            address: safe_address,
+            relayers: vec![relayer1, relayer2],
+            chain_id: ChainId(1),
+        };
 
         let manager = SafeProxyManager::new(vec![config]);
 
-        assert_eq!(manager.get_safe_proxy_for_relayer(&relayer1), Some(safe_address));
-        assert_eq!(manager.get_safe_proxy_for_relayer(&relayer2), Some(safe_address));
+        assert_eq!(manager.get_safe_proxy_for_relayer(&relayer1, ChainId(1)), Some(safe_address));
+        assert_eq!(manager.get_safe_proxy_for_relayer(&relayer2, ChainId(1)), Some(safe_address));
         assert_eq!(
-            manager.get_safe_proxy_for_relayer(&EvmAddress::new(address!(
-                "56988BA8250E009DCC5DF543D78E2277E2AA900B"
-            ))),
+            manager.get_safe_proxy_for_relayer(
+                &EvmAddress::new(address!("56988BA8250E009DCC5DF543D78E2277E2AA900B")),
+                ChainId(1)
+            ),
             None
         );
 

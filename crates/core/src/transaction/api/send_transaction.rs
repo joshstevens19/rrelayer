@@ -1,7 +1,8 @@
 use super::types::TransactionSpeed;
 use crate::rate_limiting::RateLimiter;
+use crate::relayer::get_relayer;
 use crate::shared::utils::convert_blob_strings_to_blobs;
-use crate::shared::{internal_server_error, HttpError};
+use crate::shared::{internal_server_error, not_found, unauthorized, HttpError};
 use crate::{
     app_state::AppState,
     rate_limiting::RateLimitOperation,
@@ -56,6 +57,21 @@ pub async fn send_transaction(
     headers: HeaderMap,
     Json(transaction): Json<RelayTransactionRequest>,
 ) -> Result<Json<SendTransactionResult>, HttpError> {
+    let relayer = get_relayer(&state.db, &state.cache, &relayer_id)
+        .await?
+        .ok_or(not_found("Relayer does not exist".to_string()))?;
+
+    if state.relayer_internal_only.restricted(&relayer.address, &relayer.chain_id) {
+        return Err(unauthorized(Some("Relayer can only be used internally".to_string())));
+    }
+
+    state.network_permission_validate(
+        &relayer.address,
+        &relayer.chain_id,
+        &transaction.to,
+        &transaction.value,
+    )?;
+
     let rate_limit_reservation = RateLimiter::check_and_reserve_rate_limit(
         &state,
         &headers,

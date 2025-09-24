@@ -4,6 +4,7 @@ use alloy::providers::Provider;
 use regex::{Captures, Regex};
 use serde::de::Visitor;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use std::fs::Permissions;
 use std::{env, fmt, fs::File, io::Read, path::PathBuf};
 use thiserror::Error;
 use tracing::error;
@@ -12,11 +13,11 @@ use crate::gas::{
     deserialize_gas_provider, CustomGasFeeEstimator, GasProvider, InfuraGasProviderSetupConfig,
     TenderlyGasProviderSetupConfig,
 };
-use crate::network::ChainId;
+use crate::network::{ChainId, Network};
 use crate::{create_retry_client, rrelayer_error, shared::common_types::EvmAddress};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct GcpSecretManager {
+pub struct GcpSecretManagerProviderConfig {
     pub id: String,
     pub key: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -25,7 +26,7 @@ pub struct GcpSecretManager {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AwsSecretManager {
+pub struct AwsSecretManagerProviderConfig {
     pub id: String,
     pub key: String,
     pub region: String,
@@ -38,23 +39,23 @@ pub struct KmsKeyConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AwsKmsSigningKey {
+pub struct AwsKmsSigningProviderConfig {
     pub key_configs: Vec<KmsKeyConfig>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct RawSigningKey {
+pub struct RawSigningProviderConfig {
     pub mnemonic: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct PrivySigningKey {
+pub struct PrivySigningProviderConfig {
     pub app_id: String,
     pub app_secret: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct TurnkeySigningKey {
+pub struct TurnkeySigningProviderConfig {
     pub api_public_key: String,
     pub api_private_key: String,
     pub organization_id: String,
@@ -62,57 +63,52 @@ pub struct TurnkeySigningKey {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct SigningKey {
+pub struct SigningProvider {
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub raw: Option<RawSigningKey>,
+    pub raw: Option<RawSigningProviderConfig>,
 
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub aws_secret_manager: Option<AwsSecretManager>,
+    pub aws_secret_manager: Option<AwsSecretManagerProviderConfig>,
 
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub gcp_secret_manager: Option<GcpSecretManager>,
+    pub gcp_secret_manager: Option<GcpSecretManagerProviderConfig>,
 
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub privy: Option<PrivySigningKey>,
+    pub privy: Option<PrivySigningProviderConfig>,
 
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub aws_kms: Option<AwsKmsSigningKey>,
+    pub aws_kms: Option<AwsKmsSigningProviderConfig>,
 
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub turnkey: Option<TurnkeySigningKey>,
+    pub turnkey: Option<TurnkeySigningProviderConfig>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RateLimitWithInterval {
+    pub interval: String,
+    pub transactions: u64,
+    pub signing_operations: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct UserRateLimitConfig {
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub per_relayer: Option<RateLimitWithInterval>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub global: Option<RateLimitWithInterval>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RateLimitConfig {
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub limits: Option<RateLimits>,
+    pub user_limits: Option<UserRateLimitConfig>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub user_unlimited_overrides: Option<Vec<String>>,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub global_limits: Option<GlobalRateLimits>,
+    pub relayer_limits: Option<RateLimitWithInterval>,
     #[serde(default)]
     pub fallback_to_relayer: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct RateLimits {
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub transactions_per_minute: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub signing_operations_per_minute: Option<u64>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct GlobalRateLimits {
-    /// Maximum transactions per minute across all relayers combined
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub max_transactions_per_minute: Option<u64>,
-    /// Maximum signing operations per minute across all relayers combined
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub max_signing_operations_per_minute: Option<u64>,
-}
-
-impl AwsKmsSigningKey {
+impl AwsKmsSigningProviderConfig {
     pub fn validate(&self) -> Result<(), String> {
         if self.key_configs.is_empty() {
             return Err("AWS KMS key configs cannot be empty".to_string());
@@ -142,7 +138,7 @@ impl AwsKmsSigningKey {
     }
 }
 
-impl TurnkeySigningKey {
+impl TurnkeySigningProviderConfig {
     pub fn validate(&self) -> Result<(), String> {
         if self.api_public_key.is_empty() {
             return Err("Turnkey API public key cannot be empty".to_string());
@@ -160,8 +156,8 @@ impl TurnkeySigningKey {
     }
 }
 
-impl SigningKey {
-    pub fn from_raw(raw: RawSigningKey) -> Self {
+impl SigningProvider {
+    pub fn from_raw(raw: RawSigningProviderConfig) -> Self {
         Self {
             raw: Some(raw),
             aws_secret_manager: None,
@@ -172,7 +168,7 @@ impl SigningKey {
         }
     }
 
-    pub fn from_aws_kms(aws_kms: AwsKmsSigningKey) -> Self {
+    pub fn from_aws_kms(aws_kms: AwsKmsSigningProviderConfig) -> Self {
         Self {
             raw: None,
             aws_secret_manager: None,
@@ -183,7 +179,7 @@ impl SigningKey {
         }
     }
 
-    pub fn from_turnkey(turnkey: TurnkeySigningKey) -> Self {
+    pub fn from_turnkey(turnkey: TurnkeySigningProviderConfig) -> Self {
         Self {
             raw: None,
             aws_secret_manager: None,
@@ -195,17 +191,18 @@ impl SigningKey {
     }
 
     pub fn from_aws_kms_single(key_id: String, region: String) -> Self {
-        let aws_kms = AwsKmsSigningKey { key_configs: vec![KmsKeyConfig { key_id, region }] };
+        let aws_kms =
+            AwsKmsSigningProviderConfig { key_configs: vec![KmsKeyConfig { key_id, region }] };
         Self::from_aws_kms(aws_kms)
     }
 
     pub fn from_aws_kms_multiple(key_configs: Vec<KmsKeyConfig>) -> Self {
-        let aws_kms = AwsKmsSigningKey { key_configs };
+        let aws_kms = AwsKmsSigningProviderConfig { key_configs };
         Self::from_aws_kms(aws_kms)
     }
 }
 
-impl SigningKey {
+impl SigningProvider {
     pub fn validate(&self) -> Result<(), String> {
         let configured_methods = [
             self.raw.is_some(),
@@ -228,10 +225,19 @@ impl SigningKey {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct NetworkPermissionsConfig {
+    pub relayers: AllOrAddresses,
+    pub allowlist: Vec<EvmAddress>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub disable_native_transfer: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NetworkSetupConfig {
     pub name: String,
+    pub chain_id: ChainId,
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub signing_key: Option<SigningKey>,
+    pub signing_provider: Option<SigningProvider>,
     pub provider_urls: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub block_explorer_url: Option<String>,
@@ -242,24 +248,16 @@ pub struct NetworkSetupConfig {
     )]
     pub gas_provider: Option<GasProvider>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub automatic_top_up: Option<AutomaticTopUpConfig>,
+    pub automatic_top_up: Option<NetworkAutomaticTopUpConfig>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub permissions: Option<Vec<NetworkPermissionsConfig>>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub confirmations: Option<u64>,
 }
 
-impl NetworkSetupConfig {
-    pub async fn get_chain_id(&self) -> Result<ChainId, String> {
-        let provider_url = self.provider_urls[0].clone();
-
-        let provider = create_retry_client(&provider_url)
-            .await
-            .map_err(|e| format!("RPC provider is not valid as cannot get chain ID: {}", e))?;
-        let chain_id = provider
-            .get_chain_id()
-            .await
-            .map_err(|e| format!("RPC provider is not valid as cannot get chain ID: {}", e))?;
-
-        Ok(ChainId::new(chain_id))
+impl From<NetworkSetupConfig> for Network {
+    fn from(value: NetworkSetupConfig) -> Self {
+        Network { name: value.name, chain_id: value.chain_id, provider_urls: value.provider_urls }
     }
 }
 
@@ -283,19 +281,28 @@ pub struct ApiConfig {
 }
 
 #[derive(Debug, Clone)]
-pub enum TopUpTargetAddresses {
+pub enum AllOrAddresses {
     All,
     List(Vec<EvmAddress>),
 }
 
-impl Serialize for TopUpTargetAddresses {
+impl AllOrAddresses {
+    pub fn contains(&self, address: &EvmAddress) -> bool {
+        match self {
+            AllOrAddresses::All => true,
+            AllOrAddresses::List(addresses) => addresses.contains(address),
+        }
+    }
+}
+
+impl Serialize for AllOrAddresses {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         match self {
-            TopUpTargetAddresses::All => serializer.serialize_str("*"),
-            TopUpTargetAddresses::List(addresses) => addresses.serialize(serializer),
+            AllOrAddresses::All => serializer.serialize_str("*"),
+            AllOrAddresses::List(addresses) => addresses.serialize(serializer),
         }
     }
 }
@@ -303,7 +310,7 @@ impl Serialize for TopUpTargetAddresses {
 struct ForAddressesTypeVisitor;
 
 impl<'de> Visitor<'de> for ForAddressesTypeVisitor {
-    type Value = TopUpTargetAddresses;
+    type Value = AllOrAddresses;
 
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         formatter.write_str("either '*' for all addresses or a list of addresses")
@@ -314,7 +321,7 @@ impl<'de> Visitor<'de> for ForAddressesTypeVisitor {
         E: de::Error,
     {
         if value == "*" {
-            Ok(TopUpTargetAddresses::All)
+            Ok(AllOrAddresses::All)
         } else {
             Err(de::Error::invalid_value(de::Unexpected::Str(value), &"'*' for all addresses"))
         }
@@ -325,11 +332,11 @@ impl<'de> Visitor<'de> for ForAddressesTypeVisitor {
         A: de::SeqAccess<'de>,
     {
         let addresses = Vec::<EvmAddress>::deserialize(de::value::SeqAccessDeserializer::new(seq))?;
-        Ok(TopUpTargetAddresses::List(addresses))
+        Ok(AllOrAddresses::List(addresses))
     }
 }
 
-impl<'de> Deserialize<'de> for TopUpTargetAddresses {
+impl<'de> Deserialize<'de> for AllOrAddresses {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -461,23 +468,38 @@ impl<'de> Deserialize<'de> for Erc20TokenConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AutomaticTopUpConfig {
-    pub from_address: EvmAddress,
+pub struct NetworkAutomaticTopUpRelayer {
+    pub address: EvmAddress,
     #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub internal_only: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct NetworkAutomaticTopUpFrom {
     pub safe: Option<EvmAddress>,
-    pub targets: TopUpTargetAddresses,
+    pub relayer: NetworkAutomaticTopUpRelayer,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct NetworkAutomaticTopUpConfig {
+    pub from: NetworkAutomaticTopUpFrom,
+    pub targets: AllOrAddresses,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub native: Option<NativeTokenConfig>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub erc20_tokens: Option<Vec<Erc20TokenConfig>>,
 }
 
-/// Default decimals value (18 for ETH-like tokens)
+impl NetworkAutomaticTopUpConfig {
+    pub fn via_safe(&self) -> bool {
+        self.from.safe.is_some()
+    }
+}
+
 fn default_decimals() -> u8 {
     18
 }
 
-/// Serialize an amount with custom decimal precision
 fn serialize_amount_with_decimals(amount: &U256, decimals: u8) -> String {
     let divisor = U256::from(10u64.pow(decimals as u32));
     let whole_part = amount / divisor;
@@ -517,6 +539,7 @@ pub struct WebhookConfigAdvanced {
 pub struct SafeProxyConfig {
     pub address: EvmAddress,
     pub relayers: Vec<EvmAddress>,
+    pub chain_id: ChainId,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -525,15 +548,13 @@ pub struct SetupConfig {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub signing_key: Option<SigningKey>,
+    pub signing_provider: Option<SigningProvider>,
     pub networks: Vec<NetworkSetupConfig>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub gas_providers: Option<GasProviders>,
     pub api_config: ApiConfig,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub webhooks: Option<Vec<WebhookConfig>>,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub safe_proxy: Option<Vec<SafeProxyConfig>>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub rate_limits: Option<RateLimitConfig>,
 }
@@ -570,8 +591,8 @@ pub enum ReadYamlError {
     #[error("No networks enabled in the yaml")]
     NoNetworksEnabled,
 
-    #[error("Signing key yaml bad format: {0}")]
-    SigningKeyYamlError(String),
+    #[error("Signing provider yaml bad format: {0}")]
+    SigningProviderYamlError(String),
 
     #[error("Network {0} provider urls not defined")]
     NetworkProviderUrlsNotDefined(String),
@@ -598,20 +619,20 @@ pub fn read(file_path: &PathBuf, raw_yaml: bool) -> Result<SetupConfig, ReadYaml
             return Err(ReadYamlError::NetworkProviderUrlsNotDefined(network.name.clone()));
         }
 
-        if let Some(signing_key) = &network.signing_key {
-            signing_key.validate().map_err(ReadYamlError::SigningKeyYamlError)?;
+        if let Some(signing_key) = &network.signing_provider {
+            signing_key.validate().map_err(ReadYamlError::SigningProviderYamlError)?;
         }
     }
 
-    if let Some(signing_key) = &config.signing_key {
-        signing_key.validate().map_err(ReadYamlError::SigningKeyYamlError)?;
+    if let Some(signing_key) = &config.signing_provider {
+        signing_key.validate().map_err(ReadYamlError::SigningProviderYamlError)?;
 
         if let Some(aws_kms) = &signing_key.aws_kms {
-            aws_kms.validate().map_err(ReadYamlError::SigningKeyYamlError)?;
+            aws_kms.validate().map_err(ReadYamlError::SigningProviderYamlError)?;
         }
 
         if let Some(turnkey) = &signing_key.turnkey {
-            turnkey.validate().map_err(ReadYamlError::SigningKeyYamlError)?;
+            turnkey.validate().map_err(ReadYamlError::SigningProviderYamlError)?;
         }
     }
 

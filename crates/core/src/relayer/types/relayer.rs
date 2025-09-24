@@ -29,10 +29,6 @@ pub struct Relayer {
     /// If the relayer is paused
     pub paused: bool,
 
-    /// If allowlisted only transactions are allowed
-    #[serde(rename = "allowlistedOnly")]
-    pub allowlisted_only: bool,
-
     /// If 1559 transactions are enabled
     #[serde(rename = "eip1559Enabled")]
     pub eip_1559_enabled: bool,

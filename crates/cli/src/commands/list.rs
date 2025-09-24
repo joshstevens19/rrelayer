@@ -55,21 +55,12 @@ async fn log_relayers(
             relayer.address.hex(),
             max_gas,
             status.to_string(),
-            format!("{}", relayer.allowlisted_only),
             format!("{}", relayer.eip_1559_enabled),
         ]);
     }
 
-    let headers = vec![
-        "Id",
-        "Name",
-        "Chain ID",
-        "Address",
-        "Max Gas Price",
-        "Status",
-        "Allowlisted Only",
-        "EIP-1559 Enabled",
-    ];
+    let headers =
+        vec!["Id", "Name", "Chain ID", "Address", "Max Gas Price", "Status", "EIP-1559 Enabled"];
 
     let title = format!("{} Relayers:", result.items.len());
     print_table(headers, rows, Some(&title), None);

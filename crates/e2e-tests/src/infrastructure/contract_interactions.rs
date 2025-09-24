@@ -210,15 +210,15 @@ impl ContractInteractor {
             // privy
             "0xa93e13Db16BF70b3D6B828bC0185A9F3AdD44BA9",
             // KMS
-            "0x33993A4F4AA617DA4558A0CFD0C39A7989B67720"];
+            "0x33993A4F4AA617DA4558A0CFD0C39A7989B67720",
+        ];
 
         for item in fund_addresses {
             // Transfer tokens from deployer to the automatic top-up funding address
             // The deployer (anvil_accounts[0]) has all the tokens, but the funding address in YAML is different
             // Use the known funding address from the config
-            let funding_address: Address = item
-                .parse()
-                .context("Failed to parse funding address")?;
+            let funding_address: Address =
+                item.parse().context("Failed to parse funding address")?;
 
             let transfer_amount = U256::from(100_000u64) * U256::from(10u64).pow(U256::from(18u64));
 
@@ -341,7 +341,7 @@ impl ContractInteractor {
 
         // Validate the Safe deployed to the expected address based on the provider
         let expected_address = self.get_expected_safe_address_for_provider()?;
-        
+
         if safe_address != expected_address {
             return Err(anyhow::anyhow!(
                 "Safe deployment address mismatch! Expected: {:?}, Got: {:?}",
@@ -377,17 +377,17 @@ impl ContractInteractor {
         // Check the SAFE_OWNER_ADDRESS environment variable to determine which provider is being used
         let safe_owner_address = std::env::var("SAFE_OWNER_ADDRESS")
             .unwrap_or_else(|_| "0x1C073e63f70701BC545019D3c4f2a25A69eCA8Cf".to_string());
-        
+
         // Map owner addresses to their expected Safe deployment addresses
         let expected_address = match safe_owner_address.to_lowercase().as_str() {
             "0x1c073e63f70701bc545019d3c4f2a25a69eca8cf" => {
                 // Raw provider
                 "0xcfe267de230a234c5937f18f239617b7038ec271"
-            },
+            }
             "0xde3d9699427d15d0a1419736141997e352f10f61" => {
                 // Privy provider
                 "0xd9fa512bc7ec216f0c01f4de4232629f3ec3bac7"
-            },
+            }
             _ => {
                 return Err(anyhow::anyhow!(
                     "Unknown Safe owner address: {}. Cannot determine expected Safe address.",
@@ -395,25 +395,8 @@ impl ContractInteractor {
                 ));
             }
         };
-        
+
         expected_address.parse().context("Failed to parse expected Safe address")
-    }
-
-    async fn update_yaml_config_with_safe_address(&self, safe_address: Address) -> Result<()> {
-        let config_path = std::path::Path::new("rrelayer.yaml");
-
-        let config_content =
-            tokio::fs::read_to_string(config_path).await.context("Failed to read rrelayer.yaml")?;
-
-        let updated_content = config_content
-            .replace("0x0000000000000000000000000000000000000001", &format!("{:?}", safe_address));
-
-        tokio::fs::write(config_path, updated_content)
-            .await
-            .context("Failed to write updated rrelayer.yaml")?;
-
-        info!("Updated rrelayer.yaml with Safe address: {:?}", safe_address);
-        Ok(())
     }
 
     fn extract_deployed_address(&self, forge_output: &str) -> Result<Address> {
@@ -427,23 +410,6 @@ impl ContractInteractor {
             }
         }
         Err(anyhow::anyhow!("Could not find deployed contract address in forge output"))
-    }
-
-    async fn update_yaml_config_with_token_address(&self, token_address: Address) -> Result<()> {
-        let config_path = std::path::Path::new("rrelayer.yaml");
-
-        let config_content =
-            tokio::fs::read_to_string(config_path).await.context("Failed to read rrelayer.yaml")?;
-
-        let updated_content = config_content
-            .replace("0x0000000000000000000000000000000000000000", &format!("{:?}", token_address));
-
-        tokio::fs::write(config_path, updated_content)
-            .await
-            .context("Failed to write updated rrelayer.yaml")?;
-
-        info!("Updated rrelayer.yaml with token address: {:?}", token_address);
-        Ok(())
     }
 
     pub async fn transfer_tokens(
@@ -491,33 +457,12 @@ impl ContractInteractor {
         Ok(format!("0x{}", alloy::hex::encode(encoded)))
     }
 
-    pub fn encode_always_revert(&self) -> Result<String> {
-        Ok("0xabcd1234".to_string())
-    }
-
-    pub fn encode_gas_intensive_operation(&self, iterations: u32) -> Result<String> {
-        Ok(format!("0xef123456{:064x}", iterations))
-    }
-
     pub fn contract_address(&self) -> Option<EvmAddress> {
         self.contract_address
     }
 
     pub fn token_address(&self) -> Option<EvmAddress> {
         self.token_address
-    }
-
-    pub async fn wait_for_transaction(&self, tx_hash: &str) -> Result<Option<TransactionReceipt>> {
-        let hash: FixedBytes<32> = tx_hash.parse().context("Invalid transaction hash")?;
-
-        for _ in 0..30 {
-            if let Ok(Some(receipt)) = self.provider.get_transaction_receipt(hash).await {
-                return Ok(Some(receipt));
-            }
-            tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
-        }
-
-        Ok(None)
     }
 
     pub async fn verify_contract_deployed(&self) -> Result<bool> {

@@ -1,4 +1,3 @@
-mod allowlist_toggle;
 mod clone;
 mod concurrent_creation;
 mod creation;
@@ -36,11 +35,6 @@ impl TestModule for RelayerTests {
                 "relayer_gas_configuration",
                 "Relayer gas configuration management",
                 |runner| Box::pin(runner.relayer_gas_configuration()),
-            ),
-            TestDefinition::new(
-                "relayer_allowlist_toggle",
-                "Relayer allowlist toggle functionality",
-                |runner| Box::pin(runner.relayer_allowlist_toggle()),
             ),
         ]
     }

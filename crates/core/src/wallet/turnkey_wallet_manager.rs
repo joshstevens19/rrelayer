@@ -1,7 +1,7 @@
 use crate::common_types::EvmAddress;
 use crate::network::ChainId;
 use crate::wallet::{WalletError, WalletManagerTrait};
-use crate::yaml::TurnkeySigningKey;
+use crate::yaml::TurnkeySigningProviderConfig;
 use alloy::consensus::{TxEnvelope, TypedTransaction};
 use alloy::dyn_abi::TypedData;
 use alloy::primitives::{keccak256, PrimitiveSignature};
@@ -178,7 +178,7 @@ pub struct TurnkeyWalletManager {
 }
 
 impl TurnkeyWalletManager {
-    pub async fn new(config: TurnkeySigningKey) -> Result<Self, WalletError> {
+    pub async fn new(config: TurnkeySigningProviderConfig) -> Result<Self, WalletError> {
         let client = reqwest::Client::new();
         let manager = Self {
             api_public_key: config.api_public_key,

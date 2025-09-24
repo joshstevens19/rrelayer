@@ -7,39 +7,19 @@ use tracing::info;
 
 impl TestRunner {
     /// run single with:
-    /// RRELAYER_PROVIDERS="raw" make run-test-debug TEST=rate_limiting_signing_message
-    /// RRELAYER_PROVIDERS="privy" make run-test-debug TEST=rate_limiting_signing_message
-    /// RRELAYER_PROVIDERS="aws_secret_manager" make run-test-debug TEST=rate_limiting_signing_message
-    /// RRELAYER_PROVIDERS="aws_kms" make run-test-debug TEST=rate_limiting_signing_message
-    /// RRELAYER_PROVIDERS="gcp_secret_manager" make run-test-debug TEST=rate_limiting_signing_message
-    /// RRELAYER_PROVIDERS="turnkey" make run-test-debug TEST=rate_limiting_signing_message
-    pub async fn rate_limiting_signing_message(&self) -> anyhow::Result<()> {
-        info!("Testing rate limiting signing message enforcement...");
+    /// RRELAYER_PROVIDERS="raw" make run-test-debug TEST=rate_limiting_signing_typed_data_user_limits
+    /// RRELAYER_PROVIDERS="privy" make run-test-debug TEST=rate_limiting_signing_typed_data_user_limits
+    /// RRELAYER_PROVIDERS="aws_secret_manager" make run-test-debug TEST=rate_limiting_signing_typed_data_user_limits
+    /// RRELAYER_PROVIDERS="aws_kms" make run-test-debug TEST=rate_limiting_signing_typed_data_user_limits
+    /// RRELAYER_PROVIDERS="gcp_secret_manager" make run-test-debug TEST=rate_limiting_signing_typed_data_user_limits
+    /// RRELAYER_PROVIDERS="turnkey" make run-test-debug TEST=rate_limiting_signing_typed_data_user_limits
+    pub async fn rate_limiting_signing_typed_data_user_limits(&self) -> anyhow::Result<()> {
+        info!("Testing rate limiting signing typed data enforcement...");
 
         let relayer = self.create_and_fund_relayer("rate-limit-relayer").await?;
         info!("relayer: {:?}", relayer);
 
         let relay_key = Some(self.config.anvil_accounts[0].to_string());
-
-        let mut successful_signing = 0;
-
-        for _ in 0..5 {
-            let sign_result = self
-                .relayer_client
-                .sdk
-                .sign
-                .sign_text(&relayer.id, "Hello, RRelayer!", relay_key.clone())
-                .await;
-
-            match sign_result {
-                Ok(_) => successful_signing += 1,
-                Err(_) => {}
-            }
-        }
-
-        if successful_signing != 1 {
-            return Err(anyhow!("Signing text rate limiting not enforced"));
-        }
 
         let mut successful_typed_signing = 0;
 
@@ -98,8 +78,28 @@ impl TestRunner {
             }
         }
 
-        if successful_typed_signing != 0 {
+        if successful_typed_signing != 1 {
             return Err(anyhow!("Signing typed data rate limiting not enforced"));
+        }
+
+        let mut successful_signing = 0;
+
+        for _ in 0..5 {
+            let sign_result = self
+                .relayer_client
+                .sdk
+                .sign
+                .sign_text(&relayer.id, "Hello, RRelayer!", relay_key.clone())
+                .await;
+
+            match sign_result {
+                Ok(_) => successful_signing += 1,
+                Err(_) => {}
+            }
+        }
+
+        if successful_signing != 0 {
+            return Err(anyhow!("Signing text data rate limiting not enforced"));
         }
 
         info!("Sleep for 60 seconds to allow the rate limit to expire");
@@ -109,16 +109,20 @@ impl TestRunner {
             .relayer_client
             .sdk
             .sign
-            .sign_text(&relayer.id, "Hello, RRelayer!", relay_key.clone())
+            .sign_typed_data(&relayer.id, &typed_data, relay_key.clone())
             .await;
 
         match sign_result {
             Ok(_) => {}
             Err(_) => {
-                return Err(anyhow!("Signing message should go through as rate limit expired"));
+                return Err(anyhow!("Signing typed data should go through as rate limit expired"));
             }
         }
 
+        info!("Sleep for 60 seconds to allow the rate limit to expire so doesnt hurt next test");
+        tokio::time::sleep(Duration::from_secs(60)).await;
+
+        info!("Rate limiting mechanism verified");
         Ok(())
     }
 }

@@ -6,6 +6,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 
+use crate::relayer::db::CreateRelayerMode;
 use crate::shared::{not_found, HttpError};
 use crate::{
     app_state::AppState,
@@ -40,7 +41,10 @@ pub async fn create_relayer(
     // Acquire mutex to prevent concurrent relayer creation deadlocks
     let _lock = state.relayer_creation_mutex.lock().await;
 
-    let relayer = state.db.create_relayer(&relayer.name, &chain_id, provider, None).await?;
+    let relayer = state
+        .db
+        .create_relayer(&relayer.name, &chain_id, provider, CreateRelayerMode::Create)
+        .await?;
     invalidate_relayer_cache(&state.cache, &relayer.id).await;
 
     let current_nonce = provider.get_nonce(&relayer.wallet_index).await?;
@@ -60,7 +64,7 @@ pub async fn create_relayer(
                 Default::default(),
                 Default::default(),
                 Default::default(),
-                None,
+                state.safe_proxy_manager.clone(),
             ),
             state.transactions_queues.clone(),
         )

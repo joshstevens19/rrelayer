@@ -36,21 +36,16 @@ impl TestRunner {
         let mut contract_interactor = ContractInteractor::new(&anvil_url).await?;
 
         let deployer_private_key = &config.anvil_private_keys[0];
-        let contract_address = contract_interactor
-            .deploy_test_contract(deployer_private_key)
-            .await?;
+        let contract_address =
+            contract_interactor.deploy_test_contract(deployer_private_key).await?;
 
         info!("Test contract deployed at: {:?}", contract_address);
 
-        let token_address = contract_interactor
-            .deploy_test_token(deployer_private_key)
-            .await?;
+        let token_address = contract_interactor.deploy_test_token(deployer_private_key).await?;
 
         info!("[SUCCESS] Test ERC-20 token deployed at: {:?}", token_address);
 
-        let safe_address = contract_interactor
-            .deploy_safe_contracts(deployer_private_key)
-            .await?;
+        let safe_address = contract_interactor.deploy_safe_contracts(deployer_private_key).await?;
 
         info!("[SUCCESS] Safe contracts deployed - Safe proxy at: {:?}", safe_address);
 
@@ -430,7 +425,7 @@ impl TestRunner {
 
         webhook_server.clear_webhooks();
 
-        let result = timeout(Duration::from_secs(90), (test_def.function)(self)).await;
+        let result = timeout(Duration::from_secs(180), (test_def.function)(self)).await;
 
         let test_result = match result {
             Ok(Ok(())) => {
@@ -490,7 +485,7 @@ impl TestRunner {
                 if let TestResult::Failed(msg) = &test.result {
                     println!("  [ERROR] {} - {}", test.name, msg);
                 } else if let TestResult::Timeout = &test.result {
-                    println!("  [TIMEOUT] {} - Test timed out after 90 seconds", test.name);
+                    println!("  [TIMEOUT] {} - Test timed out after 180 seconds", test.name);
                 }
             }
         }

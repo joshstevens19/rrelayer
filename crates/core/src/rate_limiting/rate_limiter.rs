@@ -8,8 +8,7 @@ use crate::relayer::RelayerId;
 use crate::shared::{not_found, too_many_requests, HttpError};
 use crate::{
     common_types::EvmAddress,
-    yaml::{RateLimitConfig, RateLimits},
-    GlobalRateLimits,
+    yaml::{RateLimitConfig, RateLimitWithInterval},
 };
 use axum::http::HeaderMap;
 use std::{
@@ -31,6 +30,7 @@ pub struct RateLimiter {
     detector: RateLimitDetector,
     usage_cache: Arc<RwLock<HashMap<String, UsageWindow>>>,
     global_usage_cache: Arc<RwLock<HashMap<String, UsageWindow>>>,
+    relayer_usage_cache: Arc<RwLock<HashMap<String, UsageWindow>>>,
 }
 
 impl RateLimiter {
@@ -42,7 +42,40 @@ impl RateLimiter {
             detector,
             usage_cache: Arc::new(RwLock::new(HashMap::new())),
             global_usage_cache: Arc::new(RwLock::new(HashMap::new())),
+            relayer_usage_cache: Arc::new(RwLock::new(HashMap::new())),
         }
+    }
+
+    fn parse_interval(interval: &str) -> u32 {
+        match interval {
+            "1m" => 60,
+            _ => 60,
+        }
+    }
+
+    fn get_limits_for_user(&self, _user_key: &str) -> (u64, u64, u32) {
+        // Returns (transaction_limit, signing_limit, window_seconds)
+
+        // First check for user-specific per-relayer limits
+        if let Some(ref user_limits) = self.config.user_limits {
+            if let Some(ref per_relayer) = user_limits.per_relayer {
+                let window_seconds = Self::parse_interval(&per_relayer.interval);
+                return (per_relayer.transactions, per_relayer.signing_operations, window_seconds);
+            }
+        }
+
+        // Then check for general relayer limits (applies to all relayers)
+        if let Some(ref relayer_limits) = self.config.relayer_limits {
+            let window_seconds = Self::parse_interval(&relayer_limits.interval);
+            return (
+                relayer_limits.transactions,
+                relayer_limits.signing_operations,
+                window_seconds,
+            );
+        }
+
+        // Default limits if none configured
+        (100, 50, 60)
     }
 
     pub async fn check_and_reserve_rate_limit<'a>(
@@ -88,12 +121,23 @@ impl RateLimiter {
     ) -> Result<RateLimitReservation, RateLimitError> {
         let context = self.detector.detect(headers, relayer_address)?;
 
-        if let Some(ref global_limits) = self.config.global_limits {
-            self.check_global_limits(operation, global_limits).await?;
+        // First check relayer limits (ALL usage on this relayer, regardless of user)
+        if let Some(ref relayer_limits) = self.config.relayer_limits {
+            self.check_relayer_limits(relayer_address, operation, relayer_limits).await?;
         }
 
+        // Then check user-specific limits
         let user_key = &context.key;
-        let result = self.check_user_limits(user_key, operation).await?;
+
+        // Check global user limits (all usage across all relayers for all users)
+        if let Some(ref user_limits) = self.config.user_limits {
+            if let Some(ref global_limits) = user_limits.global {
+                self.check_global_user_limits(operation, global_limits).await?;
+            }
+        }
+
+        // Check per-relayer user limits (user usage on this specific relayer)
+        let result = self.check_user_limits(user_key, relayer_address, operation).await?;
 
         if !result.allowed {
             return Err(RateLimitError::LimitExceeded {
@@ -104,9 +148,17 @@ impl RateLimiter {
             });
         }
 
-        self.reserve_operation(user_key, operation).await?;
-        if self.config.global_limits.is_some() {
-            self.reserve_global_operation(operation).await?;
+        // Reserve in all relevant caches
+        self.reserve_user_operation(user_key, relayer_address, operation).await?;
+
+        if let Some(ref user_limits) = self.config.user_limits {
+            if user_limits.global.is_some() {
+                self.reserve_global_user_operation(operation).await?;
+            }
+        }
+
+        if self.config.relayer_limits.is_some() {
+            self.reserve_relayer_operation(relayer_address, operation).await?;
         }
 
         Ok(RateLimitReservation {
@@ -114,62 +166,100 @@ impl RateLimiter {
             user_key: user_key.clone(),
             operation,
             context,
+            relayer_address: *relayer_address,
             reserved: true,
         })
     }
 
-    async fn check_global_limits(
+    async fn check_relayer_limits(
         &self,
+        relayer_address: &EvmAddress,
         operation: RateLimitOperation,
-        global_limits: &GlobalRateLimits,
+        relayer_limits: &RateLimitWithInterval,
     ) -> Result<(), RateLimitError> {
         let current_time = SystemTime::now();
+        let window_seconds = Self::parse_interval(&relayer_limits.interval);
 
-        let limits_to_check = match operation {
+        let (limit, cache_key) = match operation {
             RateLimitOperation::Transaction => {
-                let mut checks = Vec::new();
-                if let Some(limit) = global_limits.max_transactions_per_minute {
-                    checks.push(("global_tx_per_minute", limit, 60));
-                }
-                checks
+                (relayer_limits.transactions, format!("relayer_{}_{}", relayer_address, "tx"))
             }
+            RateLimitOperation::Signing => (
+                relayer_limits.signing_operations,
+                format!("relayer_{}_{}", relayer_address, "signing"),
+            ),
+        };
+
+        let window_start = self.calculate_window_start(current_time, window_seconds);
+
+        let relayer_cache = self.relayer_usage_cache.read().await;
+        let usage = relayer_cache
+            .get(&cache_key)
+            .cloned()
+            .unwrap_or(UsageWindow { usage_count: 0, window_start });
+
+        let current_usage = if current_time
+            .duration_since(usage.window_start)
+            .map(|d| d.as_secs() > window_seconds as u64)
+            .unwrap_or(true)
+        {
+            1 // Window expired, start fresh
+        } else {
+            usage.usage_count + 1
+        };
+
+        if current_usage > limit {
+            return Err(RateLimitError::LimitExceeded {
+                operation: format!("relayer_{}", operation.as_str()),
+                current: current_usage,
+                limit,
+                window_seconds,
+            });
+        }
+
+        Ok(())
+    }
+
+    async fn check_global_user_limits(
+        &self,
+        operation: RateLimitOperation,
+        global_limits: &RateLimitWithInterval,
+    ) -> Result<(), RateLimitError> {
+        let current_time = SystemTime::now();
+        let window_seconds = Self::parse_interval(&global_limits.interval);
+
+        let (limit, cache_key) = match operation {
+            RateLimitOperation::Transaction => (global_limits.transactions, "global_user_tx"),
             RateLimitOperation::Signing => {
-                let mut checks = Vec::new();
-                if let Some(limit) = global_limits.max_signing_operations_per_minute {
-                    checks.push(("global_signing_per_minute", limit, 60));
-                }
-                checks
+                (global_limits.signing_operations, "global_user_signing")
             }
         };
 
-        let mut global_cache = self.global_usage_cache.write().await;
+        let window_start = self.calculate_window_start(current_time, window_seconds);
 
-        for (cache_key, limit, window_seconds) in limits_to_check {
-            let window_start = self.calculate_window_start(current_time, window_seconds);
+        let global_cache = self.global_usage_cache.read().await;
+        let usage = global_cache
+            .get(cache_key)
+            .cloned()
+            .unwrap_or(UsageWindow { usage_count: 0, window_start });
 
-            let usage = global_cache
-                .get(cache_key)
-                .cloned()
-                .unwrap_or(UsageWindow { usage_count: 0, window_start });
+        let current_usage = if current_time
+            .duration_since(usage.window_start)
+            .map(|d| d.as_secs() > window_seconds as u64)
+            .unwrap_or(true)
+        {
+            1 // Window expired, start fresh
+        } else {
+            usage.usage_count + 1
+        };
 
-            let current_usage = if current_time
-                .duration_since(usage.window_start)
-                .map(|d| d.as_secs() as u32 > window_seconds)
-                .unwrap_or(true)
-            {
-                1 // Window expired, start fresh
-            } else {
-                usage.usage_count + 1
-            };
-
-            if current_usage > limit {
-                return Err(RateLimitError::LimitExceeded {
-                    operation: cache_key.to_string(),
-                    current: current_usage,
-                    limit,
-                    window_seconds,
-                });
-            }
+        if current_usage > limit {
+            return Err(RateLimitError::LimitExceeded {
+                operation: cache_key.to_string(),
+                current: current_usage,
+                limit,
+                window_seconds,
+            });
         }
 
         Ok(())
@@ -178,20 +268,16 @@ impl RateLimiter {
     async fn check_user_limits(
         &self,
         user_key: &str,
+        relayer_address: &EvmAddress,
         operation: RateLimitOperation,
     ) -> Result<RateLimitResult, RateLimitError> {
-        let limits = self.get_limits_for_user(user_key);
+        let (tx_limit, signing_limit, window_seconds) = self.get_limits_for_user(user_key);
 
         let current_time = SystemTime::now();
 
-        // Check per-minute limits
-        let (limit, window_seconds) = match operation {
-            RateLimitOperation::Transaction => {
-                (limits.transactions_per_minute.unwrap_or(u64::MAX), 60)
-            }
-            RateLimitOperation::Signing => {
-                (limits.signing_operations_per_minute.unwrap_or(u64::MAX), 60)
-            }
+        let limit = match operation {
+            RateLimitOperation::Transaction => tx_limit,
+            RateLimitOperation::Signing => signing_limit,
         };
 
         if limit == u64::MAX {
@@ -204,7 +290,7 @@ impl RateLimiter {
             });
         }
 
-        let cache_key = format!("{}_{}", user_key, operation.as_str());
+        let cache_key = format!("{}_{}_{}", user_key, relayer_address, operation.as_str());
         let window_start = self.calculate_window_start(current_time, window_seconds);
 
         let usage_cache = self.usage_cache.read().await;
@@ -215,7 +301,7 @@ impl RateLimiter {
 
         let current_usage = if current_time
             .duration_since(usage.window_start)
-            .map(|d| d.as_secs() as u32 > window_seconds)
+            .map(|d| d.as_secs() > window_seconds as u64)
             .unwrap_or(true)
         {
             1 // Window expired, start fresh
@@ -229,14 +315,16 @@ impl RateLimiter {
         Ok(RateLimitResult { allowed, current_usage, limit, window_seconds, reset_time })
     }
 
-    async fn reserve_operation(
+    async fn reserve_user_operation(
         &self,
         user_key: &str,
+        relayer_address: &EvmAddress,
         operation: RateLimitOperation,
     ) -> Result<(), RateLimitError> {
-        let cache_key = format!("{}_{}", user_key, operation.as_str());
+        let cache_key = format!("{}_{}_{}", user_key, relayer_address, operation.as_str());
         let current_time = SystemTime::now();
-        let window_start = self.calculate_window_start(current_time, 60);
+        let (_, _, window_seconds) = self.get_limits_for_user(user_key);
+        let window_start = self.calculate_window_start(current_time, window_seconds);
 
         let mut usage_cache = self.usage_cache.write().await;
         let usage = usage_cache
@@ -246,7 +334,7 @@ impl RateLimiter {
 
         let new_usage = if current_time
             .duration_since(usage.window_start)
-            .map(|d| d.as_secs() as u32 > 60)
+            .map(|d| d.as_secs() > window_seconds as u64)
             .unwrap_or(true)
         {
             UsageWindow { usage_count: 1, window_start }
@@ -258,33 +346,73 @@ impl RateLimiter {
         Ok(())
     }
 
-    async fn reserve_global_operation(
+    async fn reserve_global_user_operation(
         &self,
         operation: RateLimitOperation,
     ) -> Result<(), RateLimitError> {
         let current_time = SystemTime::now();
         let mut global_cache = self.global_usage_cache.write().await;
 
-        let cache_keys = match operation {
-            RateLimitOperation::Transaction => {
-                vec![("global_tx_per_minute", 60)]
-            }
-            RateLimitOperation::Signing => {
-                vec![("global_signing_per_minute", 60)]
-            }
-        };
+        if let Some(ref user_limits) = self.config.user_limits {
+            if let Some(ref global_limits) = user_limits.global {
+                let window_seconds = Self::parse_interval(&global_limits.interval);
+                let cache_key = match operation {
+                    RateLimitOperation::Transaction => "global_user_tx",
+                    RateLimitOperation::Signing => "global_user_signing",
+                };
 
-        for (cache_key, window_seconds) in cache_keys {
+                let window_start = self.calculate_window_start(current_time, window_seconds);
+
+                let usage = global_cache
+                    .get(cache_key)
+                    .cloned()
+                    .unwrap_or(UsageWindow { usage_count: 0, window_start });
+
+                let new_usage = if current_time
+                    .duration_since(usage.window_start)
+                    .map(|d| d.as_secs() > window_seconds as u64)
+                    .unwrap_or(true)
+                {
+                    UsageWindow { usage_count: 1, window_start }
+                } else {
+                    UsageWindow {
+                        usage_count: usage.usage_count + 1,
+                        window_start: usage.window_start,
+                    }
+                };
+
+                global_cache.insert(cache_key.to_string(), new_usage);
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn reserve_relayer_operation(
+        &self,
+        relayer_address: &EvmAddress,
+        operation: RateLimitOperation,
+    ) -> Result<(), RateLimitError> {
+        let current_time = SystemTime::now();
+
+        if let Some(ref relayer_limits) = self.config.relayer_limits {
+            let window_seconds = Self::parse_interval(&relayer_limits.interval);
+            let cache_key = match operation {
+                RateLimitOperation::Transaction => format!("relayer_{}_{}", relayer_address, "tx"),
+                RateLimitOperation::Signing => format!("relayer_{}_{}", relayer_address, "signing"),
+            };
+
             let window_start = self.calculate_window_start(current_time, window_seconds);
+            let mut relayer_cache = self.relayer_usage_cache.write().await;
 
-            let usage = global_cache
-                .get(cache_key)
+            let usage = relayer_cache
+                .get(&cache_key)
                 .cloned()
                 .unwrap_or(UsageWindow { usage_count: 0, window_start });
 
             let new_usage = if current_time
                 .duration_since(usage.window_start)
-                .map(|d| d.as_secs() as u32 > window_seconds)
+                .map(|d| d.as_secs() > window_seconds as u64)
                 .unwrap_or(true)
             {
                 UsageWindow { usage_count: 1, window_start }
@@ -292,18 +420,19 @@ impl RateLimiter {
                 UsageWindow { usage_count: usage.usage_count + 1, window_start: usage.window_start }
             };
 
-            global_cache.insert(cache_key.to_string(), new_usage);
+            relayer_cache.insert(cache_key, new_usage);
         }
 
         Ok(())
     }
 
-    async fn revert_operation(
+    async fn revert_user_operation(
         &self,
         user_key: &str,
+        relayer_address: &EvmAddress,
         operation: RateLimitOperation,
     ) -> Result<(), RateLimitError> {
-        let cache_key = format!("{}_{}", user_key, operation.as_str());
+        let cache_key = format!("{}_{}_{}", user_key, relayer_address, operation.as_str());
 
         let mut usage_cache = self.usage_cache.write().await;
         if let Some(mut usage) = usage_cache.get(&cache_key).cloned() {
@@ -313,47 +442,49 @@ impl RateLimiter {
             }
         }
 
-        // Also revert global if needed
-        if self.config.global_limits.is_some() {
-            self.revert_global_operation(operation).await?;
-        }
-
         Ok(())
     }
 
-    async fn revert_global_operation(
+    async fn revert_global_user_operation(
         &self,
         operation: RateLimitOperation,
     ) -> Result<(), RateLimitError> {
         let mut global_cache = self.global_usage_cache.write().await;
 
-        let cache_keys = match operation {
-            RateLimitOperation::Transaction => vec!["global_tx_per_minute"],
-            RateLimitOperation::Signing => {
-                vec!["global_signing_per_minute"]
-            }
+        let cache_key = match operation {
+            RateLimitOperation::Transaction => "global_user_tx",
+            RateLimitOperation::Signing => "global_user_signing",
         };
 
-        for cache_key in cache_keys {
-            if let Some(mut usage) = global_cache.get(cache_key).cloned() {
-                if usage.usage_count > 0 {
-                    usage.usage_count -= 1;
-                    global_cache.insert(cache_key.to_string(), usage);
-                }
+        if let Some(mut usage) = global_cache.get(cache_key).cloned() {
+            if usage.usage_count > 0 {
+                usage.usage_count -= 1;
+                global_cache.insert(cache_key.to_string(), usage);
             }
         }
 
         Ok(())
     }
 
-    fn get_limits_for_user(&self, user_key: &str) -> RateLimits {
-        if let Some(ref unlimited_users) = self.config.user_unlimited_overrides {
-            if unlimited_users.contains(&user_key.to_string()) {
-                return RateLimits { ..Default::default() };
+    async fn revert_relayer_operation(
+        &self,
+        relayer_address: &EvmAddress,
+        operation: RateLimitOperation,
+    ) -> Result<(), RateLimitError> {
+        let cache_key = match operation {
+            RateLimitOperation::Transaction => format!("relayer_{}_{}", relayer_address, "tx"),
+            RateLimitOperation::Signing => format!("relayer_{}_{}", relayer_address, "signing"),
+        };
+
+        let mut relayer_cache = self.relayer_usage_cache.write().await;
+        if let Some(mut usage) = relayer_cache.get(&cache_key).cloned() {
+            if usage.usage_count > 0 {
+                usage.usage_count -= 1;
+                relayer_cache.insert(cache_key, usage);
             }
         }
 
-        self.config.limits.clone().unwrap_or_default()
+        Ok(())
     }
 
     fn calculate_window_start(&self, current_time: SystemTime, window_seconds: u32) -> SystemTime {
@@ -364,17 +495,12 @@ impl RateLimiter {
     }
 }
 
-impl Default for RateLimits {
-    fn default() -> Self {
-        Self { transactions_per_minute: Some(100), signing_operations_per_minute: Some(50) }
-    }
-}
-
 pub struct RateLimitReservation<'a> {
     rate_limiter: &'a RateLimiter,
     user_key: String,
     operation: RateLimitOperation,
     context: RateLimitDetectContext,
+    relayer_address: EvmAddress,
     reserved: bool,
 }
 
@@ -385,7 +511,23 @@ impl<'a> RateLimitReservation<'a> {
 
     pub async fn revert(mut self) -> Result<(), RateLimitError> {
         if self.reserved {
-            self.rate_limiter.revert_operation(&self.user_key, self.operation).await?;
+            // Revert user operation
+            self.rate_limiter.revert_user_operation(&self.user_key, &self.relayer_address, self.operation).await?;
+
+            // Revert global user operation if applicable
+            if let Some(ref user_limits) = self.rate_limiter.config.user_limits {
+                if user_limits.global.is_some() {
+                    self.rate_limiter.revert_global_user_operation(self.operation).await?;
+                }
+            }
+
+            // Revert relayer operation if applicable
+            if self.rate_limiter.config.relayer_limits.is_some() {
+                self.rate_limiter
+                    .revert_relayer_operation(&self.relayer_address, self.operation)
+                    .await?;
+            }
+
             self.reserved = false;
         }
         Ok(())
@@ -398,8 +540,24 @@ impl<'a> Drop for RateLimitReservation<'a> {
             let rate_limiter = self.rate_limiter.clone();
             let user_key = self.user_key.clone();
             let operation = self.operation;
+            let relayer_address = self.relayer_address;
+            let config = self.rate_limiter.config.clone();
             tokio::spawn(async move {
-                let _ = rate_limiter.revert_operation(&user_key, operation).await;
+                // Revert user operation
+                let _ = rate_limiter.revert_user_operation(&user_key, &relayer_address, operation).await;
+
+                // Revert global user operation if applicable
+                if let Some(ref user_limits) = config.user_limits {
+                    if user_limits.global.is_some() {
+                        let _ = rate_limiter.revert_global_user_operation(operation).await;
+                    }
+                }
+
+                // Revert relayer operation if applicable
+                if config.relayer_limits.is_some() {
+                    let _ =
+                        rate_limiter.revert_relayer_operation(&relayer_address, operation).await;
+                }
             });
         }
     }
@@ -412,6 +570,7 @@ impl Clone for RateLimiter {
             detector: RateLimitDetector::new(self.config.fallback_to_relayer),
             usage_cache: self.usage_cache.clone(),
             global_usage_cache: self.global_usage_cache.clone(),
+            relayer_usage_cache: self.relayer_usage_cache.clone(),
         }
     }
 }

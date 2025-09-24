@@ -16,18 +16,6 @@ impl RelayerAllowlist {
         Self { client }
     }
 
-    pub async fn add(&self, relayer_id: &RelayerId, address: &EvmAddress) -> ApiResult<()> {
-        self.client
-            .post_status(&format!("relayers/{}/allowlists/{}", relayer_id, address.hex()), &())
-            .await
-    }
-
-    pub async fn delete(&self, relayer_id: &RelayerId, address: &EvmAddress) -> ApiResult<()> {
-        self.client
-            .delete_status(&format!("relayers/{}/allowlists/{}", relayer_id, address.hex()))
-            .await
-    }
-
     pub async fn get_all(
         &self,
         relayer_id: &RelayerId,

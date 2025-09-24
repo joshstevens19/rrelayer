@@ -44,7 +44,8 @@ impl TestRunner {
             alloy::primitives::utils::format_ether(relayer_balance)
         );
 
-        let safe_proxy_address = self.contract_interactor.get_expected_safe_address_for_provider()?;
+        let safe_proxy_address =
+            self.contract_interactor.get_expected_safe_address_for_provider()?;
         let safe_balance_before =
             self.contract_interactor.get_eth_balance(&safe_proxy_address).await?;
         info!(

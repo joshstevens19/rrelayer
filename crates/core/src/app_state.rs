@@ -2,6 +2,11 @@ use std::sync::Arc;
 
 use tokio::sync::Mutex;
 
+use crate::common_types::EvmAddress;
+use crate::network::ChainId;
+use crate::shared::{unauthorized, HttpError};
+use crate::transaction::types::TransactionValue;
+use crate::yaml::NetworkPermissionsConfig;
 use crate::{
     gas::{BlobGasOracleCache, GasOracleCache},
     postgres::PostgresClient,
@@ -11,9 +16,23 @@ use crate::{
     transaction::queue_system::TransactionsQueues,
     webhooks::WebhookManager,
     yaml::RateLimitConfig,
+    SafeProxyManager,
 };
 
-/// Global application state shared across all HTTP handlers.
+pub struct RelayersInternalOnly {
+    values: Vec<(ChainId, EvmAddress)>,
+}
+
+impl RelayersInternalOnly {
+    pub fn new(values: Vec<(ChainId, EvmAddress)>) -> Self {
+        Self { values }
+    }
+
+    pub fn restricted(&self, relayer: &EvmAddress, chain_id: &ChainId) -> bool {
+        self.values.iter().any(|(id, address)| id == chain_id && address == relayer)
+    }
+}
+
 pub struct AppState {
     /// Database client with connection pooling
     pub db: Arc<PostgresClient>,
@@ -35,4 +54,71 @@ pub struct AppState {
     pub rate_limit_config: Option<RateLimitConfig>,
     /// Mutex to prevent concurrent relayer creation deadlocks
     pub relayer_creation_mutex: Arc<Mutex<()>>,
+    /// The safe proxy manager can only change on startup
+    pub safe_proxy_manager: Arc<SafeProxyManager>,
+    /// Any relayers which can only be called by internal logic
+    pub relayer_internal_only: Arc<RelayersInternalOnly>,
+    /// Hold all networks permissions
+    pub network_permissions: Arc<Vec<(ChainId, Vec<NetworkPermissionsConfig>)>>,
+}
+
+impl AppState {
+    fn find_network_permission(
+        &self,
+        chain_id: &ChainId,
+    ) -> Option<&Vec<NetworkPermissionsConfig>> {
+        self.network_permissions.iter().find(|n| n.0 == *chain_id).map(|n| &n.1)
+    }
+
+    pub fn restricted_addresses(
+        &self,
+        relayer: &EvmAddress,
+        chain_id: &ChainId,
+    ) -> Vec<EvmAddress> {
+        let mut addresses = vec![];
+        let network_permission = self.find_network_permission(chain_id);
+        if let Some(network_permissions) = network_permission {
+            for network_permission in network_permissions {
+                if network_permission.relayers.contains(&relayer) {
+                    addresses.extend_from_slice(&network_permission.allowlist);
+                }
+            }
+        }
+
+        addresses
+    }
+
+    pub fn network_permission_validate(
+        &self,
+        relayer: &EvmAddress,
+        chain_id: &ChainId,
+        to: &EvmAddress,
+        value: &TransactionValue,
+    ) -> Result<(), HttpError> {
+        let network_permissions = self.find_network_permission(chain_id);
+        if let Some(network_permissions) = network_permissions {
+            for network_permission in network_permissions {
+                if network_permission.relayers.contains(&relayer) {
+                    if network_permission.allowlist.len() > 0
+                        && !network_permission.allowlist.contains(&to)
+                    {
+                        return Err(unauthorized(Some(
+                            format!("relayer is not allowed to send transactions to {}", to)
+                                .to_string(),
+                        )));
+                    }
+
+                    if !value.is_zero()
+                        && network_permission.disable_native_transfer.unwrap_or_default()
+                    {
+                        return Err(unauthorized(Some(
+                           "native transfer is disabled for this relayer".to_string(),
+                        )));
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
 }

@@ -20,6 +20,10 @@ impl TransactionValue {
     pub fn new(value: U256) -> Self {
         TransactionValue(value)
     }
+
+    pub fn is_zero(&self) -> bool {
+        self.0 == U256::from(0)
+    }
 }
 
 impl Default for TransactionValue {

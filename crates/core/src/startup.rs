@@ -1,11 +1,13 @@
 use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Instant};
 
+use crate::app_state::RelayersInternalOnly;
 use crate::authentication::{basic_auth_guard, create_basic_auth_routes};
 use crate::background_tasks::run_background_tasks;
+use crate::common_types::EvmAddress;
 use crate::gas::{create_gas_routes, BlobGasOracleCache, GasOracleCache};
-use crate::network::create_network_routes;
+use crate::network::{create_network_routes, set_networks_cache, ChainId, Network};
 use crate::webhooks::WebhookManager;
-use crate::yaml::ReadYamlError;
+use crate::yaml::{NetworkPermissionsConfig, ReadYamlError};
 use crate::{
     app_state::AppState,
     postgres::{PostgresClient, PostgresConnectionError, PostgresError},
@@ -24,7 +26,7 @@ use crate::{
             startup_transactions_queues, StartTransactionsQueuesError, TransactionsQueues,
         },
     },
-    ApiConfig, RateLimitConfig,
+    ApiConfig, RateLimitConfig, SafeProxyConfig,
 };
 use axum::{
     body::{to_bytes, Body},
@@ -149,6 +151,7 @@ async fn activity_logger(req: Request<Body>, next: Next) -> Result<Response, Sta
 async fn start_api(
     api_config: ApiConfig,
     rate_limit_config: Option<RateLimitConfig>,
+    network_permissions: Vec<(ChainId, Vec<NetworkPermissionsConfig>)>,
     gas_oracle_cache: Arc<Mutex<GasOracleCache>>,
     blob_gas_oracle_cache: Arc<Mutex<BlobGasOracleCache>>,
     transactions_queues: Arc<Mutex<TransactionsQueues>>,
@@ -157,6 +160,8 @@ async fn start_api(
     webhook_manager: Option<Arc<Mutex<WebhookManager>>>,
     user_rate_limiter: Option<Arc<RateLimiter>>,
     db: Arc<PostgresClient>,
+    safe_proxy_manager: Arc<SafeProxyManager>,
+    relayer_internal_only: RelayersInternalOnly,
 ) -> Result<(), StartApiError> {
     let app_state = Arc::new(AppState {
         db: db.clone(),
@@ -169,6 +174,9 @@ async fn start_api(
         user_rate_limiter,
         rate_limit_config,
         relayer_creation_mutex: Arc::new(Mutex::new(())),
+        safe_proxy_manager,
+        relayer_internal_only: Arc::new(relayer_internal_only),
+        network_permissions: Arc::new(network_permissions),
     });
 
     let cors = CorsLayer::new()
@@ -268,29 +276,15 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
 
     let config = read(&yaml_path, false)?;
 
-    let safe_proxy_manager = if let Some(ref safe_proxy_configs) = config.safe_proxy {
-        if !safe_proxy_configs.is_empty() {
-            info!("Initializing safe proxy with {} configurations", safe_proxy_configs.len());
-            Some(SafeProxyManager::new(safe_proxy_configs.clone()))
-        } else {
-            None
-        }
-    } else {
-        None
-    };
-
     let cache = Arc::new(Cache::new().await);
 
+    set_networks_cache(
+        &cache,
+        &config.networks.clone().into_iter().map(Network::from).collect::<Vec<Network>>(),
+    )
+    .await;
+
     let providers = Arc::new(load_providers(&project_path, &config).await?);
-
-    {
-        let mut db = PostgresClient::new().await.map_err(StartApiError::DatabaseConnectionError)?;
-
-        for provider in providers.as_ref() {
-            db.save_enabled_network(&provider.chain_id, &provider.name, &provider.provider_urls)
-                .await?;
-        }
-    }
 
     let gas_oracle_cache = Arc::new(Mutex::new(GasOracleCache::new()));
     let blob_gas_oracle_cache = Arc::new(Mutex::new(BlobGasOracleCache::new()));
@@ -309,13 +303,39 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
         None
     };
 
+    let mut safe_configs: Vec<SafeProxyConfig> = vec![];
+    let mut relayer_internal_only: Vec<(ChainId, EvmAddress)> = vec![];
+    let mut network_permissions: Vec<(ChainId, Vec<NetworkPermissionsConfig>)> = vec![];
+    for network_config in &config.networks {
+        if let Some(automatic_top_up) = &network_config.automatic_top_up {
+            if let Some(safe_address) = &automatic_top_up.from.safe {
+                safe_configs.push(SafeProxyConfig {
+                    address: *safe_address,
+                    relayers: vec![automatic_top_up.from.relayer.address],
+                    chain_id: network_config.chain_id,
+                })
+            }
+            if automatic_top_up.from.relayer.internal_only.unwrap_or(true) {
+                relayer_internal_only
+                    .push((network_config.chain_id, automatic_top_up.from.relayer.address))
+            }
+        }
+
+        if let Some(permissions) = &network_config.permissions {
+            network_permissions.push((network_config.chain_id, permissions.clone()))
+        }
+    }
+
+    let safe_proxy_manager = Arc::new(SafeProxyManager::new(safe_configs));
+    let relayer_internal_only = RelayersInternalOnly::new(relayer_internal_only);
+
     let transaction_queue = startup_transactions_queues(
         gas_oracle_cache.clone(),
         blob_gas_oracle_cache.clone(),
         providers.clone(),
         cache.clone(),
         webhook_manager.clone(),
-        safe_proxy_manager,
+        safe_proxy_manager.clone(),
     )
     .await?;
 
@@ -328,6 +348,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
         cache.clone(),
         webhook_manager.clone(),
         transaction_queue.clone(),
+        safe_proxy_manager.clone(),
     )
     .await;
 
@@ -345,6 +366,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
     start_api(
         config.api_config,
         config.rate_limits.clone(),
+        network_permissions,
         gas_oracle_cache,
         blob_gas_oracle_cache,
         transaction_queue,
@@ -353,6 +375,8 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
         webhook_manager,
         user_rate_limiter,
         postgres_client,
+        safe_proxy_manager,
+        relayer_internal_only,
     )
     .await?;
 

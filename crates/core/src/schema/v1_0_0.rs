@@ -4,29 +4,10 @@ use crate::postgres::{PostgresClient, PostgresError};
 pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), PostgresError> {
     let schema_sql = r#"
         CREATE SCHEMA IF NOT EXISTS public;
-        CREATE SCHEMA IF NOT EXISTS network;
         CREATE SCHEMA IF NOT EXISTS relayer;
         CREATE SCHEMA IF NOT EXISTS signing;
         CREATE SCHEMA IF NOT EXISTS rate_limit;
         CREATE SCHEMA IF NOT EXISTS webhook;
-
-        CREATE TABLE IF NOT EXISTS network.record (
-            chain_id BIGINT PRIMARY KEY NOT NULL,
-            name VARCHAR(50) NOT NULL,
-            disabled BOOLEAN DEFAULT FALSE NOT NULL,
-            updated_on TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-            created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS network.node (
-            chain_id BIGINT NOT NULL,
-            provider_url VARCHAR(200) NOT NULL,
-            created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-            PRIMARY KEY (chain_id, provider_url),
-            CONSTRAINT fk_network_node_chain_id
-                FOREIGN KEY (chain_id)
-                    REFERENCES network.record (chain_id)
-        );
 
         CREATE TABLE IF NOT EXISTS relayer.record (
             id UUID PRIMARY KEY NOT NULL,
@@ -36,24 +17,10 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
             wallet_index INT NOT NULL,
             max_gas_price_cap NUMERIC(80) NULL,
             paused BOOLEAN DEFAULT FALSE NOT NULL,
-            allowlisted_addresses_only BOOLEAN DEFAULT FALSE NOT NULL,
             eip_1559_enabled BOOLEAN DEFAULT TRUE NOT NULL,
             deleted BOOLEAN DEFAULT FALSE NOT NULL,
             updated_on TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-            created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-            CONSTRAINT fk_relayer_record_chain_id
-                FOREIGN KEY (chain_id)
-                    REFERENCES network.record (chain_id)
-        );
-
-        CREATE TABLE IF NOT EXISTS relayer.allowlisted_address (
-            address BYTEA NOT NULL,
-            relayer_id UUID NOT NULL,
-            created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-            PRIMARY KEY (address, relayer_id),
-            CONSTRAINT fk_relayer_allowlisted_address_relayer_id
-                FOREIGN KEY (relayer_id)
-                    REFERENCES relayer.record (id)
+            created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
         );
 
         DO $$
@@ -163,12 +130,6 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
         CREATE INDEX IF NOT EXISTS idx_relayer_deleted 
         ON relayer.record(deleted);
 
-        CREATE INDEX IF NOT EXISTS idx_network_disabled 
-        ON network.record(disabled);
-
-        CREATE INDEX IF NOT EXISTS idx_allowlist_relayer_created 
-        ON relayer.allowlisted_address(relayer_id, created_at DESC);
-
         CREATE TABLE IF NOT EXISTS rate_limit.transaction_metadata (
             id SERIAL PRIMARY KEY NOT NULL,
             transaction_hash VARCHAR(66),
@@ -265,10 +226,7 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
                     REFERENCES relayer.record (id),
             CONSTRAINT fk_webhook_delivery_transaction_id
                 FOREIGN KEY (transaction_id)
-                    REFERENCES relayer.transaction (id),
-            CONSTRAINT fk_webhook_delivery_chain_id
-                FOREIGN KEY (chain_id)
-                    REFERENCES network.record (chain_id)
+                    REFERENCES relayer.transaction (id)
         );
 
         CREATE INDEX IF NOT EXISTS idx_webhook_delivery_endpoint_status 

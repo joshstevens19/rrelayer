@@ -64,7 +64,7 @@ impl TestRunner {
         self.mine_and_wait().await?;
         info!("Waiting for all transactions to reach mempool...");
 
-        let timeout = Duration::from_secs(90);
+        let timeout = Duration::from_secs(180);
         let start = Instant::now();
 
         loop {

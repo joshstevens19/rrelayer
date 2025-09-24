@@ -51,7 +51,7 @@ pub struct TransactionsQueue {
     gas_oracle_cache: Arc<Mutex<GasOracleCache>>,
     blob_oracle_cache: Arc<Mutex<BlobGasOracleCache>>,
     confirmations: u64,
-    safe_proxy_manager: Option<SafeProxyManager>,
+    safe_proxy_manager: Arc<SafeProxyManager>,
 }
 
 impl TransactionsQueue {
@@ -443,18 +443,6 @@ impl TransactionsQueue {
         self.relayer.eip_1559_enabled = is_legacy_transactions;
     }
 
-    pub fn is_allowlisted_only(&self) -> bool {
-        self.relayer.allowlisted_only
-    }
-
-    pub fn set_is_allowlisted_only(&mut self, is_allowlisted_only: bool) {
-        info!(
-            "Setting allowlisted only to {} for relayer: {}",
-            is_allowlisted_only, self.relayer.name
-        );
-        self.relayer.allowlisted_only = is_allowlisted_only;
-    }
-
     pub fn is_paused(&self) -> bool {
         self.relayer.paused
     }
@@ -731,78 +719,69 @@ impl TransactionsQueue {
             return Err(TransactionQueueSendTransactionError::GasPriceTooHigh);
         }
 
-        let (final_to, final_data) = if let Some(ref safe_proxy_manager) = self.safe_proxy_manager {
-            if let Some(safe_address) =
-                safe_proxy_manager.get_safe_proxy_for_relayer(&self.relayer.address)
-            {
-                info!(
-                    "Routing transaction {} through safe proxy {} for relayer: {}",
-                    transaction.id, safe_address, self.relayer.name
-                );
+        let (final_to, final_data) = if let Some(safe_address) = self
+            .safe_proxy_manager
+            .get_safe_proxy_for_relayer(&self.relayer.address, transaction.chain_id)
+        {
+            info!(
+                "Routing transaction {} through safe proxy {} for relayer: {}",
+                transaction.id, safe_address, self.relayer.name
+            );
 
-                let safe_nonce =
-                    safe_proxy_manager.get_safe_nonce(&self.evm_provider, &safe_address).await?;
+            let safe_nonce =
+                self.safe_proxy_manager.get_safe_nonce(&self.evm_provider, &safe_address).await?;
 
-                let (safe_addr, safe_tx) = safe_proxy_manager
-                    .wrap_transaction_for_safe(
-                        &self.relayer.address,
-                        transaction.to,
-                        transaction.value.clone(),
-                        transaction.data.clone(),
-                        safe_nonce,
-                    )
-                    .map_err(|e| {
-                        TransactionQueueSendTransactionError::TransactionConversionError(
-                            e.to_string(),
-                        )
-                    })?;
+            let (safe_addr, safe_tx) = self
+                .safe_proxy_manager
+                .wrap_transaction_for_safe(
+                    &self.relayer.address,
+                    transaction.chain_id,
+                    transaction.to,
+                    transaction.value.clone(),
+                    transaction.data.clone(),
+                    safe_nonce,
+                )
+                .map_err(|e| {
+                    TransactionQueueSendTransactionError::TransactionConversionError(e.to_string())
+                })?;
 
-                let safe_tx_hash = safe_proxy_manager
-                    .get_safe_transaction_hash(
-                        &safe_addr,
-                        &safe_tx,
-                        self.evm_provider.chain_id.u64(),
-                    )
-                    .map_err(|e| {
-                        TransactionQueueSendTransactionError::TransactionConversionError(
-                            e.to_string(),
-                        )
-                    })?;
+            let safe_tx_hash = self
+                .safe_proxy_manager
+                .get_safe_transaction_hash(&safe_addr, &safe_tx, self.evm_provider.chain_id.u64())
+                .map_err(|e| {
+                    TransactionQueueSendTransactionError::TransactionConversionError(e.to_string())
+                })?;
 
-                let hash_hex = format!("0x{}", hex::encode(safe_tx_hash));
+            let hash_hex = format!("0x{}", hex::encode(safe_tx_hash));
 
-                let signature =
-                    self.evm_provider
-                        .sign_text(&self.relayer.wallet_index, &hash_hex)
-                        .await
-                        .map_err(|e| {
-                            TransactionQueueSendTransactionError::TransactionConversionError(
-                                format!("Failed to sign safe transaction hash: {}", e),
-                            )
-                        })?;
+            let signature =
+                self.evm_provider.sign_text(&self.relayer.wallet_index, &hash_hex).await.map_err(
+                    |e| {
+                        TransactionQueueSendTransactionError::TransactionConversionError(format!(
+                            "Failed to sign safe transaction hash: {}",
+                            e
+                        ))
+                    },
+                )?;
 
-                // Encode the signature into bytes according to Safe's requirements
-                // Safe signature format: r + s + v where v = recovery_id + 4
-                let mut sig_bytes = Vec::with_capacity(65);
-                sig_bytes.extend_from_slice(&signature.r().to_be_bytes::<32>());
-                sig_bytes.extend_from_slice(&signature.s().to_be_bytes::<32>());
-                // Safe requires v = recovery_id + 4 for ECDSA signatures
-                let recovery_id = if signature.v() { 1u8 } else { 0u8 };
-                sig_bytes.push(recovery_id + 4);
-                let signatures = alloy::primitives::Bytes::from(sig_bytes);
+            // Encode the signature into bytes according to Safe's requirements
+            // Safe signature format: r + s + v where v = recovery_id + 4
+            let mut sig_bytes = Vec::with_capacity(65);
+            sig_bytes.extend_from_slice(&signature.r().to_be_bytes::<32>());
+            sig_bytes.extend_from_slice(&signature.s().to_be_bytes::<32>());
+            // Safe requires v = recovery_id + 4 for ECDSA signatures
+            let recovery_id = if signature.v() { 1u8 } else { 0u8 };
+            sig_bytes.push(recovery_id + 4);
+            let signatures = alloy::primitives::Bytes::from(sig_bytes);
 
-                let safe_call_data = safe_proxy_manager
-                    .encode_safe_transaction(&safe_tx, signatures)
-                    .map_err(|e| {
-                        TransactionQueueSendTransactionError::TransactionConversionError(
-                            e.to_string(),
-                        )
-                    })?;
+            let safe_call_data = self
+                .safe_proxy_manager
+                .encode_safe_transaction(&safe_tx, signatures)
+                .map_err(|e| {
+                    TransactionQueueSendTransactionError::TransactionConversionError(e.to_string())
+                })?;
 
-                (safe_addr, TransactionData::new(safe_call_data))
-            } else {
-                (transaction.to, transaction.data.clone())
-            }
+            (safe_addr, TransactionData::new(safe_call_data))
         } else {
             (transaction.to, transaction.data.clone())
         };
@@ -813,13 +792,10 @@ impl TransactionsQueue {
 
         // If using safe proxy, the transaction value should be 0 because the ETH transfer
         // amount is encoded in the execTransaction call data, not in the transaction value
-        if self.safe_proxy_manager.is_some()
-            && self
-                .safe_proxy_manager
-                .as_ref()
-                .unwrap()
-                .get_safe_proxy_for_relayer(&self.relayer.address)
-                .is_some()
+        if self
+            .safe_proxy_manager
+            .get_safe_proxy_for_relayer(&self.relayer.address, transaction.chain_id)
+            .is_some()
         {
             working_transaction.value = TransactionValue::zero();
         }
@@ -878,13 +854,10 @@ impl TransactionsQueue {
                 .map_err(TransactionQueueSendTransactionError::TransactionEstimateGasError)?
         };
 
-        if self.safe_proxy_manager.is_some()
-            && self
-                .safe_proxy_manager
-                .as_ref()
-                .unwrap()
-                .get_safe_proxy_for_relayer(&self.relayer.address)
-                .is_some()
+        if self
+            .safe_proxy_manager
+            .get_safe_proxy_for_relayer(&self.relayer.address, transaction.chain_id)
+            .is_some()
         {
             let original_estimate = estimated_gas_limit;
 

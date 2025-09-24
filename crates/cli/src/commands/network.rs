@@ -2,7 +2,7 @@ use alloy::providers::Provider;
 use clap::{Args, Subcommand};
 use dialoguer::{Confirm, Input};
 use prettytable::{Cell, Row, Table, format};
-use rrelayer_core::{NetworkSetupConfig, create_retry_client, gas::GasPriceResult};
+use rrelayer_core::{NetworkSetupConfig, create_retry_client, gas::GasPriceResult, get_chain_id};
 use rrelayer_sdk::SDK;
 
 use crate::project_location::ProjectLocation;
@@ -13,19 +13,7 @@ pub enum NetworkCommands {
     /// Add a new network
     Add(AddArgs),
     /// List all networks
-    List(ListArgs),
-    /// Enable network
-    Enable {
-        /// The network name
-        #[arg(long, short = 'n')]
-        name: String,
-    },
-    /// Disable network
-    Disable {
-        /// The network name
-        #[arg(long, short = 'n')]
-        name: String,
-    },
+    List,
     Gas {
         /// The network name
         #[arg(long, short = 'n')]
@@ -36,18 +24,6 @@ pub enum NetworkCommands {
 #[derive(Args)]
 pub struct AddArgs {}
 
-#[derive(Args, Copy, Clone)]
-pub struct ListArgs {
-    #[arg(long, value_enum)]
-    filter: Option<NetworkFilter>,
-}
-
-#[derive(clap::ValueEnum, Clone, Copy)]
-enum NetworkFilter {
-    Enabled,
-    Disabled,
-}
-
 pub async fn handle_network(
     command: &NetworkCommands,
     project_path: &ProjectLocation,
@@ -55,13 +31,7 @@ pub async fn handle_network(
 ) -> Result<(), NetworkError> {
     match &command {
         NetworkCommands::Add(_) => handle_add(project_path).await,
-        NetworkCommands::List(list_args) => handle_list(list_args, sdk).await,
-        NetworkCommands::Disable { name: network_name } => {
-            handle_network_toggle(network_name, project_path, sdk, false).await
-        }
-        NetworkCommands::Enable { name: network_name } => {
-            handle_network_toggle(network_name, project_path, sdk, true).await
-        }
+        NetworkCommands::List => handle_list(sdk).await,
         NetworkCommands::Gas { name: network_name } => {
             handle_gas(network_name, project_path, sdk).await
         }
@@ -126,12 +96,16 @@ async fn handle_add(project_path: &ProjectLocation) -> Result<(), NetworkError> 
 
     setup_config.networks.push(NetworkSetupConfig {
         name: network_name.clone(),
-        signing_key: None,
+        chain_id: get_chain_id(provider_urls.first().unwrap())
+            .await
+            .expect("Could not read from rpc for the chain id"),
+        signing_provider: None,
         provider_urls,
         block_explorer_url: if block_explorer.is_empty() { None } else { Some(block_explorer) },
         gas_provider: None,
         automatic_top_up: None,
         confirmations: None,
+        permissions: None,
     });
 
     project_path.overwrite_setup_config(setup_config)?;
@@ -144,15 +118,8 @@ async fn handle_add(project_path: &ProjectLocation) -> Result<(), NetworkError> 
     Ok(())
 }
 
-async fn handle_list(args: &ListArgs, sdk: &SDK) -> Result<(), NetworkError> {
-    let networks = if let Some(filter) = args.filter {
-        match filter {
-            NetworkFilter::Enabled => sdk.network.get_enabled_networks().await?,
-            NetworkFilter::Disabled => sdk.network.get_disabled_networks().await?,
-        }
-    } else {
-        sdk.network.get_all_networks().await?
-    };
+async fn handle_list(sdk: &SDK) -> Result<(), NetworkError> {
+    let networks = sdk.network.get_all_networks().await?;
 
     if networks.is_empty() {
         println!("No networks found.");
@@ -169,17 +136,10 @@ async fn handle_list(args: &ListArgs, sdk: &SDK) -> Result<(), NetworkError> {
             format!("{} endpoints", network.provider_urls.len())
         };
 
-        let status = if network.disabled { "Disabled" } else { "Active" };
-
-        rows.push(vec![
-            network.name.clone(),
-            network.chain_id.to_string(),
-            provider_str,
-            status.to_string(),
-        ]);
+        rows.push(vec![network.name.clone(), network.chain_id.to_string(), provider_str]);
     }
 
-    let headers = vec!["Network Name", "Chain ID", "Provider URLs", "Status"];
+    let headers = vec!["Network Name", "Chain ID", "Provider URLs"];
 
     let title = format!("{} Networks Available:", networks.len());
     let footer = "Tip: Run 'network info <name>' to see more details about a specific network.";
@@ -259,28 +219,6 @@ async fn handle_gas(
             table.printstd();
         }
     }
-
-    Ok(())
-}
-
-async fn handle_network_toggle(
-    network_name: &str,
-    project_path: &ProjectLocation,
-    sdk: &SDK,
-    enable: bool,
-) -> Result<(), NetworkError> {
-    let chain_id = get_chain_id_for_network(network_name, project_path).await?;
-    if enable {
-        sdk.network.enable_network(chain_id).await?;
-    } else {
-        sdk.network.disable_network(chain_id).await?;
-    }
-
-    println!(
-        "Network '{}' {} successfully.",
-        network_name,
-        if enable { "enabled" } else { "disabled" }
-    );
 
     Ok(())
 }

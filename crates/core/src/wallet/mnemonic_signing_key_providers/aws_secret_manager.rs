@@ -2,9 +2,11 @@ use aws_config::{BehaviorVersion, Region};
 use aws_sdk_secretsmanager::Client;
 
 use crate::wallet::WalletError;
-use crate::yaml::AwsSecretManager;
+use crate::yaml::AwsSecretManagerProviderConfig;
 
-pub async fn get_aws_secret(config: &AwsSecretManager) -> Result<String, WalletError> {
+pub async fn get_aws_secret(
+    config: &AwsSecretManagerProviderConfig,
+) -> Result<String, WalletError> {
     let aws_config = aws_config::defaults(BehaviorVersion::latest())
         .region(Region::new(config.region.clone()))
         .load()

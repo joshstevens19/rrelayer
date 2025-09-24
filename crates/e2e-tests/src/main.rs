@@ -113,9 +113,7 @@ async fn run_single_provider_with_cleanup(
         Err(_) => {
             error!("[ERROR] RRelayer shutdown timed out after 15 seconds, forcing exit");
             // Force kill any remaining processes as a last resort
-            let _ = std::process::Command::new("pkill")
-                .args(["-f", "rrelayer"])
-                .output();
+            let _ = std::process::Command::new("pkill").args(["-f", "rrelayer"]).output();
         }
     }
 

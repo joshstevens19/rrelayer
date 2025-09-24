@@ -40,10 +40,6 @@ impl TestRunner {
             return Err(anyhow!("Relayer should be the same address"));
         }
 
-        if relayer.allowlisted_only {
-            return Err(anyhow!("Relayer should not be allowlisted yet"));
-        }
-
         if relayer.chain_id != ChainId::new(31337) {
             return Err(anyhow!("Relayer should not be the same chain"));
         }

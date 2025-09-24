@@ -186,7 +186,7 @@ impl EmbeddedRRelayerServer {
             let stdout = String::from_utf8_lossy(&output.stdout);
             let stderr = String::from_utf8_lossy(&output.stderr);
             let error = format!(
-                "Docker Compose failed to start containers.\nSTDOUT: {}\nSTDERR: {}", 
+                "Docker Compose failed to start containers.\nSTDOUT: {}\nSTDERR: {}",
                 stdout, stderr
             );
             error!("{}", error);
@@ -250,13 +250,14 @@ impl EmbeddedRRelayerServer {
         }
 
         Err(anyhow::anyhow!(
-            "Docker containers did not start successfully within {} retries", max_retries
+            "Docker containers did not start successfully within {} retries",
+            max_retries
         ))
     }
 
     async fn wait_for_postgres(&self) -> Result<()> {
         info!("Waiting for PostgreSQL to be ready...");
-        
+
         let connection_string = "postgres://postgres:rrelayer@localhost:5447/postgres";
         let mut retries = 30; // 30 attempts with 1 second each = 30 seconds max
 

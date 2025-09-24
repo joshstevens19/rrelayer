@@ -3,7 +3,7 @@ use crate::wallet::{
     AwsKmsWalletManager, MnemonicWalletManager, PrivyWalletManager, TurnkeyWalletManager,
     WalletError, WalletManagerTrait,
 };
-use crate::yaml::{AwsKmsSigningKey, TurnkeySigningKey};
+use crate::yaml::{AwsKmsSigningProviderConfig, TurnkeySigningProviderConfig};
 use crate::{
     gas::{
         BaseGasFeeEstimator, BlobGasEstimatorResult, BlobGasPriceResult, GasEstimatorError,
@@ -119,7 +119,6 @@ pub enum RetryClientError {
     CouldNotBuildClient(#[from] ReqwestError),
 }
 
-/// Creates a retry-enabled HTTP client for RPC communications.
 pub async fn create_retry_client(rpc_url: &str) -> Result<Arc<RelayerProvider>, RetryClientError> {
     let rpc_url = Url::parse(rpc_url).map_err(|e| {
         RetryClientError::HttpProviderCantBeCreated(rpc_url.to_string(), e.to_string())
@@ -165,7 +164,6 @@ pub enum EvmProviderNewError {
 }
 
 impl EvmProvider {
-    /// Creates a new EvmProvider using a mnemonic phrase for wallet management.
     pub async fn new_with_mnemonic(
         network_setup_config: &NetworkSetupConfig,
         mnemonic: &str,
@@ -175,7 +173,6 @@ impl EvmProvider {
         Self::new_internal(network_setup_config, wallet_manager, gas_estimator).await
     }
 
-    /// Creates a new EvmProvider using Privy for wallet management.
     pub async fn new_with_privy(
         network_setup_config: &NetworkSetupConfig,
         app_id: String,
@@ -187,20 +184,18 @@ impl EvmProvider {
         Self::new_internal(network_setup_config, wallet_manager, gas_estimator).await
     }
 
-    /// Creates a new EvmProvider using AWS KMS for wallet management.
     pub async fn new_with_aws_kms(
         network_setup_config: &NetworkSetupConfig,
-        aws_kms_config: AwsKmsSigningKey,
+        aws_kms_config: AwsKmsSigningProviderConfig,
         gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
     ) -> Result<Self, EvmProviderNewError> {
         let wallet_manager = Arc::new(AwsKmsWalletManager::new(aws_kms_config));
         Self::new_internal(network_setup_config, wallet_manager, gas_estimator).await
     }
 
-    /// Creates a new EvmProvider using Turnkey for wallet management.
     pub async fn new_with_turnkey(
         network_setup_config: &NetworkSetupConfig,
-        turnkey_config: TurnkeySigningKey,
+        turnkey_config: TurnkeySigningProviderConfig,
         gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
     ) -> Result<Self, EvmProviderNewError> {
         let turnkey_manager = TurnkeyWalletManager::new(turnkey_config).await?;
@@ -246,7 +241,6 @@ impl EvmProvider {
         })
     }
 
-    /// Returns a random RPC client from the configured providers for load balancing.
     pub fn rpc_client(&self) -> Arc<RelayerProvider> {
         let mut rng = thread_rng();
         let index = rng.gen_range(0..self.rpc_clients.len());
@@ -303,7 +297,6 @@ impl EvmProvider {
         Ok(TransactionNonce::new(nonce))
     }
 
-    /// Signs and broadcasts a transaction to the network.
     pub async fn send_transaction(
         &self,
         wallet_index: &u32,
@@ -330,7 +323,6 @@ impl EvmProvider {
         Ok(TransactionHash::from_alloy_hash(receipt.tx_hash()))
     }
 
-    /// Signs a transaction without broadcasting it.
     pub async fn sign_transaction(
         &self,
         wallet_index: &u32,
@@ -339,7 +331,6 @@ impl EvmProvider {
         self.wallet_manager.sign_transaction(*wallet_index, transaction, &self.chain_id).await
     }
 
-    /// Signs a text message using EIP-191 personal message signing.
     pub async fn sign_text(
         &self,
         wallet_index: &u32,
@@ -348,7 +339,6 @@ impl EvmProvider {
         self.wallet_manager.sign_text(*wallet_index, text).await
     }
 
-    /// Signs structured data using EIP-712 typed data signing.
     pub async fn sign_typed_data(
         &self,
         wallet_index: &u32,
@@ -357,7 +347,6 @@ impl EvmProvider {
         self.wallet_manager.sign_typed_data(*wallet_index, typed_data).await
     }
 
-    /// Estimates the gas required for a transaction execution.
     pub async fn estimate_gas(
         &self,
         transaction: &TypedTransaction,
@@ -374,12 +363,10 @@ impl EvmProvider {
         Ok(GasLimit::new(result as u128))
     }
 
-    /// Calculates current gas prices for different transaction speeds.
     pub async fn calculate_gas_price(&self) -> Result<GasEstimatorResult, GasEstimatorError> {
         self.gas_estimator.get_gas_prices(&self.chain_id).await
     }
 
-    /// Retrieves the ETH balance for a given address.
     pub async fn get_balance(
         &self,
         address: &EvmAddress,
@@ -443,7 +430,6 @@ impl EvmProvider {
         })
     }
 
-    /// Returns whether the wallet manager supports EIP-4844 blob transactions
     pub fn supports_blobs(&self) -> bool {
         self.wallet_manager.supports_blobs()
     }

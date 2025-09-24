@@ -1,5 +1,3 @@
-use std::collections::{HashMap, VecDeque};
-
 use crate::{
     provider::EvmProvider,
     relayer::Relayer,
@@ -9,6 +7,8 @@ use crate::{
         types::{Transaction, TransactionId},
     },
 };
+use std::collections::{HashMap, VecDeque};
+use std::sync::Arc;
 
 pub struct TransactionsQueueSetup {
     pub relayer: Relayer,
@@ -17,7 +17,7 @@ pub struct TransactionsQueueSetup {
     pub pending_transactions: VecDeque<Transaction>,
     pub inmempool_transactions: VecDeque<Transaction>,
     pub mined_transactions: HashMap<TransactionId, Transaction>,
-    pub safe_proxy_manager: Option<SafeProxyManager>,
+    pub safe_proxy_manager: Arc<SafeProxyManager>,
 }
 
 impl TransactionsQueueSetup {
@@ -28,7 +28,7 @@ impl TransactionsQueueSetup {
         pending_transactions: VecDeque<Transaction>,
         inmempool_transactions: VecDeque<Transaction>,
         mined_transactions: HashMap<TransactionId, Transaction>,
-        safe_proxy_manager: Option<SafeProxyManager>,
+        safe_proxy_manager: Arc<SafeProxyManager>,
     ) -> Self {
         TransactionsQueueSetup {
             relayer,

@@ -31,9 +31,6 @@ pub enum ReplaceTransactionError {
     #[error("Could not read allowlists from db: {0}")]
     CouldNotReadAllowlistsFromDb(PostgresError),
 
-    #[error("Relayer {0} could not send transactions to {1}")]
-    RelayerNotAllowedToSendTransactionTo(RelayerId, EvmAddress),
-
     #[error("Relayer {0} is paused")]
     RelayerIsPaused(RelayerId),
 
@@ -48,10 +45,6 @@ impl From<ReplaceTransactionError> for HttpError {
         }
 
         if matches!(value, ReplaceTransactionError::RelayerIsPaused(_)) {
-            return bad_request(value.to_string());
-        }
-
-        if matches!(value, ReplaceTransactionError::RelayerNotAllowedToSendTransactionTo(_, _)) {
             return bad_request(value.to_string());
         }
 
@@ -70,14 +63,8 @@ pub enum AddTransactionError {
     #[error("Could not read allowlists from db: {0}")]
     CouldNotReadAllowlistsFromDb(PostgresError),
 
-    #[error("Relayer {0} could not send transactions to {1}")]
-    RelayerNotAllowedToSendTransactionTo(RelayerId, EvmAddress),
-
     #[error("Relayer {0} is paused")]
     RelayerIsPaused(RelayerId),
-
-    #[error("Network {0} is disabled")]
-    NetworkDisabled(ChainId),
 
     #[error("{0}")]
     TransactionGasPriceError(#[from] SendTransactionGasPriceError),
@@ -106,10 +93,6 @@ impl From<AddTransactionError> for HttpError {
 
         if matches!(value, AddTransactionError::RelayerNotFound(_)) {
             return not_found(value.to_string());
-        }
-
-        if matches!(value, AddTransactionError::RelayerNotAllowedToSendTransactionTo(_, _)) {
-            return bad_request(value.to_string());
         }
 
         if matches!(value, AddTransactionError::UnsupportedTransactionType { .. }) {

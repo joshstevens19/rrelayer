@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use thiserror::Error;
 
-use crate::{gas::get_gas_estimator, network::ChainId, SetupConfig, SigningKey, WalletError};
+use crate::{gas::get_gas_estimator, network::ChainId, SetupConfig, SigningProvider, WalletError};
 
 mod evm_provider;
 mod layer_extensions;
@@ -40,7 +40,7 @@ pub async fn load_providers(
     let mut providers = Vec::new();
 
     for config in &setup_config.networks {
-        if config.signing_key.is_none() && setup_config.signing_key.is_none() {
+        if config.signing_provider.is_none() && setup_config.signing_provider.is_none() {
             return Err(LoadProvidersError::NoSigningKey);
         }
 
@@ -48,9 +48,9 @@ pub async fn load_providers(
             return Err(LoadProvidersError::ProvidersRequired);
         }
 
-        let signing_key: &SigningKey = if let Some(ref signing_key) = config.signing_key {
+        let signing_key: &SigningProvider = if let Some(ref signing_key) = config.signing_provider {
             signing_key
-        } else if let Some(ref signing_key) = setup_config.signing_key {
+        } else if let Some(ref signing_key) = setup_config.signing_provider {
             signing_key
         } else {
             return Err(LoadProvidersError::NoSigningKey);

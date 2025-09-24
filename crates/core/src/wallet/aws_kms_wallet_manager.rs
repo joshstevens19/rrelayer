@@ -1,7 +1,7 @@
 use crate::common_types::EvmAddress;
 use crate::network::ChainId;
 use crate::wallet::{WalletError, WalletManagerTrait};
-use crate::yaml::{AwsKmsSigningKey, KmsKeyConfig};
+use crate::yaml::{AwsKmsSigningProviderConfig, KmsKeyConfig};
 use alloy::consensus::TypedTransaction;
 use alloy::dyn_abi::TypedData;
 use alloy::network::TxSigner;
@@ -16,13 +16,13 @@ use tokio::sync::RwLock;
 
 #[derive(Debug)]
 pub struct AwsKmsWalletManager {
-    config: AwsKmsSigningKey,
+    config: AwsKmsSigningProviderConfig,
     signers: Arc<RwLock<HashMap<(u32, u64), AwsSigner>>>,
 }
 
 impl AwsKmsWalletManager {
     /// Creates a new AWS KMS wallet manager.
-    pub fn new(config: AwsKmsSigningKey) -> Self {
+    pub fn new(config: AwsKmsSigningProviderConfig) -> Self {
         Self { config, signers: Arc::new(RwLock::new(HashMap::new())) }
     }
 

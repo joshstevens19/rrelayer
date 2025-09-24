@@ -9,8 +9,8 @@ use crate::{
     safe_proxy::SafeProxyManager,
     shared::common_types::{EvmAddress, PagingContext},
     transaction::queue_system::TransactionsQueues,
-    yaml::{AutomaticTopUpConfig, Erc20TokenConfig, NativeTokenConfig, TopUpTargetAddresses},
-    SetupConfig,
+    yaml::{AllOrAddresses, Erc20TokenConfig, NativeTokenConfig, NetworkAutomaticTopUpConfig},
+    SafeProxyConfig, SetupConfig,
 };
 use alloy::primitives::U256;
 use alloy::providers::Provider;
@@ -29,17 +29,11 @@ sol! {
     }
 }
 
-/// The task behavior is controlled through the `SetupConfig` which contains
-/// network-specific `AutomaticTopUpConfig` settings including:
-/// - Source address for funds (`from_address`)
-/// - Target addresses (all relayers or specific list)
-/// - Minimum balance threshold (`min_balance`)
-/// - Top-up amount (`top_up_amount`)
 pub struct AutomaticTopUpTask {
     postgres_client: Arc<PostgresClient>,
     providers: Arc<Vec<EvmProvider>>,
     config: SetupConfig,
-    safe_proxy_manager: Option<SafeProxyManager>,
+    safe_proxy_manager: Arc<SafeProxyManager>,
     relayer_cache: HashMap<ChainId, Vec<Relayer>>,
     relayer_refresh_interval: Interval,
     top_up_check_interval: Interval,
@@ -47,15 +41,13 @@ pub struct AutomaticTopUpTask {
 }
 
 impl AutomaticTopUpTask {
-    pub fn new(
+    pub async fn new(
         postgres_client: Arc<PostgresClient>,
         providers: Arc<Vec<EvmProvider>>,
         config: SetupConfig,
         transactions_queues: Arc<tokio::sync::Mutex<TransactionsQueues>>,
+        safe_proxy_manager: Arc<SafeProxyManager>,
     ) -> Self {
-        let safe_proxy_manager =
-            config.safe_proxy.as_ref().map(|configs| SafeProxyManager::new(configs.clone()));
-
         Self {
             postgres_client,
             providers,
@@ -91,20 +83,15 @@ impl AutomaticTopUpTask {
             if let Some(_automatic_top_up) = &network_config.automatic_top_up {
                 info!("Refreshing relayer cache for {}", network_config.name);
 
-                let chain_id = match network_config.get_chain_id().await {
-                    Ok(id) => id,
-                    Err(e) => {
-                        error!("Failed to get chain ID for network {}: {}", network_config.name, e);
-                        continue;
-                    }
-                };
-
-                match self.get_all_relayers_for_chain(&chain_id).await {
+                match self.get_all_relayers_for_chain(&network_config.chain_id).await {
                     Ok(relayers) => {
-                        self.relayer_cache.insert(chain_id, relayers);
+                        self.relayer_cache.insert(network_config.chain_id, relayers);
                     }
                     Err(e) => {
-                        error!("Failed to refresh relayer cache for chain {}: {}", chain_id, e);
+                        error!(
+                            "Failed to refresh relayer cache for chain {}: {}",
+                            network_config.chain_id, e
+                        );
                     }
                 }
             }
@@ -127,23 +114,19 @@ impl AutomaticTopUpTask {
             if let Some(automatic_top_up) = &network_config.automatic_top_up {
                 info!("Checking addresses for top-up on {}", network_config.name);
 
-                let chain_id = match network_config.get_chain_id().await {
-                    Ok(id) => id,
-                    Err(e) => {
-                        error!("Failed to get chain ID for network {}: {}", network_config.name, e);
-                        continue;
-                    }
-                };
-
-                let provider = match self.get_provider_for_chain(&chain_id) {
+                let provider = match self.get_provider_for_chain(&network_config.chain_id) {
                     Some(p) => p,
                     None => {
-                        warn!("No provider found for chain {}. Skipping top-up checks.", chain_id);
+                        warn!(
+                            "No provider found for chain {}. Skipping top-up checks.",
+                            network_config.chain_id
+                        );
                         continue;
                     }
                 };
 
-                self.process_top_up_config(&chain_id, provider, automatic_top_up).await;
+                self.process_top_up_config(&network_config.chain_id, provider, automatic_top_up)
+                    .await;
             }
         }
     }
@@ -153,12 +136,15 @@ impl AutomaticTopUpTask {
         &self,
         chain_id: &ChainId,
         provider: &EvmProvider,
-        config: &AutomaticTopUpConfig,
+        config: &NetworkAutomaticTopUpConfig,
     ) {
-        info!("Processing top-up config for chain {} from {}", chain_id, config.from_address);
+        info!(
+            "Processing top-up config for chain {} from {}",
+            chain_id, config.from.relayer.address
+        );
 
         let target_addresses = match self
-            .resolve_target_addresses(chain_id, &config.targets, &config.from_address)
+            .resolve_target_addresses(chain_id, &config.targets, &config.from.relayer.address)
             .await
         {
             Ok(addresses) => addresses,
@@ -179,7 +165,7 @@ impl AutomaticTopUpTask {
                 self.process_native_token_top_ups(
                     chain_id,
                     provider,
-                    &config.from_address,
+                    &config.from.relayer.address,
                     &target_addresses,
                     native_config,
                     config,
@@ -202,7 +188,7 @@ impl AutomaticTopUpTask {
                 self.process_erc20_token_top_ups(
                     chain_id,
                     provider,
-                    &config.from_address,
+                    &config.from.relayer.address,
                     &target_addresses,
                     token_config,
                     config,
@@ -227,7 +213,7 @@ impl AutomaticTopUpTask {
         from_address: &EvmAddress,
         target_addresses: &[EvmAddress],
         native_config: &NativeTokenConfig,
-        config: &AutomaticTopUpConfig,
+        config: &NetworkAutomaticTopUpConfig,
     ) {
         let mut addresses_needing_top_up = Vec::new();
 
@@ -319,7 +305,7 @@ impl AutomaticTopUpTask {
         from_address: &EvmAddress,
         target_addresses: &[EvmAddress],
         token_config: &Erc20TokenConfig,
-        config: &AutomaticTopUpConfig,
+        config: &NetworkAutomaticTopUpConfig,
     ) {
         let mut addresses_needing_top_up = Vec::new();
 
@@ -418,7 +404,7 @@ impl AutomaticTopUpTask {
         from_address: &EvmAddress,
         target_address: &EvmAddress,
         native_config: &NativeTokenConfig,
-        config: &AutomaticTopUpConfig,
+        config: &NetworkAutomaticTopUpConfig,
     ) -> Result<String, String> {
         if from_address == target_address {
             return Err(format!(
@@ -432,44 +418,40 @@ impl AutomaticTopUpTask {
             from_address,
             target_address,
             format_wei_to_eth(&native_config.top_up_amount),
-            if config.safe.is_some() { " via Safe proxy" } else { "" }
+            if config.via_safe() { " via Safe" } else { "" }
         );
 
-        let (final_to, final_value, final_data) = if let Some(safe_address) = &config.safe {
-            if let Some(ref safe_manager) = self.safe_proxy_manager {
-                info!(
-                    "Using Safe proxy {} for top-up transaction from {} to {}",
-                    safe_address, from_address, target_address
-                );
+        let (final_to, final_value, final_data) = if let Some(safe_address) = &config.from.safe {
+            info!(
+                "Using Safe proxy {} for top-up transaction from {} to {}",
+                safe_address, from_address, target_address
+            );
 
-                let wallet_index =
-                    match self.find_wallet_index_for_address(chain_id, from_address).await {
-                        Some(index) => index,
-                        None => {
-                            return Err(format!(
-                                "Cannot find wallet index for from_address {} on chain {}",
-                                from_address, chain_id
-                            ));
-                        }
-                    };
+            let wallet_index =
+                match self.find_wallet_index_for_address(chain_id, from_address).await {
+                    Some(index) => index,
+                    None => {
+                        return Err(format!(
+                            "Cannot find wallet index for from_address {} on chain {}",
+                            from_address, chain_id
+                        ));
+                    }
+                };
 
-                let (_safe_tx, encoded_data) = safe_manager
-                    .create_safe_transaction_with_signature(
-                        provider,
-                        wallet_index,
-                        safe_address,
-                        *target_address,
-                        native_config.top_up_amount,
-                        alloy::primitives::Bytes::new(),
-                    )
-                    .await
-                    .map_err(|e| format!("Failed to create Safe transaction: {}", e))?;
+            let (_safe_tx, encoded_data) = self
+                .safe_proxy_manager
+                .create_safe_transaction_with_signature(
+                    provider,
+                    wallet_index,
+                    safe_address,
+                    *target_address,
+                    native_config.top_up_amount,
+                    alloy::primitives::Bytes::new(),
+                )
+                .await
+                .map_err(|e| format!("Failed to create Safe transaction: {}", e))?;
 
-                (*safe_address, U256::ZERO, encoded_data)
-            } else {
-                return Err("Safe proxy address configured but SafeProxyManager not initialized"
-                    .to_string());
-            }
+            (*safe_address, U256::ZERO, encoded_data)
         } else {
             (*target_address, native_config.top_up_amount, alloy::primitives::Bytes::new())
         };
@@ -533,11 +515,11 @@ impl AutomaticTopUpTask {
     async fn resolve_target_addresses(
         &self,
         chain_id: &ChainId,
-        targets: &TopUpTargetAddresses,
+        targets: &AllOrAddresses,
         from_address: &EvmAddress,
     ) -> Result<Vec<EvmAddress>, PostgresError> {
         let mut addresses = match targets {
-            TopUpTargetAddresses::All => {
+            AllOrAddresses::All => {
                 match self.postgres_client.get_all_relayers_for_chain(chain_id).await {
                     Ok(relayers) => {
                         let addresses: Vec<EvmAddress> =
@@ -553,7 +535,7 @@ impl AutomaticTopUpTask {
                     }
                 }
             }
-            TopUpTargetAddresses::List(addresses) => addresses.clone(),
+            AllOrAddresses::List(addresses) => addresses.clone(),
         };
 
         let contains_from_address = addresses.contains(from_address);
@@ -562,13 +544,13 @@ impl AutomaticTopUpTask {
 
         if contains_from_address {
             match targets {
-                TopUpTargetAddresses::All => {
+                AllOrAddresses::All => {
                     info!(
                         "Filtered out from_address {} from relayer targets on chain {} to prevent self-funding", 
                         from_address, chain_id
                     );
                 }
-                TopUpTargetAddresses::List(_) => {
+                AllOrAddresses::List(_) => {
                     info!(
                         "Filtered out from_address {} from explicitly configured targets on chain {} to prevent self-funding. \
                         Note: from_address should not be included in the target list in YAML configuration.", 
@@ -744,7 +726,7 @@ impl AutomaticTopUpTask {
         from_address: &EvmAddress,
         target_address: &EvmAddress,
         token_config: &Erc20TokenConfig,
-        config: &AutomaticTopUpConfig,
+        config: &NetworkAutomaticTopUpConfig,
     ) -> Result<String, String> {
         if from_address == target_address {
             return Err(format!(
@@ -759,7 +741,7 @@ impl AutomaticTopUpTask {
             target_address,
             format_token_amount(&token_config.top_up_amount),
             token_config.address,
-            if config.safe.is_some() { " via Safe proxy" } else { "" }
+            if config.via_safe() { " via Safe" } else { "" }
         );
 
         let transfer_call = IERC20::transferCall {
@@ -767,41 +749,37 @@ impl AutomaticTopUpTask {
             amount: token_config.top_up_amount,
         };
 
-        let (final_to, final_value, final_data) = if let Some(safe_address) = &config.safe {
-            if let Some(ref safe_manager) = self.safe_proxy_manager {
-                info!(
-                    "Using Safe proxy {} for ERC-20 top-up transaction from {} to {}",
-                    safe_address, from_address, target_address
-                );
+        let (final_to, final_value, final_data) = if let Some(safe_address) = &config.from.safe {
+            info!(
+                "Using Safe proxy {} for ERC-20 top-up transaction from {} to {}",
+                safe_address, from_address, target_address
+            );
 
-                let wallet_index =
-                    match self.find_wallet_index_for_address(chain_id, from_address).await {
-                        Some(index) => index,
-                        None => {
-                            return Err(format!(
-                                "Cannot find wallet index for from_address {} on chain {}",
-                                from_address, chain_id
-                            ));
-                        }
-                    };
+            let wallet_index =
+                match self.find_wallet_index_for_address(chain_id, from_address).await {
+                    Some(index) => index,
+                    None => {
+                        return Err(format!(
+                            "Cannot find wallet index for from_address {} on chain {}",
+                            from_address, chain_id
+                        ));
+                    }
+                };
 
-                let (_safe_tx, encoded_data) = safe_manager
-                    .create_safe_transaction_with_signature(
-                        provider,
-                        wallet_index,
-                        safe_address,
-                        token_config.address,
-                        U256::ZERO,
-                        transfer_call.abi_encode().into(),
-                    )
-                    .await
-                    .map_err(|e| format!("Failed to create Safe transaction: {}", e))?;
+            let (_safe_tx, encoded_data) = self
+                .safe_proxy_manager
+                .create_safe_transaction_with_signature(
+                    provider,
+                    wallet_index,
+                    safe_address,
+                    token_config.address,
+                    U256::ZERO,
+                    transfer_call.abi_encode().into(),
+                )
+                .await
+                .map_err(|e| format!("Failed to create Safe transaction: {}", e))?;
 
-                (*safe_address, U256::ZERO, encoded_data)
-            } else {
-                return Err("Safe proxy address configured but SafeProxyManager not initialized"
-                    .to_string());
-            }
+            (*safe_address, U256::ZERO, encoded_data)
         } else {
             (token_config.address.into(), U256::ZERO, transfer_call.abi_encode().into())
         };
@@ -925,11 +903,18 @@ pub async fn run_automatic_top_up_task(
     postgres_client: Arc<PostgresClient>,
     providers: Arc<Vec<EvmProvider>>,
     transactions_queues: Arc<tokio::sync::Mutex<TransactionsQueues>>,
+    safe_proxy_manager: Arc<SafeProxyManager>,
 ) {
     info!("Starting automatic top-up task");
 
-    let mut top_up_task =
-        AutomaticTopUpTask::new(postgres_client, providers, config, transactions_queues);
+    let mut top_up_task = AutomaticTopUpTask::new(
+        postgres_client,
+        providers,
+        config,
+        transactions_queues,
+        safe_proxy_manager,
+    )
+    .await;
 
     tokio::spawn(async move {
         top_up_task.run().await;

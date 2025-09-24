@@ -6,8 +6,6 @@
 
 ## TODO List
 
-- Testing sending all tx flows with:
-  - KMS - tested and needs e2e
 - Change the TS sdk to work with the changes in the playground
 - Finish documentation
 - AI write go and python SDK
@@ -22,3 +20,14 @@
 - Testing loading up infura gas
 - Testing loading up tenderly gas
 - Testing handling custom gas with http call
+
+# Pawel feedback
+
+- do rrelayer login and then throw on methods which can not be used outside the server
+
+
+# Idea for later
+
+- safe signers and submitters logic + look at account abstracted accounts
+- ability to put your signing provider in other places like auto-top-up
+- more complex allowlist aka methods etc

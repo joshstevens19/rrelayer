@@ -67,7 +67,7 @@ pub struct TransactionsQueues {
     db: PostgresClient,
     cache: Arc<Cache>,
     webhook_manager: Option<Arc<Mutex<WebhookManager>>>,
-    safe_proxy_manager: Option<SafeProxyManager>,
+    safe_proxy_manager: Arc<SafeProxyManager>,
 }
 
 impl TransactionsQueues {
@@ -77,7 +77,7 @@ impl TransactionsQueues {
         blob_gas_oracle_cache: Arc<Mutex<BlobGasOracleCache>>,
         cache: Arc<Cache>,
         webhook_manager: Option<Arc<Mutex<WebhookManager>>>,
-        safe_proxy_manager: Option<SafeProxyManager>,
+        safe_proxy_manager: Arc<SafeProxyManager>,
     ) -> Result<Self, TransactionsQueuesError> {
         let mut queues = HashMap::new();
         let mut relayer_block_times_ms = HashMap::new();
@@ -235,16 +235,6 @@ impl TransactionsQueues {
         current_transaction.external_id = replace_with.external_id.clone();
     }
 
-    /// Checks if a relayer is allowed to send transactions to a specific address.
-    async fn relayer_allowed_to_send_transaction_to(
-        &self,
-        relayer_id: &RelayerId,
-        to: &EvmAddress,
-    ) -> Result<bool, PostgresError> {
-        let relayer = self.db.is_relayer_allowlist_address(relayer_id, to).await?;
-        Ok(relayer)
-    }
-
     /// Computes gas prices for a transaction based on its type.
     async fn compute_transaction_gas_prices(
         transactions_queue: &TransactionsQueue,
@@ -358,32 +348,6 @@ impl TransactionsQueues {
 
         if transactions_queue.is_paused() {
             return Err(AddTransactionError::RelayerIsPaused(*relayer_id));
-        }
-
-        // Check if the network is disabled using cache to avoid DB lookup
-        let chain_id = transactions_queue.chain_id();
-        if let Some(networks) = network::get_networks_cache(&self.cache).await {
-            if let Some(network) = networks.iter().find(|n| n.chain_id == chain_id) {
-                if network.disabled {
-                    return Err(AddTransactionError::NetworkDisabled(chain_id));
-                }
-            }
-            // If network not found in the cache, optimistically assume it's enabled (new network)
-        }
-        // If cache returns None (cache not available), we allow the transaction through
-        // to maintain system availability. The cache is refreshed every 10 minutes by a background task.
-        // that said, it pushes the cache on new network creations and disabled and enabled
-
-        if transactions_queue.is_allowlisted_only()
-            && !self
-                .relayer_allowed_to_send_transaction_to(relayer_id, &transaction_to_send.to)
-                .await
-                .map_err(AddTransactionError::CouldNotReadAllowlistsFromDb)?
-        {
-            return Err(AddTransactionError::RelayerNotAllowedToSendTransactionTo(
-                *relayer_id,
-                transaction_to_send.to,
-            ));
         }
 
         // Check if this is a blob transaction and if the wallet manager supports blobs
@@ -574,21 +538,6 @@ impl TransactionsQueues {
 
             if transactions_queue.is_paused() {
                 return Err(ReplaceTransactionError::RelayerIsPaused(transaction.relayer_id));
-            }
-
-            if transactions_queue.is_allowlisted_only()
-                && !self
-                    .relayer_allowed_to_send_transaction_to(
-                        &transaction.relayer_id,
-                        &transaction.to,
-                    )
-                    .await
-                    .map_err(ReplaceTransactionError::CouldNotReadAllowlistsFromDb)?
-            {
-                return Err(ReplaceTransactionError::RelayerNotAllowedToSendTransactionTo(
-                    transaction.relayer_id,
-                    transaction.to,
-                ));
             }
 
             if let Some(mut result) =
