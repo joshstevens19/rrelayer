@@ -39,7 +39,7 @@ use alloy_eips::{BlockId, BlockNumberOrTag};
 use chrono::Utc;
 use tokio::sync::Mutex;
 use tracing::error;
-use tracing::log::info;
+use tracing::info;
 
 pub struct TransactionsQueue {
     pending_transactions: Mutex<VecDeque<Transaction>>,

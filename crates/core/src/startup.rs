@@ -39,8 +39,7 @@ use dotenv::dotenv;
 use thiserror::Error;
 use tokio::sync::Mutex;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
-use tracing::error;
-use tracing::log::info;
+use tracing::{error, info};
 
 #[derive(Error, Debug)]
 #[allow(clippy::enum_variant_names)]
@@ -210,7 +209,7 @@ async fn start_api(
     let address = format!("localhost:{}", api_config.port);
 
     let listener = tokio::net::TcpListener::bind(&address).await?;
-    info!("listening on http://{}", address);
+    info!("rrelayer is up on http://{}", address);
     axum::serve(listener, app).await.map_err(StartApiError::ApiStartupError)?;
 
     Ok(())
