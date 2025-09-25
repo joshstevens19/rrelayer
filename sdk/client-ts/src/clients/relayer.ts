@@ -221,17 +221,17 @@ export class RelayerClient {
       },
       /**
        * Send a transaction
-       * @param replacementTransaction The replacement transaction
+       * @param transaction The transaction to send
        * @param rateLimitKey The rate limit key if you want rate limit feature on
        * @returns transactionId
        */
       send: (
-        replacementTransaction: TransactionToSend,
-        rateLimitKey?: string | undefined
+          transaction: TransactionToSend,
+          rateLimitKey?: string | undefined
       ): Promise<TransactionSent> => {
         return sendTransaction(
           this.id,
-          replacementTransaction,
+          transaction,
           rateLimitKey,
           this._apiBaseConfig
         );
