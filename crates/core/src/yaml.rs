@@ -35,6 +35,7 @@ pub struct AwsSecretManagerProviderConfig {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AwsKmsSigningProviderConfig {
     pub region: String,
+    pub danger_override_alias: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -161,11 +162,6 @@ impl SigningProvider {
             aws_kms: None,
             turnkey: Some(turnkey),
         }
-    }
-
-    pub fn from_aws_kms_region(region: String) -> Self {
-        let aws_kms = AwsKmsSigningProviderConfig { region };
-        Self::from_aws_kms(aws_kms)
     }
 }
 

@@ -30,17 +30,23 @@ pub struct KeyPlan {
 #[derive(Debug)]
 pub struct AwsKmsWalletManager {
     config: AwsKmsSigningProviderConfig,
+    alias: String,
     signers: Arc<RwLock<HashMap<(u32, u64), AwsSigner>>>,
 }
 
 impl AwsKmsWalletManager {
     pub fn new(config: AwsKmsSigningProviderConfig) -> Self {
-        Self { config, signers: Arc::new(RwLock::new(HashMap::new())) }
+        Self { alias: config.danger_override_alias.clone().unwrap_or("rrelayer".to_string()), config, signers: Arc::new(RwLock::new(HashMap::new())) }
     }
 
-    async fn get_or_create_key_id(&self, wallet_index: u32) -> Result<String, WalletError> {
+    fn build_alias(&self, wallet_index: u32, chain_id: &ChainId) -> String {
+        format!("alias/{}-wallet-{}-{}", self.alias, wallet_index, chain_id)
+    }
+
+
+    async fn get_or_create_key_id(&self, wallet_index: u32, chain_id: &ChainId) -> Result<String, WalletError> {
         self.validate_aws_config().await?;
-        match self.find_key_by_wallet_index(wallet_index).await {
+        match self.find_key_by_alias(wallet_index, chain_id).await {
             Ok(key_id) => {
                 return Ok(key_id);
             }
@@ -50,7 +56,7 @@ impl AwsKmsWalletManager {
         }
 
         info!("AWS KMS: Creating new key for wallet_index {}", wallet_index);
-        let key_id = self.create_key_for_wallet_index(wallet_index).await?;
+        let key_id = self.create_key_for_wallet_index(wallet_index, chain_id).await?;
         info!("AWS KMS: Successfully created new key: {}", key_id);
         Ok(key_id)
     }
@@ -76,62 +82,40 @@ impl AwsKmsWalletManager {
         }
     }
 
-    async fn find_key_by_wallet_index(&self, wallet_index: u32) -> Result<String, WalletError> {
+    async fn find_key_by_alias(&self, wallet_index: u32, chain_id: &ChainId) -> Result<String, WalletError> {
         let aws_config = aws_config::defaults(BehaviorVersion::latest())
             .region(Region::new(self.config.region.clone()))
             .load()
             .await;
 
         let kms = Client::new(&aws_config);
+        let expected_alias = self.build_alias(wallet_index, chain_id);
 
-        let expected_alias = format!("alias/rrelayer-wallet-{}", wallet_index);
-
-        if let Ok(alias_response) = kms.list_aliases().send().await {
-            let alias_list = alias_response.aliases();
-            for alias in alias_list {
-                if let Some(alias_name) = alias.alias_name() {
-                    if alias_name == expected_alias {
-                        if let Some(target_key_id) = alias.target_key_id() {
-                            return Ok(target_key_id.to_string());
-                        }
-                    }
-                }
-            }
-        }
-
-        let response = kms.list_keys().send().await.map_err(|e| WalletError::ApiError {
-            message: format!("Failed to list KMS keys: {}", e),
+        let alias_response = kms.list_aliases().send().await.map_err(|e| WalletError::ApiError {
+            message: format!("Failed to list aliases: {}", e),
         })?;
 
-        let key_list = response.keys();
-        for key in key_list {
-            if let Some(key_id) = key.key_id() {
-                if let Ok(tags_response) = kms.list_resource_tags().key_id(key_id).send().await {
-                    let tags = tags_response.tags();
-                    for tag in tags {
-                        if tag.tag_key() == "wallet_index"
-                            && tag.tag_value() == wallet_index.to_string().as_str()
-                        {
-                            return Ok(key_id.to_string());
-                        }
+        let alias_list = alias_response.aliases();
+        for alias in alias_list {
+            if let Some(alias_name) = alias.alias_name() {
+                if alias_name == expected_alias {
+                    if let Some(target_key_id) = alias.target_key_id() {
+                        return Ok(target_key_id.to_string());
                     }
                 }
             }
         }
 
         Err(WalletError::ApiError {
-            message: format!(
-                "No KMS key found for wallet_index {} (searched by alias and tags)",
-                wallet_index
-            ),
+            message: format!("No KMS key found for alias: {}", expected_alias),
         })
     }
 
-    async fn create_key_for_wallet_index(&self, wallet_index: u32) -> Result<String, WalletError> {
+    async fn create_key_for_wallet_index(&self, wallet_index: u32, chain_id: &ChainId) -> Result<String, WalletError> {
         let plan = KeyPlan {
-            description: format!("ECC_SECG_P256K1 signing key - wallet_{}", wallet_index),
-            alias: Some(format!("alias/rrelayer-wallet-{}", wallet_index)),
-            tags: vec![("wallet_index".to_string(), wallet_index.to_string())],
+            description: format!("ECC_SECG_P256K1 signing key - wallet_{}_chain_{}", wallet_index, chain_id),
+            alias: Some(self.build_alias(wallet_index, chain_id)),
+            tags: vec![], // No tags needed, alias is the identifier
         };
 
         match self.create_keys(vec![plan]).await {
@@ -164,7 +148,7 @@ impl AwsKmsWalletManager {
             }
         }
 
-        let key_id = self.get_or_create_key_id(wallet_index).await?;
+        let key_id = self.get_or_create_key_id(wallet_index, chain_id).await?;
         let signer = self.initialize_aws_kms_signer(&key_id, Some(chain_id_u64)).await?;
 
         {
