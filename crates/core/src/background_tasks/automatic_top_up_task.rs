@@ -143,29 +143,29 @@ impl AutomaticTopUpTask {
             chain_id, config.from.relayer.address
         );
 
-        let target_addresses = match self
-            .resolve_target_addresses(chain_id, &config.targets, &config.from.relayer.address)
+        let relayer_addresses = match self
+            .resolve_relayer_addresses(chain_id, &config.relayers, &config.from.relayer.address)
             .await
         {
             Ok(addresses) => addresses,
             Err(e) => {
-                error!("Failed to resolve target addresses for chain {}: {}", chain_id, e);
+                error!("Failed to resolve relayer addresses for chain {}: {}", chain_id, e);
                 return;
             }
         };
 
-        if target_addresses.is_empty() {
-            info!("No target addresses found for top-up on chain {}", chain_id);
+        if relayer_addresses.is_empty() {
+            info!("No relayer addresses found for top-up on chain {}", chain_id);
             return;
         }
 
         if let Some(native_config) = &config.native {
-            info!("Processing native token top-ups for {} addresses", target_addresses.len());
+            info!("Processing native token top-ups for {} addresses", relayer_addresses.len());
             self.process_native_token_top_ups(
                 chain_id,
                 provider,
                 &config.from.relayer.address,
-                &target_addresses,
+                &relayer_addresses,
                 native_config,
                 config,
             )
@@ -179,13 +179,13 @@ impl AutomaticTopUpTask {
                     token_config.address,
                     index + 1,
                     erc20_tokens.len(),
-                    target_addresses.len()
+                    relayer_addresses.len()
                 );
                 self.process_erc20_token_top_ups(
                     chain_id,
                     provider,
                     &config.from.relayer.address,
-                    &target_addresses,
+                    &relayer_addresses,
                     token_config,
                     config,
                 )
@@ -201,19 +201,19 @@ impl AutomaticTopUpTask {
         }
     }
 
-    /// Processes native token top-ups for target addresses.
+    /// Processes native token top-ups for relayer addresses.
     async fn process_native_token_top_ups(
         &self,
         chain_id: &ChainId,
         provider: &EvmProvider,
         from_address: &EvmAddress,
-        target_addresses: &[EvmAddress],
+        relayer_addresses: &[EvmAddress],
         native_config: &NativeTokenConfig,
         config: &NetworkAutomaticTopUpConfig,
     ) {
         let mut addresses_needing_top_up = Vec::new();
 
-        for address in target_addresses {
+        for address in relayer_addresses {
             match provider.rpc_client().get_balance((*address).into()).await {
                 Ok(balance) => {
                     if balance < native_config.min_balance {
@@ -235,7 +235,7 @@ impl AutomaticTopUpTask {
         if addresses_needing_top_up.is_empty() {
             info!(
                 "All {} addresses have sufficient native token balance on chain {}",
-                target_addresses.len(),
+                relayer_addresses.len(),
                 chain_id
             );
             return;
@@ -244,7 +244,7 @@ impl AutomaticTopUpTask {
         info!(
             "{} out of {} addresses need native token top-up on chain {}",
             addresses_needing_top_up.len(),
-            target_addresses.len(),
+            relayer_addresses.len(),
             chain_id
         );
 
@@ -293,19 +293,19 @@ impl AutomaticTopUpTask {
         }
     }
 
-    /// Processes ERC-20 token top-ups for target addresses.
+    /// Processes ERC-20 token top-ups for relayer addresses.
     async fn process_erc20_token_top_ups(
         &self,
         chain_id: &ChainId,
         provider: &EvmProvider,
         from_address: &EvmAddress,
-        target_addresses: &[EvmAddress],
+        relayer_addresses: &[EvmAddress],
         token_config: &Erc20TokenConfig,
         config: &NetworkAutomaticTopUpConfig,
     ) {
         let mut addresses_needing_top_up = Vec::new();
 
-        for address in target_addresses {
+        for address in relayer_addresses {
             match self.get_erc20_balance(provider, &token_config.address, address).await {
                 Ok(balance) => {
                     if balance < token_config.min_balance {
@@ -331,7 +331,7 @@ impl AutomaticTopUpTask {
         if addresses_needing_top_up.is_empty() {
             info!(
                 "All {} addresses have sufficient ERC-20 token balance for token {} on chain {}",
-                target_addresses.len(),
+                relayer_addresses.len(),
                 token_config.address,
                 chain_id
             );
@@ -341,7 +341,7 @@ impl AutomaticTopUpTask {
         info!(
             "{} out of {} addresses need ERC-20 top-up for token {} on chain {}",
             addresses_needing_top_up.len(),
-            target_addresses.len(),
+            relayer_addresses.len(),
             token_config.address,
             chain_id
         );
@@ -392,27 +392,45 @@ impl AutomaticTopUpTask {
         }
     }
 
-    /// Sends a native token top-up transaction from one address to another.
+    /// Sends a native token top-up transaction from one relayer to another.
     async fn send_native_top_up_transaction(
         &self,
         chain_id: &ChainId,
         provider: &EvmProvider,
         from_address: &EvmAddress,
-        target_address: &EvmAddress,
+        relayer_address: &EvmAddress,
         native_config: &NativeTokenConfig,
         config: &NetworkAutomaticTopUpConfig,
     ) -> Result<String, String> {
-        if from_address == target_address {
+        if from_address == relayer_address {
             return Err(format!(
-                "Cannot send top-up transaction to self: from_address {} equals target_address {}",
-                from_address, target_address
+                "Cannot send top-up transaction to self: from_address {} equals relayer_address {}",
+                from_address, relayer_address
             ));
+        }
+
+        match self.postgres_client.get_relayer_by_address(relayer_address, chain_id).await {
+            Ok(Some(_relayer)) => {
+                // Valid relayer, proceed
+            }
+            Ok(None) => {
+                return Err(format!(
+                    "Security check failed: relayer_address {} is not a registered relayer on chain {}",
+                    relayer_address, chain_id
+                ));
+            }
+            Err(e) => {
+                return Err(format!(
+                    "Failed to validate relayer_address {} as relayer: {}",
+                    relayer_address, e
+                ));
+            }
         }
 
         info!(
             "Sending top-up transaction: {} -> {} ({} ETH){}",
             from_address,
-            target_address,
+            relayer_address,
             format_wei_to_eth(&native_config.top_up_amount),
             if config.via_safe() { " via Safe" } else { "" }
         );
@@ -420,7 +438,7 @@ impl AutomaticTopUpTask {
         let (final_to, final_value, final_data) = if let Some(safe_address) = &config.from.safe {
             info!(
                 "Using Safe proxy {} for top-up transaction from {} to {}",
-                safe_address, from_address, target_address
+                safe_address, from_address, relayer_address
             );
 
             let wallet_index =
@@ -440,7 +458,7 @@ impl AutomaticTopUpTask {
                     provider,
                     wallet_index,
                     safe_address,
-                    *target_address,
+                    *relayer_address,
                     native_config.top_up_amount,
                     alloy::primitives::Bytes::new(),
                 )
@@ -449,7 +467,7 @@ impl AutomaticTopUpTask {
 
             (*safe_address, U256::ZERO, encoded_data)
         } else {
-            (*target_address, native_config.top_up_amount, alloy::primitives::Bytes::new())
+            (*relayer_address, native_config.top_up_amount, alloy::primitives::Bytes::new())
         };
 
         let transaction_to_send = TransactionToSend::new(
@@ -458,7 +476,7 @@ impl AutomaticTopUpTask {
             TransactionData::new(final_data),
             Some(TransactionSpeed::Fast),
             None,
-            Some(format!("automatic_top_up_native_{}_{}", from_address, target_address)),
+            Some(format!("automatic_top_up_native_{}_{}", from_address, relayer_address)),
         );
 
         let relayer_id = if let Some(relayer) =
@@ -500,21 +518,21 @@ impl AutomaticTopUpTask {
             Err(e) => {
                 warn!(
                     "Failed to queue top-up transaction from {} to {}: {}. This is non-fatal, will retry next cycle.",
-                    from_address, target_address, e
+                    from_address, relayer_address, e
                 );
                 Err(format!("Failed to queue transaction: {}", e))
             }
         }
     }
 
-    /// Resolves target addresses based on the configured target type.
-    async fn resolve_target_addresses(
+    /// Resolves relayer addresses based on the configured relayers type.
+    async fn resolve_relayer_addresses(
         &self,
         chain_id: &ChainId,
-        targets: &AllOrAddresses,
+        relayers: &AllOrAddresses,
         from_address: &EvmAddress,
     ) -> Result<Vec<EvmAddress>, PostgresError> {
-        let mut addresses = match targets {
+        let mut addresses = match relayers {
             AllOrAddresses::All => {
                 match self.postgres_client.get_all_relayers_for_chain(chain_id).await {
                     Ok(relayers) => {
@@ -531,7 +549,43 @@ impl AutomaticTopUpTask {
                     }
                 }
             }
-            AllOrAddresses::List(addresses) => addresses.clone(),
+            AllOrAddresses::List(addresses) => {
+                // Get all relayers for this chain to validate against
+                let chain_relayers =
+                    match self.postgres_client.get_all_relayers_for_chain(chain_id).await {
+                        Ok(relayers) => relayers.iter().map(|r| r.address).collect::<Vec<_>>(),
+                        Err(e) => {
+                            error!(
+                                "Failed to fetch relayers for validation on chain {}: {}",
+                                chain_id, e
+                            );
+                            return Err(e);
+                        }
+                    };
+
+                // Filter addresses to only include valid relayers
+                let mut valid_addresses = Vec::new();
+                let mut invalid_addresses = Vec::new();
+
+                for addr in addresses {
+                    if chain_relayers.contains(addr) {
+                        valid_addresses.push(*addr);
+                    } else {
+                        invalid_addresses.push(*addr);
+                    }
+                }
+
+                if !invalid_addresses.is_empty() {
+                    warn!(
+                        "Ignoring {} invalid addresses on chain {} (not relayers): {:?}",
+                        invalid_addresses.len(),
+                        chain_id,
+                        invalid_addresses
+                    );
+                }
+
+                valid_addresses
+            }
         };
 
         let contains_from_address = addresses.contains(from_address);
@@ -539,7 +593,7 @@ impl AutomaticTopUpTask {
         addresses.retain(|addr| addr != from_address);
 
         if contains_from_address {
-            match targets {
+            match relayers {
                 AllOrAddresses::All => {
                     info!(
                         "Filtered out from_address {} from relayer targets on chain {} to prevent self-funding", 
@@ -549,7 +603,7 @@ impl AutomaticTopUpTask {
                 AllOrAddresses::List(_) => {
                     info!(
                         "Filtered out from_address {} from explicitly configured targets on chain {} to prevent self-funding. \
-                        Note: from_address should not be included in the target list in YAML configuration.", 
+                        Note: from_address should not be included in the relayer list in YAML configuration.", 
                         from_address, chain_id
                     );
                 }
@@ -714,41 +768,60 @@ impl AutomaticTopUpTask {
         Ok(true)
     }
 
-    /// Sends an ERC-20 token top-up transaction from one address to another.
+    /// Sends an ERC-20 token top-up transaction from one relayer to another.
     async fn send_erc20_top_up_transaction(
         &self,
         chain_id: &ChainId,
         provider: &EvmProvider,
         from_address: &EvmAddress,
-        target_address: &EvmAddress,
+        relayer_address: &EvmAddress,
         token_config: &Erc20TokenConfig,
         config: &NetworkAutomaticTopUpConfig,
     ) -> Result<String, String> {
-        if from_address == target_address {
+        if from_address == relayer_address {
             return Err(format!(
-                "Cannot send ERC-20 top-up transaction to self: from_address {} equals target_address {}",
-                from_address, target_address
+                "Cannot send ERC-20 top-up transaction to self: from_address {} equals relayer_address {}",
+                from_address, relayer_address
             ));
+        }
+
+        // Validate that relayer_address is a relayer for security
+        match self.postgres_client.get_relayer_by_address(relayer_address, chain_id).await {
+            Ok(Some(_relayer)) => {
+                // Valid relayer, proceed
+            }
+            Ok(None) => {
+                return Err(format!(
+                    "Security check failed: relayer_address {} is not a registered relayer on chain {}",
+                    relayer_address, chain_id
+                ));
+            }
+            Err(e) => {
+                return Err(format!(
+                    "Failed to validate relayer_address {} as relayer: {}",
+                    relayer_address, e
+                ));
+            }
         }
 
         info!(
             "Sending ERC-20 top-up transaction: {} -> {} ({} tokens of {}){}",
             from_address,
-            target_address,
+            relayer_address,
             format_token_amount(&token_config.top_up_amount),
             token_config.address,
             if config.via_safe() { " via Safe" } else { "" }
         );
 
         let transfer_call = IERC20::transferCall {
-            to: (*target_address).into(),
+            to: (*relayer_address).into(),
             amount: token_config.top_up_amount,
         };
 
         let (final_to, final_value, final_data) = if let Some(safe_address) = &config.from.safe {
             info!(
                 "Using Safe proxy {} for ERC-20 top-up transaction from {} to {}",
-                safe_address, from_address, target_address
+                safe_address, from_address, relayer_address
             );
 
             let wallet_index =
@@ -788,7 +861,7 @@ impl AutomaticTopUpTask {
             None,
             Some(format!(
                 "automatic_top_up_erc20_{}_{}_{}",
-                token_config.address, from_address, target_address
+                token_config.address, from_address, relayer_address
             )),
         );
 
@@ -831,7 +904,7 @@ impl AutomaticTopUpTask {
             Err(e) => {
                 warn!(
                     "Failed to queue ERC-20 top-up transaction from {} to {}: {}. This is non-fatal, will retry next cycle.",
-                    from_address, target_address, e
+                    from_address, relayer_address, e
                 );
                 Err(format!("Failed to queue ERC-20 transaction: {}", e))
             }
