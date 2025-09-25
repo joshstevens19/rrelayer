@@ -6,7 +6,7 @@ export const TEST_CONFIG = {
   PROVIDER_URL: process.env.TEST_PROVIDER_URL || 'http://localhost:8545',
   USERNAME: process.env.TEST_USERNAME || 'test-username',
   PASSWORD: process.env.TEST_PASSWORD || 'test-password',
-  CHAIN_ID: process.env.TEST_CHAIN_ID || '1',
+  CHAIN_ID: process.env.TEST_CHAIN_ID || '31337',
 };
 
 // Helper to create a new relayer for testing
