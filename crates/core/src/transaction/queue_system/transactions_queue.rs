@@ -1,7 +1,6 @@
 use std::{
     collections::{HashMap, VecDeque},
     sync::Arc,
-    time::{Duration, SystemTime},
 };
 
 use super::types::{
@@ -32,10 +31,8 @@ use alloy::network::{AnyTransactionReceipt, ReceiptResponse};
 use alloy::{
     consensus::{SignableTransaction, TypedTransaction},
     hex,
-    signers::local::LocalSignerError,
     transports::{RpcError, TransportErrorKind},
 };
-use alloy_eips::{BlockId, BlockNumberOrTag};
 use chrono::Utc;
 use tokio::sync::Mutex;
 use tracing::error;

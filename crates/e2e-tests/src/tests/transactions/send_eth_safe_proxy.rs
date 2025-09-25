@@ -3,7 +3,6 @@ use alloy::network::ReceiptResponse;
 use anyhow::{anyhow, Context};
 use rrelayer_core::common_types::EvmAddress;
 use rrelayer_core::transaction::types::TransactionData;
-use std::str::FromStr;
 use tracing::info;
 
 impl TestRunner {

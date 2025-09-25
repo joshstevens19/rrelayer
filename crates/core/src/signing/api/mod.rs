@@ -13,7 +13,6 @@ mod sign_text;
 mod sign_typed_data;
 
 // Re-export public types for backward compatibility
-pub use get_signed_text_history::GetSigningHistoryQuery;
 pub use sign_text::{SignTextDto, SignTextResult};
 pub use sign_typed_data::SignTypedDataResult;
 

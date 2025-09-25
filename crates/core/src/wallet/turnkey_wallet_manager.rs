@@ -14,12 +14,12 @@ use p256::{
     SecretKey,
 };
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
+use sha2::Digest;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::Mutex;
-use tracing::{debug, error, info};
+use tracing::{error, info};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TurnkeyAccount {

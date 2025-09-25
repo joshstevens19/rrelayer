@@ -15,7 +15,7 @@ use crate::{
 };
 use axum::{
     extract::{Path, State},
-    http::{HeaderMap, StatusCode},
+    http::HeaderMap,
     Json,
 };
 use serde::{Deserialize, Serialize};

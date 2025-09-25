@@ -1,4 +1,4 @@
-use std::{fmt::Display, time::SystemTime};
+use std::fmt::Display;
 
 use alloy::{
     consensus::{
@@ -7,10 +7,7 @@ use alloy::{
     eips::eip2930::AccessList,
     primitives::TxKind,
 };
-use alloy_eips::eip4844::{
-    builder::{SidecarBuilder, SimpleCoder},
-    Blob,
-};
+use alloy_eips::eip4844::builder::{SidecarBuilder, SimpleCoder};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;

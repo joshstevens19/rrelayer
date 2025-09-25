@@ -52,7 +52,7 @@ impl EmbeddedRRelayerServer {
         info!("[START] Starting RRelayer as separate process for complete isolation...");
 
         // Start RRelayer as a separate process using cargo run
-        let mut child = Command::new("cargo")
+        let child = Command::new("cargo")
             .args(["run", "--bin", "rrelayer"])
             .current_dir(&self.project_path)
             .stdout(Stdio::null())

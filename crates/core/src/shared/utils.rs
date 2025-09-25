@@ -5,7 +5,6 @@ use crate::{create_retry_client, rrelayer_error};
 use alloy::primitives::U256;
 use alloy::providers::Provider;
 use alloy_eips::eip4844::Blob;
-use axum::http::StatusCode;
 use std::time::Duration;
 use tokio::time::sleep;
 

@@ -7,10 +7,9 @@ use crate::{
     provider::EvmProvider,
     relayer::Relayer,
     safe_proxy::SafeProxyManager,
-    shared::common_types::{EvmAddress, PagingContext},
+    shared::common_types::EvmAddress,
     transaction::queue_system::TransactionsQueues,
-    yaml::{AllOrAddresses, Erc20TokenConfig, NativeTokenConfig, NetworkAutomaticTopUpConfig},
-    SafeProxyConfig, SetupConfig,
+    yaml::{AllOrAddresses, Erc20TokenConfig, NativeTokenConfig, NetworkAutomaticTopUpConfig}, SetupConfig,
 };
 use alloy::primitives::U256;
 use alloy::providers::Provider;

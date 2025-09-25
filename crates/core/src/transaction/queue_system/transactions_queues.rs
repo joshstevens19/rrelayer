@@ -1,7 +1,6 @@
 use std::{
     collections::{HashMap, VecDeque},
     sync::Arc,
-    time::{Duration, SystemTime},
 };
 
 use alloy::{
@@ -38,13 +37,12 @@ use crate::transaction::queue_system::types::SendTransactionGasPriceError;
 use crate::transaction::types::{TransactionConversionError, TransactionSpeed};
 use crate::{
     gas::{BlobGasOracleCache, BlobGasPriceResult, GasLimit, GasOracleCache, GasPriceResult},
-    network,
-    postgres::{PostgresClient, PostgresConnectionError, PostgresError},
+    postgres::{PostgresClient, PostgresConnectionError},
     relayer::RelayerId,
     safe_proxy::SafeProxyManager,
     shared::{
         cache::Cache,
-        common_types::{EvmAddress, WalletOrProviderError},
+        common_types::WalletOrProviderError,
     },
     transaction::{
         cache::invalidate_transaction_no_state_cache,

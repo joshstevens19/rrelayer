@@ -12,8 +12,6 @@ use anyhow::{anyhow, Context};
 use rrelayer_core::common_types::EvmAddress;
 use rrelayer_core::relayer::CreateRelayerResult;
 use rrelayer_core::transaction::types::{Transaction, TransactionId, TransactionStatus};
-use std::future::Future;
-use std::pin::Pin;
 use std::time::{Duration, Instant};
 use tokio::time::timeout;
 use tracing::{error, info};

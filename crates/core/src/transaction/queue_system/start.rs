@@ -14,7 +14,6 @@ use crate::{
     postgres::{PostgresClient, PostgresConnectionError, PostgresError},
     provider::{find_provider_for_chain_id, EvmProvider},
     relayer::{Relayer, RelayerId},
-    rrelayer_error,
     safe_proxy::SafeProxyManager,
     shared::{
         cache::Cache,

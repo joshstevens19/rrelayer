@@ -9,7 +9,7 @@ use tokio::sync::oneshot;
 use tracing::info;
 use warp::{
     http::StatusCode,
-    reply::{self, WithStatus},
+    reply::{self},
     Filter, Rejection, Reply,
 };
 

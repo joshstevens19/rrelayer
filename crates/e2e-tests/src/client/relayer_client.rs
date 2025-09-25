@@ -1,12 +1,9 @@
 use super::test_config::E2ETestConfig;
-use alloy::network::AnyTransactionReceipt;
-use alloy::primitives::U256;
 use anyhow::{anyhow, Context, Result};
-use rrelayer_core::common_types::PagingResult;
 use rrelayer_core::relayer::CreateRelayerResult;
 use rrelayer_core::transaction::types::Transaction;
 use rrelayer_core::{
-    common_types::{EvmAddress, PagingContext},
+    common_types::EvmAddress,
     relayer::RelayerId,
     transaction::api::RelayTransactionStatusResult,
     transaction::api::TransactionSpeed,
@@ -14,8 +11,6 @@ use rrelayer_core::{
     transaction::types::{TransactionData, TransactionId, TransactionValue},
 };
 use rrelayer_sdk::SDK;
-use serde_json::Value;
-use std::str::FromStr;
 use tracing::info;
 
 #[derive(Clone)]

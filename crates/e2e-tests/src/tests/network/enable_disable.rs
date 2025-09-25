@@ -1,9 +1,5 @@
 use crate::tests::test_runner::TestRunner;
 use anyhow::{anyhow, Context};
-use rrelayer_core::common_types::EvmAddress;
-use rrelayer_core::network::ChainId;
-use rrelayer_core::transaction::api::{RelayTransactionRequest, TransactionSpeed};
-use rrelayer_core::transaction::types::TransactionData;
 use tracing::info;
 
 impl TestRunner {

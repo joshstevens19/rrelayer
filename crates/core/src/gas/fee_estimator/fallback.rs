@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use alloy::network::{AnyRpcBlock, TransactionResponse};
+use alloy::network::AnyRpcBlock;
 use alloy::{
     consensus::Transaction,
     eips::{BlockId, BlockNumberOrTag},

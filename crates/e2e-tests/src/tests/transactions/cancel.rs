@@ -1,4 +1,3 @@
-use crate::client::RelayerClient;
 use crate::tests::test_runner::TestRunner;
 use anyhow::Context;
 use rrelayer_core::transaction::api::{RelayTransactionRequest, TransactionSpeed};

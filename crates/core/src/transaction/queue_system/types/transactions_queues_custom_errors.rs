@@ -1,9 +1,6 @@
 use std::time::SystemTimeError;
 
-use alloy::{
-    signers::local::LocalSignerError,
-    transports::{RpcError, TransportErrorKind},
-};
+use alloy::transports::{RpcError, TransportErrorKind};
 use thiserror::Error;
 
 use super::{
@@ -12,10 +9,8 @@ use super::{
 use crate::shared::{bad_request, internal_server_error, not_found, HttpError};
 use crate::transaction::types::TransactionConversionError;
 use crate::{
-    network::ChainId,
     postgres::PostgresError,
     relayer::RelayerId,
-    shared::common_types::EvmAddress,
     transaction::types::{Transaction, TransactionId, TransactionStatus},
     WalletError,
 };

@@ -1,10 +1,8 @@
 use alloy::sol_types::SolCall;
 use alloy::{
-    contract::ContractInstance,
     network::EthereumWallet,
-    primitives::{Address, FixedBytes, U256},
+    primitives::{Address, U256},
     providers::{Provider, ProviderBuilder, RootProvider},
-    rpc::types::TransactionReceipt,
     signers::local::PrivateKeySigner,
     sol,
     transports::http::{Client, Http},
@@ -12,7 +10,6 @@ use alloy::{
 use anyhow::{Context, Result};
 use rand;
 use rrelayer_core::common_types::EvmAddress;
-use std::str::FromStr;
 use tracing::info;
 
 sol! {

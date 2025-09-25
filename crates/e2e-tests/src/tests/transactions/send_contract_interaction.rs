@@ -1,5 +1,5 @@
 use crate::tests::test_runner::TestRunner;
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use rrelayer_core::transaction::types::{TransactionData, TransactionValue};
 use tracing::info;
 

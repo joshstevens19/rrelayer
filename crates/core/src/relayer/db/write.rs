@@ -8,7 +8,6 @@ use crate::{
     postgres::{PostgresClient, PostgresError},
     provider::EvmProvider,
     relayer::types::{Relayer, RelayerId},
-    shared::common_types::EvmAddress,
 };
 
 #[derive(Error, Debug)]

@@ -1,7 +1,6 @@
 use crate::tests::test_runner::TestRunner;
 use alloy::dyn_abi::TypedData;
 use anyhow::{anyhow, Context};
-use rrelayer_core::transaction::types::TransactionData;
 use std::time::Duration;
 use tracing::info;
 

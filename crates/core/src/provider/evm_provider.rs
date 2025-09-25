@@ -16,10 +16,6 @@ use crate::{
 };
 use alloy::consensus::{SignableTransaction, TxEnvelope};
 use alloy::network::{AnyNetwork, AnyTransactionReceipt};
-use alloy::providers::fillers::{
-    BlobGasFiller, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
-};
-use alloy::providers::{Identity, IpcConnect};
 use alloy::rpc::client::RpcClient;
 use alloy::rpc::types::serde_helpers::WithOtherFields;
 use alloy::{
@@ -31,11 +27,11 @@ use alloy::{
     network::TransactionBuilderError,
     primitives::PrimitiveSignature,
     providers::{Provider, ProviderBuilder, RootProvider},
-    rpc::{client::ClientBuilder, types::TransactionRequest},
+    rpc::types::TransactionRequest,
     signers::local::LocalSignerError,
     transports::{
         http::{
-            reqwest::{header::HeaderMap, Error as ReqwestError},
+            reqwest::Error as ReqwestError,
             Client, Http,
         },
         layers::{RetryBackoffLayer, RetryBackoffService},

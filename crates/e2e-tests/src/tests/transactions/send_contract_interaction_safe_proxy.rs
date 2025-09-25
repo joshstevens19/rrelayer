@@ -1,12 +1,8 @@
 use crate::tests::test_runner::TestRunner;
 use alloy::network::ReceiptResponse;
-use alloy::primitives::Address;
 use anyhow::{anyhow, Context};
 use rrelayer_core::common_types::EvmAddress;
 use rrelayer_core::transaction::types::{TransactionData, TransactionValue};
-use std::str::FromStr;
-use std::thread;
-use std::time::Duration;
 use tracing::info;
 
 impl TestRunner {

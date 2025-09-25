@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use axum::{
     extract::{Path, State},
-    http::StatusCode,
     Json,
 };
 use serde::{Deserialize, Serialize};
