@@ -4,6 +4,8 @@ init:
 	cargo run -- init --path $(CURDIR)/../../playground
 start:
 	RUST_BACKTRACE=1 cargo run -- start --path $(CURDIR)/../../playground/example
+start_local:
+	RUST_BACKTRACE=1 cargo run -- start --path $(CURDIR)/../../playground/local-node
 
 auth_login:
 	cargo run -- auth login
