@@ -22,7 +22,6 @@ networks:
         - "0x6F3E343161C4B905342015AD20A5C492ADFB730E"
         - "0x68333AE8A21E1F768B20DB409486BE2D569A5258"
       native:
-        enabled: true
         min_balance: "50"
         top_up_amount: "100"
       erc20_tokens:

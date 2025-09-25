@@ -160,20 +160,16 @@ impl AutomaticTopUpTask {
         }
 
         if let Some(native_config) = &config.native {
-            if native_config.enabled {
-                info!("Processing native token top-ups for {} addresses", target_addresses.len());
-                self.process_native_token_top_ups(
-                    chain_id,
-                    provider,
-                    &config.from.relayer.address,
-                    &target_addresses,
-                    native_config,
-                    config,
-                )
-                .await;
-            } else {
-                info!("Native token top-ups disabled for chain {}", chain_id);
-            }
+            info!("Processing native token top-ups for {} addresses", target_addresses.len());
+            self.process_native_token_top_ups(
+                chain_id,
+                provider,
+                &config.from.relayer.address,
+                &target_addresses,
+                native_config,
+                config,
+            )
+            .await;
         }
 
         if let Some(erc20_tokens) = &config.erc20_tokens {

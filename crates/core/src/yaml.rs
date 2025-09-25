@@ -319,7 +319,6 @@ impl<'de> Deserialize<'de> for AllOrAddresses {
 
 #[derive(Debug, Clone)]
 pub struct NativeTokenConfig {
-    pub enabled: bool,
     pub min_balance: U256,
     pub top_up_amount: U256,
     pub decimals: u8,
@@ -332,7 +331,6 @@ impl Serialize for NativeTokenConfig {
     {
         use serde::ser::SerializeStruct;
         let mut state = serializer.serialize_struct("NativeTokenConfig", 4)?;
-        state.serialize_field("enabled", &self.enabled)?;
         state.serialize_field(
             "min_balance",
             &serialize_amount_with_decimals(&self.min_balance, self.decimals),
@@ -353,7 +351,6 @@ impl<'de> Deserialize<'de> for NativeTokenConfig {
     {
         #[derive(Deserialize)]
         struct NativeTokenConfigHelper {
-            enabled: bool,
             min_balance: String,
             top_up_amount: String,
             #[serde(default = "default_decimals")]
@@ -369,12 +366,7 @@ impl<'de> Deserialize<'de> for NativeTokenConfig {
             .unwrap_or(ParseUnits::U256(U256::ZERO))
             .into();
 
-        Ok(NativeTokenConfig {
-            enabled: helper.enabled,
-            min_balance,
-            top_up_amount,
-            decimals: helper.decimals,
-        })
+        Ok(NativeTokenConfig { min_balance, top_up_amount, decimals: helper.decimals })
     }
 }
 
