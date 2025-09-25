@@ -59,16 +59,45 @@ impl TransactionApi {
             .await
     }
 
-    pub async fn cancel_transaction(&self, transaction_id: &TransactionId) -> ApiResult<bool> {
-        self.client.put(&format!("transactions/cancel/{}", transaction_id), &()).await
+    pub async fn cancel_transaction(
+        &self,
+        transaction_id: &TransactionId,
+        rate_limit_key: Option<String>,
+    ) -> ApiResult<bool> {
+        let mut headers = HeaderMap::new();
+        if let Some(rate_limit_key) = rate_limit_key.as_ref() {
+            headers.insert(
+                RATE_LIMIT_HEADER_NAME,
+                HeaderValue::from_str(rate_limit_key).expect("Invalid rate limit key"),
+            );
+        }
+
+        self.client
+            .post_with_headers(&format!("transactions/cancel/{}", transaction_id), &(), headers)
+            .await
     }
 
     pub async fn replace_transaction(
         &self,
         transaction_id: &TransactionId,
         replacement: &RelayTransactionRequest,
+        rate_limit_key: Option<String>,
     ) -> ApiResult<bool> {
-        self.client.put(&format!("transactions/replace/{}", transaction_id), replacement).await
+        let mut headers = HeaderMap::new();
+        if let Some(rate_limit_key) = rate_limit_key.as_ref() {
+            headers.insert(
+                RATE_LIMIT_HEADER_NAME,
+                HeaderValue::from_str(rate_limit_key).expect("Invalid rate limit key"),
+            );
+        }
+
+        self.client
+            .post_with_headers(
+                &format!("transactions/replace/{}", transaction_id),
+                replacement,
+                headers,
+            )
+            .await
     }
 
     pub async fn get_transaction_status(

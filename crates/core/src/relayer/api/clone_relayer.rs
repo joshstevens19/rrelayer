@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use axum::http::HeaderMap;
 use axum::{
     extract::{Path, State},
     Json,
@@ -27,8 +28,11 @@ pub struct CloneRelayerRequest {
 pub async fn clone_relayer(
     State(state): State<Arc<AppState>>,
     Path(relayer_id): Path<RelayerId>,
+    headers: HeaderMap,
     Json(relayer): Json<CloneRelayerRequest>,
 ) -> Result<Json<CreateRelayerResult>, HttpError> {
+    state.validate_basic_auth_valid(&headers)?;
+
     let provider = find_provider_for_chain_id(&state.evm_providers, &relayer.chain_id)
         .await
         .ok_or(not_found("Could not find provider for the chain id".to_string()))?;

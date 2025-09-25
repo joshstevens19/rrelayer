@@ -35,6 +35,7 @@ use update_relay_eip1559_status::update_relay_eip1559_status;
 use update_relay_max_gas_price::update_relay_max_gas_price;
 
 pub fn create_relayer_routes() -> Router<Arc<AppState>> {
+    // All routes handle authentication internally via validate_allowed_passed_basic_auth + validate_auth_basic_or_api_key
     Router::new()
         .route("/:chain_id/new", post(create_relayer))
         .route("/", get(get_relayers))

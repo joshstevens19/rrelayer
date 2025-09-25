@@ -1,7 +1,10 @@
-use axum::{http::StatusCode, Json};
+use crate::app_state::AppState;
+use crate::shared::HttpError;
+use axum::extract::State;
+use axum::http::HeaderMap;
+use axum::Json;
 use serde::{Deserialize, Serialize};
-
-use crate::authentication::basic_auth::Authenticated;
+use std::sync::Arc;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StatusResponse {
@@ -10,14 +13,12 @@ pub struct StatusResponse {
 }
 
 /// Simple endpoint to verify basic auth credentials work.
-///
-/// This endpoint can be used to test that basic auth is working correctly.
-/// If you can access this endpoint, your credentials are valid.
-///
-/// # Returns
-/// * `Ok(Json<StatusResponse>)` - Authentication status if basic auth succeeds
-/// * `Err(StatusCode::UNAUTHORIZED)` - If basic auth fails
-pub async fn status(_auth: Authenticated) -> Result<Json<StatusResponse>, StatusCode> {
+pub async fn status(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Json<StatusResponse>, HttpError> {
+    state.validate_basic_auth_valid(&headers)?;
+
     Ok(Json(StatusResponse {
         authenticated: true,
         message: "Basic authentication successful".to_string(),

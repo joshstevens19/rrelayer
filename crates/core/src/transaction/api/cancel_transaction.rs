@@ -19,6 +19,8 @@ pub async fn cancel_transaction(
     Path(transaction_id): Path<TransactionId>,
     headers: HeaderMap,
 ) -> Result<Json<bool>, HttpError> {
+    state.validate_allowed_passed_basic_auth(&headers)?;
+
     let transaction = get_transaction_by_id(&state.cache, &state.db, transaction_id)
         .await?
         .ok_or(not_found("Could not find transaction id".to_string()))?;
@@ -27,8 +29,9 @@ pub async fn cancel_transaction(
         return Err(unauthorized(Some("Relayer can only be used internally".to_string())));
     }
 
+    state.validate_auth_basic_or_api_key(&headers, &transaction.from, &transaction.chain_id)?;
+
     state.network_permission_validate(
-        &headers,
         &transaction.from,
         &transaction.chain_id,
         &transaction.to,

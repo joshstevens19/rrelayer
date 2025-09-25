@@ -23,7 +23,7 @@ export class RpcError extends Error {
   }
 }
 
-export class RrelayerEthereumProvider {
+export class Provider {
   private _client: PublicClient;
   constructor(private _providerUrl: string, private _relayer: RelayerClient) {
     this._client = createPublicClient({

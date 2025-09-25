@@ -6,7 +6,7 @@ use crate::common_types::EvmAddress;
 use crate::network::ChainId;
 use crate::shared::{unauthorized, HttpError};
 use crate::transaction::types::TransactionValue;
-use crate::yaml::NetworkPermissionsConfig;
+use crate::yaml::{ApiKey, NetworkPermissionsConfig};
 use crate::{
     gas::{BlobGasOracleCache, GasOracleCache},
     postgres::PostgresClient,
@@ -61,6 +61,8 @@ pub struct AppState {
     pub relayer_internal_only: Arc<RelayersInternalOnly>,
     /// Hold all networks permissions
     pub network_permissions: Arc<Vec<(ChainId, Vec<NetworkPermissionsConfig>)>>,
+    /// The API keys mapped to be able to be used
+    pub api_keys: Arc<Vec<(ChainId, Vec<ApiKey>)>>,
 }
 
 pub enum NetworkValidateAction {
@@ -74,6 +76,78 @@ impl AppState {
         chain_id: &ChainId,
     ) -> Option<&Vec<NetworkPermissionsConfig>> {
         self.network_permissions.iter().find(|n| n.0 == *chain_id).map(|n| &n.1)
+    }
+
+    fn is_basic_auth_valid(&self, headers: &HeaderMap) -> bool {
+        headers
+            .get("x-rrelayer-basic-auth-valid")
+            .and_then(|v| v.to_str().ok())
+            .map(|v| v == "true")
+            .unwrap_or(false)
+    }
+
+    fn find_api_keys(&self, chain_id: &ChainId) -> Option<&Vec<ApiKey>> {
+        self.api_keys.iter().find(|k| k.0 == *chain_id).map(|k| &k.1)
+    }
+
+    pub fn validate_basic_auth_valid(&self, headers: &HeaderMap) -> Result<(), HttpError> {
+        if self.is_basic_auth_valid(headers) {
+            Ok(())
+        } else {
+            Err(unauthorized(None))
+        }
+    }
+
+    pub fn validate_allowed_passed_basic_auth(&self, headers: &HeaderMap) -> Result<(), HttpError> {
+        let api_keys_enabled = self.api_keys.len() > 0;
+        if !api_keys_enabled && !self.is_basic_auth_valid(headers) {
+            return Err(unauthorized(None));
+        }
+
+        Ok(())
+    }
+
+    pub fn validate_auth_basic_or_api_key(
+        &self,
+        headers: &HeaderMap,
+        relayer_address: &EvmAddress,
+        chain_id: &ChainId,
+    ) -> Result<(), HttpError> {
+        if self.is_basic_auth_valid(headers) {
+            return Ok(());
+        }
+
+        let passed = self.is_api_key_valid_for_relayer(headers, relayer_address, chain_id);
+        if passed {
+            Ok(())
+        } else {
+            Err(unauthorized(None))
+        }
+    }
+
+    fn is_api_key_valid_for_relayer(
+        &self,
+        headers: &HeaderMap,
+        relayer_address: &EvmAddress,
+        chain_id: &ChainId,
+    ) -> bool {
+        let api_key = match headers.get("x-rrelayer-api-key").and_then(|v| v.to_str().ok()) {
+            Some(key) => key,
+            None => return false,
+        };
+
+        let api_keys = match self.find_api_keys(chain_id) {
+            Some(keys) => keys,
+            None => return false,
+        };
+
+        for api_key_config in api_keys {
+            if api_key_config.relayer == *relayer_address {
+                return api_key_config.keys.contains(&api_key.to_string());
+            }
+        }
+
+        false
     }
 
     pub fn restricted_addresses(
@@ -117,7 +191,6 @@ impl AppState {
 
     pub fn network_permission_validate(
         &self,
-        headers: &HeaderMap,
         relayer: &EvmAddress,
         chain_id: &ChainId,
         to: &EvmAddress,
@@ -142,19 +215,6 @@ impl AppState {
                                     "Relayer have disabled typed data signing".to_string(),
                                 )));
                             }
-                        }
-                    }
-
-                    if !network_permission.api_keys.is_empty() {
-                        let api_key = headers
-                            .get("x-rrelayer-api-key")
-                            .and_then(|v| v.to_str().ok())
-                            .unwrap_or_default();
-
-                        if !network_permission.api_keys.contains(&api_key.to_string()) {
-                            return Err(unauthorized(Some(
-                                "Invalid or missing x-rrelayer-api-key header".to_string(),
-                            )));
                         }
                     }
 

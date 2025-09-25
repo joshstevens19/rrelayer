@@ -1,13 +1,14 @@
 use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Instant};
 
 use crate::app_state::RelayersInternalOnly;
-use crate::authentication::{basic_auth_guard, create_basic_auth_routes};
+use crate::authentication::{create_basic_auth_routes, inject_basic_auth_status};
 use crate::background_tasks::run_background_tasks;
 use crate::common_types::EvmAddress;
-use crate::gas::{create_gas_routes, BlobGasOracleCache, GasOracleCache};
+use crate::gas::{create_gas_routes, BlobGasOracleCache, GasEstimatorResult, GasOracleCache};
 use crate::network::{create_network_routes, set_networks_cache, ChainId, Network};
+use crate::shared::HttpError;
 use crate::webhooks::WebhookManager;
-use crate::yaml::{NetworkPermissionsConfig, ReadYamlError};
+use crate::yaml::{ApiKey, NetworkPermissionsConfig, ReadYamlError};
 use crate::{
     app_state::AppState,
     postgres::{PostgresClient, PostgresConnectionError, PostgresError},
@@ -19,7 +20,7 @@ use crate::{
     schema::apply_schema,
     setup_info_logger,
     shared::cache::Cache,
-    signing::create_signing_history_routes,
+    signing::create_signing_routes,
     transaction::{
         api::create_transactions_routes,
         queue_system::{
@@ -28,6 +29,8 @@ use crate::{
     },
     ApiConfig, RateLimitConfig, SafeProxyConfig,
 };
+use axum::extract::State;
+use axum::http::HeaderMap;
 use axum::{
     body::{to_bytes, Body},
     http::{HeaderValue, Request, StatusCode},
@@ -35,7 +38,7 @@ use axum::{
     middleware::Next,
     response::{IntoResponse, Response},
     routing::get,
-    Router,
+    Json, Router,
 };
 use dotenv::dotenv;
 use thiserror::Error;
@@ -57,8 +60,8 @@ pub enum StartApiError {
 }
 
 /// Health check endpoint
-async fn health_check() -> impl IntoResponse {
-    "healthy"
+async fn health_check() -> Result<Json<String>, HttpError> {
+    Ok(Json("healthy".to_string()))
 }
 
 /// Middleware that logs all HTTP requests and responses with timing information.
@@ -152,6 +155,7 @@ async fn start_api(
     api_config: ApiConfig,
     rate_limit_config: Option<RateLimitConfig>,
     network_permissions: Vec<(ChainId, Vec<NetworkPermissionsConfig>)>,
+    api_keys: Vec<(ChainId, Vec<ApiKey>)>,
     gas_oracle_cache: Arc<Mutex<GasOracleCache>>,
     blob_gas_oracle_cache: Arc<Mutex<BlobGasOracleCache>>,
     transactions_queues: Arc<Mutex<TransactionsQueues>>,
@@ -177,6 +181,7 @@ async fn start_api(
         safe_proxy_manager,
         relayer_internal_only: Arc::new(relayer_internal_only),
         network_permissions: Arc::new(network_permissions),
+        api_keys: Arc::new(api_keys),
     });
 
     let cors = CorsLayer::new()
@@ -197,18 +202,19 @@ async fn start_api(
         .allow_methods(Any)
         .allow_headers(Any);
 
-    let protected_routes = Router::new()
+    // All routes handle their own authentication logic internally
+    let api_routes = Router::new()
         .nest("/auth", create_basic_auth_routes())
         .nest("/gas", create_gas_routes())
         .nest("/networks", create_network_routes())
         .nest("/relayers", create_relayer_routes())
         .nest("/transactions", create_transactions_routes())
-        .nest("/signing", create_signing_history_routes())
-        .layer(middleware::from_fn(basic_auth_guard));
+        .nest("/signing", create_signing_routes());
 
     let app = Router::new()
         .route("/health", get(health_check))
-        .merge(protected_routes)
+        .merge(api_routes)
+        .layer(middleware::from_fn(inject_basic_auth_status))
         .layer(middleware::from_fn(activity_logger))
         .layer(cors)
         .with_state(app_state)
@@ -306,7 +312,10 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
     let mut safe_configs: Vec<SafeProxyConfig> = vec![];
     let mut relayer_internal_only: Vec<(ChainId, EvmAddress)> = vec![];
     let mut network_permissions: Vec<(ChainId, Vec<NetworkPermissionsConfig>)> = vec![];
+    let mut api_keys: Vec<(ChainId, Vec<ApiKey>)> = vec![];
     for network_config in &config.networks {
+        api_keys
+            .push((network_config.chain_id, network_config.api_keys.clone().unwrap_or_default()));
         if let Some(automatic_top_up) = &network_config.automatic_top_up {
             if let Some(safe_address) = &automatic_top_up.from.safe {
                 safe_configs.push(SafeProxyConfig {
@@ -367,6 +376,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
         config.api_config,
         config.rate_limits.clone(),
         network_permissions,
+        api_keys,
         gas_oracle_cache,
         blob_gas_oracle_cache,
         transaction_queue,

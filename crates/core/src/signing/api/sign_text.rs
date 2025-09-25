@@ -35,13 +35,7 @@ pub async fn sign_text(
     headers: HeaderMap,
     Json(sign): Json<SignTextDto>,
 ) -> Result<Json<SignTextResult>, HttpError> {
-    let rate_limit_reservation = RateLimiter::check_and_reserve_rate_limit(
-        &state,
-        &headers,
-        &relayer_id,
-        RateLimitOperation::Signing,
-    )
-    .await?;
+    state.validate_allowed_passed_basic_auth(&headers)?;
 
     let relayer_provider_context = get_relayer_provider_context_by_relayer_id(
         &state.db,
@@ -51,6 +45,20 @@ pub async fn sign_text(
     )
     .await?
     .ok_or(not_found("Relayer does not exist".to_string()))?;
+
+    state.validate_auth_basic_or_api_key(
+        &headers,
+        &relayer_provider_context.relayer.address,
+        &relayer_provider_context.relayer.chain_id,
+    )?;
+
+    let rate_limit_reservation = RateLimiter::check_and_reserve_rate_limit(
+        &state,
+        &headers,
+        &relayer_id,
+        RateLimitOperation::Signing,
+    )
+    .await?;
 
     state.restricted_personal_signing(
         &relayer_provider_context.relayer.address,

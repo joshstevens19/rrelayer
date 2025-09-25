@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use axum::http::HeaderMap;
 use axum::{
     extract::{Query, State},
     Json,
@@ -26,7 +27,9 @@ pub struct GetRelayersQuery {
 pub async fn get_relayers(
     State(state): State<Arc<AppState>>,
     Query(query): Query<GetRelayersQuery>,
+    headers: HeaderMap,
 ) -> Result<Json<PagingResult<Relayer>>, HttpError> {
+    state.validate_basic_auth_valid(&headers)?;
     match query.chain_id {
         Some(chain_id) => {
             if !chain_enabled(&state.evm_providers, &chain_id) {

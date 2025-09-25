@@ -30,10 +30,7 @@ use alloy::{
     rpc::types::TransactionRequest,
     signers::local::LocalSignerError,
     transports::{
-        http::{
-            reqwest::Error as ReqwestError,
-            Client, Http,
-        },
+        http::{reqwest::Error as ReqwestError, Client, Http},
         layers::{RetryBackoffLayer, RetryBackoffService},
         RpcError, TransportErrorKind,
     },

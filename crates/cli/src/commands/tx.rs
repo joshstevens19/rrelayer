@@ -314,7 +314,7 @@ async fn handle_queue(relayer_id: &RelayerId, sdk: &SDK) -> Result<(), Transacti
 async fn handle_cancel(tx_id: &TransactionId, sdk: &SDK) -> Result<(), TransactionError> {
     println!("Canceling transaction: {}", tx_id);
 
-    let cancelled = sdk.transaction.cancel_transaction(tx_id).await?;
+    let cancelled = sdk.transaction.cancel_transaction(tx_id, None).await?;
 
     if cancelled {
         println!("Transaction cancelled..");
@@ -335,7 +335,7 @@ async fn handle_replace(
 ) -> Result<(), TransactionError> {
     println!("Replacing transaction: {}", tx_id);
 
-    let replaced = sdk.transaction.replace_transaction(tx_id, transaction).await?;
+    let replaced = sdk.transaction.replace_transaction(tx_id, transaction, None).await?;
 
     if replaced {
         println!("Transaction replaced..");

@@ -58,6 +58,7 @@ pub async fn handle_init(path: &Path) -> Result<(), InitError> {
             automatic_top_up: None,
             confirmations: None,
             permissions: None,
+            api_keys: None,
         }],
         gas_providers: None,
         api_config: ApiConfig {

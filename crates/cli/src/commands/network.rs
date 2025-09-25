@@ -106,6 +106,7 @@ async fn handle_add(project_path: &ProjectLocation) -> Result<(), NetworkError> 
         automatic_top_up: None,
         confirmations: None,
         permissions: None,
+        api_keys: None,
     });
 
     project_path.overwrite_setup_config(setup_config)?;

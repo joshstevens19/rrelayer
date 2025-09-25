@@ -20,8 +20,8 @@ pub use send_transaction::{RelayTransactionRequest, SendTransactionResult};
 mod types;
 pub use types::TransactionSpeed;
 
-/// Creates and configures the transaction API routes.
 pub fn create_transactions_routes() -> Router<Arc<AppState>> {
+    // All transaction routes handle authentication internally via validate_allowed_passed_basic_auth + validate_auth_basic_or_api_key
     Router::new()
         .route("/:id", get(get_transaction_by_id::get_transaction_by_id_api))
         .route("/status/:id", get(get_transaction_status::get_transaction_status))

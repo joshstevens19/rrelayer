@@ -188,11 +188,9 @@ impl SigningProvider {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NetworkPermissionsConfig {
-    pub relayers: AllOrAddresses,
+    pub relayers: AllOrOneOrManyAddresses,
     #[serde(default)]
     pub allowlist: Vec<EvmAddress>,
-    #[serde(default)]
-    pub api_keys: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub disable_native_transfer: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -201,6 +199,12 @@ pub struct NetworkPermissionsConfig {
     pub disable_typed_data_sign: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub disable_transactions: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ApiKey {
+    pub relayer: EvmAddress,
+    pub keys: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -222,6 +226,8 @@ pub struct NetworkSetupConfig {
     pub automatic_top_up: Option<NetworkAutomaticTopUpConfig>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub permissions: Option<Vec<NetworkPermissionsConfig>>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub api_keys: Option<Vec<ApiKey>>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub confirmations: Option<u64>,
 }
@@ -313,6 +319,108 @@ impl<'de> Deserialize<'de> for AllOrAddresses {
         D: Deserializer<'de>,
     {
         deserializer.deserialize_any(ForAddressesTypeVisitor)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum AllOrOneOrManyAddresses {
+    All,
+    One(EvmAddress),
+    Many(Vec<EvmAddress>),
+}
+
+impl AllOrOneOrManyAddresses {
+    pub fn contains(&self, address: &EvmAddress) -> bool {
+        match self {
+            AllOrOneOrManyAddresses::All => true,
+            AllOrOneOrManyAddresses::One(addr) => addr == address,
+            AllOrOneOrManyAddresses::Many(addresses) => addresses.contains(address),
+        }
+    }
+
+    pub fn len(&self) -> Option<usize> {
+        match self {
+            AllOrOneOrManyAddresses::All => None,
+            AllOrOneOrManyAddresses::One(_) => Some(1),
+            AllOrOneOrManyAddresses::Many(addresses) => Some(addresses.len()),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        match self {
+            AllOrOneOrManyAddresses::All => false,
+            AllOrOneOrManyAddresses::One(_) => false,
+            AllOrOneOrManyAddresses::Many(addresses) => addresses.is_empty(),
+        }
+    }
+
+    pub fn iter(&self) -> Box<dyn Iterator<Item = &EvmAddress> + '_> {
+        match self {
+            AllOrOneOrManyAddresses::All => Box::new(std::iter::empty()),
+            AllOrOneOrManyAddresses::One(addr) => Box::new(std::iter::once(addr)),
+            AllOrOneOrManyAddresses::Many(addresses) => Box::new(addresses.iter()),
+        }
+    }
+}
+
+impl Serialize for AllOrOneOrManyAddresses {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            AllOrOneOrManyAddresses::All => serializer.serialize_str("*"),
+            AllOrOneOrManyAddresses::One(address) => address.serialize(serializer),
+            AllOrOneOrManyAddresses::Many(addresses) => addresses.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for AllOrOneOrManyAddresses {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct AllOrOneOrManyVisitor;
+
+        impl<'de> Visitor<'de> for AllOrOneOrManyVisitor {
+            type Value = AllOrOneOrManyAddresses;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a string '*', a single address, or an array of addresses")
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<AllOrOneOrManyAddresses, E>
+            where
+                E: de::Error,
+            {
+                if value == "*" {
+                    Ok(AllOrOneOrManyAddresses::All)
+                } else {
+                    let address: EvmAddress =
+                        value.parse().map_err(|_| E::custom("invalid address format"))?;
+                    Ok(AllOrOneOrManyAddresses::One(address))
+                }
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<AllOrOneOrManyAddresses, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let mut addresses = Vec::new();
+                while let Some(addr) = seq.next_element::<EvmAddress>()? {
+                    addresses.push(addr);
+                }
+
+                match addresses.len() {
+                    0 => Ok(AllOrOneOrManyAddresses::Many(addresses)), // Empty array
+                    1 => Ok(AllOrOneOrManyAddresses::One(addresses.into_iter().next().unwrap())),
+                    _ => Ok(AllOrOneOrManyAddresses::Many(addresses)),
+                }
+            }
+        }
+
+        deserializer.deserialize_any(AllOrOneOrManyVisitor)
     }
 }
 

@@ -1,6 +1,7 @@
 use alloy::network::AnyTransactionReceipt;
 use axum::{
     extract::{Path, State},
+    http::HeaderMap,
     Json,
 };
 use serde::{Deserialize, Serialize};
@@ -28,10 +29,15 @@ pub struct RelayTransactionStatusResult {
 pub async fn get_transaction_status(
     State(state): State<Arc<AppState>>,
     Path(id): Path<TransactionId>,
+    headers: HeaderMap,
 ) -> Result<Json<RelayTransactionStatusResult>, HttpError> {
+    state.validate_allowed_passed_basic_auth(&headers)?;
+
     let transaction = get_transaction_by_id(&state.cache, &state.db, id)
         .await?
         .ok_or(not_found("Transaction id not found".to_string()))?;
+
+    state.validate_auth_basic_or_api_key(&headers, &transaction.from, &transaction.chain_id)?;
 
     if matches!(
         transaction.status,

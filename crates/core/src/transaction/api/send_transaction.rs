@@ -57,16 +57,19 @@ pub async fn send_transaction(
     headers: HeaderMap,
     Json(transaction): Json<RelayTransactionRequest>,
 ) -> Result<Json<SendTransactionResult>, HttpError> {
+    state.validate_allowed_passed_basic_auth(&headers)?;
+
     let relayer = get_relayer(&state.db, &state.cache, &relayer_id)
         .await?
         .ok_or(not_found("Relayer does not exist".to_string()))?;
+
+    state.validate_auth_basic_or_api_key(&headers, &relayer.address, &relayer.chain_id)?;
 
     if state.relayer_internal_only.restricted(&relayer.address, &relayer.chain_id) {
         return Err(unauthorized(Some("Relayer can only be used internally".to_string())));
     }
 
     state.network_permission_validate(
-        &headers,
         &relayer.address,
         &relayer.chain_id,
         &transaction.to,

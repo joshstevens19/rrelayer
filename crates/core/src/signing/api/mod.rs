@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use axum::{
+    middleware,
     routing::{get, post},
     Router,
 };
@@ -12,18 +13,11 @@ mod get_signed_typed_data_history;
 mod sign_text;
 mod sign_typed_data;
 
-// Re-export public types for backward compatibility
 pub use sign_text::{SignTextDto, SignTextResult};
 pub use sign_typed_data::SignTypedDataResult;
 
-/// Creates and configures the HTTP routes for signing history operations.
-///
-/// This function sets up the REST API endpoints for querying signing history,
-/// including both text message and typed data signing records.
-///
-/// # Returns
-/// * A configured Axum Router with signing history endpoints
-pub fn create_signing_history_routes() -> Router<Arc<AppState>> {
+pub fn create_signing_routes() -> Router<Arc<AppState>> {
+    // All signing routes handle authentication internally via validate_allowed_passed_basic_auth + validate_auth_basic_or_api_key
     Router::new()
         .route("/:relayer_id/message", post(sign_text::sign_text))
         .route("/:relayer_id/typed-data", post(sign_typed_data::sign_typed_data))

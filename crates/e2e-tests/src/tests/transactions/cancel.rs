@@ -41,7 +41,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .cancel_transaction(transaction_id)
+            .cancel_transaction(transaction_id, None)
             .await
             .context("Failed to cancel transaction")?;
 

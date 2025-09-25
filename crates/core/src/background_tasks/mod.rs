@@ -4,9 +4,9 @@ mod webhook_manager_task;
 use crate::background_tasks::webhook_manager_task::run_webhook_manager_task;
 use crate::gas::{blob_gas_oracle, gas_oracle, BlobGasOracleCache, GasOracleCache};
 use crate::{
-    background_tasks::automatic_top_up_task::run_automatic_top_up_task, provider::EvmProvider, shared::cache::Cache,
-    transaction::queue_system::TransactionsQueues, webhooks::WebhookManager, PostgresClient,
-    SafeProxyManager, SetupConfig,
+    background_tasks::automatic_top_up_task::run_automatic_top_up_task, provider::EvmProvider,
+    shared::cache::Cache, transaction::queue_system::TransactionsQueues, webhooks::WebhookManager,
+    PostgresClient, SafeProxyManager, SetupConfig,
 };
 use std::sync::Arc;
 use tokio::sync::Mutex;

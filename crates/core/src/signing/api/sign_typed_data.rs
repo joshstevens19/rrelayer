@@ -31,6 +31,8 @@ pub async fn sign_typed_data(
     headers: HeaderMap,
     Json(typed_data): Json<TypedData>,
 ) -> Result<Json<SignTypedDataResult>, HttpError> {
+    state.validate_allowed_passed_basic_auth(&headers)?;
+
     let relayer_provider_context = get_relayer_provider_context_by_relayer_id(
         &state.db,
         &state.cache,
@@ -40,6 +42,12 @@ pub async fn sign_typed_data(
     .await?
     .ok_or(not_found("Relayer does not exist".to_string()))?;
 
+    state.validate_auth_basic_or_api_key(
+        &headers,
+        &relayer_provider_context.relayer.address,
+        &relayer_provider_context.relayer.chain_id,
+    )?;
+
     if let Some(chain_id) = typed_data.domain.chain_id {
         let chain_id: u64 = chain_id.to();
         if chain_id != relayer_provider_context.relayer.chain_id.u64() {
@@ -47,7 +55,6 @@ pub async fn sign_typed_data(
         }
 
         state.network_permission_validate(
-            &headers,
             &relayer_provider_context.relayer.address,
             &relayer_provider_context.relayer.chain_id,
             &EvmAddress::new(typed_data.domain.verifying_contract.unwrap_or_default()),

@@ -1,5 +1,9 @@
 use std::env;
 
+use axum::body::Body;
+use axum::extract::Request;
+use axum::middleware::Next;
+use axum::response::Response;
 use axum::{
     async_trait,
     extract::FromRequestParts,
@@ -100,4 +104,28 @@ where
 pub fn validate_basic_auth(headers: &HeaderMap) -> Result<(), BasicAuthError> {
     let credentials = BasicAuthCredentials::from_headers(headers)?;
     credentials.validate()
+}
+
+/// Injects basic auth status into all requests for downstream endpoint handlers.
+/// This middleware should be applied globally to all routes.
+///
+/// This middleware:
+/// 1. Checks if basic auth is present and valid
+/// 2. Sets the `x-rrelayer-basic-auth-valid` header to "true" if valid
+/// 3. Always continues - individual endpoint handlers decide authentication requirements
+pub async fn inject_basic_auth_status(
+    req: Request<Body>,
+    next: Next,
+) -> Result<Response, StatusCode> {
+    let mut req = req;
+
+    let basic_auth_valid = validate_basic_auth(req.headers()).is_ok();
+
+    if basic_auth_valid {
+        req.headers_mut().insert("x-rrelayer-basic-auth-valid", "true".parse().unwrap());
+    } else {
+        req.headers_mut().insert("x-rrelayer-basic-auth-valid", "false".parse().unwrap());
+    }
+
+    Ok(next.run(req).await)
 }

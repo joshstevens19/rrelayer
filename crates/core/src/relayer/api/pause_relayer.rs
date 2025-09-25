@@ -1,22 +1,25 @@
 use std::sync::Arc;
 
-use axum::{
-    extract::{Path, State},
-    http::StatusCode,
-};
-
 use crate::relayer::get_relayer::relayer_exists;
 use crate::shared::{not_found, HttpError};
 use crate::{
     app_state::AppState,
     relayer::{cache::invalidate_relayer_cache, types::RelayerId},
 };
+use axum::http::HeaderMap;
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+};
 
 /// Pauses transaction processing for a relayer.
 pub async fn pause_relayer(
     State(state): State<Arc<AppState>>,
     Path(relayer_id): Path<RelayerId>,
+    headers: HeaderMap,
 ) -> Result<StatusCode, HttpError> {
+    state.validate_basic_auth_valid(&headers)?;
+
     let exists = relayer_exists(&state.db, &state.cache, &relayer_id).await?;
     if exists {
         state.db.pause_relayer(&relayer_id).await?;

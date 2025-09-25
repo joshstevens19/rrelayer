@@ -1,20 +1,22 @@
 use std::sync::Arc;
 
+use crate::relayer::cache::invalidate_relayer_cache;
+use crate::relayer::get_relayer::relayer_exists;
+use crate::shared::{not_found, HttpError};
+use crate::{app_state::AppState, gas::GasPrice, relayer::types::RelayerId};
+use axum::http::HeaderMap;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
 };
 
-use crate::relayer::cache::invalidate_relayer_cache;
-use crate::relayer::get_relayer::relayer_exists;
-use crate::shared::{not_found, HttpError};
-use crate::{app_state::AppState, gas::GasPrice, relayer::types::RelayerId};
-
 /// Updates the maximum gas price limit for a relayer.
 pub async fn update_relay_max_gas_price(
     State(state): State<Arc<AppState>>,
     Path((relayer_id, cap)): Path<(RelayerId, GasPrice)>,
+    headers: HeaderMap,
 ) -> Result<StatusCode, HttpError> {
+    state.validate_basic_auth_valid(&headers)?;
     let max_gas_price = if cap.into_u128() > 0 { Some(cap) } else { None };
 
     let exists = relayer_exists(&state.db, &state.cache, &relayer_id).await?;

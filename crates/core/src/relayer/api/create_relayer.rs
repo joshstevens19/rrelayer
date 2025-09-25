@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use axum::http::HeaderMap;
 use axum::{
     extract::{Path, State},
     Json,
@@ -32,8 +33,11 @@ pub struct CreateRelayerResult {
 pub async fn create_relayer(
     State(state): State<Arc<AppState>>,
     Path(chain_id): Path<ChainId>,
+    headers: HeaderMap,
     Json(relayer): Json<CreateRelayerRequest>,
 ) -> Result<Json<CreateRelayerResult>, HttpError> {
+    state.validate_basic_auth_valid(&headers)?;
+
     let provider = find_provider_for_chain_id(&state.evm_providers, &chain_id)
         .await
         .ok_or(not_found("Could not find provider for the chain id".to_string()))?;

@@ -40,10 +40,7 @@ use crate::{
     postgres::{PostgresClient, PostgresConnectionError},
     relayer::RelayerId,
     safe_proxy::SafeProxyManager,
-    shared::{
-        cache::Cache,
-        common_types::WalletOrProviderError,
-    },
+    shared::{cache::Cache, common_types::WalletOrProviderError},
     transaction::{
         cache::invalidate_transaction_no_state_cache,
         nonce_manager::NonceManager,

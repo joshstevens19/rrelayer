@@ -21,16 +21,19 @@ pub async fn replace_transaction(
     headers: HeaderMap,
     Json(replace_with): Json<RelayTransactionRequest>,
 ) -> Result<Json<bool>, HttpError> {
+    state.validate_allowed_passed_basic_auth(&headers)?;
+
     let transaction = get_transaction_by_id(&state.cache, &state.db, transaction_id)
         .await?
         .ok_or(not_found("Could not find transaction id".to_string()))?;
+
+    state.validate_auth_basic_or_api_key(&headers, &transaction.from, &transaction.chain_id)?;
 
     if state.relayer_internal_only.restricted(&transaction.from, &transaction.chain_id) {
         return Err(unauthorized(Some("Relayer can only be used internally".to_string())));
     }
 
     state.network_permission_validate(
-        &headers,
         &transaction.from,
         &transaction.chain_id,
         &transaction.to,
