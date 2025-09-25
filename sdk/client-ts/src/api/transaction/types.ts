@@ -1,5 +1,5 @@
 import { Address, Hash } from 'viem';
-import { GasPriceResult } from '../gas';
+import { GasPriceResult, BlobGasPriceResult } from '../gas';
 
 export enum TransactionStatus {
   PENDING = 'PENDING',
@@ -22,19 +22,27 @@ export interface Transaction {
   relayerId: string;
   to: Address;
   from: Address;
-  value?: string | null;
-  data?: string | null;
+  value: string;
+  data: string;
   nonce: string;
+  chainId: number;
+  gasLimit?: string | null;
   status: TransactionStatus;
-  knownTransactionHash?: Hash | null;
+  blobs?: any[] | null;
+  txHash?: Hash | null;
   queuedAt: string;
   expiresAt: string;
   sentAt?: string | null;
+  confirmedAt?: string | null;
   sentWithGas?: GasPriceResult | null;
+  sentWithBlobGas?: BlobGasPriceResult | null;
   minedAt?: string | null;
+  minedAtBlockNumber?: string | null;
   speed: TransactionSpeed;
-  sentWithMaxPriorityFeePerGas?: string | null;
-  sentWithMaxFeePerGas?: string | null;
+  maxPriorityFee?: string | null;
+  maxFee?: string | null;
+  isNoop: boolean;
+  externalId?: string | null;
 }
 
 export interface TransactionToSend {

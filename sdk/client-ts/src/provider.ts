@@ -4,7 +4,7 @@ import {
   createPublicClient,
   http,
 } from 'viem';
-import { RelayerClient } from './clients/relayer-client';
+import { RelayerClient } from './clients/relayer';
 
 interface RequestArguments {
   method: any;

@@ -1,29 +1,23 @@
-import { postApi } from '../axios-wrapper';
+import { getApi } from '../axios-wrapper';
 import { ApiBaseConfig } from '../types';
-import { TokenPair } from './types';
 
-export interface AuthenticateRequest {
-  id: string;
-  signedBy: string;
-  signature: string;
+export interface StatusResponse {
+  authenticated: Boolean;
+  message: string;
 }
 
-export const authenticate = async (
-  request: AuthenticateRequest,
+export const test_auth = async (
   baseConfig: ApiBaseConfig
-): Promise<TokenPair> => {
+): Promise<StatusResponse> => {
   try {
-    const result = await postApi<TokenPair>(
+    const result = await getApi<StatusResponse>(
       baseConfig,
-      'authentication/authenticate',
-      {
-        ...request,
-      }
+      'auth/status'
     );
 
     return result.data;
   } catch (error) {
-    console.error('Failed to authenticate:', error);
+    console.error('Failed to test auth status:', error);
     throw error;
   }
 };

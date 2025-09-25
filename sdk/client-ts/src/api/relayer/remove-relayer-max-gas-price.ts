@@ -1,15 +1,14 @@
 import { putApi } from '../axios-wrapper';
 import { ApiBaseConfig } from '../types';
 
-export const updateRelayerMaxGasPrice = async (
+export const removeRelayerMaxGasPrice = async (
   relayerId: string,
-  cap: string,
   baseConfig: ApiBaseConfig
 ): Promise<void> => {
   try {
-    await putApi(baseConfig, `relayers/${relayerId}/gas/max/${cap}`);
+    await putApi(baseConfig, `relayers/${relayerId}/gas/max/0`);
   } catch (error) {
-    console.error('Failed to updateRelayerEIP1559Status:', error);
+    console.error('Failed to removeRelayerMaxGasPrice:', error);
     throw error;
   }
 };

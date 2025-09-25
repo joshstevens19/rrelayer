@@ -5,9 +5,9 @@ export interface Relayer {
   name: string;
   chainId: number;
   address: Address;
+  walletIndex: number;
   maxGasPrice?: number;
   paused: boolean;
-  allowlistedOnly: boolean;
   eip1559Enabled: boolean;
   createdAt: string;
 }

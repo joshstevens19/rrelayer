@@ -1,5 +1,5 @@
 export * from './allowlist';
-export * from './api-keys';
+export * from './clone-relayer';
 export * from './create-relayer';
 export * from './delete-relayer';
 export * from './get-relayer';
@@ -9,3 +9,4 @@ export * from './types';
 export * from './unpause-relayer';
 export * from './update-relayer-eip-1559-status';
 export * from './update-relayer-max-gas-price';
+export * from './remove-relayer-max-gas-price';

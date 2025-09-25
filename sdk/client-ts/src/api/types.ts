@@ -1,13 +1,13 @@
 export type ApiBaseConfig =
   | {
       serverUrl: string;
-      authToken: string;
+      apiKey: string;
     }
   | {
       serverUrl: string;
-      apiKey: string;
-    }
-  | { serverUrl: string };
+      username: string;
+      password: string;
+    };
 
 export interface PagingContext {
   limit: number;

@@ -6,5 +6,4 @@ export * from './get-transactions-inmempool-count';
 export * from './get-transactions-pending-count';
 export * from './replace-transaction';
 export * from './send-transaction';
-export * from './sign';
 export * from './types';

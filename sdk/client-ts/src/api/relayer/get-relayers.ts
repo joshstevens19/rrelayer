@@ -3,7 +3,7 @@ import { ApiBaseConfig, PagingContext, PagingResult } from '../types';
 import { Relayer } from './types';
 
 export const getRelayers = async (
-  chainId: string | number | undefined,
+  chainId: number | undefined,
   pagingContext: PagingContext,
   baseConfig: ApiBaseConfig
 ): Promise<PagingResult<Relayer>> => {

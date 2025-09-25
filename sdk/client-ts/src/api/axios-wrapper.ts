@@ -21,10 +21,12 @@ const buildHeaders = (
     };
   }
 
-  if ('authToken' in baseConfig) {
+
+  if ('username' in baseConfig && 'password' in baseConfig) {
+    const credentials = btoa(`${baseConfig.username}:${baseConfig.password}`);
     headers = {
-      ...knownHeaders,
-      Authorization: `Bearer ${baseConfig.authToken}`,
+      ...headers,
+      Authorization: `Basic ${credentials}`,
     };
   }
 

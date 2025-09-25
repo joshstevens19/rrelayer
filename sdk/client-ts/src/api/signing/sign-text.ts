@@ -1,5 +1,6 @@
-import { postApi } from '../../axios-wrapper';
-import { ApiBaseConfig } from '../../types';
+import { postApi } from '../axios-wrapper';
+import { ApiBaseConfig } from '../types';
+import {RATE_LIMIT_HEADER_NAME} from "../index";
 
 export interface SignTextResult {
   messageSigned: string;
@@ -9,15 +10,22 @@ export interface SignTextResult {
 export const signText = async (
   relayerId: string,
   text: string,
+  rateLimitKey: string | undefined,
   baseConfig: ApiBaseConfig
 ): Promise<SignTextResult> => {
   try {
+    const config: any = {};
+    if (rateLimitKey) {
+      config.headers = {
+        [RATE_LIMIT_HEADER_NAME]: rateLimitKey,
+      };
+    }
+
     const response = await postApi<SignTextResult>(
       baseConfig,
-      `relayers/${relayerId}/sign/message`,
-      {
-        text,
-      }
+      `signing/${relayerId}/message`,
+      { text },
+      config
     );
     return response.data;
   } catch (error) {

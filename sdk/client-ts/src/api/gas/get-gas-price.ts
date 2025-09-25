@@ -8,6 +8,11 @@ export interface GasPriceResult {
   maxWaitTimeEstimate?: number;
 }
 
+export interface BlobGasPriceResult {
+  blobGasPrice: string;
+  totalFeeForBlob: string;
+}
+
 export interface GasEstimatorResult {
   slow: GasPriceResult;
   medium: GasPriceResult;

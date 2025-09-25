@@ -3,3 +3,8 @@ export enum NetworkStatus {
   DISABLED = 'DISABLED',
   ENABLED = 'ENABLED',
 }
+
+export enum TransactionCountType {
+  PENDING = 'PENDING',
+  INMEMPOOL = 'INMEMPOOL',
+}
