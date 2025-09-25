@@ -33,14 +33,8 @@ pub struct AwsSecretManagerProviderConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct KmsKeyConfig {
-    pub key_id: String,
-    pub region: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AwsKmsSigningProviderConfig {
-    pub key_configs: Vec<KmsKeyConfig>,
+    pub region: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -110,31 +104,10 @@ pub struct RateLimitConfig {
 
 impl AwsKmsSigningProviderConfig {
     pub fn validate(&self) -> Result<(), String> {
-        if self.key_configs.is_empty() {
-            return Err("AWS KMS key configs cannot be empty".to_string());
-        }
-
-        for (index, config) in self.key_configs.iter().enumerate() {
-            if config.key_id.is_empty() {
-                return Err(format!("KMS key ID at index {} cannot be empty", index));
-            }
-            if config.region.is_empty() {
-                return Err(format!("KMS region at index {} cannot be empty", index));
-            }
+        if self.region.is_empty() {
+            return Err("AWS KMS region cannot be empty".to_string());
         }
         Ok(())
-    }
-
-    pub fn get_key_config_for_index(&self, wallet_index: u32) -> Result<&KmsKeyConfig, String> {
-        let index = wallet_index as usize;
-        if index >= self.key_configs.len() {
-            return Err(format!(
-                "Wallet index {} is out of bounds for {} KMS key configs",
-                wallet_index,
-                self.key_configs.len()
-            ));
-        }
-        Ok(&self.key_configs[index])
     }
 }
 
@@ -190,14 +163,8 @@ impl SigningProvider {
         }
     }
 
-    pub fn from_aws_kms_single(key_id: String, region: String) -> Self {
-        let aws_kms =
-            AwsKmsSigningProviderConfig { key_configs: vec![KmsKeyConfig { key_id, region }] };
-        Self::from_aws_kms(aws_kms)
-    }
-
-    pub fn from_aws_kms_multiple(key_configs: Vec<KmsKeyConfig>) -> Self {
-        let aws_kms = AwsKmsSigningProviderConfig { key_configs };
+    pub fn from_aws_kms_region(region: String) -> Self {
+        let aws_kms = AwsKmsSigningProviderConfig { region };
         Self::from_aws_kms(aws_kms)
     }
 }

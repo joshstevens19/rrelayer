@@ -1,6 +1,6 @@
-use clap::Subcommand;
 use crate::credentials::{self, StoredCredentials};
 use crate::error::CliError;
+use clap::Subcommand;
 use dialoguer::{Input, Password};
 use rrelayer_sdk::SDK;
 
@@ -65,7 +65,7 @@ async fn status() -> () {
 
     // Check stored credentials
     println!("\n🔑 Stored Credentials:");
-    
+
     // First try to load default profile directly
     match credentials::load_credentials("default") {
         Ok(creds) => {
@@ -75,16 +75,20 @@ async fn status() -> () {
             println!("  ❌ Default profile error: {}", e);
         }
     }
-    
+
     // Also try the profiles list approach
     match credentials::list_profiles() {
         Ok(profiles) if !profiles.is_empty() => {
             println!("  📋 Found profiles: {:?}", profiles);
             for profile in profiles {
-                if profile != "default" { // Avoid duplicate output
+                if profile != "default" {
+                    // Avoid duplicate output
                     match credentials::load_credentials(&profile) {
                         Ok(creds) => {
-                            println!("  ✅ Profile '{}': {} ({})", profile, creds.username, creds.api_url);
+                            println!(
+                                "  ✅ Profile '{}': {} ({})",
+                                profile, creds.username, creds.api_url
+                            );
                         }
                         Err(e) => {
                             println!("  ❌ Profile '{}': {}", profile, e);
@@ -129,7 +133,7 @@ async fn login(profile_name: &str) -> Result<(), CliError> {
     // Test the credentials
     println!("\n🧪 Testing credentials...");
     let sdk = SDK::new(api_url.clone(), username.clone(), password.clone());
-    
+
     match sdk.health.check().await {
         Ok(_) => {
             println!("✅ API server is reachable");
@@ -137,7 +141,7 @@ async fn login(profile_name: &str) -> Result<(), CliError> {
         Err(e) => {
             println!("❌ Failed to reach API server: {}", e);
             return Err(CliError::Authentication(
-                "API server is not reachable. Please check the URL and try again.".to_string()
+                "API server is not reachable. Please check the URL and try again.".to_string(),
             ));
         }
     }
@@ -149,17 +153,13 @@ async fn login(profile_name: &str) -> Result<(), CliError> {
         Err(e) => {
             println!("❌ Authentication failed: {}", e);
             return Err(CliError::Authentication(
-                "Invalid credentials. Please check your username and password.".to_string()
+                "Invalid credentials. Please check your username and password.".to_string(),
             ));
         }
     }
 
     // Store credentials
-    let credentials = StoredCredentials {
-        api_url,
-        username,
-        password,
-    };
+    let credentials = StoredCredentials { api_url, username, password };
 
     // Store credentials with detailed error reporting
     match credentials::store_credentials(profile_name, &credentials) {
@@ -170,7 +170,7 @@ async fn login(profile_name: &str) -> Result<(), CliError> {
         }
     }
 
-    // Update profile list with detailed error reporting  
+    // Update profile list with detailed error reporting
     match credentials::add_profile_to_list(profile_name) {
         Ok(_) => println!("📋 Profile list update: Success"),
         Err(e) => {
@@ -183,7 +183,10 @@ async fn login(profile_name: &str) -> Result<(), CliError> {
     println!("🧪 Testing immediate retrieval...");
     match credentials::load_credentials(profile_name) {
         Ok(test_creds) => {
-            println!("✅ Immediate retrieval successful: {} at {}", test_creds.username, test_creds.api_url);
+            println!(
+                "✅ Immediate retrieval successful: {} at {}",
+                test_creds.username, test_creds.api_url
+            );
         }
         Err(e) => {
             println!("❌ Immediate retrieval failed: {}", e);
@@ -235,7 +238,10 @@ async fn list_profiles() -> Result<(), CliError> {
             for profile in profiles {
                 match credentials::load_credentials(&profile) {
                     Ok(creds) => {
-                        println!("✅ Profile '{}': {} ({})", profile, creds.username, creds.api_url);
+                        println!(
+                            "✅ Profile '{}': {} ({})",
+                            profile, creds.username, creds.api_url
+                        );
                     }
                     Err(_) => {
                         println!("❌ Profile '{}': Failed to load", profile);

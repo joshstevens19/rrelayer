@@ -13,7 +13,7 @@ mod mnemonic_signing_key_providers;
 pub use mnemonic_signing_key_providers::get_mnemonic_from_signing_key;
 
 mod aws_kms_wallet_manager;
-pub use aws_kms_wallet_manager::AwsKmsWalletManager;
+pub use aws_kms_wallet_manager::{AwsKmsWalletManager, KeyPlan};
 
 mod privy_wallet_manager;
 pub use privy_wallet_manager::PrivyWalletManager;

@@ -1,7 +1,7 @@
 use crate::common_types::EvmAddress;
 use crate::network::ChainId;
 use crate::wallet::{WalletError, WalletManagerTrait};
-use crate::yaml::{AwsKmsSigningProviderConfig, KmsKeyConfig};
+use crate::yaml::AwsKmsSigningProviderConfig;
 use alloy::consensus::TypedTransaction;
 use alloy::dyn_abi::TypedData;
 use alloy::network::TxSigner;
@@ -9,10 +9,23 @@ use alloy::primitives::PrimitiveSignature;
 use alloy::signers::{aws::AwsSigner, Signer};
 use async_trait::async_trait;
 use aws_config::{BehaviorVersion, Region};
-use aws_sdk_kms::Client;
+use aws_sdk_kms::{
+    types::{KeySpec, KeyUsageType, Tag},
+    Client,
+};
+use aws_sdk_sts::Client as StsClient;
+use serde_json::json;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use tracing::{debug, error, info, warn};
+
+#[derive(Clone, Debug)]
+pub struct KeyPlan {
+    pub description: String,
+    pub alias: Option<String>,
+    pub tags: Vec<(String, String)>,
+}
 
 #[derive(Debug)]
 pub struct AwsKmsWalletManager {
@@ -21,27 +34,121 @@ pub struct AwsKmsWalletManager {
 }
 
 impl AwsKmsWalletManager {
-    /// Creates a new AWS KMS wallet manager.
     pub fn new(config: AwsKmsSigningProviderConfig) -> Self {
         Self { config, signers: Arc::new(RwLock::new(HashMap::new())) }
     }
 
-    /// Gets the KMS key config for the specified wallet index.
-    fn get_key_config_for_index(&self, wallet_index: u32) -> Result<&KmsKeyConfig, WalletError> {
-        let index = wallet_index as usize;
-        if index >= self.config.key_configs.len() {
-            return Err(WalletError::ConfigurationError {
-                message: format!(
-                    "Wallet index {} is out of bounds for {} KMS key configs",
-                    wallet_index,
-                    self.config.key_configs.len()
-                ),
-            });
+    async fn get_or_create_key_id(&self, wallet_index: u32) -> Result<String, WalletError> {
+        self.validate_aws_config().await?;
+        match self.find_key_by_wallet_index(wallet_index).await {
+            Ok(key_id) => {
+                return Ok(key_id);
+            }
+            Err(e) => {
+                debug!("AWS KMS: No existing key found: {}", e);
+            }
         }
-        Ok(&self.config.key_configs[index])
+
+        info!("AWS KMS: Creating new key for wallet_index {}", wallet_index);
+        let key_id = self.create_key_for_wallet_index(wallet_index).await?;
+        info!("AWS KMS: Successfully created new key: {}", key_id);
+        Ok(key_id)
     }
 
-    /// Gets or initializes an AWS KMS signer for the specified wallet index and chain ID.
+    async fn validate_aws_config(&self) -> Result<(), WalletError> {
+        let aws_config = aws_config::defaults(BehaviorVersion::latest())
+            .region(Region::new(self.config.region.clone()))
+            .load()
+            .await;
+
+        let sts = StsClient::new(&aws_config);
+        match sts.get_caller_identity().send().await {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                let error_msg = format!(
+                    "AWS KMS authentication failed. Please ensure AWS credentials are properly configured. \
+                    Error: {}. \
+                    Required: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, or an IAM role with KMS permissions.",
+                    e
+                );
+                Err(WalletError::AuthenticationError { message: error_msg })
+            }
+        }
+    }
+
+    async fn find_key_by_wallet_index(&self, wallet_index: u32) -> Result<String, WalletError> {
+        let aws_config = aws_config::defaults(BehaviorVersion::latest())
+            .region(Region::new(self.config.region.clone()))
+            .load()
+            .await;
+
+        let kms = Client::new(&aws_config);
+
+        let expected_alias = format!("alias/rrelayer-wallet-{}", wallet_index);
+
+        if let Ok(alias_response) = kms.list_aliases().send().await {
+            let alias_list = alias_response.aliases();
+            for alias in alias_list {
+                if let Some(alias_name) = alias.alias_name() {
+                    if alias_name == expected_alias {
+                        if let Some(target_key_id) = alias.target_key_id() {
+                            return Ok(target_key_id.to_string());
+                        }
+                    }
+                }
+            }
+        }
+
+        let response = kms.list_keys().send().await.map_err(|e| WalletError::ApiError {
+            message: format!("Failed to list KMS keys: {}", e),
+        })?;
+
+        let key_list = response.keys();
+        for key in key_list {
+            if let Some(key_id) = key.key_id() {
+                if let Ok(tags_response) = kms.list_resource_tags().key_id(key_id).send().await {
+                    let tags = tags_response.tags();
+                    for tag in tags {
+                        if tag.tag_key() == "wallet_index"
+                            && tag.tag_value() == wallet_index.to_string().as_str()
+                        {
+                            return Ok(key_id.to_string());
+                        }
+                    }
+                }
+            }
+        }
+
+        Err(WalletError::ApiError {
+            message: format!(
+                "No KMS key found for wallet_index {} (searched by alias and tags)",
+                wallet_index
+            ),
+        })
+    }
+
+    async fn create_key_for_wallet_index(&self, wallet_index: u32) -> Result<String, WalletError> {
+        let plan = KeyPlan {
+            description: format!("ECC_SECG_P256K1 signing key - wallet_{}", wallet_index),
+            alias: Some(format!("alias/rrelayer-wallet-{}", wallet_index)),
+            tags: vec![("wallet_index".to_string(), wallet_index.to_string())],
+        };
+
+        match self.create_keys(vec![plan]).await {
+            Ok(keys) => {
+                if let Some(key_id) = keys.into_iter().next() {
+                    Ok(key_id)
+                } else {
+                    let error = WalletError::ApiError {
+                        message: "Failed to create KMS key - no key ID returned".to_string(),
+                    };
+                    Err(error)
+                }
+            }
+            Err(e) => Err(e),
+        }
+    }
+
     async fn get_or_initialize_signer(
         &self,
         wallet_index: u32,
@@ -57,8 +164,8 @@ impl AwsKmsWalletManager {
             }
         }
 
-        let key_config = self.get_key_config_for_index(wallet_index)?;
-        let signer = self.initialize_aws_kms_signer(key_config, Some(chain_id_u64)).await?;
+        let key_id = self.get_or_create_key_id(wallet_index).await?;
+        let signer = self.initialize_aws_kms_signer(&key_id, Some(chain_id_u64)).await?;
 
         {
             let mut signers = self.signers.write().await;
@@ -68,27 +175,187 @@ impl AwsKmsWalletManager {
         Ok(signer)
     }
 
-    /// Initializes an AWS KMS signer instance from the key configuration.
     async fn initialize_aws_kms_signer(
         &self,
-        key_config: &KmsKeyConfig,
+        key_id: &str,
         chain_id: Option<u64>,
     ) -> Result<AwsSigner, WalletError> {
         let aws_config = aws_config::defaults(BehaviorVersion::latest())
-            .region(Region::new(key_config.region.clone()))
+            .region(Region::new(self.config.region.clone()))
             .load()
             .await;
 
         let client = Client::new(&aws_config);
 
-        let signer =
-            AwsSigner::new(client, key_config.key_id.clone(), chain_id).await.map_err(|e| {
-                WalletError::ApiError {
-                    message: format!("Failed to initialize AWS KMS signer: {}", e),
-                }
-            })?;
+        let signer = AwsSigner::new(client, key_id.to_string(), chain_id).await.map_err(|e| {
+            WalletError::ApiError { message: format!("Failed to initialize AWS KMS signer: {}", e) }
+        })?;
 
         Ok(signer)
+    }
+
+    fn normalize_principal_arn(caller_arn: &str) -> String {
+        if let Some(rest) = caller_arn.strip_prefix("arn:aws:sts::") {
+            if let Some(pos) = rest.find(":assumed-role/") {
+                let (account_id, after) = rest.split_at(pos);
+                let parts: Vec<&str> =
+                    after.trim_start_matches(":assumed-role/").split('/').collect();
+                if let Some(role_name) = parts.get(0) {
+                    return format!("arn:aws:iam::{}:role/{}", account_id, role_name);
+                }
+            }
+        }
+        caller_arn.to_string()
+    }
+
+    fn build_key_policy(account_id: &str, admin_principal_arn: &str) -> String {
+        let policy = json!({
+            "Version": "2012-10-17",
+            "Id": "key-default-1",
+            "Statement": [
+                {
+                    "Sid": "AllowRootAccountAccess",
+                    "Effect": "Allow",
+                    "Principal": { "AWS": format!("arn:aws:iam::{}:root", account_id) },
+                    "Action": "kms:*",
+                    "Resource": "*"
+                },
+                {
+                    "Sid": "AllowAdminPrincipalSelf",
+                    "Effect": "Allow",
+                    "Principal": { "AWS": admin_principal_arn },
+                    "Action": "kms:*",
+                    "Resource": "*"
+                }
+            ]
+        });
+        policy.to_string()
+    }
+
+    pub async fn create_keys(&self, plans: Vec<KeyPlan>) -> Result<Vec<String>, WalletError> {
+        let aws_config = aws_config::defaults(BehaviorVersion::latest())
+            .region(Region::new(self.config.region.clone()))
+            .load()
+            .await;
+
+        let sts = StsClient::new(&aws_config);
+        let who = sts.get_caller_identity().send().await.map_err(|e| WalletError::ApiError {
+            message: format!("STS GetCallerIdentity failed: {}", e),
+        })?;
+
+        let account_id = who.account().ok_or_else(|| WalletError::ApiError {
+            message: "No account id from STS".to_string(),
+        })?;
+
+        let caller_arn = who
+            .arn()
+            .ok_or_else(|| WalletError::ApiError { message: "No ARN from STS".to_string() })?;
+
+        let admin_principal_arn = Self::normalize_principal_arn(caller_arn);
+        let kms = Client::new(&aws_config);
+        let policy = Self::build_key_policy(account_id, &admin_principal_arn);
+
+        let mut created_keys = Vec::new();
+
+        for plan in plans {
+            let mut create_key_builder = kms
+                .create_key()
+                .description(&plan.description)
+                .key_spec(KeySpec::EccSecgP256K1)
+                .key_usage(KeyUsageType::SignVerify)
+                .policy(policy.clone());
+
+            for (k, v) in &plan.tags {
+                let tag = Tag::builder().tag_key(k).tag_value(v).build().unwrap();
+                create_key_builder = create_key_builder.tags(tag);
+            }
+
+            let out = create_key_builder.send().await.map_err(|e| {
+                let service_error = e.into_service_error();
+                let error_msg = format!("Creating key '{}': {}", plan.description, service_error);
+                error!("AWS KMS: {}", error_msg);
+                WalletError::ApiError { message: error_msg }
+            })?;
+
+            let key_id = out.key_metadata().and_then(|m| Some(m.key_id())).ok_or_else(|| {
+                WalletError::ApiError { message: "No key_id in CreateKey response".to_string() }
+            })?;
+
+            if let Some(alias) = &plan.alias {
+                match kms.create_alias().alias_name(alias).target_key_id(key_id).send().await {
+                    Ok(_) => {
+                        info!("AWS KMS: Successfully created alias: {}", alias);
+                    }
+                    Err(e) => {
+                        warn!(
+                            "AWS KMS: Failed to create alias {} for key {}: {}",
+                            alias, key_id, e
+                        );
+                    }
+                }
+            }
+
+            created_keys.push(key_id.to_string());
+        }
+
+        Ok(created_keys)
+    }
+
+    pub async fn list_keys(&self) -> Result<Vec<(String, String)>, WalletError> {
+        let aws_config = aws_config::defaults(BehaviorVersion::latest())
+            .region(Region::new(self.config.region.clone()))
+            .load()
+            .await;
+
+        let kms = Client::new(&aws_config);
+
+        let response = kms.list_keys().send().await.map_err(|e| WalletError::ApiError {
+            message: format!("Failed to list KMS keys: {}", e),
+        })?;
+
+        let mut keys = Vec::new();
+
+        let key_list = response.keys();
+        for key in key_list {
+            if let (Some(key_id), Some(_key_arn)) = (key.key_id(), key.key_arn()) {
+                if let Ok(desc) = kms.describe_key().key_id(key_id).send().await {
+                    if let Some(metadata) = desc.key_metadata() {
+                        if metadata.key_usage() == Some(&KeyUsageType::SignVerify) {
+                            let description = metadata.description().unwrap_or("No description");
+                            keys.push((key_id.to_string(), description.to_string()));
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(keys)
+    }
+
+    pub async fn list_aliases(&self) -> Result<Vec<(String, String)>, WalletError> {
+        let aws_config = aws_config::defaults(BehaviorVersion::latest())
+            .region(Region::new(self.config.region.clone()))
+            .load()
+            .await;
+
+        let kms = Client::new(&aws_config);
+
+        let response = kms.list_aliases().send().await.map_err(|e| WalletError::ApiError {
+            message: format!("Failed to list KMS aliases: {}", e),
+        })?;
+
+        let mut aliases = Vec::new();
+
+        let alias_list = response.aliases();
+        for alias in alias_list {
+            if let (Some(alias_name), Some(target_key_id)) =
+                (alias.alias_name(), alias.target_key_id())
+            {
+                aliases.push((alias_name.to_string(), target_key_id.to_string()));
+            }
+        }
+
+        Ok(aliases)
     }
 }
 
@@ -100,7 +367,9 @@ impl WalletManagerTrait for AwsKmsWalletManager {
         chain_id: &ChainId,
     ) -> Result<EvmAddress, WalletError> {
         let signer = self.get_or_initialize_signer(wallet_index, chain_id).await?;
-        Ok(EvmAddress::from(alloy::signers::Signer::address(&signer)))
+        let address = EvmAddress::from(alloy::signers::Signer::address(&signer));
+        info!("AWS KMS: Successfully created wallet with address: {}", address);
+        Ok(address)
     }
 
     async fn get_address(

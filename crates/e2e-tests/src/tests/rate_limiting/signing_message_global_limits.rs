@@ -109,7 +109,10 @@ impl TestRunner {
         }
 
         if successful_signing != 3 {
-            return Err(anyhow!("Signing message rate limiting not enforced should of got 3 but got {}", successful_signing));
+            return Err(anyhow!(
+                "Signing message rate limiting not enforced should of got 3 but got {}",
+                successful_signing
+            ));
         }
 
         info!("Successful signing operations before rate limit: {}", successful_signing);
@@ -127,9 +130,7 @@ impl TestRunner {
         match sign_result {
             Ok(_) => {}
             Err(_) => {
-                return Err(anyhow!(
-                    "Signing message should go through as rate limit expired"
-                ));
+                return Err(anyhow!("Signing message should go through as rate limit expired"));
             }
         }
 

@@ -4,8 +4,7 @@ use std::path::PathBuf;
 
 // Simple file-based credential storage (like npm)
 fn get_storage_dir() -> Result<PathBuf, CredentialError> {
-    let home_dir = std::env::var("HOME")
-        .map_err(|_| CredentialError::NotFound)?;
+    let home_dir = std::env::var("HOME").map_err(|_| CredentialError::NotFound)?;
     let storage_dir = PathBuf::from(home_dir).join(".rrelayer");
     if !storage_dir.exists() {
         fs::create_dir_all(&storage_dir)
@@ -83,7 +82,7 @@ pub fn delete_credentials(profile_name: &str) -> Result<(), CredentialError> {
 pub fn list_profiles() -> Result<Vec<String>, CredentialError> {
     let mut profiles = Vec::new();
     let storage_dir = get_storage_dir()?;
-    
+
     if storage_dir.exists() {
         if let Ok(entries) = fs::read_dir(storage_dir) {
             for entry in entries {
@@ -100,7 +99,7 @@ pub fn list_profiles() -> Result<Vec<String>, CredentialError> {
             }
         }
     }
-    
+
     profiles.sort();
     Ok(profiles)
 }

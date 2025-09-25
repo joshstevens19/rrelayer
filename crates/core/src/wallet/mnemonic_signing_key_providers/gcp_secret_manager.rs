@@ -3,7 +3,6 @@ use crate::yaml::GcpSecretManagerProviderConfig;
 use google_secretmanager1::{hyper, hyper_rustls, oauth2, SecretManager};
 use std::path::PathBuf;
 
-/// Retrieves a secret value from Google Cloud Secret Manager.
 pub async fn get_gcp_secret(
     project_path: &PathBuf,
     config: &GcpSecretManagerProviderConfig,

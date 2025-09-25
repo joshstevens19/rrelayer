@@ -112,7 +112,7 @@ impl AppState {
                         && network_permission.disable_native_transfer.unwrap_or_default()
                     {
                         return Err(unauthorized(Some(
-                           "native transfer is disabled for this relayer".to_string(),
+                            "native transfer is disabled for this relayer".to_string(),
                         )));
                     }
                 }

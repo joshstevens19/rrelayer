@@ -1,9 +1,9 @@
-mod signing_message_user_limits;
-mod signing_typed_data_user_limits;
-mod transactions_user_limits;
-mod transactions_global_limits;
 mod signing_message_global_limits;
+mod signing_message_user_limits;
 mod signing_typed_data_global_limits;
+mod signing_typed_data_user_limits;
+mod transactions_global_limits;
+mod transactions_user_limits;
 
 use crate::tests::registry::{TestDefinition, TestModule};
 

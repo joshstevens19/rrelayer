@@ -134,7 +134,10 @@ impl TestRunner {
         }
 
         if successful_transactions != 3 {
-            return Err(anyhow!("Sending transactions rate limiting not enforced should of got 3 but got {}", successful_transactions));
+            return Err(anyhow!(
+                "Sending transactions rate limiting not enforced should of got 3 but got {}",
+                successful_transactions
+            ));
         }
 
         self.mine_blocks(1).await?;

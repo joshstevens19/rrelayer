@@ -16,8 +16,8 @@ use crate::{
 mod authentication;
 mod cli_interface;
 mod commands;
-mod credentials;
 mod console;
+mod credentials;
 use crate::commands::error::ProjectLocationError;
 pub use console::{print_error_message, print_success_message};
 
@@ -41,15 +41,10 @@ fn create_sdk_with_basic_auth(
     use std::env;
 
     // Try environment variables first (for backward compatibility)
-    if let (Ok(username), Ok(password)) = (
-        env::var("RRELAYER_AUTH_USERNAME"),
-        env::var("RRELAYER_AUTH_PASSWORD"),
-    ) {
-        return Ok(SDK::new(
-            project_location.get_api_url()?,
-            username,
-            password,
-        ));
+    if let (Ok(username), Ok(password)) =
+        (env::var("RRELAYER_AUTH_USERNAME"), env::var("RRELAYER_AUTH_PASSWORD"))
+    {
+        return Ok(SDK::new(project_location.get_api_url()?, username, password));
     }
 
     // Try to read from rrelayer.yaml file
@@ -70,7 +65,8 @@ fn create_sdk_with_basic_auth(
                 "No authentication credentials found. Please either:\n\
                 1. Set RRELAYER_AUTH_USERNAME and RRELAYER_AUTH_PASSWORD environment variables\n\
                 2. Ensure rrelayer.yaml exists with authentication config\n\
-                3. Run 'rrelayer auth login' to store credentials securely".to_string()
+                3. Run 'rrelayer auth login' to store credentials securely"
+                    .to_string(),
             ));
         }
     }

@@ -512,7 +512,9 @@ impl<'a> RateLimitReservation<'a> {
     pub async fn revert(mut self) -> Result<(), RateLimitError> {
         if self.reserved {
             // Revert user operation
-            self.rate_limiter.revert_user_operation(&self.user_key, &self.relayer_address, self.operation).await?;
+            self.rate_limiter
+                .revert_user_operation(&self.user_key, &self.relayer_address, self.operation)
+                .await?;
 
             // Revert global user operation if applicable
             if let Some(ref user_limits) = self.rate_limiter.config.user_limits {
@@ -544,7 +546,9 @@ impl<'a> Drop for RateLimitReservation<'a> {
             let config = self.rate_limiter.config.clone();
             tokio::spawn(async move {
                 // Revert user operation
-                let _ = rate_limiter.revert_user_operation(&user_key, &relayer_address, operation).await;
+                let _ = rate_limiter
+                    .revert_user_operation(&user_key, &relayer_address, operation)
+                    .await;
 
                 // Revert global user operation if applicable
                 if let Some(ref user_limits) = config.user_limits {

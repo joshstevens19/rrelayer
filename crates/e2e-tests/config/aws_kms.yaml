@@ -1,13 +1,7 @@
 name: e2e-tests
-signing_key:
+signing_provider:
   aws_kms:
-    key_configs:
-      - key_id: ${AWS_KMS_KEY_1_ID}
-        region: "eu-west-1"
-      - key_id: ${AWS_KMS_KEY_2_ID}
-        region: "eu-west-1"
-      - key_id: ${AWS_KMS_KEY_3_ID}
-        region: "eu-west-1"
+    region: "eu-west-1"
 networks:
   - name: local_anvil
     chain_id: 31337
