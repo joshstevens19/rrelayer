@@ -52,6 +52,11 @@ pub async fn sign_text(
     .await?
     .ok_or(not_found("Relayer does not exist".to_string()))?;
 
+    state.restricted_personal_signing(
+        &relayer_provider_context.relayer.address,
+        &relayer_provider_context.relayer.chain_id,
+    )?;
+
     let signature = relayer_provider_context
         .provider
         .sign_text(&relayer_provider_context.relayer.wallet_index, &sign.text)

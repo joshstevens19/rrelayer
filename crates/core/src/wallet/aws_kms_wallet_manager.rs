@@ -36,15 +36,22 @@ pub struct AwsKmsWalletManager {
 
 impl AwsKmsWalletManager {
     pub fn new(config: AwsKmsSigningProviderConfig) -> Self {
-        Self { alias: config.danger_override_alias.clone().unwrap_or("rrelayer".to_string()), config, signers: Arc::new(RwLock::new(HashMap::new())) }
+        Self {
+            alias: config.danger_override_alias.clone().unwrap_or("rrelayer".to_string()),
+            config,
+            signers: Arc::new(RwLock::new(HashMap::new())),
+        }
     }
 
     fn build_alias(&self, wallet_index: u32, chain_id: &ChainId) -> String {
         format!("alias/{}-wallet-{}-{}", self.alias, wallet_index, chain_id)
     }
 
-
-    async fn get_or_create_key_id(&self, wallet_index: u32, chain_id: &ChainId) -> Result<String, WalletError> {
+    async fn get_or_create_key_id(
+        &self,
+        wallet_index: u32,
+        chain_id: &ChainId,
+    ) -> Result<String, WalletError> {
         self.validate_aws_config().await?;
         match self.find_key_by_alias(wallet_index, chain_id).await {
             Ok(key_id) => {
@@ -82,7 +89,11 @@ impl AwsKmsWalletManager {
         }
     }
 
-    async fn find_key_by_alias(&self, wallet_index: u32, chain_id: &ChainId) -> Result<String, WalletError> {
+    async fn find_key_by_alias(
+        &self,
+        wallet_index: u32,
+        chain_id: &ChainId,
+    ) -> Result<String, WalletError> {
         let aws_config = aws_config::defaults(BehaviorVersion::latest())
             .region(Region::new(self.config.region.clone()))
             .load()
@@ -91,8 +102,8 @@ impl AwsKmsWalletManager {
         let kms = Client::new(&aws_config);
         let expected_alias = self.build_alias(wallet_index, chain_id);
 
-        let alias_response = kms.list_aliases().send().await.map_err(|e| WalletError::ApiError {
-            message: format!("Failed to list aliases: {}", e),
+        let alias_response = kms.list_aliases().send().await.map_err(|e| {
+            WalletError::ApiError { message: format!("Failed to list aliases: {}", e) }
         })?;
 
         let alias_list = alias_response.aliases();
@@ -111,9 +122,16 @@ impl AwsKmsWalletManager {
         })
     }
 
-    async fn create_key_for_wallet_index(&self, wallet_index: u32, chain_id: &ChainId) -> Result<String, WalletError> {
+    async fn create_key_for_wallet_index(
+        &self,
+        wallet_index: u32,
+        chain_id: &ChainId,
+    ) -> Result<String, WalletError> {
         let plan = KeyPlan {
-            description: format!("ECC_SECG_P256K1 signing key - wallet_{}_chain_{}", wallet_index, chain_id),
+            description: format!(
+                "ECC_SECG_P256K1 signing key - wallet_{}_chain_{}",
+                wallet_index, chain_id
+            ),
             alias: Some(self.build_alias(wallet_index, chain_id)),
             tags: vec![], // No tags needed, alias is the identifier
         };

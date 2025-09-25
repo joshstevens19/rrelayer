@@ -1,4 +1,5 @@
 use super::send_transaction::RelayTransactionRequest;
+use crate::app_state::NetworkValidateAction;
 use crate::rate_limiting::{RateLimitOperation, RateLimiter};
 use crate::shared::{not_found, unauthorized, HttpError};
 use crate::{
@@ -29,10 +30,12 @@ pub async fn replace_transaction(
     }
 
     state.network_permission_validate(
+        &headers,
         &transaction.from,
         &transaction.chain_id,
         &transaction.to,
         &transaction.value,
+        NetworkValidateAction::Transaction,
     )?;
 
     let rate_limit_reservation = RateLimiter::check_and_reserve_rate_limit(

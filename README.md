@@ -20,10 +20,7 @@
 - Testing loading up infura gas
 - Testing loading up tenderly gas
 - Testing handling custom gas with http call
-
-# Pawel feedback
-
-- do rrelayer login and then throw on methods which can not be used outside the server
+- rrelayer auth without being in project
 
 
 # Idea for later

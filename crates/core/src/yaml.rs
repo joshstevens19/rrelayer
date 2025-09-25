@@ -190,9 +190,18 @@ impl SigningProvider {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NetworkPermissionsConfig {
     pub relayers: AllOrAddresses,
+    #[serde(default)]
     pub allowlist: Vec<EvmAddress>,
+    #[serde(default)]
+    pub api_keys: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub disable_native_transfer: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub disable_personal_sign: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub disable_typed_data_sign: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub disable_transactions: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

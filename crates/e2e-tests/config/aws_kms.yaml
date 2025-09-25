@@ -32,6 +32,10 @@ networks:
         allowlist:
           - "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
         disable_native_transfer: false
+        # TODO: need to test these
+        disable_personal_sign: false
+        disable_typed_data_sign: false
+        disable_transactions: false
       - relayers:
           - "0x6f3e343161c4b905342015ad20a5c492adfb730e"
         allowlist:

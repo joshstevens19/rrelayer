@@ -18,6 +18,7 @@ use crate::{
     yaml::RateLimitConfig,
     SafeProxyManager,
 };
+use axum::http::HeaderMap;
 
 pub struct RelayersInternalOnly {
     values: Vec<(ChainId, EvmAddress)>,
@@ -62,6 +63,11 @@ pub struct AppState {
     pub network_permissions: Arc<Vec<(ChainId, Vec<NetworkPermissionsConfig>)>>,
 }
 
+pub enum NetworkValidateAction {
+    Transaction,
+    SigningTypedData,
+}
+
 impl AppState {
     fn find_network_permission(
         &self,
@@ -88,17 +94,70 @@ impl AppState {
         addresses
     }
 
+    pub fn restricted_personal_signing(
+        &self,
+        relayer: &EvmAddress,
+        chain_id: &ChainId,
+    ) -> Result<(), HttpError> {
+        let network_permission = self.find_network_permission(chain_id);
+        if let Some(network_permissions) = network_permission {
+            for network_permission in network_permissions {
+                if network_permission.relayers.contains(&relayer) {
+                    if network_permission.disable_personal_sign.unwrap_or_default() {
+                        return Err(unauthorized(Some(
+                            "Relayer have disabled personal signing".to_string(),
+                        )));
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn network_permission_validate(
         &self,
+        headers: &HeaderMap,
         relayer: &EvmAddress,
         chain_id: &ChainId,
         to: &EvmAddress,
         value: &TransactionValue,
+        action: NetworkValidateAction,
     ) -> Result<(), HttpError> {
         let network_permissions = self.find_network_permission(chain_id);
         if let Some(network_permissions) = network_permissions {
             for network_permission in network_permissions {
                 if network_permission.relayers.contains(&relayer) {
+                    match action {
+                        NetworkValidateAction::Transaction => {
+                            if network_permission.disable_transactions.unwrap_or_default() {
+                                return Err(unauthorized(Some(
+                                    "Relayer have disabled transactions".to_string(),
+                                )));
+                            }
+                        }
+                        NetworkValidateAction::SigningTypedData => {
+                            if network_permission.disable_typed_data_sign.unwrap_or_default() {
+                                return Err(unauthorized(Some(
+                                    "Relayer have disabled typed data signing".to_string(),
+                                )));
+                            }
+                        }
+                    }
+
+                    if !network_permission.api_keys.is_empty() {
+                        let api_key = headers
+                            .get("x-rrelayer-api-key")
+                            .and_then(|v| v.to_str().ok())
+                            .unwrap_or_default();
+
+                        if !network_permission.api_keys.contains(&api_key.to_string()) {
+                            return Err(unauthorized(Some(
+                                "Invalid or missing x-rrelayer-api-key header".to_string(),
+                            )));
+                        }
+                    }
+
                     if network_permission.allowlist.len() > 0
                         && !network_permission.allowlist.contains(&to)
                     {

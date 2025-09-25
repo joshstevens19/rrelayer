@@ -4,7 +4,7 @@ use crate::relayer::get_relayer;
 use crate::shared::utils::convert_blob_strings_to_blobs;
 use crate::shared::{internal_server_error, not_found, unauthorized, HttpError};
 use crate::{
-    app_state::AppState,
+    app_state::{AppState, NetworkValidateAction},
     rate_limiting::RateLimitOperation,
     relayer::RelayerId,
     shared::common_types::EvmAddress,
@@ -66,10 +66,12 @@ pub async fn send_transaction(
     }
 
     state.network_permission_validate(
+        &headers,
         &relayer.address,
         &relayer.chain_id,
         &transaction.to,
         &transaction.value,
+        NetworkValidateAction::Transaction,
     )?;
 
     let rate_limit_reservation = RateLimiter::check_and_reserve_rate_limit(
