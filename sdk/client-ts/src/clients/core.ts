@@ -88,18 +88,19 @@ export class Client {
   }
 
   public get network() {
+    const apiBaseConfig = this._apiBaseConfig;
     return {
       /**
        * get all networks
        * @returns Network array
        */
       getAll: (): Promise<Network[]> => {
-        return getAllNetworks(this._apiBaseConfig);
+        return getAllNetworks(apiBaseConfig);
       },
       getGasPrices(
           chainId: string | number
       ): Promise<GasEstimatorResult | null> {
-        return getGasPrices(chainId, this._apiBaseConfig);
+        return getGasPrices(chainId, apiBaseConfig);
       }
     };
   }
