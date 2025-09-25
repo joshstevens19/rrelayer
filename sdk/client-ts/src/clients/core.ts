@@ -11,16 +11,25 @@ import {
   Transaction,
   getTransaction,
   TransactionStatusResult,
-  getTransactionStatus, getGasPrices, GasEstimatorResult,
+  getTransactionStatus,
+  getGasPrices,
+  GasEstimatorResult,
 } from '../api';
-import {RelayerClient} from './relayer';
-import {ApiBaseConfig, defaultPagingContext, PagingContext, PagingResult} from "../api/types";
-import {AdminRelayerClient} from "./admin";
+import { RelayerClient } from './relayer';
+import {
+  ApiBaseConfig,
+  defaultPagingContext,
+  PagingContext,
+  PagingResult,
+} from '../api/types';
+import { AdminRelayerClient } from './admin';
 
 export interface CreateClientConfig {
   serverUrl: string;
-  basicAuthUsername: string
-  basicAuthPassword: string
+  auth: {
+    username: string;
+    password: string;
+  };
 }
 
 export interface CreateRelayerClientConfig {
@@ -34,9 +43,9 @@ export class Client {
   constructor(private readonly _config: CreateClientConfig) {
     this._apiBaseConfig = {
       serverUrl: _config.serverUrl,
-      username: _config.basicAuthUsername,
-      password: _config.basicAuthPassword,
-    }
+      username: _config.auth.username,
+      password: _config.auth.password,
+    };
   }
 
   public get relayer() {
@@ -48,8 +57,8 @@ export class Client {
        * @returns string
        */
       create: async (
-          chainId: string | number,
-          name: string
+        chainId: string | number,
+        name: string
       ): Promise<CreateRelayerResult> => {
         return createRelayer(chainId, name, this._apiBaseConfig);
       },
@@ -75,14 +84,10 @@ export class Client {
        * @returns Relayer
        */
       getAll: async (
-          pagingContext: PagingContext = defaultPagingContext,
-          onlyForChainId?: number
+        pagingContext: PagingContext = defaultPagingContext,
+        onlyForChainId?: number
       ): Promise<PagingResult<Relayer>> => {
-        return getRelayers(
-            onlyForChainId,
-            pagingContext,
-            this._apiBaseConfig
-        );
+        return getRelayers(onlyForChainId, pagingContext, this._apiBaseConfig);
       },
     };
   }
@@ -98,10 +103,10 @@ export class Client {
         return getAllNetworks(apiBaseConfig);
       },
       getGasPrices(
-          chainId: string | number
+        chainId: string | number
       ): Promise<GasEstimatorResult | null> {
         return getGasPrices(chainId, apiBaseConfig);
-      }
+      },
     };
   }
 
@@ -121,20 +126,21 @@ export class Client {
        * @returns TransactionStatusResult | null
        */
       getStatus: (
-          transactionId: string
+        transactionId: string
       ): Promise<TransactionStatusResult | null> => {
         return getTransactionStatus(transactionId, this._apiBaseConfig);
       },
-    }
+    };
   }
-
 
   /**
    * Create admin relayer client
    * @param relayerId The relayer id
    * @returns AdminRelayerClient The admin relayer client
    */
-  public async getRelayerClient(relayerId: string): Promise<AdminRelayerClient> {
+  public async getRelayerClient(
+    relayerId: string
+  ): Promise<AdminRelayerClient> {
     const relayer = await this.relayer.get(relayerId);
     if (!relayer) {
       throw new Error(`Relayer ${relayerId} not found`);
@@ -142,29 +148,26 @@ export class Client {
 
     return new AdminRelayerClient({
       serverUrl: this._config.serverUrl,
-      providerUrl: "TODO",
+      providerUrl: 'TODO',
       relayerId,
-      username: this._config.basicAuthUsername,
-      password: this._config.basicAuthUsername
+      auth: this._config.auth,
     });
   }
 }
 
-export const createClient = (
-  config: CreateClientConfig
-): Client => {
+export const createClient = (config: CreateClientConfig): Client => {
   return new Client(config);
 };
 
 export const createRelayerClient = async (
-    config: CreateRelayerClientConfig
+  config: CreateRelayerClientConfig
 ): Promise<RelayerClient> => {
-    return new RelayerClient({
-      serverUrl: config.serverUrl,
-      providerUrl: "TODO",
-      relayerId: config.relayerId,
-      auth: {
-        apiKey: config.apiKey,
-      }
-    });
-}
+  return new RelayerClient({
+    serverUrl: config.serverUrl,
+    providerUrl: 'TODO',
+    relayerId: config.relayerId,
+    auth: {
+      apiKey: config.apiKey,
+    },
+  });
+};

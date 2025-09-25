@@ -28,7 +28,12 @@ import {
 } from '../api/types';
 import { Provider } from '../provider';
 import { invariant } from '../utils';
-import {signText, SignTextResult, signTypedData, SignTypedDataResult} from "../api";
+import {
+  signText,
+  SignTextResult,
+  signTypedData,
+  SignTypedDataResult,
+} from '../api';
 
 export interface RelayerClientConfig {
   serverUrl: string;
@@ -50,10 +55,7 @@ export class RelayerClient {
   private readonly _ethereumProvider: Provider;
   constructor(config: RelayerClientConfig) {
     this.id = config.relayerId;
-    this._ethereumProvider = new Provider(
-        config.providerUrl,
-        this
-    );
+    this._ethereumProvider = new Provider(config.providerUrl, this);
     if ('apiKey' in config.auth) {
       this._apiBaseConfig = {
         serverUrl: config.serverUrl,
@@ -108,12 +110,12 @@ export class RelayerClient {
        * @returns An address of allowlist addresses
        */
       get: (
-          pagingContext: PagingContext = defaultPagingContext
+        pagingContext: PagingContext = defaultPagingContext
       ): Promise<PagingResult<string>> => {
         return getRelayerAllowlistAddress(
-            this.id,
-            pagingContext,
-            this._apiBaseConfig
+          this.id,
+          pagingContext,
+          this._apiBaseConfig
         );
       },
     };
@@ -127,7 +129,10 @@ export class RelayerClient {
        * @param rateLimitKey Optional rate limit key
        * @returns SignTextResult
        */
-      text: (message: string, rateLimitKey?: string): Promise<SignTextResult> => {
+      text: (
+        message: string,
+        rateLimitKey?: string
+      ): Promise<SignTextResult> => {
         return signText(this.id, message, rateLimitKey, this._apiBaseConfig);
       },
       /**
@@ -137,15 +142,20 @@ export class RelayerClient {
        * @returns SignTypedDataResult
        */
       typedData: (
-          typedData: TypedDataDefinition,
-          rateLimitKey?: string,
+        typedData: TypedDataDefinition,
+        rateLimitKey?: string
       ): Promise<SignTypedDataResult> => {
-        return signTypedData(this.id, typedData, rateLimitKey, this._apiBaseConfig);
+        return signTypedData(
+          this.id,
+          typedData,
+          rateLimitKey,
+          this._apiBaseConfig
+        );
       },
     };
   }
 
-  public get transactions() {
+  public get transaction() {
     return {
       /**
        * Get a transaction
@@ -161,7 +171,7 @@ export class RelayerClient {
        * @returns TransactionStatusResult | null
        */
       getStatus: (
-          transactionId: string
+        transactionId: string
       ): Promise<TransactionStatusResult | null> => {
         return getTransactionStatus(transactionId, this._apiBaseConfig);
       },
@@ -170,13 +180,9 @@ export class RelayerClient {
        * @returns Transaction[]
        */
       getAll: (
-          pagingContext: PagingContext = defaultPagingContext
+        pagingContext: PagingContext = defaultPagingContext
       ): Promise<PagingResult<Transaction>> => {
-        return getTransactions(
-            this.id,
-            pagingContext,
-            this._apiBaseConfig
-        );
+        return getTransactions(this.id, pagingContext, this._apiBaseConfig);
       },
       /**
        * Replace a transaction
@@ -186,15 +192,15 @@ export class RelayerClient {
        * @returns transactionId
        */
       replace: (
-          transactionId: string,
-          replacementTransaction: TransactionToSend,
-          rateLimitKey?: string | undefined,
+        transactionId: string,
+        replacementTransaction: TransactionToSend,
+        rateLimitKey?: string | undefined
       ): Promise<TransactionSent> => {
         return replaceTransaction(
-            transactionId,
-            replacementTransaction,
-            rateLimitKey,
-            this._apiBaseConfig,
+          transactionId,
+          replacementTransaction,
+          rateLimitKey,
+          this._apiBaseConfig
         );
       },
       /**
@@ -203,8 +209,15 @@ export class RelayerClient {
        * @param rateLimitKey The rate limit key if you want rate limit feature on
        * @returns boolean
        */
-      cancel: (transactionId: string, rateLimitKey?: string | undefined): Promise<boolean> => {
-        return cancelTransaction(transactionId, rateLimitKey, this._apiBaseConfig);
+      cancel: (
+        transactionId: string,
+        rateLimitKey?: string | undefined
+      ): Promise<boolean> => {
+        return cancelTransaction(
+          transactionId,
+          rateLimitKey,
+          this._apiBaseConfig
+        );
       },
       /**
        * Send a transaction
@@ -213,23 +226,21 @@ export class RelayerClient {
        * @returns transactionId
        */
       send: (
-          replacementTransaction: TransactionToSend,
-          rateLimitKey?: string | undefined
+        replacementTransaction: TransactionToSend,
+        rateLimitKey?: string | undefined
       ): Promise<TransactionSent> => {
         return sendTransaction(
-            this.id,
-            replacementTransaction,
-            rateLimitKey,
-            this._apiBaseConfig
+          this.id,
+          replacementTransaction,
+          rateLimitKey,
+          this._apiBaseConfig
         );
       },
       waitForTransactionReceiptById: async (
-          transactionId: string
+        transactionId: string
       ): Promise<TransactionReceipt> => {
         while (true) {
-          const result = await this.transactions.getStatus(
-              transactionId
-          );
+          const result = await this.transaction.getStatus(transactionId);
           if (!result) {
             throw new Error('Transaction not found');
           }

@@ -1,6 +1,6 @@
 import { postApi } from '../axios-wrapper';
 import { ApiBaseConfig } from '../types';
-import {RATE_LIMIT_HEADER_NAME} from "../index";
+import { RATE_LIMIT_HEADER_NAME } from '../index';
 
 export const cancelTransaction = async (
   transactionId: string,
@@ -18,8 +18,8 @@ export const cancelTransaction = async (
     const response = await postApi<boolean>(
       baseConfig,
       `transactions/cancel/${transactionId}`,
-        {},
-        config
+      {},
+      config
     );
     return response.data;
   } catch (error) {

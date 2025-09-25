@@ -3,32 +3,31 @@ import {
   pauseRelayer,
   unpauseRelayer,
   updateRelayerEIP1559Status,
-  updateRelayerMaxGasPrice, 
+  updateRelayerMaxGasPrice,
   removeRelayerMaxGasPrice,
+  getTransactionsPendingCount,
 } from '../api';
-import {RelayerClient, RelayerClientConfig} from "./relayer";
-import {TransactionCountType} from "./types";
+import { RelayerClient } from './relayer';
+import { TransactionCountType } from './types';
 
 export interface AdminRelayerClientConfig {
   serverUrl: string;
   providerUrl: string;
   relayerId: string;
-  username: string;
-  password: string;
+  auth: {
+    username: string;
+    password: string;
+  };
 }
 
 export class AdminRelayerClient extends RelayerClient {
   constructor(config: AdminRelayerClientConfig) {
-    let relayer: RelayerClientConfig = {
+    super({
       serverUrl: config.serverUrl,
       providerUrl: config.providerUrl,
       relayerId: config.relayerId,
-      auth: {
-        username: config.username,
-        password: config.password
-      }
-    }
-    super(relayer);
+      auth: config.auth,
+    });
   }
 
   /**
@@ -53,11 +52,7 @@ export class AdminRelayerClient extends RelayerClient {
    * @returns void
    */
   public updateEIP1559Status(status: boolean): Promise<void> {
-    return updateRelayerEIP1559Status(
-        this.id,
-        status,
-        this._apiBaseConfig
-    );
+    return updateRelayerEIP1559Status(this.id, status, this._apiBaseConfig);
   }
 
   /**
@@ -77,9 +72,9 @@ export class AdminRelayerClient extends RelayerClient {
     return removeRelayerMaxGasPrice(this.id, this._apiBaseConfig);
   }
 
-  public get transactions() {
+  public get transaction() {
     return {
-      ...super.transactions,
+      ...super.transaction,
       /**
        * Get the count of transactions
        * @param type The type of transaction count
@@ -88,15 +83,9 @@ export class AdminRelayerClient extends RelayerClient {
       getCount: (type: TransactionCountType): Promise<number> => {
         switch (type) {
           case TransactionCountType.PENDING:
-            return getTransactionsInmempoolCount(
-                this.id,
-                this._apiBaseConfig
-            );
+            return getTransactionsPendingCount(this.id, this._apiBaseConfig);
           case TransactionCountType.INMEMPOOL:
-            return getTransactionsInmempoolCount(
-                this.id,
-                this._apiBaseConfig
-            );
+            return getTransactionsInmempoolCount(this.id, this._apiBaseConfig);
           default:
             throw new Error('Invalid transaction count type');
         }

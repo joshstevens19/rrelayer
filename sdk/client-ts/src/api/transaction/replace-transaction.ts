@@ -1,7 +1,7 @@
 import { postApi } from '../axios-wrapper';
 import { ApiBaseConfig } from '../types';
 import { TransactionSent, TransactionToSend } from './types';
-import {RATE_LIMIT_HEADER_NAME} from "../index";
+import { RATE_LIMIT_HEADER_NAME } from '../index';
 
 export const replaceTransaction = async (
   transactionId: string,
@@ -23,7 +23,7 @@ export const replaceTransaction = async (
       {
         ...replacementTransaction,
       },
-        config
+      config
     );
     return response.data;
   } catch (error) {

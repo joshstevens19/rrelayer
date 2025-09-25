@@ -25,7 +25,10 @@ export class RpcError extends Error {
 
 export class Provider {
   private _client: PublicClient;
-  constructor(private _providerUrl: string, private _relayer: RelayerClient) {
+  constructor(
+    private _providerUrl: string,
+    private _relayer: RelayerClient
+  ) {
     this._client = createPublicClient({
       transport: http(this._providerUrl),
     });
@@ -58,7 +61,7 @@ export class Provider {
           );
         }
 
-        const result = await this._relayer.transactions.send({
+        const result = await this._relayer.transaction.send({
           to: transaction.to,
           value: transaction.value ? transaction.value.toString() : undefined,
           data: transaction.data,

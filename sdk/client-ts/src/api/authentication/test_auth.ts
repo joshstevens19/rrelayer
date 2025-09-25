@@ -10,10 +10,7 @@ export const test_auth = async (
   baseConfig: ApiBaseConfig
 ): Promise<StatusResponse> => {
   try {
-    const result = await getApi<StatusResponse>(
-      baseConfig,
-      'auth/status'
-    );
+    const result = await getApi<StatusResponse>(baseConfig, 'auth/status');
 
     return result.data;
   } catch (error) {

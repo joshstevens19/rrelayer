@@ -1,6 +1,6 @@
 import { postApi } from '../axios-wrapper';
 import { ApiBaseConfig } from '../types';
-import {CreateRelayerResult} from "./create-relayer";
+import { CreateRelayerResult } from './create-relayer';
 
 export const cloneRelayer = async (
   id: string,
@@ -14,7 +14,7 @@ export const cloneRelayer = async (
       `relayers/${id}/clone`,
       {
         new_relayer_name: name,
-        chain_id: chainId
+        chain_id: chainId,
       }
     );
     return response.data;

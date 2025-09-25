@@ -21,7 +21,6 @@ const buildHeaders = (
     };
   }
 
-
   if ('username' in baseConfig && 'password' in baseConfig) {
     const credentials = btoa(`${baseConfig.username}:${baseConfig.password}`);
     headers = {

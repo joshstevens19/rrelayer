@@ -13,7 +13,7 @@ export {
   Client,
   CreateClientConfig,
   createClient,
-  createRelayerClient
+  createRelayerClient,
 } from './core';
 export { RelayerClientConfig } from './relayer';
 export { TransactionCountType } from './types';
