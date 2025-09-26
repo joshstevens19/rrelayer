@@ -4,7 +4,7 @@ use crate::app_state::RelayersInternalOnly;
 use crate::authentication::{create_basic_auth_routes, inject_basic_auth_status};
 use crate::background_tasks::run_background_tasks;
 use crate::common_types::EvmAddress;
-use crate::gas::{create_gas_routes, BlobGasOracleCache, GasEstimatorResult, GasOracleCache};
+use crate::gas::{BlobGasOracleCache, GasEstimatorResult, GasOracleCache};
 use crate::network::{create_network_routes, set_networks_cache, ChainId, Network};
 use crate::shared::HttpError;
 use crate::webhooks::WebhookManager;
@@ -205,7 +205,6 @@ async fn start_api(
     // All routes handle their own authentication logic internally
     let api_routes = Router::new()
         .nest("/auth", create_basic_auth_routes())
-        .nest("/gas", create_gas_routes())
         .nest("/networks", create_network_routes())
         .nest("/relayers", create_relayer_routes())
         .nest("/transactions", create_transactions_routes())

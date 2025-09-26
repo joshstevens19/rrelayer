@@ -122,7 +122,7 @@ impl RelayerClient {
             to: to.clone(),
             value,
             data,
-            speed: Some(TransactionSpeed::Fast),
+            speed: Some(TransactionSpeed::FAST),
             external_id: None,
             blobs: None,
         };

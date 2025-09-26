@@ -62,10 +62,10 @@ impl BlobGasOracleCache {
         info!("Blob gas prices: {:?}", blob_gas_prices);
 
         match speed {
-            TransactionSpeed::Super => Some(blob_gas_prices.super_fast),
-            TransactionSpeed::Fast => Some(blob_gas_prices.fast),
-            TransactionSpeed::Medium => Some(blob_gas_prices.medium),
-            TransactionSpeed::Slow => Some(blob_gas_prices.slow),
+            TransactionSpeed::SUPER => Some(blob_gas_prices.super_fast),
+            TransactionSpeed::FAST => Some(blob_gas_prices.fast),
+            TransactionSpeed::MEDIUM => Some(blob_gas_prices.medium),
+            TransactionSpeed::SLOW => Some(blob_gas_prices.slow),
         }
     }
 

@@ -13,10 +13,10 @@ use crate::postgres::ToSql;
 
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub enum TransactionSpeed {
-    Slow,
-    Medium,
-    Fast,
-    Super,
+    SLOW,
+    MEDIUM,
+    FAST,
+    SUPER,
 }
 
 impl Display for TransactionSpeed {
@@ -28,10 +28,10 @@ impl Display for TransactionSpeed {
 impl TransactionSpeed {
     pub fn format(&self) -> String {
         match self {
-            TransactionSpeed::Slow => "SLOW".to_string(),
-            TransactionSpeed::Medium => "MEDIUM".to_string(),
-            TransactionSpeed::Fast => "FAST".to_string(),
-            TransactionSpeed::Super => "SUPER".to_string(),
+            TransactionSpeed::SLOW => "SLOW".to_string(),
+            TransactionSpeed::MEDIUM => "MEDIUM".to_string(),
+            TransactionSpeed::FAST => "FAST".to_string(),
+            TransactionSpeed::SUPER => "SUPER".to_string(),
         }
     }
 }
@@ -42,10 +42,10 @@ impl<'a> FromSql<'a> for TransactionSpeed {
             let speed = from_utf8(raw).map_err(|err| format!("Invalid UTF-8 sequence: {}", err))?;
 
             match speed {
-                "SLOW" => Ok(TransactionSpeed::Slow),
-                "MEDIUM" => Ok(TransactionSpeed::Medium),
-                "FAST" => Ok(TransactionSpeed::Fast),
-                "SUPER" => Ok(TransactionSpeed::Super),
+                "SLOW" => Ok(TransactionSpeed::SLOW),
+                "MEDIUM" => Ok(TransactionSpeed::MEDIUM),
+                "FAST" => Ok(TransactionSpeed::FAST),
+                "SUPER" => Ok(TransactionSpeed::SUPER),
                 _ => Err(format!("Unknown TransactionSpeed: {}", speed).into()),
             }
         } else if *ty == Type::TEXT
@@ -56,10 +56,10 @@ impl<'a> FromSql<'a> for TransactionSpeed {
             let speed = from_utf8(raw).map_err(|err| format!("Invalid UTF-8 sequence: {}", err))?;
 
             match speed {
-                "SLOW" => Ok(TransactionSpeed::Slow),
-                "MEDIUM" => Ok(TransactionSpeed::Medium),
-                "FAST" => Ok(TransactionSpeed::Fast),
-                "SUPER" => Ok(TransactionSpeed::Super),
+                "SLOW" => Ok(TransactionSpeed::SLOW),
+                "MEDIUM" => Ok(TransactionSpeed::MEDIUM),
+                "FAST" => Ok(TransactionSpeed::FAST),
+                "SUPER" => Ok(TransactionSpeed::SUPER),
                 _ => Err(format!("Unknown TransactionSpeed: {}", speed).into()),
             }
         } else {
@@ -84,10 +84,10 @@ impl ToSql for TransactionSpeed {
         }
 
         let speed_str = match self {
-            TransactionSpeed::Slow => "SLOW",
-            TransactionSpeed::Medium => "MEDIUM",
-            TransactionSpeed::Fast => "FAST",
-            TransactionSpeed::Super => "SUPER",
+            TransactionSpeed::SLOW => "SLOW",
+            TransactionSpeed::MEDIUM => "MEDIUM",
+            TransactionSpeed::FAST => "FAST",
+            TransactionSpeed::SUPER => "SUPER",
         };
 
         out.extend_from_slice(speed_str.as_bytes());

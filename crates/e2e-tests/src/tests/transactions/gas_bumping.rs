@@ -24,7 +24,7 @@ impl TestRunner {
             to: self.config.anvil_accounts[1],
             value: alloy::primitives::utils::parse_ether("0.5")?.into(),
             data: TransactionData::empty(),
-            speed: Some(TransactionSpeed::Slow),
+            speed: Some(TransactionSpeed::SLOW),
             external_id: Some("gas-bump-test".to_string()),
             blobs: None,
         };

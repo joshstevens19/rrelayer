@@ -1,0 +1,371 @@
+# Relayers API
+
+The Relayers API allows you to create, manage, and monitor relayer accounts that send transactions on behalf of your applications.
+
+## Authentication
+
+All relayer endpoints require authentication. See [Authentication](/integration/api/authentication) for details.
+
+## Create Relayer
+
+Create a new relayer for a specific blockchain network.
+
+### Endpoint
+```
+POST /api/relayers/{chain_id}/new
+```
+
+### Request Body
+
+```json
+{
+  "name": "my-app-relayer"
+}
+```
+
+#### Parameters
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | `string` | Yes | Human-readable name for the relayer |
+
+### Response
+
+```json
+{
+  "id": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
+  "address": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b"
+}
+```
+
+### Example
+
+```bash
+curl -X POST https://your-rrelayer.com/api/relayers/11155111/new \
+  -u "username:password" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "my-app-relayer"}'
+```
+
+## Get Relayers
+
+Get a list of all relayers.
+
+### Endpoint
+```
+GET /api/relayers
+```
+
+### Query Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `limit` | `number` | Maximum number of relayers to return |
+| `offset` | `number` | Number of relayers to skip |
+| `chain_id` | `number` | Filter by chain ID |
+
+### Response
+
+```json
+{
+  "relayers": [
+    {
+      "id": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
+      "address": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
+      "name": "my-app-relayer",
+      "chain_id": 11155111,
+      "status": "ACTIVE",
+      "created_at": "2025-09-26T10:00:00Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+### Example
+
+```bash
+curl "https://your-rrelayer.com/api/relayers?limit=10&chain_id=11155111" \
+  -u "username:password"
+```
+
+## Get Relayer
+
+Get details for a specific relayer.
+
+### Endpoint
+```
+GET /api/relayers/{relayer_id}
+```
+
+### Response
+
+```json
+{
+  "id": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
+  "address": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
+  "name": "my-app-relayer",
+  "chain_id": 11155111,
+  "status": "ACTIVE",
+  "balance": "1000000000000000000",
+  "nonce": 42,
+  "max_gas_price": "50000000000",
+  "eip1559_enabled": true,
+  "created_at": "2025-09-26T10:00:00Z",
+  "updated_at": "2025-09-26T12:00:00Z"
+}
+```
+
+### Relayer Status
+
+| Status | Description |
+|--------|-------------|
+| `ACTIVE` | Relayer is active and can send transactions |
+| `PAUSED` | Relayer is paused and will not send transactions |
+| `DELETED` | Relayer has been deleted |
+
+### Example
+
+```bash
+curl https://your-rrelayer.com/api/relayers/0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b \
+  -u "username:password"
+```
+
+## Clone Relayer
+
+Create a copy of an existing relayer with the same configuration.
+
+### Endpoint
+```
+POST /api/relayers/{relayer_id}/clone
+```
+
+### Request Body
+
+```json
+{
+  "name": "cloned-relayer"
+}
+```
+
+### Response
+
+```json
+{
+  "id": "0x853e46dd7577c4c0df3f4e9f0b0e1f1f1c2d3e4f",
+  "address": "0x853e46dd7577c4c0df3f4e9f0b0e1f1f1c2d3e4f"
+}
+```
+
+### Example
+
+```bash
+curl -X POST https://your-rrelayer.com/api/relayers/0x742d35.../clone \
+  -u "username:password" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "cloned-relayer"}'
+```
+
+## Pause Relayer
+
+Pause a relayer to stop it from sending new transactions.
+
+### Endpoint
+```
+PUT /api/relayers/{relayer_id}/pause
+```
+
+### Response
+
+```json
+{
+  "message": "Relayer paused successfully"
+}
+```
+
+### Example
+
+```bash
+curl -X PUT https://your-rrelayer.com/api/relayers/0x742d35.../pause \
+  -u "username:password"
+```
+
+## Unpause Relayer
+
+Resume a paused relayer.
+
+### Endpoint
+```
+PUT /api/relayers/{relayer_id}/unpause
+```
+
+### Response
+
+```json
+{
+  "message": "Relayer unpaused successfully"
+}
+```
+
+### Example
+
+```bash
+curl -X PUT https://your-rrelayer.com/api/relayers/0x742d35.../unpause \
+  -u "username:password"
+```
+
+## Update Max Gas Price
+
+Set the maximum gas price a relayer will use for transactions.
+
+### Endpoint
+```
+PUT /api/relayers/{relayer_id}/gas/max/{gas_price_cap}
+```
+
+### Path Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `gas_price_cap` | `string` | Maximum gas price in wei |
+
+### Response
+
+```json
+{
+  "message": "Max gas price updated successfully"
+}
+```
+
+### Example
+
+```bash
+curl -X PUT https://your-rrelayer.com/api/relayers/0x742d35.../gas/max/50000000000 \
+  -u "username:password"
+```
+
+## Update EIP-1559 Status
+
+Enable or disable EIP-1559 transaction types for a relayer.
+
+### Endpoint
+```
+PUT /api/relayers/{relayer_id}/gas/eip1559/{enabled}
+```
+
+### Path Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `enabled` | `boolean` | `true` to enable EIP-1559, `false` to disable |
+
+### Response
+
+```json
+{
+  "message": "EIP-1559 status updated successfully"
+}
+```
+
+### Example
+
+```bash
+curl -X PUT https://your-rrelayer.com/api/relayers/0x742d35.../gas/eip1559/true \
+  -u "username:password"
+```
+
+## Get Allowlist Addresses
+
+Get the list of allowed recipient addresses for a relayer.
+
+### Endpoint
+```
+GET /api/relayers/{relayer_id}/allowlists
+```
+
+### Response
+
+```json
+{
+  "addresses": [
+    "0x1234567890abcdef1234567890abcdef12345678",
+    "0x9876543210fedcba9876543210fedcba98765432"
+  ]
+}
+```
+
+### Example
+
+```bash
+curl https://your-rrelayer.com/api/relayers/0x742d35.../allowlists \
+  -u "username:password"
+```
+
+## Delete Relayer
+
+Delete a relayer permanently.
+
+### Endpoint
+```
+DELETE /api/relayers/{relayer_id}
+```
+
+### Response
+
+```json
+{
+  "message": "Relayer deleted successfully"
+}
+```
+
+### Example
+
+```bash
+curl -X DELETE https://your-rrelayer.com/api/relayers/0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b \
+  -u "username:password"
+```
+
+## Error Responses
+
+### Common Error Codes
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 400 | `INVALID_REQUEST` | Invalid request parameters |
+| 401 | `UNAUTHORIZED` | Authentication required |
+| 403 | `FORBIDDEN` | Insufficient permissions |
+| 404 | `NOT_FOUND` | Relayer not found |
+| 409 | `CONFLICT` | Relayer name already exists |
+| 500 | `INTERNAL_ERROR` | Server error |
+
+### Error Response Format
+
+```json
+{
+  "error": "Relayer not found",
+  "code": "NOT_FOUND"
+}
+```
+
+## Best Practices
+
+### Relayer Management
+
+1. **Use descriptive names** - Choose meaningful names for easy identification
+2. **Monitor balances** - Keep relayer accounts funded for transaction fees
+3. **Set appropriate gas limits** - Configure max gas prices to control costs
+4. **Use allowlists** - Restrict transaction recipients for security
+
+### Security Considerations
+
+1. **Access control** - Limit API access to authorized systems only
+2. **Rate limiting** - Monitor and control transaction volumes
+3. **Balance monitoring** - Set up alerts for low balances
+4. **Regular audits** - Review relayer activity and configurations
+
+### Performance Optimization
+
+1. **Multiple relayers** - Use multiple relayers for high-volume applications
+2. **Chain-specific relayers** - Create dedicated relayers per blockchain
+3. **Load balancing** - Distribute transactions across multiple relayers
+4. **Monitoring** - Track relayer performance and transaction success rates

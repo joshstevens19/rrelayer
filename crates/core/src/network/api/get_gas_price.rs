@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
+use crate::gas::GasEstimatorResult;
 use crate::shared::{not_found, HttpError};
-use crate::{app_state::AppState, gas::fee_estimator::GasEstimatorResult, network::ChainId};
+use crate::{app_state::AppState, network::ChainId};
 use axum::http::HeaderMap;
 use axum::{
     extract::{Path, State},

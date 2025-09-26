@@ -167,7 +167,7 @@ async fn handle_gas(
 ) -> Result<(), NetworkError> {
     let chain_id = get_chain_id_for_network(network_name, project_path).await?;
 
-    let gas_prices = sdk.gas.get_gas_prices(chain_id).await?;
+    let gas_prices = sdk.network.get_gas_prices(chain_id).await?;
     match gas_prices {
         None => {
             println!("No gas prices found for chain ID: {}", chain_id);

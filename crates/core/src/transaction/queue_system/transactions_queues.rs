@@ -212,7 +212,7 @@ impl TransactionsQueues {
         transaction.data = TransactionData::empty();
         transaction.gas_limit = Some(GasLimit::new(21000_u128));
         transaction.is_noop = true;
-        transaction.speed = TransactionSpeed::Fast;
+        transaction.speed = TransactionSpeed::FAST;
     }
 
     /// Replaces the content of an existing transaction with new parameters.

@@ -1,0 +1,279 @@
+# Allowlist API
+
+The Allowlist API allows you to manage allowed recipient addresses for relayers, providing an additional security layer by restricting where transactions can be sent.
+
+## Overview
+
+Allowlists help secure your relayers by:
+
+- **Restricting recipients** - Only allowed addresses can receive transactions
+- **Preventing misuse** - Unauthorized destinations are blocked
+- **Compliance** - Meet regulatory requirements for transaction restrictions
+- **Risk management** - Limit exposure to unknown addresses
+
+## Authentication
+
+All allowlist endpoints require authentication. See [Authentication](/integration/api/authentication) for details.
+
+## Get Allowlist Addresses
+
+Get the list of allowed recipient addresses for a specific relayer.
+
+### Endpoint
+```
+GET /api/relayers/{relayer_id}/allowlists
+```
+
+### Response
+
+```json
+{
+  "relayer_id": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
+  "addresses": [
+    "0x1234567890abcdef1234567890abcdef12345678",
+    "0x9876543210fedcba9876543210fedcba98765432",
+    "0xabcdef1234567890abcdef1234567890abcdef12"
+  ],
+  "total": 3,
+  "updated_at": "2025-09-26T10:30:00Z"
+}
+```
+
+### Example
+
+```bash
+curl https://your-rrelayer.com/api/relayers/0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b/allowlists \
+  -u "username:password"
+```
+
+## Configuration
+
+Allowlists are configured in your rrelayer.yaml configuration file:
+
+### Global Allowlist
+
+Apply the same allowlist to all relayers:
+
+```yaml
+name: my-rrelayer
+description: "Secure rrelayer with allowlist"
+api_config:
+  port: 3000
+  authentication_username: "${RRELAYER_AUTH_USERNAME}"
+  authentication_password: "${RRELAYER_AUTH_PASSWORD}"
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+networks:
+- name: "ethereum_mainnet"
+  chain_id: 1
+  provider_urls:
+  - "https://eth.gateway.tenderly.co"
+  block_explorer_url: "https://etherscan.io"
+permissions: // [!code focus]
+  allowlist: // [!code focus]
+    addresses: // [!code focus]
+    - "0x1234567890abcdef1234567890abcdef12345678" // [!code focus]
+    - "0x9876543210fedcba9876543210fedcba98765432" // [!code focus]
+```
+
+### Per-Relayer Allowlist
+
+Configure different allowlists for different relayers:
+
+```yaml
+permissions:
+  allowlist:
+    relayers:
+      "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b":
+        - "0x1234567890abcdef1234567890abcdef12345678"
+        - "0x9876543210fedcba9876543210fedcba98765432"
+      "0x853e46dd7577c4c0df3f4e9f0b0e1f1f1c2d3e4f":
+        - "0xabcdef1234567890abcdef1234567890abcdef12"
+        - "0xfedcba0987654321fedcba0987654321fedcba09"
+```
+
+### Wildcard Allowlist
+
+Allow transactions to any address (disable allowlist):
+
+```yaml
+permissions:
+  allowlist:
+    addresses: ["*"]
+```
+
+## Allowlist Behavior
+
+### Transaction Validation
+
+When a transaction is submitted:
+
+1. **Check allowlist** - Verify the `to` address is in the allowlist
+2. **Block if not allowed** - Reject transactions to non-allowlisted addresses
+3. **Allow if permitted** - Process transactions to allowlisted addresses
+
+### Error Response
+
+When a transaction is sent to a non-allowlisted address:
+
+```json
+{
+  "error": "Recipient address not in allowlist",
+  "code": "FORBIDDEN",
+  "details": {
+    "recipient": "0xunauthorized1234567890abcdef1234567890abcdef",
+    "allowlist_enabled": true
+  }
+}
+```
+
+## Use Cases
+
+### Restricted DeFi Protocol
+
+Limit transactions to specific DeFi protocol contracts:
+
+```yaml
+permissions:
+  allowlist:
+    addresses:
+    - "0xa0b86a33e6441e776e21c0b7f0c8de3d5cde6b8e"  # Uniswap V3 Router
+    - "0x7a250d5630b4cf539739df2c5dacb4c659f2488d"  # Uniswap V2 Router
+    - "0x1111111254eeb25477b68fb85ed929f73a960582"  # 1inch Router
+```
+
+### Corporate Treasury
+
+Restrict to approved corporate addresses:
+
+```yaml
+permissions:
+  allowlist:
+    addresses:
+    - "0x1234567890abcdef1234567890abcdef12345678"  # Treasury Wallet
+    - "0x9876543210fedcba9876543210fedcba98765432"  # Operations Wallet
+    - "0xabcdef1234567890abcdef1234567890abcdef12"  # Payroll Wallet
+```
+
+### Multi-Chain Bridge
+
+Allow only specific bridge contracts:
+
+```yaml
+permissions:
+  allowlist:
+    relayers:
+      # Ethereum mainnet relayer
+      "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b":
+        - "0xa0b86a33e6441e776e21c0b7f0c8de3d5cde6b8e"  # Ethereum Bridge
+      # Polygon relayer  
+      "0x853e46dd7577c4c0df3f4e9f0b0e1f1f1c2d3e4f":
+        - "0x8484ef722627bf18ca5ae6bcf031c23e6e922b30"  # Polygon Bridge
+```
+
+## Security Considerations
+
+### Address Validation
+
+1. **Verify addresses** - Ensure all allowlist addresses are valid
+2. **Check ownership** - Confirm you control or trust the addresses
+3. **Regular reviews** - Periodically audit allowlist contents
+4. **Remove unused** - Clean up old or unnecessary addresses
+
+### Best Practices
+
+1. **Principle of least privilege** - Only allowlist necessary addresses
+2. **Environment separation** - Use different allowlists for dev/staging/prod
+3. **Monitoring** - Log all allowlist violations for security review
+4. **Documentation** - Document why each address is allowlisted
+
+### Common Mistakes
+
+1. **Overly permissive** - Using "*" in production environments
+2. **Stale addresses** - Not removing old or compromised addresses
+3. **Case sensitivity** - Addresses must match exactly (0x vs 0X)
+4. **Missing addresses** - Forgetting to allowlist required destinations
+
+## Testing Allowlists
+
+### Verify Allowlist Configuration
+
+Test your allowlist setup:
+
+```bash
+# Check current allowlist
+curl https://your-rrelayer.com/api/relayers/0x742d35.../allowlists \
+  -u "username:password"
+
+# Test allowed transaction
+curl -X POST https://your-rrelayer.com/api/transactions/relayers/0x742d35.../send \
+  -u "username:password" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": "0x1234567890abcdef1234567890abcdef12345678",
+    "value": "1000000000000000000"
+  }'
+
+# Test blocked transaction (should fail)
+curl -X POST https://your-rrelayer.com/api/transactions/relayers/0x742d35.../send \
+  -u "username:password" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": "0xunauthorized1234567890abcdef1234567890abcdef",
+    "value": "1000000000000000000"
+  }'
+```
+
+### Validate Address Format
+
+Ensure allowlist addresses are properly formatted:
+
+```bash
+# Valid Ethereum address format
+echo "0x1234567890abcdef1234567890abcdef12345678" | grep -E "^0x[a-fA-F0-9]{40}$"
+
+# Check if address is checksummed
+# Addresses should be either all lowercase or properly checksummed
+```
+
+## Error Responses
+
+### Common Error Codes
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 400 | `INVALID_REQUEST` | Invalid request parameters |
+| 401 | `UNAUTHORIZED` | Authentication required |
+| 403 | `FORBIDDEN` | Address not in allowlist |
+| 404 | `NOT_FOUND` | Relayer not found |
+| 500 | `INTERNAL_ERROR` | Server error |
+
+### Error Response Format
+
+```json
+{
+  "error": "Recipient address not in allowlist",
+  "code": "FORBIDDEN",
+  "details": {
+    "recipient": "0xunauthorized1234567890abcdef1234567890abcdef",
+    "allowlist_enabled": true,
+    "allowed_addresses_count": 3
+  }
+}
+```
+
+## Performance Considerations
+
+### Allowlist Size
+
+- **Small lists** (< 100 addresses) - No performance impact
+- **Medium lists** (100-1000 addresses) - Minimal impact
+- **Large lists** (> 1000 addresses) - Consider optimization
+
+### Optimization Tips
+
+1. **Use wildcards** sparingly - "*" disables security checks
+2. **Regular cleanup** - Remove unused addresses
+3. **Monitor performance** - Track transaction validation times
+4. **Consider alternatives** - For very large lists, consider contract-based checks

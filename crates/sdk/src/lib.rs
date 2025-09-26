@@ -1,8 +1,6 @@
 mod api;
 
-pub use api::{
-    ApiSdkError, Authentication, GasApi, NetworkApi, RelayerApi, SignApi, TransactionApi,
-};
+pub use api::{ApiSdkError, Authentication, NetworkApi, RelayerApi, SignApi, TransactionApi};
 use std::sync::Arc;
 
 use crate::api::{ApiResult, HealthApi, http::HttpClient, types::ApiBaseConfig};
@@ -10,7 +8,6 @@ use crate::api::{ApiResult, HealthApi, http::HttpClient, types::ApiBaseConfig};
 #[derive(Clone)]
 pub struct SDK {
     pub auth: Authentication,
-    pub gas: GasApi,
     pub network: NetworkApi,
     pub relayer: RelayerApi,
     pub sign: SignApi,
@@ -26,7 +23,6 @@ impl SDK {
 
         Self {
             auth: Authentication::new(Arc::clone(&client)),
-            gas: GasApi::new(Arc::clone(&client)),
             network: NetworkApi::new(Arc::clone(&client)),
             relayer: RelayerApi::new(Arc::clone(&client)),
             sign: SignApi::new(Arc::clone(&client)),

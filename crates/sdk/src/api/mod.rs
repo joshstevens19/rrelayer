@@ -1,5 +1,4 @@
 mod authentication;
-mod gas;
 pub mod http;
 mod network;
 mod relayer;
@@ -26,7 +25,6 @@ impl HealthApi {
 }
 
 pub use authentication::Authentication;
-pub use gas::GasApi;
 pub use network::NetworkApi;
 pub use relayer::RelayerApi;
 pub use sign::SignApi;

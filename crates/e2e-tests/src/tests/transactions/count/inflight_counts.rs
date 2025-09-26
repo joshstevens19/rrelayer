@@ -43,7 +43,7 @@ impl TestRunner {
                 to: self.config.anvil_accounts[1],
                 value: TransactionValue::new(U256::from(100000000000000000u128 * (i + 1))),
                 data: TransactionData::empty(),
-                speed: Some(TransactionSpeed::Fast),
+                speed: Some(TransactionSpeed::FAST),
                 external_id: Some(format!("test-counts-{}", i)),
                 blobs: None,
             };

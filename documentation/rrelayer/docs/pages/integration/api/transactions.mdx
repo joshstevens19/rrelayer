@@ -1,0 +1,321 @@
+# Transactions API
+
+The Transactions API allows you to send, monitor, and manage blockchain transactions through rrelayer.
+
+## Authentication
+
+All transaction endpoints require authentication. See [Authentication](/integration/api/authentication) for details.
+
+## Send Transaction
+
+Send a new transaction through a relayer.
+
+### Endpoint
+```
+POST /api/transactions/relayers/{relayer_id}/send
+```
+
+### Request Body
+
+```json
+{
+  "to": "0x1234567890abcdef1234567890abcdef12345678",
+  "value": "1000000000000000000",
+  "data": "0xa9059cbb000000000000000000000000...",
+  "speed": "MEDIUM",
+  "external_id": "order_12345",
+  "blobs": ["0x01234567..."]
+}
+```
+
+#### Parameters
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `to` | `string` | Yes | Recipient address |
+| `value` | `string` | No | Transaction value in wei (default: "0") |
+| `data` | `string` | No | Transaction data/input (default: "0x") |
+| `speed` | `string` | No | Transaction speed: `"SLOW"`, `"MEDIUM"`, `"FAST"`, `"SUPER_FAST"` |
+| `external_id` | `string` | No | Custom external ID for tracking |
+| `blobs` | `string[]` | No | Blob data for EIP-4844 transactions |
+
+### Response
+
+```json
+{
+  "id": "tx_abc123def456",
+  "hash": "0xabcdef123456789abcdef123456789abcdef123456789abcdef123456789abcdef"
+}
+```
+
+### Example
+
+```bash
+curl -X POST https://your-rrelayer.com/api/transactions/relayers/0x742d35.../send \
+  -u "username:password" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": "0x1234567890abcdef1234567890abcdef12345678",
+    "value": "1000000000000000000",
+    "speed": "MEDIUM",
+    "external_id": "order_12345"
+  }'
+```
+
+## Get Transaction
+
+Get transaction details by ID.
+
+### Endpoint
+```
+GET /api/transactions/{transaction_id}
+```
+
+### Response
+
+```json
+{
+  "id": "tx_abc123def456",
+  "relayer_id": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
+  "to": "0x1234567890abcdef1234567890abcdef12345678",
+  "from": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
+  "value": "1000000000000000000",
+  "data": "0xa9059cbb000000000000000000000000...",
+  "chain_id": 11155111,
+  "status": "CONFIRMED",
+  "transaction_hash": "0xabcdef123456789abcdef123456789abcdef123456789abcdef123456789abcdef",
+  "queued_at": "2025-09-26T10:29:30Z",
+  "sent_at": "2025-09-26T10:30:00Z",
+  "confirmed_at": "2025-09-26T10:32:00Z",
+  "expires_at": "2025-09-26T11:30:00Z",
+  "external_id": "order_12345",
+  "nonce": 42,
+  "is_noop": false
+}
+```
+
+### Example
+
+```bash
+curl https://your-rrelayer.com/api/transactions/tx_abc123def456 \
+  -u "username:password"
+```
+
+## Get Transaction Status
+
+Get the current status and receipt information for a transaction.
+
+### Endpoint
+```
+GET /api/transactions/status/{transaction_id}
+```
+
+### Response
+
+```json
+{
+  "hash": "0xabcdef123456789abcdef123456789abcdef123456789abcdef123456789abcdef",
+  "status": "CONFIRMED",
+  "receipt": {
+    "transactionHash": "0xabcdef...",
+    "blockNumber": "0x123456",
+    "blockHash": "0xfedcba...",
+    "gasUsed": "0x5208",
+    "status": "0x1",
+    "logs": []
+  }
+}
+```
+
+### Transaction Statuses
+
+| Status | Description |
+|--------|-------------|
+| `PENDING` | Transaction is queued and waiting to be sent |
+| `INMEMPOOL` | Transaction has been sent to the blockchain |
+| `MINED` | Transaction has been included in a block |
+| `CONFIRMED` | Transaction has reached required confirmations |
+| `FAILED` | Transaction failed |
+| `EXPIRED` | Transaction expired before being mined |
+
+### Example
+
+```bash
+curl https://your-rrelayer.com/api/transactions/status/tx_abc123def456 \
+  -u "username:password"
+```
+
+## Replace Transaction
+
+Replace a pending transaction with a new one (higher gas price).
+
+### Endpoint
+```
+PUT /api/transactions/replace/{transaction_id}
+```
+
+### Request Body
+
+```json
+{
+  "to": "0x1234567890abcdef1234567890abcdef12345678",
+  "value": "2000000000000000000",
+  "data": "0xa9059cbb000000000000000000000000...",
+  "speed": "FAST"
+}
+```
+
+### Response
+
+```json
+{
+  "id": "tx_def456ghi789",
+  "hash": "0xdef456ghi789def456ghi789def456ghi789def456ghi789def456ghi789def456"
+}
+```
+
+### Example
+
+```bash
+curl -X PUT https://your-rrelayer.com/api/transactions/replace/tx_abc123def456 \
+  -u "username:password" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": "0x1234567890abcdef1234567890abcdef12345678",
+    "value": "2000000000000000000",
+    "speed": "FAST"
+  }'
+```
+
+## Cancel Transaction
+
+Cancel a pending transaction.
+
+### Endpoint
+```
+PUT /api/transactions/cancel/{transaction_id}
+```
+
+### Response
+
+```json
+{
+  "id": "tx_cancel789",
+  "hash": "0xcancel789cancel789cancel789cancel789cancel789cancel789cancel789cancel"
+}
+```
+
+### Example
+
+```bash
+curl -X PUT https://your-rrelayer.com/api/transactions/cancel/tx_abc123def456 \
+  -u "username:password"
+```
+
+## Get Relayer Transactions
+
+Get all transactions for a specific relayer.
+
+### Endpoint
+```
+GET /api/transactions/relayers/{relayer_id}
+```
+
+### Query Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `limit` | `number` | Maximum number of transactions to return |
+| `offset` | `number` | Number of transactions to skip |
+| `status` | `string` | Filter by transaction status |
+
+### Response
+
+```json
+{
+  "transactions": [
+    {
+      "id": "tx_abc123def456",
+      "to": "0x1234567890abcdef1234567890abcdef12345678",
+      "value": "1000000000000000000",
+      "status": "CONFIRMED",
+      "transaction_hash": "0xabcdef...",
+      "queued_at": "2025-09-26T10:29:30Z",
+      "external_id": "order_12345"
+    }
+  ],
+  "total": 1
+}
+```
+
+### Example
+
+```bash
+curl "https://your-rrelayer.com/api/transactions/relayers/0x742d35...?limit=10&offset=0" \
+  -u "username:password"
+```
+
+## Get Transaction Counts
+
+Get pending and in-mempool transaction counts for a relayer.
+
+### Pending Count
+```
+GET /api/transactions/relayers/{relayer_id}/pending/count
+```
+
+### In-Mempool Count
+```
+GET /api/transactions/relayers/{relayer_id}/inmempool/count
+```
+
+### Response
+
+```json
+{
+  "count": 5
+}
+```
+
+### Example
+
+```bash
+curl https://your-rrelayer.com/api/transactions/relayers/0x742d35.../pending/count \
+  -u "username:password"
+```
+
+## Error Responses
+
+### Common Error Codes
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 400 | `INVALID_REQUEST` | Invalid request parameters |
+| 401 | `UNAUTHORIZED` | Authentication required |
+| 403 | `FORBIDDEN` | Insufficient permissions |
+| 404 | `NOT_FOUND` | Transaction or relayer not found |
+| 429 | `RATE_LIMIT_EXCEEDED` | Rate limit exceeded |
+| 500 | `INTERNAL_ERROR` | Server error |
+
+### Error Response Format
+
+```json
+{
+  "error": "Transaction not found",
+  "code": "NOT_FOUND"
+}
+```
+
+## Rate Limiting
+
+Transaction endpoints are subject to rate limiting. See [Rate Limits](/config/rate-limits) for configuration details.
+
+Use the `x-rrelayer-rate-limit-key` header to specify a custom rate limit key:
+
+```bash
+curl -X POST https://your-rrelayer.com/api/transactions/relayers/0x742d35.../send \
+  -H "x-rrelayer-rate-limit-key: user-12345" \
+  -u "username:password" \
+  -H "Content-Type: application/json" \
+  -d '{"to": "0x...", "value": "1000000000000000000"}'
+```

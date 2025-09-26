@@ -38,10 +38,10 @@ impl GasOracleCache {
         let gas_prices = self.get_gas_price(chain_id).await?;
 
         match speed {
-            TransactionSpeed::Super => Some(gas_prices.super_fast),
-            TransactionSpeed::Fast => Some(gas_prices.fast),
-            TransactionSpeed::Medium => Some(gas_prices.medium),
-            TransactionSpeed::Slow => Some(gas_prices.slow),
+            TransactionSpeed::SUPER => Some(gas_prices.super_fast),
+            TransactionSpeed::FAST => Some(gas_prices.fast),
+            TransactionSpeed::MEDIUM => Some(gas_prices.medium),
+            TransactionSpeed::SLOW => Some(gas_prices.slow),
         }
     }
 }

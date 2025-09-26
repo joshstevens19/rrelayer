@@ -78,10 +78,10 @@ impl TransactionsQueue {
 
     fn blocks_to_wait_before_bump(&self, speed: &TransactionSpeed) -> u64 {
         match speed {
-            TransactionSpeed::Slow => 10,
-            TransactionSpeed::Medium => 5,
-            TransactionSpeed::Fast => 4,
-            TransactionSpeed::Super => 2,
+            TransactionSpeed::SLOW => 10,
+            TransactionSpeed::MEDIUM => 5,
+            TransactionSpeed::FAST => 4,
+            TransactionSpeed::SUPER => 2,
         }
     }
 
@@ -285,7 +285,7 @@ impl TransactionsQueue {
                 transaction.value = TransactionValue::zero();
                 transaction.data = TransactionData::empty();
                 transaction.is_noop = true;
-                transaction.speed = TransactionSpeed::Fast;
+                transaction.speed = TransactionSpeed::FAST;
                 transaction.sent_at = Some(Utc::now());
             }
         }

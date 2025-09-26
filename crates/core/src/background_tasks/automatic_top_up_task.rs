@@ -474,7 +474,7 @@ impl AutomaticTopUpTask {
             final_to,
             TransactionValue::new(final_value),
             TransactionData::new(final_data),
-            Some(TransactionSpeed::Fast),
+            Some(TransactionSpeed::FAST),
             None,
             Some(format!("automatic_top_up_native_{}_{}", from_address, relayer_address)),
         );
@@ -857,7 +857,7 @@ impl AutomaticTopUpTask {
             final_to,
             TransactionValue::new(final_value),
             TransactionData::new(final_data),
-            Some(TransactionSpeed::Fast),
+            Some(TransactionSpeed::FAST),
             None,
             Some(format!(
                 "automatic_top_up_erc20_{}_{}_{}",

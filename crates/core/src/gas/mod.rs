@@ -1,6 +1,3 @@
-mod api;
-pub use api::create_gas_routes;
-
 mod blob_gas_oracle;
 pub use blob_gas_oracle::{
     blob_gas_oracle, BlobGasEstimatorResult, BlobGasOracleCache, BlobGasPriceResult,

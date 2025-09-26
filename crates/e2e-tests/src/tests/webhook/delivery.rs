@@ -30,7 +30,7 @@ impl TestRunner {
             to: self.config.anvil_accounts[1],
             value: alloy::primitives::utils::parse_ether("0.1")?.into(),
             data: TransactionData::empty(),
-            speed: Some(TransactionSpeed::Fast),
+            speed: Some(TransactionSpeed::FAST),
             external_id: Some("webhook-eth-transfer".to_string()),
             blobs: None,
         };
@@ -81,7 +81,7 @@ impl TestRunner {
             to: contract_address,
             value: TransactionValue::zero(),
             data: TransactionData::raw_hex(&contract_data).unwrap(),
-            speed: Some(TransactionSpeed::Fast),
+            speed: Some(TransactionSpeed::FAST),
             external_id: Some("webhook-contract-call".to_string()),
             blobs: None,
         };
@@ -236,7 +236,7 @@ impl TestRunner {
             to: self.config.anvil_accounts[1],
             value: alloy::primitives::utils::parse_ether("0.1")?.into(),
             data: TransactionData::empty(),
-            speed: Some(TransactionSpeed::Slow),
+            speed: Some(TransactionSpeed::SLOW),
             external_id: Some("test-original".to_string()),
             blobs: None,
         };
@@ -275,7 +275,7 @@ impl TestRunner {
             to: self.config.anvil_accounts[1],
             value: alloy::primitives::utils::parse_ether("0.1")?.into(),
             data: TransactionData::empty(),
-            speed: Some(TransactionSpeed::Slow),
+            speed: Some(TransactionSpeed::SLOW),
             external_id: Some("test-original".to_string()),
             blobs: None,
         };
@@ -294,7 +294,7 @@ impl TestRunner {
             to: self.config.anvil_accounts[1],
             value: alloy::primitives::utils::parse_ether("0.2")?.into(),
             data: TransactionData::empty(),
-            speed: Some(TransactionSpeed::Fast),
+            speed: Some(TransactionSpeed::FAST),
             external_id: Some("test-replacement".to_string()),
             blobs: None,
         };

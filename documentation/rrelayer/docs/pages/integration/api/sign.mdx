@@ -1,0 +1,450 @@
+# Signing API
+
+The Signing API allows you to sign messages and typed data using your relayer's private key, enabling secure authentication and authorization flows.
+
+## Authentication
+
+All signing endpoints require authentication. See [Authentication](/integration/api/authentication) for details.
+
+## Sign Text Message
+
+Sign a plain text message using a relayer's private key.
+
+### Endpoint
+```
+POST /api/signing/{relayer_id}/message
+```
+
+### Request Body
+
+```json
+{
+  "message": "Hello, World! Please sign this message to authenticate."
+}
+```
+
+#### Parameters
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `message` | `string` | Yes | The text message to sign |
+
+### Response
+
+```json
+{
+  "signature": {
+    "r": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+    "s": "0xfedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321",
+    "v": 27
+  },
+  "message": "Hello, World! Please sign this message to authenticate.",
+  "relayer_address": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b"
+}
+```
+
+### Example
+
+```bash
+curl -X POST https://your-rrelayer.com/api/signing/0x742d35.../message \
+  -u "username:password" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Hello, World! Please sign this message to authenticate."
+  }'
+```
+
+## Sign Typed Data (EIP-712)
+
+Sign structured data according to the EIP-712 standard.
+
+### Endpoint
+```
+POST /api/signing/{relayer_id}/typed-data
+```
+
+### Request Body
+
+```json
+{
+  "domain": {
+    "name": "MyApp",
+    "version": "1",
+    "chainId": 11155111,
+    "verifyingContract": "0x1234567890abcdef1234567890abcdef12345678"
+  },
+  "types": {
+    "EIP712Domain": [
+      {"name": "name", "type": "string"},
+      {"name": "version", "type": "string"},
+      {"name": "chainId", "type": "uint256"},
+      {"name": "verifyingContract", "type": "address"}
+    ],
+    "Transfer": [
+      {"name": "to", "type": "address"},
+      {"name": "amount", "type": "uint256"}
+    ]
+  },
+  "primaryType": "Transfer",
+  "message": {
+    "to": "0x9876543210fedcba9876543210fedcba98765432",
+    "amount": "1000000000000000000"
+  }
+}
+```
+
+#### Parameters
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `domain` | `object` | Yes | EIP-712 domain separator |
+| `types` | `object` | Yes | Type definitions |
+| `primaryType` | `string` | Yes | Primary type being signed |
+| `message` | `object` | Yes | The message data to sign |
+
+### Response
+
+```json
+{
+  "signature": {
+    "r": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+    "s": "0xfedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321",
+    "v": 28
+  },
+  "domain": {
+    "name": "MyApp",
+    "version": "1",
+    "chainId": 11155111,
+    "verifyingContract": "0x1234567890abcdef1234567890abcdef12345678"
+  },
+  "message": {
+    "to": "0x9876543210fedcba9876543210fedcba98765432",
+    "amount": "1000000000000000000"
+  },
+  "primaryType": "Transfer",
+  "relayer_address": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b"
+}
+```
+
+### Example
+
+```bash
+curl -X POST https://your-rrelayer.com/api/signing/0x742d35.../typed-data \
+  -u "username:password" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "domain": {
+      "name": "MyApp",
+      "version": "1",
+      "chainId": 11155111,
+      "verifyingContract": "0x1234567890abcdef1234567890abcdef12345678"
+    },
+    "types": {
+      "EIP712Domain": [
+        {"name": "name", "type": "string"},
+        {"name": "version", "type": "string"},
+        {"name": "chainId", "type": "uint256"},
+        {"name": "verifyingContract", "type": "address"}
+      ],
+      "Transfer": [
+        {"name": "to", "type": "address"},
+        {"name": "amount", "type": "uint256"}
+      ]
+    },
+    "primaryType": "Transfer",
+    "message": {
+      "to": "0x9876543210fedcba9876543210fedcba98765432",
+      "amount": "1000000000000000000"
+    }
+  }'
+```
+
+## Get Text Signing History
+
+Get the history of text messages signed by a relayer.
+
+### Endpoint
+```
+GET /api/signing/{relayer_id}/text-history
+```
+
+### Query Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `limit` | `number` | Maximum number of entries to return |
+| `offset` | `number` | Number of entries to skip |
+
+### Response
+
+```json
+{
+  "signatures": [
+    {
+      "id": "sign_abc123def456",
+      "message": "Hello, World! Please sign this message to authenticate.",
+      "signature": {
+        "r": "0x1234567890abcdef...",
+        "s": "0xfedcba0987654321...",
+        "v": 27
+      },
+      "signed_at": "2025-09-26T10:30:00Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+### Example
+
+```bash
+curl "https://your-rrelayer.com/api/signing/0x742d35.../text-history?limit=10" \
+  -u "username:password"
+```
+
+## Get Typed Data Signing History
+
+Get the history of typed data signed by a relayer.
+
+### Endpoint
+```
+GET /api/signing/{relayer_id}/typed-data-history
+```
+
+### Query Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `limit` | `number` | Maximum number of entries to return |
+| `offset` | `number` | Number of entries to skip |
+
+### Response
+
+```json
+{
+  "signatures": [
+    {
+      "id": "sign_typed_def456ghi789",
+      "domain": {
+        "name": "MyApp",
+        "version": "1",
+        "chainId": 11155111,
+        "verifyingContract": "0x1234567890abcdef1234567890abcdef12345678"
+      },
+      "message": {
+        "to": "0x9876543210fedcba9876543210fedcba98765432",
+        "amount": "1000000000000000000"
+      },
+      "primaryType": "Transfer",
+      "signature": {
+        "r": "0x1234567890abcdef...",
+        "s": "0xfedcba0987654321...",
+        "v": 28
+      },
+      "signed_at": "2025-09-26T10:35:00Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+### Example
+
+```bash
+curl "https://your-rrelayer.com/api/signing/0x742d35.../typed-data-history?limit=10" \
+  -u "username:password"
+```
+
+## Signature Format
+
+All signatures returned by the API use the standard Ethereum signature format:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `r` | `string` | First 32 bytes of signature |
+| `s` | `string` | Second 32 bytes of signature |
+| `v` | `number` | Recovery ID (27 or 28) |
+
+### Converting to Hex String
+
+You can convert the signature components to a single hex string:
+
+```javascript
+function signatureToHex(signature) {
+  const r = signature.r.slice(2); // Remove 0x prefix
+  const s = signature.s.slice(2); // Remove 0x prefix
+  const v = signature.v.toString(16).padStart(2, '0');
+  return '0x' + r + s + v;
+}
+```
+
+## EIP-712 Domain Types
+
+### Standard Domain Fields
+
+The EIP-712 domain should include these standard fields:
+
+```json
+{
+  "name": "string",           // DApp name
+  "version": "string",        // DApp version
+  "chainId": "uint256",       // Blockchain chain ID
+  "verifyingContract": "address" // Contract address
+}
+```
+
+### Example Domain Separators
+
+**Simple DApp:**
+```json
+{
+  "name": "MyDApp",
+  "version": "1",
+  "chainId": 1,
+  "verifyingContract": "0x1234567890abcdef1234567890abcdef12345678"
+}
+```
+
+**Complex DApp with Salt:**
+```json
+{
+  "name": "ComplexDApp",
+  "version": "2.1.0",
+  "chainId": 137,
+  "verifyingContract": "0x9876543210fedcba9876543210fedcba98765432",
+  "salt": "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+}
+```
+
+## Common Use Cases
+
+### Authentication
+
+Sign a message to prove ownership of an address:
+
+```bash
+curl -X POST https://your-rrelayer.com/api/signing/0x742d35.../message \
+  -u "username:password" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Authenticate with MyApp at 2025-09-26T10:30:00Z"
+  }'
+```
+
+### Authorization
+
+Sign structured data for permission grants:
+
+```bash
+curl -X POST https://your-rrelayer.com/api/signing/0x742d35.../typed-data \
+  -u "username:password" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "domain": {
+      "name": "PermissionManager",
+      "version": "1",
+      "chainId": 1,
+      "verifyingContract": "0x..."
+    },
+    "types": {
+      "Permission": [
+        {"name": "user", "type": "address"},
+        {"name": "action", "type": "string"},
+        {"name": "expiry", "type": "uint256"}
+      ]
+    },
+    "primaryType": "Permission",
+    "message": {
+      "user": "0x...",
+      "action": "transfer",
+      "expiry": 1735689600
+    }
+  }'
+```
+
+### Meta-Transactions
+
+Sign transaction data for gasless execution:
+
+```bash
+curl -X POST https://your-rrelayer.com/api/signing/0x742d35.../typed-data \
+  -u "username:password" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "domain": {
+      "name": "MetaTransaction",
+      "version": "1",
+      "chainId": 1,
+      "verifyingContract": "0x..."
+    },
+    "types": {
+      "MetaTransaction": [
+        {"name": "from", "type": "address"},
+        {"name": "to", "type": "address"},
+        {"name": "value", "type": "uint256"},
+        {"name": "data", "type": "bytes"},
+        {"name": "nonce", "type": "uint256"}
+      ]
+    },
+    "primaryType": "MetaTransaction",
+    "message": {
+      "from": "0x...",
+      "to": "0x...",
+      "value": "0",
+      "data": "0xa9059cbb...",
+      "nonce": 1
+    }
+  }'
+```
+
+## Error Responses
+
+### Common Error Codes
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 400 | `INVALID_REQUEST` | Invalid request parameters |
+| 401 | `UNAUTHORIZED` | Authentication required |
+| 403 | `FORBIDDEN` | Insufficient permissions |
+| 404 | `NOT_FOUND` | Relayer not found |
+| 429 | `RATE_LIMIT_EXCEEDED` | Rate limit exceeded |
+| 500 | `INTERNAL_ERROR` | Server error |
+
+### Error Response Format
+
+```json
+{
+  "error": "Invalid EIP-712 typed data",
+  "code": "INVALID_REQUEST"
+}
+```
+
+## Rate Limiting
+
+Signing endpoints are subject to rate limiting. See [Rate Limits](/config/rate-limits) for configuration details.
+
+Use the `x-rrelayer-rate-limit-key` header to specify a custom rate limit key:
+
+```bash
+curl -X POST https://your-rrelayer.com/api/signing/0x742d35.../message \
+  -H "x-rrelayer-rate-limit-key: user-12345" \
+  -u "username:password" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Hello, World!"}'
+```
+
+## Security Considerations
+
+### Message Security
+
+1. **Include timestamps** - Prevent replay attacks with time-based messages
+2. **Use nonces** - Include unique identifiers to prevent replay
+3. **Specify context** - Include application-specific information
+4. **Validate domains** - Ensure domain separators match your application
+
+### Best Practices
+
+1. **Limit signing scope** - Only sign necessary data
+2. **Validate inputs** - Sanitize all message content
+3. **Monitor usage** - Track signing activity for anomalies
+4. **Secure storage** - Never log private keys or sensitive data

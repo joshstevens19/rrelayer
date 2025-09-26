@@ -1,5 +1,6 @@
 use crate::api::{http::HttpClient, types::ApiResult};
 use rrelayer_core::WalletError::ApiError;
+use rrelayer_core::gas::GasEstimatorResult;
 use rrelayer_core::network::{ChainId, Network};
 use std::sync::Arc;
 
@@ -22,5 +23,19 @@ impl NetworkApi {
     /// Get all networks
     pub async fn get_all(&self) -> ApiResult<Vec<Network>> {
         self.client.get("networks").await
+    }
+
+    /// Get gas prices for a specific chain ID
+    ///
+    /// # Arguments
+    ///
+    /// * `chain_id` - The chain ID to get gas prices for
+    ///
+    /// # Returns
+    ///
+    /// Returns a Result containing either the gas prices or an error
+    pub async fn get_gas_prices(&self, chain_id: u64) -> ApiResult<Option<GasEstimatorResult>> {
+        let endpoint = format!("networks/gas/price/{}", chain_id.to_string());
+        self.client.get(&endpoint).await
     }
 }

@@ -25,7 +25,7 @@ impl TestRunner {
             to: self.config.anvil_accounts[1],
             value: TransactionValue::new(U256::ZERO),
             data: TransactionData::empty(),
-            speed: Some(TransactionSpeed::Fast),
+            speed: Some(TransactionSpeed::FAST),
             external_id: Some("blob-test".to_string()),
             blobs: Some(vec![hex_blob]),
         };

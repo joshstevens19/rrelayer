@@ -24,7 +24,7 @@ impl TestRunner {
                 to: self.config.anvil_accounts[1],
                 value: alloy::primitives::utils::parse_ether("0.1")?.into(),
                 data: TransactionData::empty(),
-                speed: Some(TransactionSpeed::Fast),
+                speed: Some(TransactionSpeed::FAST),
                 external_id: Some(format!("test-list-{}", i)),
                 blobs: None,
             };

@@ -45,7 +45,7 @@ impl TestRunner {
                 to: self.config.anvil_accounts[4],
                 value: drain_amount.into(),
                 data: TransactionData::empty(),
-                speed: Some(TransactionSpeed::Fast),
+                speed: Some(TransactionSpeed::FAST),
                 external_id: Some("drain-tx-1".to_string()),
                 blobs: None,
             };
@@ -58,7 +58,7 @@ impl TestRunner {
                 to: self.config.anvil_accounts[4],
                 value: drain_amount.into(),
                 data: TransactionData::empty(),
-                speed: Some(TransactionSpeed::Fast),
+                speed: Some(TransactionSpeed::FAST),
                 external_id: Some("drain-tx-2".to_string()),
                 blobs: None,
             };

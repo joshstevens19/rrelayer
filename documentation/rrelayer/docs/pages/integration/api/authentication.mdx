@@ -1,0 +1,205 @@
+# Authentication API
+
+The Authentication API provides endpoints for verifying API access and checking server status.
+
+## Authentication Methods
+
+rrelayer supports multiple authentication methods:
+
+### Basic Authentication
+
+Use HTTP Basic Authentication with username and password:
+
+```bash
+# curl automatically encodes credentials with -u flag
+curl https://your-rrelayer.com/api/relayers \
+  -u "username:password"
+```
+
+### API Key Authentication
+
+Use API keys in the x-rrelayer-api-key header:
+
+```bash
+curl https://your-rrelayer.com/api/relayers \
+  -H "x-rrelayer-api-key: your-api-key"
+```
+
+### Configuration
+
+Authentication is configured in your rrelayer.yaml:
+
+```yaml
+api_config:
+  port: 3000
+  authentication_username: "${RRELAYER_AUTH_USERNAME}"
+  authentication_password: "${RRELAYER_AUTH_PASSWORD}"
+```
+
+## Status Check
+
+Check if the API server is running and accessible.
+
+### Endpoint
+```
+GET /api/auth/status
+```
+
+### Response
+
+```json
+{
+  "status": "ok",
+  "version": "1.0.0",
+  "timestamp": "2025-09-26T10:30:00Z",
+  "uptime_seconds": 3600
+}
+```
+
+### Example
+
+```bash
+curl https://your-rrelayer.com/api/auth/status \
+  -u "username:password"
+```
+
+## Authentication Headers
+
+All authenticated requests must include proper authentication headers:
+
+### Basic Auth Header
+
+```
+Authorization: Basic <base64-encoded-credentials>
+```
+
+Example:
+```bash
+# username:password encoded as base64
+curl https://your-rrelayer.com/api/relayers \
+  -H "Authorization: Basic dXNlcm5hbWU6cGFzc3dvcmQ="
+```
+
+### API Key Header
+
+```
+x-rrelayer-api-key: <api-key>
+```
+
+Example:
+```bash
+curl https://your-rrelayer.com/api/relayers \
+  -H "x-rrelayer-api-key: sk_1234567890abcdef"
+```
+
+## Rate Limiting Headers
+
+When using rate limiting, include the rate limit key header:
+
+```
+x-rrelayer-rate-limit-key: <rate-limit-key>
+```
+
+Example:
+```bash
+curl https://your-rrelayer.com/api/transactions/relayers/0x.../send \
+  -H "x-rrelayer-rate-limit-key: user-12345" \
+  -u "username:password" \
+  -H "Content-Type: application/json" \
+  -d '{"to": "0x...", "value": "1000000000000000000"}'
+```
+
+## Error Responses
+
+### Authentication Errors
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 401 | `UNAUTHORIZED` | Missing or invalid credentials |
+| 403 | `FORBIDDEN` | Valid credentials but insufficient permissions |
+
+### Error Response Format
+
+```json
+{
+  "error": "Authentication required",
+  "code": "UNAUTHORIZED"
+}
+```
+
+## Security Best Practices
+
+### Credential Management
+
+1. **Use environment variables** for credentials
+2. **Rotate credentials regularly**
+3. **Use HTTPS** for all API calls
+4. **Store credentials securely**
+
+### API Key Security
+
+1. **Generate strong API keys** (min 32 characters)
+2. **Use different keys** for different environments
+3. **Monitor API key usage**
+4. **Revoke unused keys**
+
+### Network Security
+
+1. **Use HTTPS only** for production
+2. **Implement IP whitelisting** if possible
+3. **Monitor for unusual activity**
+4. **Use rate limiting** to prevent abuse
+
+## Development vs Production
+
+### Development Setup
+
+For local development, you can use simple credentials:
+
+```yaml
+api_config:
+  authentication_username: "admin"
+  authentication_password: "password"
+```
+
+### Production Setup
+
+For production, use strong, randomly generated credentials:
+
+```yaml
+api_config:
+  authentication_username: "${RRELAYER_AUTH_USERNAME}"
+  authentication_password: "${RRELAYER_AUTH_PASSWORD}"
+```
+
+Set environment variables:
+```bash
+export RRELAYER_AUTH_USERNAME="admin_$(openssl rand -hex 16)"
+export RRELAYER_AUTH_PASSWORD="$(openssl rand -base64 32)"
+```
+
+## Testing Authentication
+
+### Verify Credentials
+
+Test your authentication setup:
+
+```bash
+# Test basic auth
+curl -f https://your-rrelayer.com/api/auth/status \
+  -u "username:password"
+
+# Test with wrong credentials (should fail)
+curl -f https://your-rrelayer.com/api/auth/status \
+  -u "wrong:credentials"
+```
+
+### Check Headers
+
+Verify proper headers are being sent:
+
+```bash
+# Show request headers
+curl -v https://your-rrelayer.com/api/auth/status \
+  -u "username:password"
+```

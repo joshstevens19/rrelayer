@@ -28,7 +28,7 @@ impl TestRunner {
             data: TransactionData::new(alloy::primitives::Bytes::from_static(&[
                 0xde, 0xad, 0xbe, 0xef,
             ])), // Invalid function selector
-            speed: Some(TransactionSpeed::Fast),
+            speed: Some(TransactionSpeed::FAST),
             external_id: Some("test-failed".to_string()),
             blobs: None,
         };

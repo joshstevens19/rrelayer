@@ -26,7 +26,7 @@ impl TransactionToSend {
     ) -> Self {
         Self {
             id: TransactionId::new(),
-            speed: speed.unwrap_or(TransactionSpeed::Fast),
+            speed: speed.unwrap_or(TransactionSpeed::FAST),
             to,
             value,
             data,
