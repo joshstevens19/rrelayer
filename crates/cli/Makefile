@@ -1,7 +1,7 @@
 help:
 	cargo run -- --help
-init:
-	cargo run -- init --path $(CURDIR)/../../playground
+new:
+	cargo run -- new --path $(CURDIR)/../../playground
 start:
 	RUST_BACKTRACE=1 cargo run -- start --path $(CURDIR)/../../playground/example
 start_local:

@@ -13,8 +13,8 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
-    /// Initialize a new relayer project
-    Init {
+    /// Create a new rrelayer project
+    New {
         /// optional - The path to create the project in, default will be where the command is run.
         #[clap(long, short)]
         path: Option<String>,

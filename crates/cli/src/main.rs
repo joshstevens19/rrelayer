@@ -9,7 +9,7 @@ use crate::commands::clone;
 use crate::project_location::ProjectLocation;
 use crate::{
     cli_interface::{Cli, Commands},
-    commands::{allowlist, auth, balance, config, create, init, list, network, sign, start, tx},
+    commands::{allowlist, auth, balance, config, create, new, list, network, sign, start, tx},
     error::CliError,
 };
 
@@ -78,11 +78,11 @@ async fn main() -> Result<(), CliError> {
     setup_info_logger();
 
     match &cli.command {
-        Commands::Init { path } => {
+        Commands::New { path } => {
             let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;
             load_env_from_project_path(&resolved_path);
 
-            init::handle_init(&resolved_path).await?;
+            new::handle_init(&resolved_path).await?;
         }
         Commands::Auth { path, command } => {
             let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;

@@ -5,7 +5,7 @@ pub mod clone;
 pub mod config;
 pub mod create;
 pub mod error;
-pub mod init;
+pub mod new;
 pub mod list;
 pub mod network;
 pub mod sign;
