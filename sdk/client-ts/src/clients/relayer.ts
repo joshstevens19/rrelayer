@@ -1,9 +1,12 @@
 import {
   Address,
+  Chain,
   TransactionReceipt,
   TypedDataDefinition,
   formatEther,
+  defineChain
 } from 'viem';
+import * as knownChains from 'viem/chains';
 import {
   Relayer,
   Transaction,
@@ -245,7 +248,7 @@ export class RelayerClient {
             throw new Error('Transaction not found');
           }
 
-          switch (result.status) {
+          switch (result.status.toUpperCase()) {
             case TransactionStatus.PENDING:
             case TransactionStatus.INMEMPOOL:
               await new Promise((resolve) => setTimeout(resolve, 500));
@@ -258,14 +261,44 @@ export class RelayerClient {
             case TransactionStatus.EXPIRED:
               throw new Error('Transaction expired');
             default:
-              throw new Error('Unknown transaction status');
+              throw new Error(`Unknown transaction status ${result.status}`);
           }
         }
       },
     };
   }
 
+  /**
+   * EIP-1193 Ethereum provider which can work with viem/ethers and others
+   */
   public ethereumProvider(): Provider {
     return this._ethereumProvider;
+  }
+
+  /**
+   * Get the viem chain object for this relayer
+   * @returns Promise<Chain>
+   */
+  public async getViemChain(): Promise<Chain> {
+    const relayerInfo = await this.getInfo();
+    return this.getChainById(relayerInfo.chainId);
+  }
+
+  private async getChainById(chainId: number) {
+    const chainEntries = Object.values(knownChains);
+    const knownChain = chainEntries.find(chain => 'id' in chain && chain.id === chainId);
+
+    if (knownChain) return knownChain;
+
+    // Return default for unknown chains
+    return defineChain({
+      id: chainId,
+      name: `Chain ${chainId}`,
+      network: `chain-${chainId}`,
+      nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+      rpcUrls: {
+        default: { http: [`https://rpc.chain-${chainId}.com`] },
+      },
+    });
   }
 }

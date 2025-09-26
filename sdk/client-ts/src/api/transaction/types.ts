@@ -49,7 +49,8 @@ export interface TransactionToSend {
   to: string;
   value?: string | null;
   data?: string | null;
-  speed?: TransactionSpeed;
+  speed?: TransactionSpeed | null;
+  blobs?: `0x${string}`[];
   external_id?: string;
 }
 

@@ -13,7 +13,7 @@ import {
   TransactionStatusResult,
   getTransactionStatus,
   getGasPrices,
-  GasEstimatorResult,
+  GasEstimatorResult, getRelayerAllowlistAddress,
 } from '../api';
 import { RelayerClient } from './relayer';
 import {
@@ -23,6 +23,7 @@ import {
   PagingResult,
 } from '../api/types';
 import { AdminRelayerClient } from './admin';
+import {http} from "viem";
 
 export interface CreateClientConfig {
   serverUrl: string;
@@ -99,6 +100,14 @@ export class Client {
        * get all networks
        * @returns Network array
        */
+      get: async (chainId: number): Promise<Network | null> => {
+        let networks = await getAllNetworks(apiBaseConfig);
+        return networks.find(network => network.chainId === chainId) || null;
+      },
+      /**
+       * get all networks
+       * @returns Network array
+       */
       getAll: (): Promise<Network[]> => {
         return getAllNetworks(apiBaseConfig);
       },
@@ -133,6 +142,25 @@ export class Client {
     };
   }
 
+  public get allowlist() {
+    return {
+      /**
+       * Get the relayer allowlist
+       * @returns An address of allowlist addresses
+       */
+      get: (
+          relayerId: string,
+          pagingContext: PagingContext = defaultPagingContext
+      ): Promise<PagingResult<string>> => {
+        return getRelayerAllowlistAddress(
+            relayerId,
+            pagingContext,
+            this._apiBaseConfig
+        );
+      },
+    };
+  }
+
   /**
    * Create admin relayer client
    * @param relayerId The relayer id
@@ -152,6 +180,24 @@ export class Client {
       relayerId,
       auth: this._config.auth,
     });
+  }
+
+  /**
+   * Create viem http instance
+   * @param chain_id The chain id
+   * @returns HttpTransport - Viem standard
+   */
+  public async getViemHttp(chain_id: number) {
+    let networks = await this.network.get(chain_id);
+    if (!networks) {
+      throw new Error(`Chain ${chain_id} not found`);
+    }
+
+    if (!networks.providerUrls) {
+      throw new Error(`Chain ${chain_id} has no provider urls`);
+    }
+
+    return http(networks.providerUrls[0]);
   }
 }
 

@@ -1,5 +1,5 @@
 {
-  "name": "rrelayer-sdk",
+  "name": "rrelayer",
   "version": "1.0.19",
   "description": "The rrelayer sdk",
   "main": "dist/index.js",
@@ -14,13 +14,38 @@
     "test:relayer": "jest --testMatch='**/__tests__/relayer-client.test.ts'",
     "test:admin": "jest --testMatch='**/__tests__/admin-client.test.ts'",
     "test:client": "jest --testMatch='**/__tests__/client.test.ts'",
-    "playground": "ts-node src/___PLAYGROUND___/index.ts"
+    "playground::network::get-all": "ts-node src/___PLAYGROUND___/networks/get-all-networks.ts",
+    "playground::relayer::create": "ts-node src/___PLAYGROUND___/relayer/create-relayer.ts",
+    "playground::relayer::get-all": "ts-node src/___PLAYGROUND___/relayer/get-all-relayers.ts",
+    "playground::relayer::get": "ts-node src/___PLAYGROUND___/relayer/get-relayer.ts",
+    "playground::relayer::address": "ts-node src/___PLAYGROUND___/relayer/get-address.ts",
+    "playground::relayer::get-allowlist": "ts-node src/___PLAYGROUND___/relayer/get-allowlist.ts",
+    "playground::relayer::balance": "ts-node src/___PLAYGROUND___/relayer/get-balance.ts",
+    "playground::relayer::pause-unpause": "ts-node src/___PLAYGROUND___/relayer/pause-unpause.ts",
+    "playground::relayer::eip1559": "ts-node src/___PLAYGROUND___/relayer/update-eip1559.ts",
+    "playground::relayer::max-gas-price": "ts-node src/___PLAYGROUND___/relayer/update-max-gas-price.ts",
+    "playground::transaction::send": "ts-node src/___PLAYGROUND___/transaction/send-transaction.ts",
+    "playground::transaction::send-blob": "ts-node src/___PLAYGROUND___/transaction/send-blob-transaction.ts",
+    "playground::transaction::get-all": "ts-node src/___PLAYGROUND___/transaction/get-all-transactions.ts",
+    "playground::transaction::counts": "ts-node src/___PLAYGROUND___/transaction/get-transaction-counts.ts",
+    "playground::signing::text": "ts-node src/___PLAYGROUND___/signing/sign-text.ts",
+    "playground::signing::typed-data": "ts-node src/___PLAYGROUND___/signing/sign-typed-data.ts",
+    "playground::gas::price": "ts-node src/___PLAYGROUND___/gas/get-gas-price.ts",
+    "playground::auth::test": "ts-node src/___PLAYGROUND___/authentication/test-auth.ts",
+    "playground::viem::sign-text": "ts-node src/___PLAYGROUND___/viem/sign-text.ts",
+    "playground::viem::sign-typed-data": "ts-node src/___PLAYGROUND___/viem/sign-typed-data.ts",
+    "playground::viem::send-blob": "ts-node src/___PLAYGROUND___/viem/send-blob.ts",
+    "playground::ethers::sign-text": "ts-node src/___PLAYGROUND___/ethers/sign-text.ts",
+    "playground::ethers::sign-typed-data": "ts-node src/___PLAYGROUND___/ethers/sign-typed-data.ts",
+    "playground::ethers::send-transaction": "ts-node src/___PLAYGROUND___/ethers/send-transaction.ts"
   },
   "author": "joshstevens19@hotmail.co.uk",
   "license": "MIT",
   "dependencies": {
     "axios": "^1.6.7",
-    "viem": "^2.7.19"
+    "c-kzg": "^4.1.0",
+    "ethers": "^6.15.0",
+    "viem": "^2.37.3"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
