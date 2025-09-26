@@ -5,8 +5,9 @@ export const sidebar = {
     {
       text: 'Introduction',
       items: [
-        { text: 'What is rrelayer?', link: '/docs/what-is-rrelayer' },
-        { text: 'Why rrelayer?', link: '/docs/why-rrelayer' },
+        { text: 'What is RRelayer?', link: '/docs/introduction/what-is-rrelayer' },
+        { text: 'Why RRelayer?', link: '/docs/introduction/why-rrelayer' },
+        { text: 'Installation', link: '/docs/introduction/installation' },
       ],
     },
     {

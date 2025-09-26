@@ -1,0 +1,37 @@
+# Why rrelayer?
+
+## Why do we need a relayer in general?
+
+As we keep moving forward in the web3 space we are seeing more and more that abstracting away the complexity of the blockchain is a good thing and paying for gas is a bad UX.
+
+With L2 solutions opening up scaling bringing down transaction prices gasless transactions are becoming more and more important. Lets also note here that with the rise on L2 solutions
+these systems have to submit back the state or proofs to the main chain, this is where this relayer software can also come in for general purpose use.
+
+We see that over the next year or so the want to be able to have infrastructure that can handle these gasless transactions will become more and more needed. Not even gasless just a system which
+can get a bunch of transactions on a chain without worrying about writing scripts all the time for it.
+
+## The Problems
+
+We have some good existing solutions for relaying transactions but they are always behind a SaaS or a centralized service, on top of this they are not opensource and are not easy to customize or extend.
+Most of these providers have a pricing model (which they should) but these can become expensive and a bottleneck for people building new applications. This means if your application hits x amount an hour
+its now a bigger bill with the provider over just paying more gas on your side. Remember that the services provided only give you the software the gas itself is down to your business to pay.
+
+With L2 solutions becoming cheaper and cheaper being able to pay for the users gas is going to become more and more important. We need a system that can handle this openly and freely but without rate limits.
+When you run your own infrastructure you can control the rate limits and the costs.
+
+## Developer Experience
+
+rrelayer has tried to abstract everything away for you to make it as easy as just following some steps to get setup. Running a rust server is extremely cheap and easy to do.
+We have guides in how to deploy it to most major cloud providers.
+
+On top of this we have integrated with the most popular web3 libraries to make it as easy as possible to integrate with your application with the tools you know.
+With a few lines of code you can be relaying transactions.
+
+## Stability
+
+When building solid foundation systems being in control of your stability is critical, with rrelayer being opensource and extendable you can can be in control of the direction you take, the costing you pay,
+the stability of the system and the features you need.
+
+## Performance
+
+We built this in rust for this exact purpose rust was built to be a beast in a task like this. Performance will be blazing fast and always be the fastest solution around.

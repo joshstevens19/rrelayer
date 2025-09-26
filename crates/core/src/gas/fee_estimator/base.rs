@@ -115,12 +115,12 @@ pub async fn get_gas_estimator(
     if let Some(setup_gas_providers) = &setup_config.gas_providers {
         if let Some(network_gas_provider) = &network.gas_provider {
             match network_gas_provider {
-                GasProvider::Tenderly => {
+                GasProvider::TENDERLY => {
                     if let Some(setup) = &setup_gas_providers.tenderly {
                         return Ok(Arc::new(TenderlyGasFeeEstimator::new(&setup.api_key)));
                     }
                 }
-                GasProvider::Infura => {
+                GasProvider::INFURA => {
                     if let Some(setup) = &setup_gas_providers.infura {
                         return Ok(Arc::new(InfuraGasFeeEstimator::new(
                             &setup.api_key,
@@ -128,7 +128,7 @@ pub async fn get_gas_estimator(
                         )));
                     }
                 }
-                GasProvider::Custom => {
+                GasProvider::CUSTOM => {
                     if let Some(setup) = &setup_gas_providers.custom {
                         return Ok(Arc::new(setup.to_owned()));
                     }

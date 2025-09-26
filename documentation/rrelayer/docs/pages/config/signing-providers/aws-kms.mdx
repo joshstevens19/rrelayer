@@ -1,0 +1,82 @@
+# AWS Key Management Service (KMS)
+
+AWS KMS is a fully managed encryption service that allows you to create, manage, and control cryptographic keys
+used to protect your data. It provides centralized key management with strong security controls,
+integrates seamlessly with other AWS services, and offers both AWS-managed and customer-managed
+encryption keys. KMS handles the complexity of key storage, rotation, and access control while
+providing detailed audit logs through CloudTrail. It supports symmetric and asymmetric keys,
+enables envelope encryption for large datasets, and helps meet compliance requirements by providing FIPS 140-2
+validated hardware security modules.
+
+You can read more about KMS [here](https://docs.aws.amazon.com/kms/latest/developerguide/overview.html).
+
+:::info
+This guide will just talk about how you config the signing provider and not go into depth of the setup on the AWS portal
+:::
+
+## Required roles
+
+rrelayer creates new KMS keys, tags them and reads them back this means it can handle as many KMS keys are you want.
+This is an important factor to know because of how deeply integrated KMS is into rrelayer you need to make sure you
+have the correct roles allowed for the AWS credentials.
+
+required roles:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowKMSKeyCreation",
+      "Effect": "Allow",
+      "Action": [
+        "kms:CreateKey",
+        "kms:DescribeKey",
+        "kms:ListKeys",
+        "kms:ListAliases",
+        "kms:TagResource",
+        "kms:ListKeyPolicies",
+        "kms:ListKeyRotations",
+        "kms:ListResourceTags",
+        "kms:ListRetirableGrants",
+        "kms:GetKeyPolicy",
+        "kms:GetPublicKey",
+        "kms:DisableKey",
+        "kms:EnableKey",
+        "kms:CreateAlias",
+        "kms:DeleteAlias",
+        "kms:UpdateAlias"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+# Usage
+
+To enable KMS you need to add the region to the YAML under the `aws_kms` key:
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider: // [!code focus]
+  aws_kms: // [!code focus]
+    region: "eu-west-1" // [!code focus]
+```
+
+You then need to add the AWS variables to the `.env`
+
+```bash
+AWS_ACCESS_KEY_ID=YOUR_AWS_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY=YOUR_AWS_SECRET_ACCESS_KEY
+```
+
+:::warning
+Your user must have the required roles assigned in AWS to this user which we state above else it will not work and
+rrelayer will throw errors to tell you this.
+:::

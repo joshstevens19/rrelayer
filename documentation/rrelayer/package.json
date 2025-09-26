@@ -1,0 +1,24 @@
+{
+  "name": "rindexer_docs",
+  "version": "0.0.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "vocs dev",
+    "build": "vocs build",
+    "preview": "vocs preview",
+    "format": "prettier --write \"**/*.{ts,js,json,tsx,mdx}\""
+  },
+  "dependencies": {
+    "@types/react": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "typescript": "latest",
+    "vocs": "1.0.0-alpha.52"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2"
+  }
+}

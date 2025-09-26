@@ -13,7 +13,6 @@ use crate::{
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TenderlyGasProviderSetupConfig {
-    pub enabled: bool,
     pub api_key: String,
 }
 

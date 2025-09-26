@@ -9,7 +9,7 @@ use crate::commands::clone;
 use crate::project_location::ProjectLocation;
 use crate::{
     cli_interface::{Cli, Commands},
-    commands::{allowlist, auth, balance, config, create, new, list, network, sign, start, tx},
+    commands::{allowlist, auth, balance, config, create, list, network, new, sign, start, tx},
     error::CliError,
 };
 

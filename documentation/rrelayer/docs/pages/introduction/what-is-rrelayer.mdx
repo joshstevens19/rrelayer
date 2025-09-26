@@ -1,0 +1,48 @@
+# What is rrelayer?
+
+rrelayer is an open-source relayer built in Rust that enables gasless transactions, transaction migrations, L2 proof transactions, blob storage transactions, and general blockchain automation.
+
+rrelayer provides a complete out-of-the-box solution for managing Ethereum transactions. It automatically handles gas price fluctuations, bumps transactions when needed, and ensures your transactions get confirmed on-chain.
+
+## Core Features
+
+### 🚀 **High Performance**
+
+Built in Rust for maximum performance and reliability, handling thousands of transactions per second with minimal latency.
+
+### ⛽ **Gasless Transactions**
+
+Enable users to interact with your dApps without needing ETH for gas fees. rrelayer manages all gas payments automatically.
+
+### 🔧 **Multiple Wallet Integrations**
+
+Support for various wallet providers:
+
+- **Privy** - Social login onboarding
+- **Turnkey** - Enterprise key management
+- **AWS KMS** - Cloud-based key storage
+- **Raw Private Keys** - Direct key control
+
+### 🌐 **Universal EVM Support**
+
+Deploy across any EVM-compatible network and extend functionality to meet your specific needs.
+
+## Architecture
+
+### Server
+
+The core Rust server handles transaction relaying, accepting transactions and adding them to a processing queue. It monitors network gas changes and includes safeguards for:
+
+- Maximum spending limits
+- Address allowlisting
+- Transaction retry logic
+- RESTful API for programmatic access
+
+The server uses PostgreSQL for data persistence with in-memory caching for high-performance processing.
+
+### SDKs
+
+RRelayer ships with fully-featured SDKs for easy integration:
+
+- **TypeScript** - Complete support for viem and ethers.js
+- **Rust, Go, Python** - Coming soon (use direct API calls for now)

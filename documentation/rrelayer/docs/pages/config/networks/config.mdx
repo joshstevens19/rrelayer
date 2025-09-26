@@ -1,0 +1,90 @@
+# Networks
+
+rrelayer supports any EVM chain out the box. You can config this really easily. Alongside it allows some additional nice features
+which we talk about a little later.
+
+## Fields
+
+### name
+
+This is the name of the network it can be anything its YOUR name of it
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+networks: // [!code focus]
+- name: "sepolia_ethereum" // [!code focus]
+```
+
+### chain_id
+
+This is the chain id for the network
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+networks: // [!code focus]
+- name: "sepolia_ethereum"
+  chain_id: 11155111 // [!code focus]
+```
+
+### provider_urls
+
+This is rpc urls for your network which rrelayer will use to send transactions and also monitor transactions.
+It can accept an array of providers and will randomly load balance through them if you put more then 1.
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+networks: // [!code focus]
+- name: "sepolia_ethereum"
+  chain_id: 11155111
+  provider_urls: // [!code focus]
+  - "https://sepolia.gateway.tenderly.co" // [!code focus]
+  block_explorer_url: "https://sepolia.etherscan.io"
+```
+
+### block_explorer_url - optional
+
+This is the block explorer url - it will come back in network info but is not required
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+networks: // [!code focus]
+- name: "sepolia_ethereum"
+  chain_id: 11155111
+  provider_urls:
+  - "https://sepolia.gateway.tenderly.co"
+  block_explorer_url: "https://sepolia.etherscan.io" // [!code focus]
+```
+
+Lets move on to the more advanced things you can config in the network config.

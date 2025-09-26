@@ -1,0 +1,159 @@
+# Create New Project - Standard Mode
+
+:::info
+Make sure you have the CLI installed before starting a new project.
+You can find the installation instructions [here](/getting-started/installation).
+:::
+
+We advise anyone using rindexer to install docker which makes running locally with postgres storage a lot easier.
+If you not got docker you can install it [here](https://docs.docker.com/get-docker/).
+
+## 1. Create a new project
+
+This will walk you through setting up your project by asking you a series of questions in the terminal.
+
+```bash [rust]
+rrelayer new
+```
+
+### Example New
+
+```bash
+Initializing new rindexer project...
+
+Enter project name: MyFirstRelayer
+Enter project description (skip by pressing Enter): My first rrelayer project
+Do you want Docker support out of the box (will make it easy to run)? [Y/n]: Y
+
+Project 'MyFirstRelayer' initialized successfully! note we advise to not use the RAW_DANGEROUS_MNEMONIC in production and use one of the secure key management signing keys. Alongside replace RRELAYER_AUTH_USERNAME and RRELAYER_AUTH_PASSWORD in the .env
+```
+
+Once completed a new boilerplate project will be created in the current directory. You can navigate to the project directory and start building your project.
+The boilerplate project is configured with sepolia ethereum testnet configured to be able to easily start it up.
+
+## 2. Environment Variables
+
+On creation, it will generate you a `.env` with some values it to make it easy to run by default it generates you signing provider raw which
+is not the securest to run as the seed is in the `env`, but rrelayer offers many signing key provider which you can find out more [here](../todo).
+
+The `.env` file will look something like this:
+
+```bash
+RAW_DANGEROUS_MNEMONIC="RANDOM SEED PHRASE"
+DATABASE_URL=postgresql://postgres:rrelayer@localhost:5441/postgres # will say FILL_IN if you did not pick docker support out the box
+POSTGRES_PASSWORD=rrelayer # will only be here if you picked docker support out the box
+RRELAYER_AUTH_USERNAME=your_username
+RRELAYER_AUTH_PASSWORD=your_password
+```
+
+### RAW_DANGEROUS_MNEMONIC
+
+This is just a seed phrase in the env file as said you can use many more secure key providers but we do this to be easy to just run off the bat,
+relayer offers many signing key provider which you can find out more [here](../todo).
+
+### DATABASE_URL
+
+For ease of running locally we suggest you enable docker support on the rrelayer project, if you did not
+enable docker support you will need to provide a postgres database information in the `.env` file
+which has been generated for you.
+
+`sslmode=require` is supported as well just include it in the connection string.
+
+### POSTGRES_PASSWORD - docker only
+
+This is injected into the `.env` for your if you selected `yes` to the `Postgres Docker Support Out The Box?` question.
+This is used for the docker to create a postgres database for you locally. You do not need this if you have your own postgres database or
+on deployed environments. It is purely for local development.
+
+```bash
+POSTGRES_PASSWORD=password
+```
+
+### RRELAYER_AUTH_USERNAME
+
+rrelayer uses basic auth to allow you to config who can hit the rrelayer API, so this is the username used, you should replace it
+with one which is more secure before you deploy this to production. Note if anyone gets these details, they can hit your relayers.
+
+### RRELAYER_AUTH_PASSWORD
+
+rrelayer uses basic auth to allow you to config who can hit the rrelayer API, so this is the password used, you should replace it
+with one which is more secure before you deploy this to production. Note if anyone gets these details, they can hit your relayers.
+
+### Other Environment Variables
+
+Every part of the `rrelayer.yaml` file can be overridden by an environment variable.
+The syntax for this in the `rrelayer.yaml` is `${ENV_VARIABLE_NAME}` example `${RRELAYER_AUTH_USERNAME}`. This can be used in ANY field in the YAML file.
+Read more about the environment variables in the [yaml configuration documentation](/docs/start-building/yaml-config#environment-variables).
+
+## 3. Config your `rrelayer.yaml` file
+
+Generating a rrelayer project will generate a `rrelayer.yaml` file for you. This is where you will configure your project.
+You can read all about the rrelayer.yaml settings in the [yaml configuration documentation](/config).
+
+It will generate you an boilerplate project which is configured to sepolia ethereum network.
+
+:::warning
+The boilerplate template uses no gas price provider which means its estimating the gas prices from the last 20 blocks as the fallback.
+To get more exact prices we recommend you setting up one of the supported gas price providers which you can find more info on [here](/gas-providers).
+:::
+
+```yaml
+name: first-rrelayer
+description: 'my first rrelayer'
+api_config:
+  port: 8000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider:
+  raw:
+    mnemonic: ${RAW_DANGEROUS_MNEMONIC}
+networks:
+  - name: sepolia_ethereum
+    chain_id: 11155111
+    provider_urls:
+      - https://sepolia.gateway.tenderly.co
+    block_explorer_url: https://sepolia.etherscan.io
+```
+
+## 4. Start the project
+
+:::info
+rrelayer starts your postgres docker compose file up for you automatically if the DATABASE_URL can not connect to the database and docker-compose.yml is present in the parent directory.
+You will need to make sure you have docker running on your machine before starting the project. If you have not got docker you can install it [here](https://docs.docker.com/get-docker/).
+You can also run docker manually by using `docker compose up -d`.
+:::
+
+to run make sure your in your rrelayer project and then run:
+
+```bash
+rrelayer start
+...
+26 September - 12:59:27.131388  INFO Loading from path "/Users/josh/code/rrelayer/playground/example"
+26 September - 12:59:27.132224  INFO Starting relayer...
+26 September - 12:59:27.380866  INFO Docker starting up the postgres container..
+26 September - 12:59:27.440710  INFO All containers are up and running.
+26 September - 12:59:27.440776  INFO Docker postgres containers started up successfully
+26 September - 12:59:27.501688  INFO Starting up the server
+26 September - 12:59:27.615170  INFO Applied database schema
+26 September - 12:59:27.849761  INFO Calculated block time: 12s (12000ms), limited to 12000ms
+26 September - 12:59:27.849924  INFO Webhooks disabled - no webhook configuration found
+26 September - 12:59:28.072807  INFO Creating new TransactionsQueue for relayer: 96578090-068b-4caa-85fa-2d106c55564f (name: relayer1) on chain: 11155111
+26 September - 12:59:28.130062  INFO Starting background tasks
+26 September - 12:59:28.130242  INFO Getting initial gas price for provider: sepolia_ethereum
+26 September - 12:59:28.130288  INFO Getting initial blob gas price for provider: sepolia_ethereum
+26 September - 12:59:28.130305  INFO Starting automatic top-up task
+26 September - 12:59:28.130367  INFO Starting automatic top-up background task
+26 September - 12:59:28.162981  INFO Initial blob gas price collection completed for all blob-supporting providers
+26 September - 12:59:28.163018  INFO Starting blob_gas_oracle interval for provider: sepolia_ethereum
+26 September - 12:59:30.445777  INFO Initial gas price collection completed for all providers
+26 September - 12:59:30.445828  INFO Starting gas_oracle interval for provider: sepolia_ethereum
+26 September - 12:59:30.445847  INFO Background tasks spawned up
+26 September - 12:59:30.445856  INFO Rate limiting disabled - no configuration found
+26 September - 12:59:30.447145  INFO rrelayer is up on http://localhost:8000
+```
+
+:::warning
+The boilerplate template uses a free rpc node which may get rate limited. We recommend using a paid node for production.
+:::
+
+That is it your rrelayer is running and you can start using it straight away. Might be good to explore the

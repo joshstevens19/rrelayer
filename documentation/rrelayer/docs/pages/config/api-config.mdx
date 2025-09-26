@@ -1,0 +1,49 @@
+# API Config
+
+This holds the port the API will be exposed on alongside basic authentication details.
+
+## Fields
+
+### port
+
+The port the API will try to start up from
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: 'my first rrelayer'
+api_config:
+  port: 3000
+```
+
+### authentication_username
+
+:::info
+rrelayer users basic authentication for the API.
+:::
+
+The basic authentication username
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: "${RRELAYER_AUTH_USERNAME}" // [!code focus]
+```
+
+### authentication_username
+
+:::info
+rrelayer users basic authentication for the API.
+:::
+
+The basic authentication username
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: "${RRELAYER_AUTH_USERNAME}" // [!code focus]
+  authentication_password: "${RRELAYER_AUTH_PASSWORD}" // [!code focus]
+```

@@ -168,10 +168,7 @@ impl WebhookManager {
         let mut deliveries_to_queue = Vec::new();
 
         for webhook_config in &self.webhook_configs {
-            if webhook_config.networks.is_empty()
-                || webhook_config.networks.contains(&chain_name)
-                || webhook_config.networks.contains(&"*".to_string())
-            {
+            if webhook_config.networks.is_empty() || webhook_config.networks.contains(&chain_name) {
                 let delivery = WebhookDelivery::new(
                     webhook_config.clone(),
                     payload.event_type.clone(),

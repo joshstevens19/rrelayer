@@ -14,7 +14,6 @@ use crate::{
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct InfuraGasProviderSetupConfig {
-    pub enabled: bool,
     pub api_key: String,
     pub secret: String,
 }

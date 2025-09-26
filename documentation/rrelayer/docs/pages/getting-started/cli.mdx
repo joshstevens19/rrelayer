@@ -1,0 +1,556 @@
+# rrelayer CLI
+
+rrelayer is a CLI first tool allowing you to do everything you need to do with rrelayer.
+
+```bash
+Usage: rrelayer <COMMAND>
+
+Commands:
+  new        Create a new rrelayer project
+  clone      Clone an existing relayer
+  auth       Authenticate with rrelayer
+  start      Start the relayer service
+  network    Manage network configurations and settings
+  list       List all configured relayers
+  config     Configure operations for a specific relayer
+  balance    Check the balance of a relayer's account
+  allowlist  Manage allowlist addresses for restricted access
+  create     Create a new relayer client instance
+  sign       Sign messages and typed data alongside get history of signing
+  tx         Send, manage and monitor transactions
+  help       Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+```
+
+## new
+
+Create a new rrelayer project. This will walk you through setting up your project by asking
+you a series of questions in the terminal.
+
+```bash
+Usage: rrelayer new [OPTIONS]
+
+Options:
+  -p, --path <PATH>  optional - The path to create the project in, default will be where the command is run
+  -h, --help         Print help
+  -V, --version      Print version
+```
+
+## clone
+
+Clone an existing relayer
+
+```bash
+Usage: rrelayer clone [OPTIONS] --relayer-id <RELAYER_ID> --name <NAME> --network <NETWORK>
+
+Options:
+  -p, --path <PATH>              optional - The path to create the project in, default will be where the command is run
+  -r, --relayer-id <RELAYER_ID>  The unique identifier of the relayer to clone from
+  -n, --name <NAME>              The new relayer name
+      --network <NETWORK>        Network to assign it to
+  -h, --help                     Print help
+  -V, --version                  Print version
+```
+
+## auth
+
+TODO
+
+## start
+
+Start the relayer service
+
+```bash
+Usage: rrelayer start [OPTIONS]
+
+Options:
+  -p, --path <PATH>  optional - The path to create the project in, default will be where the command is run
+  -h, --help         Print help
+  -V, --version      Print version
+```
+
+## network
+
+Manage network configurations and settings
+
+```bash
+Usage: rrelayer network [OPTIONS] <COMMAND>
+
+Commands:
+  add   Add a new network
+  list  List all networks
+  gas   Get the gas prices for the network
+  help  Print this message or the help of the given subcommand(s)
+
+Options:
+  -p, --path <PATH>  optional - The path to create the project in, default will be where the command is run
+  -h, --help         Print help
+  -V, --version      Print version
+```
+
+### add
+
+Add a new network. This will walk you through setting up your new network by asking
+you a series of questions in the terminal.
+
+```bash
+Usage: rrelayer network add
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print versio
+```
+
+### list
+
+Add a new network
+
+```bash
+Usage: rrelayer network list
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+```
+
+### gas
+
+Get the gas prices for the network
+
+```bash
+Usage: rrelayer network gas --name <NAME>
+
+Options:
+  -n, --name <NAME>  The network name
+  -h, --help         Print help
+  -V, --version      Print version
+```
+
+## list
+
+List all configured relayers
+
+```bash
+Usage: rrelayer list [OPTIONS]
+
+Options:
+  -p, --path <PATH>        optional - The path to create the project in, default will be where the command is run
+  -n, --network <NETWORK>  Network to get the list back
+      --limit <LIMIT>      Number of results to return (default: 10) [default: 10]
+      --offset <OFFSET>    Number of results to skip (default: 0) [default: 0]
+  -h, --help               Print help
+  -V, --version            Print version
+```
+
+## config
+
+Configure operations for a specific relayer
+
+```bash
+Usage: rrelayer config [OPTIONS] <COMMAND>
+
+Commands:
+  get      Get detailed information about the relayer
+  pause    Pause operations for a specific relayer
+  unpause  Resume operations for a paused relayer
+  gas      Manage gas settings for a relayer
+  help     Print this message or the help of the given subcommand(s)
+
+Options:
+  -p, --path <PATH>  optional - The path to create the project in, default will be where the command is run
+  -h, --help         Print help
+  -V, --version      Print version
+```
+
+### get
+
+Get detailed information about the relayer
+
+```bash
+Usage: rrelayer config get --relayer-id <RELAYER_ID>
+
+Options:
+  -r, --relayer-id <RELAYER_ID>  The unique identifier of the relayer
+  -h, --help                     Print help
+  -V, --version                  Print version
+```
+
+### pause
+
+Pause operations for a specific relayer
+
+```bash
+Usage: rrelayer config pause --relayer-id <RELAYER_ID>
+
+Options:
+  -r, --relayer-id <RELAYER_ID>  The unique identifier of the relayer
+  -h, --help                     Print help
+  -V, --version                  Print version
+```
+
+### unpause
+
+Resume operations for a paused relayer
+
+```bash
+Usage: rrelayer config unpause --relayer-id <RELAYER_ID>
+
+Options:
+  -r, --relayer-id <RELAYER_ID>  The unique identifier of the relayer
+  -h, --help                     Print help
+  -V, --version                  Print version
+```
+
+### gas
+
+Manage gas settings for a relayer
+
+```bash
+Usage: rrelayer config gas --relayer-id <RELAYER_ID> <COMMAND>
+
+Commands:
+  max-price  Set maximum gas price cap
+  legacy     Enable legacy transactions gas support (non-EIP-1559)
+  latest     Enable EIP-1559 gas standard for transactions
+  help       Print this message or the help of the given subcommand(s)
+
+Options:
+  -r, --relayer-id <RELAYER_ID>  The unique identifier of the relayer
+  -h, --help                     Print help
+  -V, --version                  Print version
+```
+
+#### max-price
+
+Set maximum gas price cap
+
+```bash
+Usage: rrelayer config gas --relayer-id <RELAYER_ID> max-price --price <PRICE>
+
+Options:
+  -p, --price <PRICE>  Maximum gas price in wei
+  -h, --help           Print help
+  -V, --version        Print version
+```
+
+#### legacy
+
+Enable legacy transactions gas support (non-EIP-1559)
+
+```bash
+Usage: rrelayer config gas --relayer-id <RELAYER_ID> legacy
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+```
+
+#### latest
+
+Enable legacy transactions gas support (non-EIP-1559)
+
+```bash
+Usage: rrelayer config gas --relayer-id <RELAYER_ID> latest
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+```
+
+## balance
+
+Check the balance of a relayer's account
+
+```bash
+Usage: rrelayer balance [OPTIONS] --relayer-id <RELAYER_ID>
+
+Options:
+  -p, --path <PATH>              optional - The path to create the project in, default will be where the command is run
+  -r, --relayer-id <RELAYER_ID>  The unique identifier of the relayer
+      --token <TOKEN>            The token address if you want an erc20/721 balance
+  -h, --help                     Print help
+  -V, --version                  Print version
+```
+
+## allowlist
+
+Check the balance of a relayer's account
+
+```bash
+Usage: rrelayer allowlist [OPTIONS] <COMMAND>
+
+Commands:
+  list  List all allowlisted addresses
+  help  Print this message or the help of the given subcommand(s)
+
+Options:
+  -p, --path <PATH>  optional - The path to create the project in, default will be where the command is run
+  -h, --help         Print help
+  -V, --version      Print version
+```
+
+### list
+
+List all allowlisted addresses
+
+```bash
+Usage: rrelayer allowlist list [OPTIONS] --relayer-id <RELAYER_ID>
+
+Options:
+  -r, --relayer-id <RELAYER_ID>  The unique identifier of the relayer
+      --limit <LIMIT>            Number of results to return (default: 10) [default: 10]
+      --offset <OFFSET>          Number of results to skip (default: 0) [default: 0]
+  -h, --help                     Print help
+  -V, --version                  Print version
+```
+
+## create
+
+Create a new relayer client instance
+
+```bash
+Usage: rrelayer create [OPTIONS] --name <NAME> --network <NETWORK>
+
+Options:
+  -p, --path <PATH>        optional - The path to create the project in, default will be where the command is run
+  -n, --name <NAME>        The relayer name
+      --network <NETWORK>  Network to assign it to
+  -h, --help               Print help
+  -V, --version            Print version
+```
+
+## sign
+
+Sign messages and typed data alongside get history of signing
+
+```bash
+Usage: rrelayer sign [OPTIONS] <COMMAND>
+
+Commands:
+  text                Sign a text message
+  typed-data          Sign typed data
+  text-history        View signing text history for a relayer
+  typed-data-history  View signing typed data history for a relayer
+  help                Print this message or the help of the given subcommand(s)
+
+Options:
+  -p, --path <PATH>  optional - The path to create the project in, default will be where the command is run
+  -h, --help         Print help
+  -V, --version      Print version
+```
+
+### text
+
+Sign a text message
+
+```bash
+Usage: rrelayer sign text --relayer-id <RELAYER_ID> --message <MESSAGE>
+
+Options:
+  -r, --relayer-id <RELAYER_ID>  The unique identifier of the relayer
+  -m, --message <MESSAGE>        The message to sign
+  -h, --help                     Print help
+  -V, --version                  Print version
+```
+
+### typed-data
+
+Sign typed data
+
+```bash
+Usage: rrelayer sign typed-data [OPTIONS] --relayer-id <RELAYER_ID> --data <DATA>
+
+Options:
+  -r, --relayer-id <RELAYER_ID>  The unique identifier of the relayer
+  -d, --data <DATA>              The typed data to sign as a JSON string it can also be a file location
+  -f, --file                     Read typed data from a file instead of a string
+  -h, --help                     Print help
+  -V, --version                  Print version
+```
+
+### text-history
+
+View signing text history for a relayer
+
+```bash
+Usage: rrelayer sign text-history [OPTIONS] --relayer-id <RELAYER_ID>
+
+Options:
+  -r, --relayer-id <RELAYER_ID>  The unique identifier of the relayer
+      --limit <LIMIT>            Number of results to return (default: 10) [default: 10]
+      --offset <OFFSET>          Number of results to skip (default: 0) [default: 0]
+  -h, --help                     Print help
+  -V, --version                  Print version
+```
+
+### typed-data-history
+
+View signing typed data history for a relayer
+
+```bash
+Usage: rrelayer sign typed-data-history [OPTIONS] --relayer-id <RELAYER_ID>
+
+Options:
+  -r, --relayer-id <RELAYER_ID>  The unique identifier of the relayer
+      --limit <LIMIT>            Number of results to return (default: 10) [default: 10]
+      --offset <OFFSET>          Number of results to skip (default: 0) [default: 0]
+  -h, --help                     Print help
+  -V, --version                  Print version
+```
+
+## tx
+
+Send, manage and monitor transactions
+
+```bash
+Usage: rrelayer tx [OPTIONS] <COMMAND>
+
+Commands:
+  get       Get transaction by ID
+  status    Get transaction status by ID
+  list      List transactions for a relayer
+  queue     List pending and mempool transactions size
+  cancel    Cancel a transaction
+  replace   Replace a transaction
+  send      Send a new transaction
+  withdraw  Withdraw tokens from the relayer to somewhere else
+  fund      Fund tokens from a wallet to your relayer
+  help      Print this message or the help of the given subcommand(s)
+
+Options:
+  -p, --path <PATH>  optional - The path to create the project in, default will be where the command is run
+  -h, --help         Print help
+  -V, --version      Print version
+```
+
+### get
+
+Get transaction by ID
+
+```bash
+Usage: rrelayer tx get --tx-id <TX_ID>
+
+Options:
+  -t, --tx-id <TX_ID>  The transaction id which is generated by rrelayer
+  -h, --help           Print help
+  -V, --version        Print version
+```
+
+### status
+
+Get transaction status by ID
+
+```bash
+Usage: rrelayer tx status --tx-id <TX_ID>
+
+Options:
+  -t, --tx-id <TX_ID>  The transaction id which is generated by rrelayer
+  -h, --help           Print help
+  -V, --version        Print version
+```
+
+### list
+
+List transactions for a relayer
+
+```bash
+Usage: rrelayer tx list [OPTIONS] --relayer-id <RELAYER_ID>
+
+Options:
+  -r, --relayer-id <RELAYER_ID>  Relayer ID
+      --status <STATUS>          Filter by status (pending, sent, failed, success) [possible values: pending, sent, failed, success]
+      --limit <LIMIT>            Number of results to return (default: 10) [default: 10]
+      --offset <OFFSET>          Number of results to skip (default: 0) [default: 0]
+  -h, --help                     Print help
+  -V, --version                  Print version
+```
+
+### queue
+
+List pending and mempool transactions size
+
+```bash
+Usage: rrelayer tx queue --relayer-id <RELAYER_ID>
+
+Options:
+  -r, --relayer-id <RELAYER_ID>  Relayer ID
+  -h, --help                     Print help
+  -V, --version                  Print version
+```
+
+### cancel
+
+Cancel a transaction
+
+```bash
+Usage: rrelayer tx cancel --tx-id <TX_ID>
+
+Options:
+  -t, --tx-id <TX_ID>  The transaction id which is generated by rrelayer
+  -h, --help           Print help
+  -V, --version        Print version
+```
+
+### replace
+
+Replace a transaction
+
+```bash
+Usage: rrelayer tx replace --tx-id <TX_ID> --transaction <TRANSACTION>
+
+Options:
+  -t, --tx-id <TX_ID>              The transaction id which is generated by rrelayer
+  -d, --transaction <TRANSACTION>  The transaction data as JSON
+  -h, --help                       Print help
+  -V, --version                    Print version
+```
+
+### send
+
+Send a new transaction
+
+```bash
+Usage: rrelayer tx send --relayer-id <RELAYER_ID> --transaction <TRANSACTION>
+
+Options:
+  -r, --relayer-id <RELAYER_ID>    Relayer ID
+  -d, --transaction <TRANSACTION>  The transaction data as JSON
+  -h, --help                       Print help
+  -V, --version                    Print version
+```
+
+### withdraw
+
+Withdraw tokens from the relayer to somewhere else
+
+```bash
+Usage: rrelayer tx withdraw [OPTIONS] --relayer-id <RELAYER_ID> --to <TO> --amount <AMOUNT>
+
+Options:
+  -r, --relayer-id <RELAYER_ID>  Relayer ID
+      --to <TO>                  Destination for the funds to go to
+  -a, --amount <AMOUNT>          Amount to send (e.g., "1.5" for 1.5 ETH or "100" for 100 tokens)
+      --token <TOKEN>            The token address if you want an erc20/721 balance
+      --decimals <DECIMALS>      Number of decimals for the token (default: 18 for ETH) [default: 18]
+  -h, --help                     Print help
+  -V, --version                  Print version
+```
+
+### fund
+
+Fund tokens from a wallet to your relayer
+
+```bash
+Usage: rrelayer tx fund [OPTIONS] --relayer-id <RELAYER_ID> --amount <AMOUNT>
+
+Options:
+  -r, --relayer-id <RELAYER_ID>  Relayer ID
+  -a, --amount <AMOUNT>          Amount to send (e.g., "1.5" for 1.5 ETH or "100" for 100 tokens)
+      --token <TOKEN>            The token address if you want an erc20/721 balance
+      --decimals <DECIMALS>      Number of decimals for the token (default: 18 for ETH) [default: 18]
+  -h, --help                     Print help
+  -V, --version                  Print version
+```

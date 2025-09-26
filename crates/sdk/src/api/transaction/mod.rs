@@ -20,10 +20,7 @@ impl TransactionApi {
         Self { client }
     }
 
-    pub async fn get(
-        &self,
-        transaction_id: &TransactionId,
-    ) -> ApiResult<Option<Transaction>> {
+    pub async fn get(&self, transaction_id: &TransactionId) -> ApiResult<Option<Transaction>> {
         self.client.get_or_none(&format!("transactions/{}", transaction_id)).await
     }
 

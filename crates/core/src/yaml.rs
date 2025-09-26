@@ -585,11 +585,83 @@ fn serialize_amount_with_decimals(amount: &U256, decimals: u8) -> String {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum AllOrNetworks {
+    All,
+    List(Vec<String>),
+}
+
+impl AllOrNetworks {
+    pub fn contains(&self, network: &str) -> bool {
+        match self {
+            AllOrNetworks::All => true,
+            AllOrNetworks::List(networks) => networks.contains(&network.to_string()),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        match self {
+            AllOrNetworks::All => false,
+            AllOrNetworks::List(networks) => networks.is_empty(),
+        }
+    }
+}
+
+impl Serialize for AllOrNetworks {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            AllOrNetworks::All => serializer.serialize_str("*"),
+            AllOrNetworks::List(networks) => networks.serialize(serializer),
+        }
+    }
+}
+
+struct AllOrNetworksVisitor;
+
+impl<'de> Visitor<'de> for AllOrNetworksVisitor {
+    type Value = AllOrNetworks;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("either '*' for all networks or a list of network names")
+    }
+
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        if value == "*" {
+            Ok(AllOrNetworks::All)
+        } else {
+            Ok(AllOrNetworks::List(vec![value.to_string()]))
+        }
+    }
+
+    fn visit_seq<A>(self, seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: de::SeqAccess<'de>,
+    {
+        let networks = Vec::<String>::deserialize(de::value::SeqAccessDeserializer::new(seq))?;
+        Ok(AllOrNetworks::List(networks))
+    }
+}
+
+impl<'de> Deserialize<'de> for AllOrNetworks {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_any(AllOrNetworksVisitor)
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct WebhookConfig {
     pub endpoint: String,
     pub shared_secret: String,
-    pub networks: Vec<String>,
+    pub networks: AllOrNetworks,
     pub max_retries: Option<u32>,
 }
 

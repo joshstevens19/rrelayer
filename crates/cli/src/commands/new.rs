@@ -26,7 +26,7 @@ pub async fn handle_init(path: &Path) -> Result<(), InitError> {
     let project_name: String = Input::new().with_prompt("Enter project name").interact_text()?;
 
     let project_description: String = Input::new()
-        .with_prompt("Enter project description (optional)")
+        .with_prompt("Enter project description (skip by pressing Enter)")
         .allow_empty(true)
         .interact_text()?;
 

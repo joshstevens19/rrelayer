@@ -39,11 +39,8 @@ impl TestRunner {
             let relayer_id = relayer.id;
 
             let handle = tokio::spawn(async move {
-                let result = relayer_client
-                    .sdk
-                    .transaction
-                    .send(&relayer_id, &tx_request, None)
-                    .await;
+                let result =
+                    relayer_client.sdk.transaction.send(&relayer_id, &tx_request, None).await;
                 (i, result)
             });
 
@@ -87,8 +84,7 @@ impl TestRunner {
 
             let mut all_mined = true;
             for tx_id in &transaction_ids {
-                if let Some(tx) = self.relayer_client.sdk.transaction.get(tx_id).await?
-                {
+                if let Some(tx) = self.relayer_client.sdk.transaction.get(tx_id).await? {
                     if tx.status != TransactionStatus::MINED {
                         all_mined = false;
                         break;

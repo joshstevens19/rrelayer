@@ -452,15 +452,7 @@ export const begin = async (
     );
 
     // Step 4: Create admin relayer client
-    const relayer = new AdminRelayerClient({
-      serverUrl: config.serverUrl,
-      providerUrl: config.providerUrl,
-      relayerId: relayerInfo.id,
-      auth: {
-        username: 'your_username',
-        password: 'your_password',
-      },
-    });
+    const relayer = await client.getRelayerClient(relayerInfo.id);
 
     // Step 5: Get accounts
     const accounts = getAnvilAccounts();

@@ -1,0 +1,339 @@
+# Permissions - optional
+
+You can config fine grain permissions on the relayers to lock down certain things for security POV.
+
+## Fields
+
+This can accept an array of this object so you can just repeat it with a list in yaml using `-` in this example il just config one
+
+### relayers
+
+You can config relayers in a few way but this is applying the permissions on them:
+
+#### list of relayers
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+networks: // [!code focus]
+  - name: local_anvil
+    chain_id: 31337
+    provider_urls:
+      - http://127.0.0.1:8545
+    block_explorer_url: http://localhost:8545
+    automatic_top_up:
+      from:
+        relayer:
+          address: "0x33993A4F4AA617DA4558A0CFD0C39A7989B67720"
+      relayers: "*"
+      native:
+        min_balance: "0.1"
+        top_up_amount: "0.5"
+      erc20_tokens:
+        - address: "0x99bba657f2bbc93c02d617f8ba121cb8fc104acf"
+          min_balance: "100"
+          top_up_amount: "500"
+          decimals: "18"
+     permissions: // [!code focus]
+      - relayers: // [!code focus]
+          - "0x1c09df15fb12656420033eb58067ec9406ef0e26" // [!code focus]
+          - "0x6f3e343161c4b905342015ad20a5c492adfb730e" // [!code focus]
+```
+
+#### Single relayer
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+networks: // [!code focus]
+  - name: local_anvil
+    chain_id: 31337
+    provider_urls:
+      - http://127.0.0.1:8545
+    block_explorer_url: http://localhost:8545
+    automatic_top_up:
+      from:
+        relayer:
+          address: "0x33993A4F4AA617DA4558A0CFD0C39A7989B67720"
+      relayers: "*"
+      native:
+        min_balance: "0.1"
+        top_up_amount: "0.5"
+      erc20_tokens:
+        - address: "0x99bba657f2bbc93c02d617f8ba121cb8fc104acf"
+          min_balance: "100"
+          top_up_amount: "500"
+          decimals: "18"
+     permissions: // [!code focus]
+      - relayers: "0x1c09df15fb12656420033eb58067ec9406ef0e26" // [!code focus]
+```
+
+#### All relayer
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+networks: // [!code focus]
+  - name: local_anvil
+    chain_id: 31337
+    provider_urls:
+      - http://127.0.0.1:8545
+    block_explorer_url: http://localhost:8545
+    automatic_top_up:
+      from:
+        relayer:
+          address: "0x33993A4F4AA617DA4558A0CFD0C39A7989B67720"
+      relayers: "*"
+      native:
+        min_balance: "0.1"
+        top_up_amount: "0.5"
+      erc20_tokens:
+        - address: "0x99bba657f2bbc93c02d617f8ba121cb8fc104acf"
+          min_balance: "100"
+          top_up_amount: "500"
+          decimals: "18"
+     permissions: // [!code focus]
+      - relayers: "*" // [!code focus]
+```
+
+### allowlist - optional
+
+You can config which contracts/addresses this relayer can hit, if this is set then it will only allow sending transactions
+and signed typed data based on these addresses. If this is not on then it will send transactions anywhere when you trigger it to.
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+networks: // [!code focus]
+  - name: local_anvil
+    chain_id: 31337
+    provider_urls:
+      - http://127.0.0.1:8545
+    block_explorer_url: http://localhost:8545
+    automatic_top_up:
+      from:
+        relayer:
+          address: "0x33993A4F4AA617DA4558A0CFD0C39A7989B67720"
+      relayers: "*"
+      native:
+        min_balance: "0.1"
+        top_up_amount: "0.5"
+      erc20_tokens:
+        - address: "0x99bba657f2bbc93c02d617f8ba121cb8fc104acf"
+          min_balance: "100"
+          top_up_amount: "500"
+          decimals: "18"
+     permissions: // [!code focus]
+      - relayers:
+          - "0x1c09df15fb12656420033eb58067ec9406ef0e26"
+          - "0x6f3e343161c4b905342015ad20a5c492adfb730e"
+        allowlist: // [!code focus]
+          - "0x70997970C51812dc3A010C7d01b50e0d17dc79C8" // [!code focus]
+          - "0xcfe267de230a234c5937f18f239617b7038ec271" // [!code focus]
+```
+
+### disable_native_transfer - optional default false
+
+You can config a relayer to never be able to send native transfers.
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+networks: // [!code focus]
+  - name: local_anvil
+    chain_id: 31337
+    provider_urls:
+      - http://127.0.0.1:8545
+    block_explorer_url: http://localhost:8545
+    automatic_top_up:
+      from:
+        relayer:
+          address: "0x33993A4F4AA617DA4558A0CFD0C39A7989B67720"
+      relayers: "*"
+      native:
+        min_balance: "0.1"
+        top_up_amount: "0.5"
+      erc20_tokens:
+        - address: "0x99bba657f2bbc93c02d617f8ba121cb8fc104acf"
+          min_balance: "100"
+          top_up_amount: "500"
+          decimals: "18"
+     permissions: // [!code focus]
+      - relayers:
+          - "0x1c09df15fb12656420033eb58067ec9406ef0e26"
+          - "0x6f3e343161c4b905342015ad20a5c492adfb730e"
+        allowlist:
+          - "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+          - "0xcfe267de230a234c5937f18f239617b7038ec271"
+       disable_native_transfer: true // [!code focus]
+```
+
+### disable_personal_sign - optional default false
+
+You can config a relayer to never personal sign messages
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+networks: // [!code focus]
+  - name: local_anvil
+    chain_id: 31337
+    provider_urls:
+      - http://127.0.0.1:8545
+    block_explorer_url: http://localhost:8545
+    automatic_top_up:
+      from:
+        relayer:
+          address: "0x33993A4F4AA617DA4558A0CFD0C39A7989B67720"
+      relayers: "*"
+      native:
+        min_balance: "0.1"
+        top_up_amount: "0.5"
+      erc20_tokens:
+        - address: "0x99bba657f2bbc93c02d617f8ba121cb8fc104acf"
+          min_balance: "100"
+          top_up_amount: "500"
+          decimals: "18"
+     permissions: // [!code focus]
+      - relayers:
+          - "0x1c09df15fb12656420033eb58067ec9406ef0e26"
+          - "0x6f3e343161c4b905342015ad20a5c492adfb730e"
+        allowlist:
+          - "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+          - "0xcfe267de230a234c5937f18f239617b7038ec271"
+       disable_native_transfer: true
+       disable_personal_sign: true // [!code focus]
+```
+
+### disable_typed_data_sign - optional default false
+
+You can config a relayer to never sign typed data
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+networks: // [!code focus]
+  - name: local_anvil
+    chain_id: 31337
+    provider_urls:
+      - http://127.0.0.1:8545
+    block_explorer_url: http://localhost:8545
+    automatic_top_up:
+      from:
+        relayer:
+          address: "0x33993A4F4AA617DA4558A0CFD0C39A7989B67720"
+      relayers: "*"
+      native:
+        min_balance: "0.1"
+        top_up_amount: "0.5"
+      erc20_tokens:
+        - address: "0x99bba657f2bbc93c02d617f8ba121cb8fc104acf"
+          min_balance: "100"
+          top_up_amount: "500"
+          decimals: "18"
+     permissions: // [!code focus]
+      - relayers:
+          - "0x1c09df15fb12656420033eb58067ec9406ef0e26"
+          - "0x6f3e343161c4b905342015ad20a5c492adfb730e"
+        allowlist:
+          - "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+          - "0xcfe267de230a234c5937f18f239617b7038ec271"
+       disable_native_transfer: true
+       disable_personal_sign: true
+       disable_typed_data_sign: true // [!code focus]
+```
+
+### disable_transactions - optional default false
+
+You can config a relayer to never send transactions, this could be if you only wanted to use relayers to sign stuff
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+networks: // [!code focus]
+  - name: local_anvil
+    chain_id: 31337
+    provider_urls:
+      - http://127.0.0.1:8545
+    block_explorer_url: http://localhost:8545
+    automatic_top_up:
+      from:
+        relayer:
+          address: "0x33993A4F4AA617DA4558A0CFD0C39A7989B67720"
+      relayers: "*"
+      native:
+        min_balance: "0.1"
+        top_up_amount: "0.5"
+      erc20_tokens:
+        - address: "0x99bba657f2bbc93c02d617f8ba121cb8fc104acf"
+          min_balance: "100"
+          top_up_amount: "500"
+          decimals: "18"
+     permissions: // [!code focus]
+      - relayers:
+          - "0x1c09df15fb12656420033eb58067ec9406ef0e26"
+          - "0x6f3e343161c4b905342015ad20a5c492adfb730e"
+        allowlist:
+          - "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+          - "0xcfe267de230a234c5937f18f239617b7038ec271"
+       disable_native_transfer: true
+       disable_personal_sign: true
+       disable_typed_data_sign: true
+       disable_transactions: true // [!code focus]
+```

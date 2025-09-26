@@ -37,10 +37,6 @@ networks:
       disable_personal_sign: false
       disable_typed_data_sign: false
       disable_transactions: false
-api_config:
-  port: 3000
-  authentication_username: ${RRELAYER_AUTH_USERNAME}
-  authentication_password: ${RRELAYER_AUTH_PASSWORD}
 webhooks:
 - endpoint: http://localhost:8546/webhook
   shared_secret: ${RRELAYER_WEBHOOK_SHARED_SECRET}
@@ -61,3 +57,7 @@ rate_limits:
 #    interval: "minute"
 #    transactions: 5
 #    signing_operations: 100
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}

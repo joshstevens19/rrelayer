@@ -1,0 +1,140 @@
+# Gas Provider
+
+Every transaction has a gas price which you are willing to pay, and this is computed by how active the
+chain is at a given time. A few gas price providers exist, but all require signup; we do recommend
+that you use a provider over the fallback as it will be more aligned to the prices.
+
+## Infura
+
+You can go to infura docs to see what chains they support https://docs.metamask.io/services/get-started/endpoints#gas-api.
+You can sign up to the developer dashboard https://developer.metamask.io/register and get a free API key.
+A note as we hit the gas price in a cron it only hits it every few seconds, so a free key tends to work fine,
+the free rate limit gives you 2k credits a second and 6 million credits a day, which is plenty for this.
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: "${RRELAYER_AUTH_USERNAME}"
+  authentication_password: "${RRELAYER_AUTH_PASSWORD}"
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+networks:
+- name: "sepolia_ethereum"
+  chain_id: 11155111
+  provider_urls:
+  - "https://sepolia.gateway.tenderly.co"
+  block_explorer_url: "https://sepolia.etherscan.io"
+  gas_provider: "INFURA" // [!code focus]
+gas_providers: // [!code focus]
+  infura: // [!code focus]
+    api_key: "${INFURA_API_KEY}" // [!code focus]
+    secret: "${INFURA_SECRET_KEY}" // [!code focus]
+```
+
+## Tenderly
+
+You can go to tenderly docs to see what chains they support https://docs.tenderly.co/supported-networks which is most EVM chains.
+You can sign up to the developer dashboard https://dashboard.tenderly.co/ and get a free API key.
+A note as we hit the gas price in a cron it only hits it every few seconds, so a free key tends to work fine.
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: "${RRELAYER_AUTH_USERNAME}"
+  authentication_password: "${RRELAYER_AUTH_PASSWORD}"
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+networks:
+- name: "sepolia_ethereum"
+  chain_id: 11155111
+  provider_urls:
+  - "https://sepolia.gateway.tenderly.co"
+  block_explorer_url: "https://sepolia.etherscan.io"
+  gas_provider: "TENDERLY" // [!code focus]
+gas_providers: // [!code focus]
+  tenderly: // [!code focus]
+    api_key: "${TENDERLY_API_KEY}" // [!code focus]
+```
+
+## Custom
+
+You can implement your own custom gas fee estimator by providing an API endpoint that returns gas price estimates.
+This allows you to integrate with any gas price service or build your own gas estimation logic.
+
+The custom gas provider expects your endpoint to return gas estimates in a specific JSON format with
+four speed tiers: `slow`, `medium`, `fast`, and `superFast`. Each tier should include suggested gas prices and optional wait time estimates.
+
+### Expected API Response Format
+
+Your custom endpoint should return a JSON response with this structure:
+
+```json
+{
+  "slow": {
+    "suggestedMaxPriorityFeePerGas": "0.1",
+    "suggestedMaxFeePerGas": "2.5",
+    "minWaitTimeEstimate": 180,
+    "maxWaitTimeEstimate": 300
+  },
+  "medium": {
+    "suggestedMaxPriorityFeePerGas": "0.5",
+    "suggestedMaxFeePerGas": "4.0",
+    "minWaitTimeEstimate": 60,
+    "maxWaitTimeEstimate": 120
+  },
+  "fast": {
+    "suggestedMaxPriorityFeePerGas": "1.0",
+    "suggestedMaxFeePerGas": "6.0",
+    "minWaitTimeEstimate": 15,
+    "maxWaitTimeEstimate": 60
+  },
+  "superFast": {
+    "suggestedMaxPriorityFeePerGas": "2.0",
+    "suggestedMaxFeePerGas": "10.0",
+    "minWaitTimeEstimate": 5,
+    "maxWaitTimeEstimate": 15
+  }
+}
+```
+
+Gas prices should be provided as strings in Gwei. Wait time estimates are optional and should be in seconds.
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: "${RRELAYER_AUTH_USERNAME}"
+  authentication_password: "${RRELAYER_AUTH_PASSWORD}"
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+networks:
+- name: "sepolia_ethereum"
+  chain_id: 11155111
+  provider_urls:
+  - "https://sepolia.gateway.tenderly.co"
+  block_explorer_url: "https://sepolia.etherscan.io"
+  gas_provider: "CUSTOM" // [!code focus]
+gas_providers: // [!code focus]
+  custom: // [!code focus]
+    endpoint: "https://api.example.com/gas-estimates" // [!code focus]
+    supported_chains: [1, 11155111, 137] // [!code focus]
+    auth_header: "${CUSTOM_GAS_API_AUTH_HEADER}" // [!code focus]
+```
+
+### Configuration Options
+
+- **`endpoint`**: The base URL of your gas estimation API. The relayer will append the chain ID to this URL (e.g., `https://api.example.com/gas-estimates/1` for Ethereum mainnet)
+- **`supported_chains`**: Array of chain IDs that your custom gas provider supports
+- **`auth_header`** *(optional)*: Authorization header value to include in requests to your API
+
+## Fallback
+
+.... come back to this!!!

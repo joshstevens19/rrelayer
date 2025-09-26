@@ -153,8 +153,6 @@ impl WebhookFilter {
         _transaction: &Transaction,
         chain_name: &str,
     ) -> bool {
-        webhook_config.networks.is_empty()
-            || webhook_config.networks.contains(&chain_name.to_string())
-            || webhook_config.networks.contains(&"*".to_string())
+        webhook_config.networks.is_empty() || webhook_config.networks.contains(chain_name)
     }
 }

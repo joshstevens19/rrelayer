@@ -1,0 +1,49 @@
+# Turnkey
+
+Turnkey is a crypto infrastructure platform that provides secure key management and wallet-as-a-service solutions for developers building Web3 applications.
+The platform focuses on enterprise-grade security and compliance while offering APIs that allow developers to integrate sophisticated
+cryptographic operations without managing the underlying security infrastructure themselves.
+
+:::info
+This guide will just talk about how you config the signing provider and not go into depth of the setup on the Turnkey portal.
+:::
+
+:::warning
+We advise you create a brand new wallet on Turnkey and do not allow anyone else to use it this is because rrelayer attaches IDs
+to each new wallet created so it knows how to load the list and keep it in sync.
+:::
+
+# Usage
+
+To enable Turnkey you need to add its `api_public_key`, `api_private_key`, `organization_id` and `wallet_id` in the YAML under the `turnkey` key:
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: "${RRELAYER_AUTH_USERNAME}"
+  authentication_password: "${RRELAYER_AUTH_PASSWORD}"
+signing_provider: // [!code focus]
+  turnkey:  // [!code focus]
+    api_public_key: "${TURNKEY_PUBLIC_KEY}"  // [!code focus]
+    api_private_key: "${TURNKEY_PRIVATE_KEY}"  // [!code focus]
+    organization_id: "${TURNKEY_ORG_ID}"  // [!code focus]
+    wallet_id: "{TURNKEY_WALLET_ID}"  // [!code focus]
+```
+
+You then need to add the turnkey credentials to the `.env`
+
+```bash
+TURNKEY_PUBLIC_KEY=YOUR_TURNKEY_PUBLIC_KEY
+TURNKEY_PRIVATE_KEY=YOUR_TURNKEY_PRIVATE_KEY
+TURNKEY_ORG_ID=YOUR_TURNKEY_ORG_ID
+TURNKEY_WALLET_ID=YOUR_TURNKEY_WALLET_ID
+```
+
+:::info
+You can call TURNKEY_PUBLIC_KEY, TURNKEY_PRIVATE_KEY, TURNKEY_ORG_ID and TURNKEY_WALLET_ID anything it is just advising you
+to make sure you don't paste it clear text in the YAML
+:::
+
+You can get the turnkey credentials from the Privy developer dashboard.

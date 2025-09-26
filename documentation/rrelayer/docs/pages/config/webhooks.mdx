@@ -1,0 +1,374 @@
+# Webhooks
+
+Webhooks allow you to receive real-time notifications about transaction events and signing operations. When configured, rrelayer will send HTTP POST requests to your specified endpoints whenever certain events occur.
+
+## Overview
+
+rrelayer supports webhooks for the following events:
+
+### Transaction Events
+- **`transaction_queued`** - Transaction was added to the queue
+- **`transaction_sent`** - Transaction was sent to the blockchain
+- **`transaction_mined`** - Transaction was mined (included in a block)
+- **`transaction_confirmed`** - Transaction reached required confirmations
+- **`transaction_failed`** - Transaction failed
+- **`transaction_expired`** - Transaction expired
+- **`transaction_cancelled`** - Transaction was cancelled
+- **`transaction_replaced`** - Transaction was replaced
+
+### Signing Events
+- **`text_signed`** - Text message was signed
+- **`typed_data_signed`** - Typed data (EIP-712) was signed
+
+## Configuration
+
+### Basic Configuration
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: "${RRELAYER_AUTH_USERNAME}"
+  authentication_password: "${RRELAYER_AUTH_PASSWORD}"
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+networks:
+- name: "sepolia_ethereum"
+  chain_id: 11155111
+  provider_urls:
+  - "https://sepolia.gateway.tenderly.co"
+  block_explorer_url: "https://sepolia.etherscan.io"
+webhooks: // [!code focus]
+- endpoint: "https://api.yourapp.com/webhooks/rrelayer" // [!code focus]
+  shared_secret: "${WEBHOOK_SECRET}" // [!code focus]
+  networks: "*" // [!code focus]
+  max_retries: 3 // [!code focus]
+```
+
+### Multiple Webhooks
+
+You can configure multiple webhook endpoints for different purposes:
+
+```yaml [rrelayer.yaml]
+webhooks: // [!code focus]
+- endpoint: "https://api.yourapp.com/webhooks/transactions" // [!code focus]
+  shared_secret: "${TRANSACTION_WEBHOOK_SECRET}" // [!code focus]
+  networks: ["sepolia_ethereum", "polygon_mainnet"] // [!code focus]
+  max_retries: 5 // [!code focus]
+- endpoint: "https://monitoring.yourapp.com/webhooks/signing" // [!code focus]
+  shared_secret: "${SIGNING_WEBHOOK_SECRET}" // [!code focus]
+  networks: "*" // [!code focus]
+  max_retries: 3 // [!code focus]you
+```
+
+### Network Filtering
+
+Control which networks trigger webhooks:
+
+```yaml [rrelayer.yaml]
+webhooks:
+# Send webhooks for all networks (using string)
+- endpoint: "https://api.yourapp.com/webhooks/all"
+  shared_secret: "${WEBHOOK_SECRET}"
+  networks: "*" // [!code focus]
+
+# Send webhooks for all networks (using array)
+- endpoint: "https://api.yourapp.com/webhooks/all-array"
+  shared_secret: "${WEBHOOK_SECRET}"
+  networks: ["*"] // [!code focus]
+
+# Send webhooks only for specific networks
+- endpoint: "https://api.yourapp.com/webhooks/ethereum"
+  shared_secret: "${WEBHOOK_SECRET}"
+  networks: ["sepolia_ethereum", "ethereum_mainnet"] // [!code focus]
+
+# Send webhooks for no networks (webhook disabled)
+- endpoint: "https://api.yourapp.com/webhooks/disabled"
+  shared_secret: "${WEBHOOK_SECRET}"
+  networks: [] // [!code focus]
+```
+
+## Configuration Options
+
+### Required Fields
+
+- **`endpoint`**: The URL where webhook requests will be sent
+- **`shared_secret`**: Secret used for webhook authentication and payload verification
+- **`networks`**: Array of network names that should trigger this webhook
+
+### Optional Fields
+
+- **`max_retries`**: Maximum number of retry attempts for failed webhooks (default: 3)
+
+## Webhook Payload Structure
+
+### Transaction Webhooks
+
+All transaction webhooks send a JSON payload with this structure:
+
+```json
+{
+  "event_type": "transaction_sent",
+  "api_version": "1.0",
+  "timestamp": "2025-09-26T10:30:00Z",
+  "transaction": {
+    "id": "tx_abc123def456",
+    "relayerId": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
+    "to": "0x1234567890abcdef1234567890abcdef12345678",
+    "from": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
+    "value": "1000000000000000000",
+    "data": "0xa9059cbb000000000000000000000000...",
+    "chainId": 11155111,
+    "status": "INMEMPOOL",
+    "txHash": "0xabcdef123456789abcdef123456789abcdef123456789abcdef123456789abcdef",
+    "queuedAt": "2025-09-26T10:29:30Z",
+    "sentAt": "2025-09-26T10:30:00Z",
+    "confirmedAt": null,
+    "expiresAt": "2025-09-26T11:30:00Z",
+    "externalId": "order_12345",
+    "nonce": 42,
+    "maxPriorityFee": "2.0",
+    "maxFee": "15.5",
+    "is_noop": false
+  }
+}
+```
+
+### Enhanced Payloads
+
+Some events include additional data:
+
+#### Transaction Mined/Confirmed with Receipt
+
+```json
+{
+  "event_type": "transaction_mined",
+  "api_version": "1.0",
+  "timestamp": "2025-09-26T10:32:00Z",
+  "transaction": {
+    "id": "tx_abc123def456",
+    "relayerId": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
+    "to": "0x1234567890abcdef1234567890abcdef12345678",
+    "from": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
+    "value": "1000000000000000000",
+    "data": "0xa9059cbb000000000000000000000000...",
+    "chainId": 11155111,
+    "status": "MINED",
+    "txHash": "0xabcdef123456789abcdef123456789abcdef123456789abcdef123456789abcdef",
+    "queuedAt": "2025-09-26T10:29:30Z",
+    "sentAt": "2025-09-26T10:30:00Z",
+    "confirmedAt": "2025-09-26T10:32:00Z",
+    "expiresAt": "2025-09-26T11:30:00Z",
+    "externalId": "order_12345",
+    "nonce": 42,
+    "minedAt": "2025-09-26T10:32:00Z",
+    "minedAtBlockNumber": 1193046,
+    "maxPriorityFee": "2.0",
+    "maxFee": "15.5",
+    "is_noop": false
+  },
+  "receipt": {
+    "transactionHash": "0xabcdef123456789abcdef123456789abcdef123456789abcdef123456789abcdef",
+    "blockNumber": "0x123456",
+    "blockHash": "0xfedcba987654321fedcba987654321fedcba987654321fedcba987654321fedcba",
+    "gasUsed": "0x5208",
+    "status": "0x1",
+    "logs": []
+  }
+}
+```
+
+#### Transaction Replaced
+
+```json
+{
+  "event_type": "transaction_replaced",
+  "api_version": "1.0",
+  "timestamp": "2025-09-26T10:35:00Z",
+  "transaction": {
+    "id": "tx_def456ghi789",
+    "relayerId": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
+    "to": "0x1234567890abcdef1234567890abcdef12345678",
+    "from": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
+    "value": "1000000000000000000",
+    "data": "0xa9059cbb000000000000000000000000...",
+    "chainId": 11155111,
+    "status": "PENDING",
+    "txHash": "0xdef456ghi789def456ghi789def456ghi789def456ghi789def456ghi789def456",
+    "queuedAt": "2025-09-26T10:35:00Z",
+    "sentAt": null,
+    "confirmedAt": null,
+    "expiresAt": "2025-09-26T11:35:00Z"
+  },
+  "original_transaction": {
+    "id": "tx_abc123def456",
+    "relayerId": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
+    "to": "0x1234567890abcdef1234567890abcdef12345678",
+    "from": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
+    "value": "1000000000000000000",
+    "data": "0xa9059cbb000000000000000000000000...",
+    "chainId": 11155111,
+    "status": "EXPIRED",
+    "txHash": "0xabcdef123456789abcdef123456789abcdef123456789abcdef123456789abcdef",
+    "queuedAt": "2025-09-26T10:29:30Z",
+    "sentAt": "2025-09-26T10:30:00Z",
+    "confirmedAt": null,
+    "expiresAt": "2025-09-26T11:30:00Z"
+  }
+}
+```
+
+### Signing Webhooks
+
+Signing webhooks have a different payload structure:
+
+#### Text Signing
+
+```json
+{
+  "event_type": "text_signed",
+  "api_version": "1.0",
+  "timestamp": "2025-09-26T10:30:00Z",
+  "signing": {
+    "relayerId": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
+    "chainId": 11155111,
+    "signature": {
+      "r": "0x1234567890abcdef...",
+      "s": "0xfedcba0987654321...",
+      "v": 27
+    },
+    "signedAt": "2025-09-26T10:30:00Z",
+    "message": "Hello, World!"
+  }
+}
+```
+
+#### Typed Data Signing (EIP-712)
+
+```json
+{
+  "event_type": "typed_data_signed",
+  "api_version": "1.0",
+  "timestamp": "2025-09-26T10:30:00Z",
+  "signing": {
+    "relayerId": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
+    "chainId": 11155111,
+    "signature": {
+      "r": "0x1234567890abcdef...",
+      "s": "0xfedcba0987654321...",
+      "v": 27
+    },
+    "signedAt": "2025-09-26T10:30:00Z",
+    "domainData": {
+      "name": "MyApp",
+      "version": "1",
+      "chainId": 11155111,
+      "verifyingContract": "0x..."
+    },
+    "messageData": {
+      "user": "0x...",
+      "amount": "1000"
+    },
+    "primaryType": "Transfer"
+  }
+}
+```
+
+## Webhook Authentication
+
+All webhook requests include authentication headers for security:
+
+### Headers Sent
+
+- **`X-rrelayer-Signature`**: HMAC-SHA256 signature of the request body using your shared secret
+- **`X-rrelayer-Event-Type`**: The event type that triggered the webhook
+- **`X-rrelayer-Timestamp`**: Unix timestamp when the webhook was sent
+- **`Content-Type`**: `application/json`
+
+### Verifying Webhooks
+
+To verify webhook authenticity, compute the HMAC-SHA256 signature of the request body using your shared secret and compare it with the `X-rrelayer-Signature` header.
+
+Example verification in Node.js:
+
+```javascript
+const crypto = require('crypto');
+
+function verifyWebhook(body, signature, secret) {
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(body, 'utf8')
+    .digest('hex');
+  
+  return crypto.timingSafeEqual(
+    Buffer.from(signature, 'hex'),
+    Buffer.from(expectedSignature, 'hex')
+  );
+}
+```
+
+## Delivery and Retry Logic
+
+### Delivery Behavior
+
+- Webhooks are sent as HTTP POST requests with JSON payloads
+- rrelayer considers a webhook successful if it receives a 2xx HTTP response
+- Failed webhooks are automatically retried with exponential backoff
+
+### Retry Configuration
+
+- **Default max retries**: 3 attempts
+- **Initial retry delay**: 1 second
+- **Maximum retry delay**: 2 minutes
+- **Exponential backoff multiplier**: 2.0
+- **Request timeout**: 30 seconds
+
+### Retry Schedule Example
+
+1. **Initial attempt**: Immediate
+2. **First retry**: After 1 second
+3. **Second retry**: After 2 seconds  
+4. **Third retry**: After 4 seconds
+5. **Final failure**: After 3 failed attempts
+
+## Best Practices
+
+### Endpoint Implementation
+
+1. **Return 2xx status codes** for successful processing
+2. **Implement idempotency** - Handle duplicate webhooks gracefully
+3. **Process quickly** - Respond within 30 seconds to avoid timeouts
+4. **Verify signatures** - Always validate the `X-rrelayer-Signature` header
+
+### Error Handling
+
+1. **Use appropriate HTTP status codes**:
+   - `200-299`: Success - webhook processed
+   - `400-499`: Client error - rrelayer will not retry
+   - `500-599`: Server error - rrelayer will retry
+
+2. **Log webhook failures** for debugging
+3. **Implement monitoring** for webhook endpoint health
+
+### Security
+
+1. **Use HTTPS endpoints** for production
+2. **Validate webhook signatures** to prevent spoofing
+3. **Keep shared secrets secure** and rotate them regularly
+4. **Implement rate limiting** on your webhook endpoints
+
+## Monitoring Webhooks
+
+rrelayer provides internal monitoring of webhook delivery:
+
+- Failed webhooks are logged with error details
+- Retry attempts are tracked and logged
+- Webhook statistics are available for monitoring
+
+Monitor your webhook endpoints for:
+- Response times
+- Error rates
+- Processing failures
+- Queue depth (if applicable)

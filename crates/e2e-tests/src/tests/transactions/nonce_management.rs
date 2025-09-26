@@ -30,12 +30,8 @@ impl TestRunner {
                 blobs: None,
             };
 
-            let send_result = self
-                .relayer_client
-                .sdk
-                .transaction
-                .send(&relayer.id, &tx_request, None)
-                .await?;
+            let send_result =
+                self.relayer_client.sdk.transaction.send(&relayer.id, &tx_request, None).await?;
 
             transaction_ids.push(send_result.id);
         }
@@ -74,8 +70,7 @@ impl TestRunner {
 
             let mut all_in_mempool = true;
             for tx_id in &transaction_ids {
-                if let Some(tx) = self.relayer_client.sdk.transaction.get(tx_id).await?
-                {
+                if let Some(tx) = self.relayer_client.sdk.transaction.get(tx_id).await? {
                     if tx.status != TransactionStatus::MINED {
                         info!("Transaction {} not in mempool - status {}", tx_id, tx.status);
                         all_in_mempool = false;

@@ -1,0 +1,302 @@
+# Rate Limits
+
+Rate limits help protect your rrelayer instance from abuse and ensure fair resource usage across different users and operations. rrelayer supports flexible rate limiting configurations that can be applied at different levels.
+
+## Overview
+
+rrelayer supports rate limiting for two types of operations:
+
+- **Transactions** - Creating and sending blockchain transactions
+- **Signing Operations** - Signing messages and typed data (EIP-712)
+
+Rate limits can be configured at multiple levels:
+
+1. **User Limits** - Per-user rate limits (identified by API key or relayer address)
+   - **Per-relayer** - Limits specific to each relayer address
+   - **Global** - Combined limits across all relayers for a user
+2. **Relayer Limits** - Per-relayer address limits (currently in development)
+
+## Configuration
+
+### Basic Rate Limiting
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: "${RRELAYER_AUTH_USERNAME}"
+  authentication_password: "${RRELAYER_AUTH_PASSWORD}"
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+networks:
+- name: "sepolia_ethereum"
+  chain_id: 11155111
+  provider_urls:
+  - "https://sepolia.gateway.tenderly.co"
+  block_explorer_url: "https://sepolia.etherscan.io"
+rate_limits: // [!code focus]
+  user_limits: // [!code focus]
+    per_relayer: // [!code focus]
+      interval: "minute" // [!code focus]
+      transactions: 10 // [!code focus]
+      signing_operations: 20 // [!code focus]
+```
+
+### Complete Rate Limiting Configuration
+
+```yaml [rrelayer.yaml]
+rate_limits: // [!code focus]
+  user_limits: // [!code focus]
+    per_relayer: // [!code focus]
+      interval: "minute" // [!code focus]
+      transactions: 10 // [!code focus]
+      signing_operations: 20 // [!code focus]
+    global: // [!code focus]
+      interval: "minute" // [!code focus]
+      transactions: 100 // [!code focus]
+      signing_operations: 200 // [!code focus]
+  fallback_to_relayer: true // [!code focus]
+```
+
+### Advanced Configuration
+
+```yaml [rrelayer.yaml]
+rate_limits:
+  user_limits:
+    # Per-relayer limits (applied to each relayer address individually)
+    per_relayer:
+      interval: "minute"
+      transactions: 5
+      signing_operations: 10
+    # Global limits (applied across all relayers for a user)
+    global:
+      interval: "minute" 
+      transactions: 50
+      signing_operations: 100
+  # Whether to fall back to relayer address when no rate limit key is provided
+  fallback_to_relayer: true
+```
+
+## Configuration Options
+
+### Rate Limit Intervals
+
+Currently supported interval values:
+
+- **`"minute"`** - Per-minute rate limits (60 seconds)
+
+**Note**: The current implementation only supports 1-minute intervals. Any interval value defaults to 60 seconds.
+
+### User Limits Configuration
+
+#### Per-Relayer Limits
+Limits applied to each relayer address individually:
+
+```yaml
+user_limits:
+  per_relayer:
+    interval: "minute"
+    transactions: 10        # Max 10 transactions per minute per relayer
+    signing_operations: 20  # Max 20 signing operations per minute per relayer
+```
+
+#### Global Limits
+Limits applied across all relayers for a user:
+
+```yaml
+user_limits:
+  global:
+    interval: "minute"
+    transactions: 100       # Max 100 transactions per minute across all relayers
+    signing_operations: 200 # Max 200 signing operations per minute across all relayers
+```
+
+### Fallback Behavior
+
+- **`fallback_to_relayer: true`** - Use relayer address as rate limit key when no custom key is provided
+- **`fallback_to_relayer: false`** - Require explicit rate limit key in requests
+
+## Rate Limit Identification
+
+### Custom Rate Limit Keys
+
+Users can provide custom rate limit keys via the `x-rrelayer-rate-limit-key` header:
+
+```bash
+curl -X POST https://your-rrelayer.com/api/transactions \
+  -H "x-rrelayer-rate-limit-key: user-12345" \
+  -H "Content-Type: application/json" \
+  -d '{"to": "0x...", "data": "0x..."}'
+```
+
+### Automatic Fallback
+
+When `fallback_to_relayer: true` and no custom key is provided, rrelayer uses the relayer address as the rate limit key.
+
+## Rate Limit Examples
+
+### Conservative Limits
+```yaml
+rate_limits:
+  user_limits:
+    per_relayer:
+      interval: "minute"
+      transactions: 1
+      signing_operations: 1
+    global:
+      interval: "minute"
+      transactions: 3
+      signing_operations: 3
+  fallback_to_relayer: true
+```
+
+### Production Limits
+```yaml
+rate_limits:
+  user_limits:
+    per_relayer:
+      interval: "minute"
+      transactions: 30
+      signing_operations: 60
+    global:
+      interval: "minute"
+      transactions: 500
+      signing_operations: 1000
+  fallback_to_relayer: true
+```
+
+### High-Volume API
+```yaml
+rate_limits:
+  user_limits:
+    per_relayer:
+      interval: "second"
+      transactions: 5
+      signing_operations: 10
+    global:
+      interval: "minute"
+      transactions: 200
+      signing_operations: 400
+  fallback_to_relayer: false  # Require explicit rate limit keys
+```
+
+## Rate Limit Responses
+
+### Successful Request
+When within rate limits, requests proceed normally.
+
+### Rate Limit Exceeded
+When rate limits are exceeded, rrelayer returns:
+
+```json
+{
+  "error": "Rate limit exceeded for transactions: 11/10 in 60s",
+  "code": "RATE_LIMIT_EXCEEDED"
+}
+```
+
+HTTP Status: `429 Too Many Requests`
+
+## Optional Configurations
+
+All rate limit configurations are optional:
+
+### Minimal Configuration
+```yaml
+# No rate limits configured - all requests allowed
+rate_limits: {}
+```
+
+### Per-Relayer Only
+```yaml
+rate_limits:
+  user_limits:
+    per_relayer:
+      interval: "minute"
+      transactions: 10
+      signing_operations: 20
+```
+
+### Global Only
+```yaml
+rate_limits:
+  user_limits:
+    global:
+      interval: "minute"
+      transactions: 100
+      signing_operations: 200
+```
+
+## Best Practices
+
+### Setting Appropriate Limits
+
+1. **Start Conservative**: Begin with lower limits and increase based on usage patterns
+2. **Monitor Usage**: Track rate limit hits to adjust limits appropriately
+3. **Consider Use Cases**: Different applications may need different limit profiles
+
+### Recommended Starting Values
+
+**Development/Testing:**
+```yaml
+rate_limits:
+  user_limits:
+    per_relayer:
+      interval: "minute"
+      transactions: 5
+      signing_operations: 10
+```
+
+**Production API:**
+```yaml
+rate_limits:
+  user_limits:
+    per_relayer:
+      interval: "minute"
+      transactions: 30
+      signing_operations: 60
+    global:
+      interval: "minute"
+      transactions: 500
+      signing_operations: 1000
+```
+
+### Rate Limit Key Strategy
+
+1. **Use Custom Keys**: Implement `x-rrelayer-rate-limit-key` for better user tracking
+2. **Unique Per User**: Each user should have a unique rate limit key
+3. **Consistent Format**: Use consistent key formatting (e.g., `user-{id}`, `api-{key}`)
+
+### Monitoring and Alerting
+
+1. **Track Rate Limit Hits**: Monitor how often users hit rate limits
+2. **Alert on Patterns**: Set up alerts for unusual rate limit activity
+3. **Adjust Dynamically**: Consider adjusting limits based on usage patterns
+
+## Troubleshooting
+
+### Common Issues
+
+**Rate limits too restrictive:**
+- Increase transaction and signing operation limits
+- Note: All intervals are currently 1-minute windows
+- Ensure users are using appropriate rate limit keys
+
+**Rate limits not working:**
+- Verify `fallback_to_relayer` setting
+- Check if rate limit keys are properly set in headers
+- Confirm rate limit configuration syntax
+
+**Unexpected rate limit errors:**
+- Check if global limits are being hit across multiple relayers
+- Verify rate limit key consistency across requests
+- Review interval configuration (typos in interval names)
+
+### Debug Tips
+
+1. **Check Headers**: Ensure `x-rrelayer-rate-limit-key` header is properly set
+2. **Monitor Logs**: Rate limit violations are logged for debugging
+3. **Test Configuration**: Start with high limits and gradually decrease
+4. **Validate Intervals**: Ensure interval strings match supported values exactly

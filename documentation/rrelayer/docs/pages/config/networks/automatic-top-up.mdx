@@ -1,0 +1,244 @@
+# Automatic top up - optional
+
+As your relayers will be spending native tokens (which is the gas) and in some cases spending ERC20 tokens rrelayer
+has built in refill logic to make sure you keep topping up the relayers so they can keep doing their job.
+
+## Fields
+
+### from
+
+This is where the funds are going to come from you have 2 options a safe or an relayer.
+
+#### relayer
+
+You can map the funds to come from a relayer which is on rrelayer itself you can do this by doing:
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+networks: // [!code focus]
+  - name: local_anvil
+    chain_id: 31337
+    provider_urls:
+      - http://127.0.0.1:8545
+    block_explorer_url: http://localhost:8545
+    automatic_top_up: // [!code focus]
+      from: // [!code focus]
+        relayer:  // [!code focus]
+          address: "0x33993A4F4AA617DA4558A0CFD0C39A7989B67720" // [!code focus]
+```
+
+You can also config if you want this relayer to be able to be used outside of the rrelayer server, we advise you do not do
+this as this rrelayer should really just be used internally (for security measures) so by default we set this to false but if you want to override you can.
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+networks: // [!code focus]
+  - name: local_anvil
+    chain_id: 31337
+    provider_urls:
+      - http://127.0.0.1:8545
+    block_explorer_url: http://localhost:8545
+    automatic_top_up: // [!code focus]
+      from: // [!code focus]
+        relayer:  // [!code focus]
+          address: "0x33993A4F4AA617DA4558A0CFD0C39A7989B67720"
+          internal_only: false // [!code focus]
+```
+
+#### safe
+
+If you set this then the funds will be taken from the safe executed by the relayer address. This is important to understand
+rrelayer only knows how to execute and not sign so to use this the safe must be a 1 threshold and the relayer address must be
+one of the owners. We will explore more advanced multisig stuff with safe later on.
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+networks: // [!code focus]
+  - name: local_anvil
+    chain_id: 31337
+    provider_urls:
+      - http://127.0.0.1:8545
+    block_explorer_url: http://localhost:8545
+    automatic_top_up: // [!code focus]
+      from: // [!code focus]
+        safe: '0xcfe267de230a234c5937f18f239617b7038ec271' // [!code focus]
+        relayer:
+          address: "0x33993A4F4AA617DA4558A0CFD0C39A7989B67720"
+```
+
+### relayers
+
+This is the relayer addresses which will be topped up - it will only send to internal known relayer addresses if you put
+a random address in their rrelayer will throw and not process it.
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+networks: // [!code focus]
+  - name: local_anvil
+    chain_id: 31337
+    provider_urls:
+      - http://127.0.0.1:8545
+    block_explorer_url: http://localhost:8545
+    automatic_top_up: // [!code focus]
+      from:
+        relayer:
+          address: "0x33993A4F4AA617DA4558A0CFD0C39A7989B67720"
+      relayers: // [!code focus]
+        - "0x1C09DF15FB12656420033EB58067EC9406EF0E26" // [!code focus]
+        - "0x6F3E343161C4B905342015AD20A5C492ADFB730E" // [!code focus]
+        - "0x68333AE8A21E1F768B20DB409486BE2D569A5258" // [!code focus]
+```
+
+you can also use the `*` syntax to say fund every relayer, note it will not fund itself.
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+networks: // [!code focus]
+  - name: local_anvil
+    chain_id: 31337
+    provider_urls:
+      - http://127.0.0.1:8545
+    block_explorer_url: http://localhost:8545
+    automatic_top_up: // [!code focus]
+      from:
+        relayer:
+          address: "0x33993A4F4AA617DA4558A0CFD0C39A7989B67720"
+      relayers: "*" // [!code focus]
+```
+
+### native - optional (you should have this OR erc20_tokens)
+
+This is the mapping of how much you top up each time and also the trigger points of the min balance to send it.
+This should be in formatted style so if you want to send 2 ETH it should be "2", rrelayer will handle the formatting
+from decimals to send it.
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+networks: // [!code focus]
+  - name: local_anvil
+    chain_id: 31337
+    provider_urls:
+      - http://127.0.0.1:8545
+    block_explorer_url: http://localhost:8545
+    automatic_top_up: // [!code focus]
+      from:
+        relayer:
+          address: "0x33993A4F4AA617DA4558A0CFD0C39A7989B67720"
+      relayers: "*"
+      native: // [!code focus]
+        min_balance: "0.1" // [!code focus]
+        top_up_amount: "0.5" // [!code focus]
+```
+
+By default it will assume your decimals are 18 but some native tokens do not have that decimal figure so you can set it:
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+networks: // [!code focus]
+  - name: local_anvil
+    chain_id: 31337
+    provider_urls:
+      - http://127.0.0.1:8545
+    block_explorer_url: http://localhost:8545
+    automatic_top_up: // [!code focus]
+      from:
+        relayer:
+          address: "0x33993A4F4AA617DA4558A0CFD0C39A7989B67720"
+      relayers: "*"
+      native: // [!code focus]
+        min_balance: "0.1"
+        top_up_amount: "0.5"
+        decimals: "6" // [!code focus]
+```
+
+### erc20 tokens - optional (you should have this OR native)
+
+You can also map top up tokens say if you were using these relayers to send ERC20 tokens somewhere. It accepts an array
+of `erc20_tokens`.
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+networks: // [!code focus]
+  - name: local_anvil
+    chain_id: 31337
+    provider_urls:
+      - http://127.0.0.1:8545
+    block_explorer_url: http://localhost:8545
+    automatic_top_up: // [!code focus]
+      from:
+        relayer:
+          address: "0x33993A4F4AA617DA4558A0CFD0C39A7989B67720"
+      relayers: "*"
+      native:
+        min_balance: "0.1"
+        top_up_amount: "0.5"
+      erc20_tokens: // [!code focus]
+        - address: "0x99bba657f2bbc93c02d617f8ba121cb8fc104acf" // [!code focus]
+          min_balance: "100" // [!code focus]
+          top_up_amount: "500" // [!code focus]
+          decimals: "18" // [!code focus]
+```

@@ -1,10 +1,11 @@
 use crate::{
+    gas::{MaxFee, MaxPriorityFee},
     network::ChainId,
     relayer::RelayerId,
-    shared::common_types::EvmAddress,
+    shared::common_types::{BlockNumber, EvmAddress},
     transaction::types::{
-        Transaction, TransactionData, TransactionHash, TransactionId, TransactionStatus,
-        TransactionValue,
+        Transaction, TransactionBlob, TransactionData, TransactionHash, TransactionId,
+        TransactionNonce, TransactionStatus, TransactionValue,
     },
 };
 use alloy::{network::AnyTransactionReceipt, primitives::PrimitiveSignature};
@@ -66,6 +67,28 @@ pub struct WebhookTransactionData {
     /// Transaction expiration time
     #[serde(rename = "expiresAt")]
     pub expires_at: DateTime<Utc>,
+    /// External ID for transaction tracking
+    #[serde(rename = "externalId", skip_serializing_if = "Option::is_none")]
+    pub external_id: Option<String>,
+    /// Transaction blobs (for blob transactions)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub blobs: Option<Vec<TransactionBlob>>,
+    /// Transaction nonce
+    pub nonce: TransactionNonce,
+    /// When transaction was mined (if applicable)
+    #[serde(rename = "minedAt", skip_serializing_if = "Option::is_none", default)]
+    pub mined_at: Option<DateTime<Utc>>,
+    /// Block number when transaction was mined
+    #[serde(rename = "minedAtBlockNumber", skip_serializing_if = "Option::is_none", default)]
+    pub mined_at_block_number: Option<BlockNumber>,
+    /// Max priority fee per gas used when sending
+    #[serde(rename = "maxPriorityFee", skip_serializing_if = "Option::is_none", default)]
+    pub sent_with_max_priority_fee_per_gas: Option<MaxPriorityFee>,
+    /// Max fee per gas used when sending
+    #[serde(rename = "maxFee", skip_serializing_if = "Option::is_none", default)]
+    pub sent_with_max_fee_per_gas: Option<MaxFee>,
+    /// Whether this is a no-op transaction
+    pub is_noop: bool,
 }
 
 impl From<&Transaction> for WebhookTransactionData {
@@ -84,6 +107,16 @@ impl From<&Transaction> for WebhookTransactionData {
             sent_at: transaction.sent_at.map(|dt| dt.into()),
             confirmed_at: transaction.confirmed_at.map(|dt| dt.into()),
             expires_at: transaction.expires_at.into(),
+            external_id: transaction.external_id.clone(),
+            blobs: transaction.blobs.clone(),
+            nonce: transaction.nonce.clone(),
+            mined_at: transaction.mined_at.map(|dt| dt.into()),
+            mined_at_block_number: transaction.mined_at_block_number,
+            sent_with_max_priority_fee_per_gas: transaction
+                .sent_with_max_priority_fee_per_gas
+                .clone(),
+            sent_with_max_fee_per_gas: transaction.sent_with_max_fee_per_gas.clone(),
+            is_noop: transaction.is_noop,
         }
     }
 }

@@ -28,12 +28,8 @@ impl TestRunner {
             blobs: None,
         };
 
-        let send_result = self
-            .relayer_client
-            .sdk
-            .transaction
-            .send(&relayer.id, &tx_request, None)
-            .await?;
+        let send_result =
+            self.relayer_client.sdk.transaction.send(&relayer.id, &tx_request, None).await?;
 
         loop {
             tokio::time::sleep(Duration::from_millis(100)).await;

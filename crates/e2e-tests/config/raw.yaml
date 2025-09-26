@@ -1,4 +1,8 @@
 name: e2e-tests
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
 signing_provider:
   raw:
     mnemonic: ${RAW_DANGEROUS_MNEMONIC}
@@ -51,10 +55,6 @@ networks:
     - relayer: "0x70e0ba845a1a0f2da3359c97e0285013525ffc49"
       keys:
        - ${API_KEY_2}
-api_config:
-  port: 3000
-  authentication_username: ${RRELAYER_AUTH_USERNAME}
-  authentication_password: ${RRELAYER_AUTH_PASSWORD}
 webhooks:
 - endpoint: http://localhost:8546/webhook
   shared_secret: ${RRELAYER_WEBHOOK_SHARED_SECRET}
@@ -75,8 +75,3 @@ rate_limits:
 #    interval: "minute"
 #    transactions: 5
 #    signing_operations: 100
-api_keys:
-  - name: "APIKey1"
-    key: ${API_KEY_1}
-  - name: "APIKey2"
-    key: ${API_KEY_2}

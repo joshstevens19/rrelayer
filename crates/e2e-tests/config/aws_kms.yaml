@@ -1,4 +1,9 @@
-name: e2e-tests
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
 signing_provider:
   aws_kms:
     region: "eu-west-1"
@@ -41,10 +46,6 @@ networks:
           - "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
           - "0x70e0ba845a1a0f2da3359c97e0285013525ffc49"
         disable_native_transfer: true
-api_config:
-  port: 3000
-  authentication_username: ${RRELAYER_AUTH_USERNAME}
-  authentication_password: ${RRELAYER_AUTH_PASSWORD}
 webhooks:
   - endpoint: http://localhost:8546/webhook
     shared_secret: ${RRELAYER_WEBHOOK_SHARED_SECRET}

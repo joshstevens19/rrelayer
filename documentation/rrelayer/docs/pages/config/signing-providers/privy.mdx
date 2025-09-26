@@ -1,0 +1,45 @@
+# Privy
+
+Privy is a developer infrastructure platform that provides embedded wallet solutions and user authentication for Web3 applications.
+It offers a suite of tools designed to simplify crypto onboarding by allowing users to create wallets using familiar authentication methods
+like email, phone numbers, or social logins, without requiring them to manage seed phrases or private keys directly. Privy handles the
+complex cryptographic operations behind the scenes while providing developers with APIs to integrate wallet functionality into their applications.
+
+:::info
+This guide will just talk about how you config the signing provider and not go into depth of the setup on the Privy portal.
+:::
+
+:::warning
+We advise you create a brand new app on Privy and do not allow anyone else to use it this is because rrelayer attaches IDs
+to each new wallet created so it knows how to load the list and keep it in sync.
+:::
+
+# Usage
+
+To enable Privy you need to add its `app_id` and `app_secret` in the YAML under the `privy` key:
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: "${RRELAYER_AUTH_USERNAME}"
+  authentication_password: "${RRELAYER_AUTH_PASSWORD}"
+signing_provider: // [!code focus]
+  privy: // [!code focus]
+    app_id: ${PRIVY_APP_ID} // [!code focus]
+    app_secret: ${PRIVY_APP_SECRET} // [!code focus]
+```
+
+You then need to add the privy credentials to the `.env`
+
+```bash
+PRIVY_APP_ID=YOUR_PRIVY_APP_ID
+PRIVY_APP_SECRET=YOUR_PRIVY_APP_SECRET
+```
+
+:::info
+You can call PRIVY_APP_ID and PRIVY_APP_SECRET anything it is just advising you to make sure you don't paste it clear text in the YAML
+:::
+
+You can get the `app_id` and `app_secret` from the Privy developer dashboard.

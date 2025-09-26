@@ -19,7 +19,7 @@ pub enum Commands {
         #[clap(long, short)]
         path: Option<String>,
     },
-    /// Clone an existing relayer private key to another network
+    /// Clone an existing relayer
     Clone {
         /// optional - The path to create the project in, default will be where the command is run.
         #[clap(long, short)]
@@ -125,7 +125,7 @@ pub enum Commands {
         #[arg(long)]
         network: String,
     },
-    /// Sign messages and transactions
+    /// Sign messages and typed data alongside get history of signing
     Sign {
         /// optional - The path to create the project in, default will be where the command is run.
         #[clap(long, short)]
@@ -134,7 +134,7 @@ pub enum Commands {
         #[command(subcommand)]
         command: sign::SignCommand,
     },
-    /// Manage and monitor transactions
+    /// Send, manage and monitor transactions
     Tx {
         /// optional - The path to create the project in, default will be where the command is run.
         #[clap(long, short)]

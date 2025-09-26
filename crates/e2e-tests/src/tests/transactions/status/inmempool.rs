@@ -28,12 +28,8 @@ impl TestRunner {
             blobs: None,
         };
 
-        let send_result = self
-            .relayer_client
-            .sdk
-            .transaction
-            .send(&relayer.id, &tx_request, None)
-            .await?;
+        let send_result =
+            self.relayer_client.sdk.transaction.send(&relayer.id, &tx_request, None).await?;
 
         let mut attempts = 0;
         loop {

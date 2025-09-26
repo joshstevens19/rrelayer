@@ -50,11 +50,7 @@ impl TestRunner {
                 blobs: None,
             };
 
-            self.relayer_client
-                .sdk
-                .transaction
-                .send(&relayer1.id, &tx_request, None)
-                .await?;
+            self.relayer_client.sdk.transaction.send(&relayer1.id, &tx_request, None).await?;
         }
 
         if initial_balance2 > drain_amount {
@@ -67,11 +63,7 @@ impl TestRunner {
                 blobs: None,
             };
 
-            self.relayer_client
-                .sdk
-                .transaction
-                .send(&relayer2.id, &tx_request, None)
-                .await?;
+            self.relayer_client.sdk.transaction.send(&relayer2.id, &tx_request, None).await?;
         }
 
         self.mine_and_wait().await?;

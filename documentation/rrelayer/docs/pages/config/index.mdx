@@ -1,0 +1,115 @@
+# YAML Configuration File
+
+The YAML configuration file is the heart of your rrelayer project. You enable and define features and is the best source of
+truth when working with rrelayer.
+
+**YAML is case-sensitive, so make sure to use the correct case when defining the fields in the configuration file.**
+
+:::info
+YAML files can be mapped to environment variables to store sensitive information, such as RPC urls or other credentials.
+The syntax for this in the YAML is `${ENV_VARIABLE_NAME}`.
+:::
+
+example of an advanced one:
+
+:::info
+We will walk through all the config below
+:::
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: 'my first rrelayer'
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider:
+  aws_secret_manager:
+    id: 'testing-josh-relayer'
+    key: 'seed'
+    region: 'eu-west-1'
+networks:
+  - name: sepolia_ethereum
+    chain_id: 11155111
+    provider_urls:
+      - https://sepolia.gateway.tenderly.co
+    block_explorer_url: https://sepolia.etherscan.io
+    automatic_top_up:
+      from:
+        relayer:
+          address: '0x655B2B8861D7E911D283A05A5CAD042C157106DA'
+          internal_only: false
+      relayers:
+        - '0x1C09DF15FB12656420033EB58067EC9406EF0E26'
+        - '0x6F3E343161C4B905342015AD20A5C492ADFB730E'
+        - '0x68333AE8A21E1F768B20DB409486BE2D569A5258'
+      native:
+        min_balance: '50'
+        top_up_amount: '100'
+      erc20_tokens:
+        - address: '0x99bba657f2bbc93c02d617f8ba121cb8fc104acf'
+          min_balance: '100'
+          top_up_amount: '500'
+    permissions:
+      - relayers:
+          - '0x1c09df15fb12656420033eb58067ec9406ef0e26'
+        allowlist:
+          - '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'
+        disable_native_transfer: false
+      - relayers:
+          - '0x6f3e343161c4b905342015ad20a5c492adfb730e'
+        allowlist:
+          - '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'
+          - '0x70e0ba845a1a0f2da3359c97e0285013525ffc49'
+        disable_native_transfer: true
+        disable_personal_sign: false
+        disable_typed_data_sign: false
+        disable_transactions: false
+      - relayers:
+          - '0x6f3e343161c4b905342015ad20a5c492adfb730c'
+        api_keys:
+          - ${API_KEY_1}
+          - ${API_KEY_2}
+        disable_native_transfer: true
+webhooks:
+  - endpoint: http://localhost:8546/webhook
+    shared_secret: ${RRELAYER_WEBHOOK_SHARED_SECRET}
+    networks:
+      - sepolia_ethereum
+rate_limits:
+  user_limits:
+    per_relayer:
+      interval: 'minute'
+      transactions: 1
+      signing_operations: 1
+    global:
+      interval: 'minute'
+      transactions: 3
+      signing_operations: 3
+```
+
+### Environment Variables
+
+YAML files can be mapped to environment variables to store sensitive information, such as RPC urls or other credentials.
+Alongside different environments mappings, allowing you to store different values for different environments.
+The syntax for this in the YAML is `${ENV_VARIABLE_NAME}`. This can be used in ANY field in the YAML file.
+
+example:
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: 'my first rrelayer'
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider:
+  raw:
+    mnemonic: ${RAW_DANGEROUS_MNEMONIC}
+networks:
+  - name: sepolia_ethereum
+    chain_id: 11155111
+    provider_urls:
+      - https://sepolia.gateway.tenderly.co
+    block_explorer_url: https://sepolia.etherscan.io
+```

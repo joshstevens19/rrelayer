@@ -14,6 +14,7 @@ pub enum NetworkCommands {
     Add(AddArgs),
     /// List all networks
     List,
+    /// Get the gas prices for the network
     Gas {
         /// The network name
         #[arg(long, short = 'n')]

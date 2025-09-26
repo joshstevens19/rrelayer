@@ -1,0 +1,37 @@
+# API keys - optional
+
+The root authentication for rrelayer is basic auth but this gives admin access to anyone with that and thats not ideal if you
+wish to just have a single relayer used on a system which can just send and sign transactions. This is where API keys come in
+you can assign API keys to a relayer and with that API key systems can send, sign and read information about just that relayer.
+Note [permissions](/config/networks/permissions) will inherit on everything. This API key can not do any write actions to the relayer
+itself it can only read information about the relayer and do transactions and signing with it.
+
+:::info
+Note here you have to expose `API_KEY_1`, `API_KEY_2` and `API_KEY_3` in the `.env.`
+:::
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+networks: // [!code focus]
+  - name: local_anvil
+    chain_id: 31337
+    provider_urls:
+      - http://127.0.0.1:8545
+    block_explorer_url: http://localhost:8545
+    api_keys: // [!code focus]
+    - relayer: "0x6f3e343161c4b905342015ad20a5c492adfb730e" // [!code focus]
+      keys: // [!code focus]
+       - "${API_KEY_1}" // [!code focus]
+       - "${API_KEY_2}" // [!code focus]
+    - relayer: "0x70e0ba845a1a0f2da3359c97e0285013525ffc49" // [!code focus]
+      keys: // [!code focus]
+       - "${API_KEY_3}" // [!code focus]
+```
