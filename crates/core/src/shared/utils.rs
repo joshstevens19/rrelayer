@@ -28,8 +28,8 @@ pub fn convert_blob_strings_to_blobs(
             let mut blobs = Vec::new();
             for blob_str in strings {
                 let blob = blob_str.parse::<Blob>().map_err(|e| {
-                    rrelayer_error!("Failed to parse blob hex string '{}': {:?}", blob_str, e);
-                    bad_request("Failed to parse blob hex string".to_string())
+                    rrelayer_error!("Failed to parse blob it must be 131,072 bytes'{}': {:?}", blob_str, e);
+                    bad_request("Failed to parse blob it must be 131,072 bytes".to_string())
                 })?;
 
                 blobs.push(TransactionBlob::new(&blob));

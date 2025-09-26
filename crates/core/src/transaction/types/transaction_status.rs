@@ -11,12 +11,12 @@ use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 
 #[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize)]
 pub enum TransactionStatus {
-    Pending,
-    Inmempool,
-    Mined,
-    Confirmed,
-    Failed,
-    Expired,
+    PENDING,
+    INMEMPOOL,
+    MINED,
+    CONFIRMED,
+    FAILED,
+    EXPIRED,
 }
 
 impl Display for TransactionStatus {
@@ -28,12 +28,12 @@ impl Display for TransactionStatus {
 impl TransactionStatus {
     fn format(&self) -> String {
         match self {
-            TransactionStatus::Pending => "PENDING".to_string(),
-            TransactionStatus::Inmempool => "INMEMPOOL".to_string(),
-            TransactionStatus::Mined => "MINED".to_string(),
-            TransactionStatus::Confirmed => "CONFIRMED".to_string(),
-            TransactionStatus::Failed => "FAILED".to_string(),
-            TransactionStatus::Expired => "EXPIRED".to_string(),
+            TransactionStatus::PENDING => "PENDING".to_string(),
+            TransactionStatus::INMEMPOOL => "INMEMPOOL".to_string(),
+            TransactionStatus::MINED => "MINED".to_string(),
+            TransactionStatus::CONFIRMED => "CONFIRMED".to_string(),
+            TransactionStatus::FAILED => "FAILED".to_string(),
+            TransactionStatus::EXPIRED => "EXPIRED".to_string(),
         }
     }
 }
@@ -45,12 +45,12 @@ impl<'a> FromSql<'a> for TransactionStatus {
                 from_utf8(raw).map_err(|err| format!("Invalid UTF-8 sequence: {}", err))?;
 
             match status {
-                "PENDING" => Ok(TransactionStatus::Pending),
-                "INMEMPOOL" => Ok(TransactionStatus::Inmempool),
-                "MINED" => Ok(TransactionStatus::Mined),
-                "CONFIRMED" => Ok(TransactionStatus::Confirmed),
-                "FAILED" => Ok(TransactionStatus::Failed),
-                "EXPIRED" => Ok(TransactionStatus::Expired),
+                "PENDING" => Ok(TransactionStatus::PENDING),
+                "INMEMPOOL" => Ok(TransactionStatus::INMEMPOOL),
+                "MINED" => Ok(TransactionStatus::MINED),
+                "CONFIRMED" => Ok(TransactionStatus::CONFIRMED),
+                "FAILED" => Ok(TransactionStatus::FAILED),
+                "EXPIRED" => Ok(TransactionStatus::EXPIRED),
                 _ => Err(format!("Unknown TransactionStatus: {}", status).into()),
             }
         } else if *ty == Type::TEXT
@@ -62,12 +62,12 @@ impl<'a> FromSql<'a> for TransactionStatus {
                 from_utf8(raw).map_err(|err| format!("Invalid UTF-8 sequence: {}", err))?;
 
             match status {
-                "PENDING" => Ok(TransactionStatus::Pending),
-                "INMEMPOOL" => Ok(TransactionStatus::Inmempool),
-                "MINED" => Ok(TransactionStatus::Mined),
-                "CONFIRMED" => Ok(TransactionStatus::Confirmed),
-                "FAILED" => Ok(TransactionStatus::Failed),
-                "EXPIRED" => Ok(TransactionStatus::Expired),
+                "PENDING" => Ok(TransactionStatus::PENDING),
+                "INMEMPOOL" => Ok(TransactionStatus::INMEMPOOL),
+                "MINED" => Ok(TransactionStatus::MINED),
+                "CONFIRMED" => Ok(TransactionStatus::CONFIRMED),
+                "FAILED" => Ok(TransactionStatus::FAILED),
+                "EXPIRED" => Ok(TransactionStatus::EXPIRED),
                 _ => Err(format!("Unknown TransactionStatus: {}", status).into()),
             }
         } else {
@@ -92,12 +92,12 @@ impl ToSql for TransactionStatus {
         }
 
         let status_str = match self {
-            TransactionStatus::Pending => "PENDING",
-            TransactionStatus::Inmempool => "INMEMPOOL",
-            TransactionStatus::Mined => "MINED",
-            TransactionStatus::Confirmed => "CONFIRMED",
-            TransactionStatus::Failed => "FAILED",
-            TransactionStatus::Expired => "EXPIRED",
+            TransactionStatus::PENDING => "PENDING",
+            TransactionStatus::INMEMPOOL => "INMEMPOOL",
+            TransactionStatus::MINED => "MINED",
+            TransactionStatus::CONFIRMED => "CONFIRMED",
+            TransactionStatus::FAILED => "FAILED",
+            TransactionStatus::EXPIRED => "EXPIRED",
         };
 
         out.extend_from_slice(status_str.as_bytes());

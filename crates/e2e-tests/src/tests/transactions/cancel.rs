@@ -31,7 +31,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .send_transaction(&relayer.id, &tx_request, None)
+            .send(&relayer.id, &tx_request, None)
             .await
             .context("Failed to send transaction")?;
 
@@ -41,7 +41,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .cancel_transaction(transaction_id, None)
+            .cancel(transaction_id, None)
             .await
             .context("Failed to cancel transaction")?;
 
@@ -56,8 +56,8 @@ impl TestRunner {
                 return Err(anyhow::anyhow!("Cancel transaction failed"));
             }
             let result = self.relayer_client.get_transaction_status(&send_result.id).await?;
-            if result.status == TransactionStatus::Mined
-                || result.status == TransactionStatus::Expired
+            if result.status == TransactionStatus::MINED
+                || result.status == TransactionStatus::EXPIRED
             {
                 break;
             } else {

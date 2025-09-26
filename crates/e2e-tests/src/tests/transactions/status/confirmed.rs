@@ -32,7 +32,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .send_transaction(&relayer.id, &tx_request, None)
+            .send(&relayer.id, &tx_request, None)
             .await?;
 
         loop {
@@ -41,11 +41,11 @@ impl TestRunner {
                 .relayer_client
                 .sdk
                 .transaction
-                .get_transaction_status(&send_result.id)
+                .get_status(&send_result.id)
                 .await?
                 .context("Transaction status not found")?;
 
-            if status.status == TransactionStatus::Inmempool {
+            if status.status == TransactionStatus::INMEMPOOL {
                 break;
             }
         }
@@ -59,11 +59,11 @@ impl TestRunner {
                 .relayer_client
                 .sdk
                 .transaction
-                .get_transaction_status(&send_result.id)
+                .get_status(&send_result.id)
                 .await?
                 .context("Transaction status not found")?;
 
-            if status.status == TransactionStatus::Confirmed {
+            if status.status == TransactionStatus::CONFIRMED {
                 if status.hash.is_none() {
                     return Err(anyhow::anyhow!("Confirmed transaction should have hash"));
                 }

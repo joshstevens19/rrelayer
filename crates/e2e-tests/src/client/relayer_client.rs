@@ -132,7 +132,7 @@ impl RelayerClient {
         let result = self
             .sdk
             .transaction
-            .send_transaction(&relayer_id, &request, rate_limit_key)
+            .send(&relayer_id, &request, rate_limit_key)
             .await
             .context("Failed to send transaction")?;
 
@@ -150,7 +150,7 @@ impl RelayerClient {
         let result = self
             .sdk
             .transaction
-            .get_transaction_status(&transaction_id)
+            .get_status(&transaction_id)
             .await
             .context("Failed to get transaction status")?;
 
@@ -167,7 +167,7 @@ impl RelayerClient {
         let result = self
             .sdk
             .transaction
-            .get_transaction(&transaction_id)
+            .get(&transaction_id)
             .await
             .context("Failed to get transaction status")?;
 

@@ -31,7 +31,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .send_transaction(&relayer.id, &tx_request, None)
+            .send(&relayer.id, &tx_request, None)
             .await
             .context("Failed to send transaction")?;
 
@@ -42,14 +42,14 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .get_transaction_status(transaction_id)
+            .get_status(transaction_id)
             .await
             .context("Failed to get transaction status")?;
 
         if let Some(result) = status_result {
             // this depends on how fast relayer executes the queue
-            if result.status != TransactionStatus::Pending
-                && result.status != TransactionStatus::Inmempool
+            if result.status != TransactionStatus::PENDING
+                && result.status != TransactionStatus::INMEMPOOL
             {
                 return Err(anyhow::anyhow!(
                     "Transaction status should be inmempool or pending at this point but it is {}",
@@ -69,12 +69,12 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .get_transaction_status(transaction_id)
+            .get_status(transaction_id)
             .await
             .context("Failed to get updated transaction status")?;
 
         if let Some(status) = updated_status {
-            if status.status != TransactionStatus::Mined {
+            if status.status != TransactionStatus::MINED {
                 return Err(anyhow::anyhow!("Transaction status should be mined at this point"));
             }
         }

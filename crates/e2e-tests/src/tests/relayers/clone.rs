@@ -69,7 +69,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .get_transactions(&relayer.id, &paging)
+            .get_all(&relayer.id, &paging)
             .await
             .context("Failed to get relayer transactions")?;
 
@@ -82,7 +82,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .get_transactions(&cloned_relayer.id, &paging)
+            .get_all(&cloned_relayer.id, &paging)
             .await
             .context("Failed to get relayer transactions")?;
 

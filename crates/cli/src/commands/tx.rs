@@ -165,7 +165,7 @@ pub async fn handle_tx(command: &TxCommand, sdk: &SDK) -> Result<(), Transaction
 }
 
 async fn handle_get(tx_id: &TransactionId, sdk: &SDK) -> Result<(), TransactionError> {
-    let tx = sdk.transaction.get_transaction(tx_id).await?;
+    let tx = sdk.transaction.get(tx_id).await?;
     if let Some(tx) = tx {
         log_transactions(vec![tx])?;
     } else {
@@ -201,7 +201,7 @@ async fn handle_withdraw(
 
             let tx = sdk
                 .transaction
-                .send_transaction(
+                .send(
                     relayer_id,
                     &RelayTransactionRequest {
                         to: *token_address,
@@ -223,7 +223,7 @@ async fn handle_withdraw(
             // Native ETH transfer
             let tx = sdk
                 .transaction
-                .send_transaction(
+                .send(
                     relayer_id,
                     &RelayTransactionRequest {
                         to: *to,
@@ -247,7 +247,7 @@ async fn handle_withdraw(
 }
 
 async fn handle_status(tx_id: &TransactionId, sdk: &SDK) -> Result<(), TransactionError> {
-    let status = sdk.transaction.get_transaction_status(tx_id).await?;
+    let status = sdk.transaction.get_status(tx_id).await?;
     match status {
         None => {
             println!("Can not find transaction id {}", tx_id)
@@ -272,7 +272,7 @@ async fn handle_list(
     sdk: &SDK,
 ) -> Result<(), TransactionError> {
     let paging_context = PagingContext::new(limit, offset);
-    let transactions = sdk.transaction.get_transactions(relayer_id, &paging_context).await?;
+    let transactions = sdk.transaction.get_all(relayer_id, &paging_context).await?;
 
     log_transactions(transactions.items)?;
 
@@ -285,8 +285,8 @@ async fn handle_list(
 
 async fn handle_queue(relayer_id: &RelayerId, sdk: &SDK) -> Result<(), TransactionError> {
     let (pending_result, mempool_result) = tokio::join!(
-        sdk.transaction.get_transactions_pending_count(relayer_id),
-        sdk.transaction.get_transactions_inmempool_count(relayer_id)
+        sdk.transaction.get_pending_count(relayer_id),
+        sdk.transaction.get_inmempool_count(relayer_id)
     );
 
     let pending_count = pending_result?;
@@ -314,7 +314,7 @@ async fn handle_queue(relayer_id: &RelayerId, sdk: &SDK) -> Result<(), Transacti
 async fn handle_cancel(tx_id: &TransactionId, sdk: &SDK) -> Result<(), TransactionError> {
     println!("Canceling transaction: {}", tx_id);
 
-    let cancelled = sdk.transaction.cancel_transaction(tx_id, None).await?;
+    let cancelled = sdk.transaction.cancel(tx_id, None).await?;
 
     if cancelled {
         println!("Transaction cancelled..");
@@ -335,7 +335,7 @@ async fn handle_replace(
 ) -> Result<(), TransactionError> {
     println!("Replacing transaction: {}", tx_id);
 
-    let replaced = sdk.transaction.replace_transaction(tx_id, transaction, None).await?;
+    let replaced = sdk.transaction.replace(tx_id, transaction, None).await?;
 
     if replaced {
         println!("Transaction replaced..");
@@ -355,7 +355,7 @@ async fn handle_send(
 ) -> Result<(), TransactionError> {
     println!("Sending transaction: {:?}", transaction);
 
-    let tx = sdk.transaction.send_transaction(relayer_id, transaction, None).await?;
+    let tx = sdk.transaction.send(relayer_id, transaction, None).await?;
 
     println!("Transaction sent..");
     println!("Transaction id: {}", tx.id);
@@ -384,7 +384,7 @@ async fn handle_fund(
         })?
         .into();
 
-    let network = sdk.network.get_all_networks().await?;
+    let network = sdk.network.get_all().await?;
     let network = network.into_iter().find(|n| n.chain_id == chain_id).expect("Network not found");
 
     println!("┌─────────────────────────────────────────────────────────────────────");

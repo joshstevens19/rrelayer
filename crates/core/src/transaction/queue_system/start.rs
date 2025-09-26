@@ -299,7 +299,7 @@ pub async fn startup_transactions_queues(
                 let relayer_id = relayer.id;
 
                 let mined_transactions =
-                    repopulate_transaction_queue(&postgres, &relayer_id, &TransactionStatus::Mined)
+                    repopulate_transaction_queue(&postgres, &relayer_id, &TransactionStatus::MINED)
                         .await?;
 
                 transaction_relayer_setups.push(TransactionRelayerSetup::new(
@@ -308,13 +308,13 @@ pub async fn startup_transactions_queues(
                     repopulate_transaction_queue(
                         &postgres,
                         &relayer_id,
-                        &TransactionStatus::Pending,
+                        &TransactionStatus::PENDING,
                     )
                     .await?,
                     repopulate_transaction_queue(
                         &postgres,
                         &relayer_id,
-                        &TransactionStatus::Inmempool,
+                        &TransactionStatus::INMEMPOOL,
                     )
                     .await?,
                     mined_transactions

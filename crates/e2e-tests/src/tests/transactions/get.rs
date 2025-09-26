@@ -31,7 +31,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .send_transaction(&relayer.id, &tx_request, None)
+            .send(&relayer.id, &tx_request, None)
             .await
             .context("Failed to send transaction")?;
 
@@ -41,7 +41,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .get_transaction(transaction_id)
+            .get(transaction_id)
             .await
             .context("Failed to get transaction")?;
 

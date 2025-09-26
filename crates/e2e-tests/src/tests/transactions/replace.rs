@@ -31,7 +31,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .send_transaction(&relayer.id, &tx_request, None)
+            .send(&relayer.id, &tx_request, None)
             .await
             .context("Failed to send transaction")?;
 
@@ -50,7 +50,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .replace_transaction(transaction_id, &replacement_request, None)
+            .replace(transaction_id, &replacement_request, None)
             .await
             .context("Failed to replace transaction")?;
         info!("[SUCCESS] Transaction replacement result: {}", replace_result);

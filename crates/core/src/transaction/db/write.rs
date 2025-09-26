@@ -86,7 +86,7 @@ impl PostgresClient {
                 ",
                 &[
                     &transaction_id,
-                    &TransactionStatus::Inmempool,
+                    &TransactionStatus::INMEMPOOL,
                     &transaction_hash,
                     &max_priority_fee_option,
                     &max_fee_fee_option,
@@ -113,7 +113,7 @@ impl PostgresClient {
                 ",
                 &[
                     &transaction_id,
-                    &TransactionStatus::Inmempool,
+                    &TransactionStatus::INMEMPOOL,
                     &transaction_hash,
                     &max_priority_fee_option,
                     &max_fee_fee_option,
@@ -237,7 +237,7 @@ impl PostgresClient {
                         failed_reason = $3
                     WHERE id = $1;
                 ",
-                &[&transaction_id, &TransactionStatus::Failed, &truncated_reason],
+                &[&transaction_id, &TransactionStatus::FAILED, &truncated_reason],
             )
             .await?;
 
@@ -260,7 +260,7 @@ impl PostgresClient {
                 ",
                 &[
                     &transaction_id,
-                    &TransactionStatus::Failed,
+                    &TransactionStatus::FAILED,
                     &truncated_reason,
                 ],
             )
@@ -307,7 +307,7 @@ impl PostgresClient {
             ",
                 &[
                     &transaction.id,
-                    &TransactionStatus::Mined,
+                    &TransactionStatus::MINED,
                     &transaction.to,
                     &transaction.from,
                     &transaction.value,
@@ -344,7 +344,7 @@ impl PostgresClient {
             ",
                 &[
                     &transaction.id,
-                    &TransactionStatus::Mined,
+                    &TransactionStatus::MINED,
                     &transaction.to,
                     &transaction.from,
                     &transaction.value,
@@ -382,7 +382,7 @@ impl PostgresClient {
                         confirmed_at = NOW()
                     WHERE id = $1;
                 ",
-                &[&transaction_id, &TransactionStatus::Confirmed],
+                &[&transaction_id, &TransactionStatus::CONFIRMED],
             )
             .await?;
 
@@ -403,7 +403,7 @@ impl PostgresClient {
                     FROM relayer.transaction
                     WHERE id = $1;
                 ",
-                &[&transaction_id, &TransactionStatus::Confirmed],
+                &[&transaction_id, &TransactionStatus::CONFIRMED],
             )
             .await?;
 
@@ -427,7 +427,7 @@ impl PostgresClient {
                     expired_at = NOW()
                 WHERE id = $1;
                 ",
-                &[&transaction_id, &TransactionStatus::Expired],
+                &[&transaction_id, &TransactionStatus::EXPIRED],
             )
             .await?;
 
@@ -448,7 +448,7 @@ impl PostgresClient {
                     FROM relayer.transaction
                     WHERE id = $1;
                 ",
-                &[&transaction_id, &TransactionStatus::Expired],
+                &[&transaction_id, &TransactionStatus::EXPIRED],
             )
             .await?;
 

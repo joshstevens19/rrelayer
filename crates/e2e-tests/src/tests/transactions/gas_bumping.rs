@@ -33,7 +33,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .send_transaction(&relayer.id, &tx_request, None)
+            .send(&relayer.id, &tx_request, None)
             .await?;
 
         let mut attempts = 0;
@@ -43,11 +43,11 @@ impl TestRunner {
                 .relayer_client
                 .sdk
                 .transaction
-                .get_transaction_status(&send_result.id)
+                .get_status(&send_result.id)
                 .await?
                 .context("Transaction status not found")?;
 
-            if status.status == TransactionStatus::Inmempool {
+            if status.status == TransactionStatus::INMEMPOOL {
                 info!("Transaction reached InMempool with hash: {:?}", status.hash);
                 break;
             }
@@ -62,7 +62,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .get_transaction(&send_result.id)
+            .get(&send_result.id)
             .await?
             .context("Transaction not found")?;
         let max_fee_per_gas_before = transaction_before
@@ -89,7 +89,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .get_transaction(&send_result.id)
+            .get(&send_result.id)
             .await?
             .context("Transaction not found")?;
         let max_fee_per_gas_after = transaction_after
@@ -111,7 +111,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .get_transaction_status(&send_result.id)
+            .get_status(&send_result.id)
             .await?
             .context("Transaction status not found")?
             .receipt

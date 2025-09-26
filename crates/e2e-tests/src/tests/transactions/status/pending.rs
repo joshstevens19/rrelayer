@@ -31,18 +31,18 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .send_transaction(&relayer.id, &tx_request, None)
+            .send(&relayer.id, &tx_request, None)
             .await?;
 
         let status = self
             .relayer_client
             .sdk
             .transaction
-            .get_transaction_status(&send_result.id)
+            .get_status(&send_result.id)
             .await?
             .context("Transaction status not found")?;
 
-        if status.status != TransactionStatus::Pending {
+        if status.status != TransactionStatus::PENDING {
             return Err(anyhow::anyhow!(
                 "Expected transaction to be in Pending state, but got: {:?}",
                 status.status

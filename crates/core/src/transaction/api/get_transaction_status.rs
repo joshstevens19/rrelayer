@@ -41,7 +41,7 @@ pub async fn get_transaction_status(
 
     if matches!(
         transaction.status,
-        TransactionStatus::Pending | TransactionStatus::Inmempool | TransactionStatus::Expired
+        TransactionStatus::PENDING | TransactionStatus::INMEMPOOL | TransactionStatus::EXPIRED
     ) {
         return Ok(Json(RelayTransactionStatusResult {
             hash: transaction.known_transaction_hash,

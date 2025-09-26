@@ -34,7 +34,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .send_transaction(&relayer.id, &tx_request, None)
+            .send(&relayer.id, &tx_request, None)
             .await?;
 
         let result = self.wait_for_transaction_completion(&blob_result.id).await?;

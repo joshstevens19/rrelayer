@@ -1,6 +1,6 @@
-use rrelayer_core::network::Network;
+use rrelayer_core::network::{ChainId, Network};
 use std::sync::Arc;
-
+use rrelayer_core::WalletError::ApiError;
 use crate::api::{http::HttpClient, types::ApiResult};
 
 #[derive(Clone)]
@@ -13,8 +13,16 @@ impl NetworkApi {
         Self { client }
     }
 
+    /// Get a single network by ID
+    pub async fn get(&self, chain_id: &ChainId) -> ApiResult<Option<Network>> {
+        let networks = self.get_all().await?;
+        Ok(networks
+            .into_iter()
+            .find(|network| network.chain_id == *chain_id))
+    }
+
     /// Get all networks
-    pub async fn get_all_networks(&self) -> ApiResult<Vec<Network>> {
+    pub async fn get_all(&self) -> ApiResult<Vec<Network>> {
         self.client.get("networks").await
     }
 }

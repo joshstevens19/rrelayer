@@ -35,12 +35,12 @@ pub enum WebhookEventType {
 impl From<TransactionStatus> for WebhookEventType {
     fn from(status: TransactionStatus) -> Self {
         match status {
-            TransactionStatus::Pending => WebhookEventType::TransactionQueued,
-            TransactionStatus::Inmempool => WebhookEventType::TransactionSent,
-            TransactionStatus::Mined => WebhookEventType::TransactionMined,
-            TransactionStatus::Confirmed => WebhookEventType::TransactionConfirmed,
-            TransactionStatus::Failed => WebhookEventType::TransactionFailed,
-            TransactionStatus::Expired => WebhookEventType::TransactionExpired,
+            TransactionStatus::PENDING => WebhookEventType::TransactionQueued,
+            TransactionStatus::INMEMPOOL => WebhookEventType::TransactionSent,
+            TransactionStatus::MINED => WebhookEventType::TransactionMined,
+            TransactionStatus::CONFIRMED => WebhookEventType::TransactionConfirmed,
+            TransactionStatus::FAILED => WebhookEventType::TransactionFailed,
+            TransactionStatus::EXPIRED => WebhookEventType::TransactionExpired,
         }
     }
 }

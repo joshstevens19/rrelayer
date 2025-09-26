@@ -6,7 +6,7 @@ networks:
 - name: local_anvil
   chain_id: 31337
   provider_urls:
-    - http://127.0.0.1:8545
+    - http://localhost:8545
   block_explorer_url: http://localhost:8545
 api_config:
   port: 8000

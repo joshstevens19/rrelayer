@@ -364,7 +364,7 @@ impl TransactionsQueues {
             data: transaction_to_send.data.clone(),
             nonce: assigned_nonce,
             gas_limit: None,
-            status: TransactionStatus::Pending,
+            status: TransactionStatus::PENDING,
             blobs: transaction_to_send.blobs.clone(),
             chain_id: transactions_queue.chain_id(),
             known_transaction_hash: None,
@@ -636,7 +636,7 @@ impl TransactionsQueues {
                         if let Some(webhook_manager) = &self.webhook_manager {
                             let webhook_manager = webhook_manager.clone();
                             let sent_transaction = Transaction {
-                                status: TransactionStatus::Inmempool,
+                                status: TransactionStatus::INMEMPOOL,
                                 known_transaction_hash: Some(transaction_sent.hash),
                                 sent_at: Some(Utc::now()),
                                 ..transaction
@@ -778,16 +778,16 @@ impl TransactionsQueues {
                                 .await.map_err(ProcessInmempoolTransactionError::MoveInmempoolTransactionToMinedError)?;
 
                             match status {
-                                TransactionStatus::Mined => {
+                                TransactionStatus::MINED => {
                                     self.db
                                         .transaction_mined(&transaction, &receipt)
-                                        .await.map_err(|e| ProcessInmempoolTransactionError::CouldNotUpdateTransactionStatusInTheDatabase(*relayer_id, transaction.clone(), TransactionStatus::Mined, e))?;
+                                        .await.map_err(|e| ProcessInmempoolTransactionError::CouldNotUpdateTransactionStatusInTheDatabase(*relayer_id, transaction.clone(), TransactionStatus::MINED, e))?;
                                     self.invalidate_transaction_cache(&transaction.id).await;
 
                                     if let Some(webhook_manager) = &self.webhook_manager {
                                         let webhook_manager = webhook_manager.clone();
                                         let mined_transaction = Transaction {
-                                            status: TransactionStatus::Mined,
+                                            status: TransactionStatus::MINED,
                                             mined_at: Some(Utc::now()),
                                             ..transaction
                                         };
@@ -803,14 +803,14 @@ impl TransactionsQueues {
                                         });
                                     }
                                 }
-                                TransactionStatus::Expired => {
-                                    self.db.transaction_expired(&transaction.id).await.map_err(|e| ProcessInmempoolTransactionError::CouldNotUpdateTransactionStatusInTheDatabase(*relayer_id, transaction.clone(), TransactionStatus::Expired, e))?;
+                                TransactionStatus::EXPIRED => {
+                                    self.db.transaction_expired(&transaction.id).await.map_err(|e| ProcessInmempoolTransactionError::CouldNotUpdateTransactionStatusInTheDatabase(*relayer_id, transaction.clone(), TransactionStatus::EXPIRED, e))?;
                                     self.invalidate_transaction_cache(&transaction.id).await;
 
                                     if let Some(webhook_manager) = &self.webhook_manager {
                                         let webhook_manager = webhook_manager.clone();
                                         let expired_transaction = Transaction {
-                                            status: TransactionStatus::Expired,
+                                            status: TransactionStatus::EXPIRED,
                                             ..transaction
                                         };
                                         tokio::spawn(async move {
@@ -821,16 +821,16 @@ impl TransactionsQueues {
                                         });
                                     }
                                 }
-                                TransactionStatus::Failed => {
+                                TransactionStatus::FAILED => {
                                     self.db
                                         .update_transaction_failed(&transaction.id, "Failed onchain")
-                                        .await.map_err(|e| ProcessInmempoolTransactionError::CouldNotUpdateTransactionStatusInTheDatabase(*relayer_id, transaction.clone(), TransactionStatus::Failed, e))?;
+                                        .await.map_err(|e| ProcessInmempoolTransactionError::CouldNotUpdateTransactionStatusInTheDatabase(*relayer_id, transaction.clone(), TransactionStatus::FAILED, e))?;
                                     self.invalidate_transaction_cache(&transaction.id).await;
 
                                     if let Some(webhook_manager) = &self.webhook_manager {
                                         let webhook_manager = webhook_manager.clone();
                                         let failed_transaction = Transaction {
-                                            status: TransactionStatus::Failed,
+                                            status: TransactionStatus::FAILED,
                                             ..transaction
                                         };
                                         tokio::spawn(async move {
@@ -971,7 +971,7 @@ impl TransactionsQueues {
                         if let Some(webhook_manager) = &self.webhook_manager {
                             let webhook_manager = webhook_manager.clone();
                             let confirmed_transaction = Transaction {
-                                status: TransactionStatus::Confirmed,
+                                status: TransactionStatus::CONFIRMED,
                                 confirmed_at: Some(Utc::now()),
                                 ..transaction
                             };

@@ -120,7 +120,7 @@ async fn handle_add(project_path: &ProjectLocation) -> Result<(), NetworkError> 
 }
 
 async fn handle_list(sdk: &SDK) -> Result<(), NetworkError> {
-    let networks = sdk.network.get_all_networks().await?;
+    let networks = sdk.network.get_all().await?;
 
     if networks.is_empty() {
         println!("No networks found.");

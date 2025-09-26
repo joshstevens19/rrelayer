@@ -22,7 +22,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .get_transactions_pending_count(&relayer.id)
+            .get_pending_count(&relayer.id)
             .await
             .context("Failed to get pending count")?;
 
@@ -34,7 +34,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .get_transactions_inmempool_count(&relayer.id)
+            .get_inmempool_count(&relayer.id)
             .await
             .context("Failed to get inmempool count")?;
 
@@ -62,7 +62,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .get_transactions_pending_count(&relayer.id)
+            .get_pending_count(&relayer.id)
             .await
             .context("Failed to get pending count")?;
 
@@ -76,7 +76,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .get_transactions_pending_count(&relayer.id)
+            .get_pending_count(&relayer.id)
             .await
             .context("Failed to get pending count")?;
 
@@ -88,7 +88,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .get_transactions_inmempool_count(&relayer.id)
+            .get_inmempool_count(&relayer.id)
             .await
             .context("Failed to get inmempool count")?;
 
@@ -104,7 +104,7 @@ impl TestRunner {
                 .relayer_client
                 .sdk
                 .transaction
-                .get_transactions_inmempool_count(&relayer.id)
+                .get_inmempool_count(&relayer.id)
                 .await
                 .context("Failed to get inmempool count")?;
 

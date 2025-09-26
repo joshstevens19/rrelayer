@@ -288,7 +288,7 @@ impl TestRunner {
             info!("Transaction {} status: {:?}", transaction_id, result);
 
             match result.status {
-                TransactionStatus::Confirmed | TransactionStatus::Mined => {
+                TransactionStatus::CONFIRMED | TransactionStatus::MINED => {
                     info!("Transaction {} completed successfully", transaction_id);
                     let transaction = self
                         .relayer_client
@@ -301,10 +301,10 @@ impl TestRunner {
                         result.receipt.expect("Transaction receipt should always be present now"),
                     ));
                 }
-                TransactionStatus::Failed => {
+                TransactionStatus::FAILED => {
                     anyhow::bail!("Transaction {} failed: {:?}", transaction_id, result);
                 }
-                TransactionStatus::Pending | TransactionStatus::Inmempool => {
+                TransactionStatus::PENDING | TransactionStatus::INMEMPOOL => {
                     info!(
                         "Transaction {} still pending, mining a block and waiting...",
                         transaction_id
@@ -312,7 +312,7 @@ impl TestRunner {
                     self.mine_and_wait().await?;
                     tokio::time::sleep(Duration::from_millis(100)).await;
                 }
-                TransactionStatus::Expired => {
+                TransactionStatus::EXPIRED => {
                     anyhow::bail!("Transaction {} expired: {:?}", transaction_id, result);
                 }
             }

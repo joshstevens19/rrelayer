@@ -53,7 +53,7 @@ impl TestRunner {
             self.relayer_client
                 .sdk
                 .transaction
-                .send_transaction(&relayer1.id, &tx_request, None)
+                .send(&relayer1.id, &tx_request, None)
                 .await?;
         }
 
@@ -70,7 +70,7 @@ impl TestRunner {
             self.relayer_client
                 .sdk
                 .transaction
-                .send_transaction(&relayer2.id, &tx_request, None)
+                .send(&relayer2.id, &tx_request, None)
                 .await?;
         }
 

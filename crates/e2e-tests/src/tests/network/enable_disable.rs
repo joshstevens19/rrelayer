@@ -17,7 +17,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .network
-            .get_all_networks()
+            .get_all()
             .await
             .context("Failed to get all networks")?;
         info!("All networks: {} found", all_networks.len());

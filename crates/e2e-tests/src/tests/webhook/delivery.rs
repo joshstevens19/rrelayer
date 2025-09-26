@@ -39,7 +39,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .send_transaction(&relayer.id, &tx_request, None)
+            .send(&relayer.id, &tx_request, None)
             .await?;
 
         info!("📨 Transaction submitted: {}", send_result.id);
@@ -94,7 +94,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .send_transaction(&relayer.id, &contract_tx_request, None)
+            .send(&relayer.id, &contract_tx_request, None)
             .await?;
 
         info!("📨 Contract transaction submitted: {}", contract_send_result.id);
@@ -249,7 +249,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .send_transaction(&relayer.id, &tx_request, None)
+            .send(&relayer.id, &tx_request, None)
             .await
             .context("Failed to send transaction")?;
 
@@ -259,7 +259,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .cancel_transaction(transaction_id, None)
+            .cancel(transaction_id, None)
             .await
             .context("Failed to cancel transaction")?;
 
@@ -288,7 +288,7 @@ impl TestRunner {
             .relayer_client
             .sdk
             .transaction
-            .send_transaction(&relayer.id, &tx_request, None)
+            .send(&relayer.id, &tx_request, None)
             .await
             .context("Failed to send transaction")?;
 

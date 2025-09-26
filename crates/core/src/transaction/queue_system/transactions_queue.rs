@@ -184,7 +184,7 @@ impl TransactionsQueue {
                 let mut inmempool_transactions = self.inmempool_transactions.lock().await;
                 inmempool_transactions.push_back(Transaction {
                     known_transaction_hash: Some(transaction_sent.hash),
-                    status: TransactionStatus::Inmempool,
+                    status: TransactionStatus::INMEMPOOL,
                     sent_with_max_fee_per_gas: Some(transaction_sent.sent_with_gas.max_fee),
                     sent_with_max_priority_fee_per_gas: Some(
                         transaction_sent.sent_with_gas.max_priority_fee,
@@ -352,13 +352,13 @@ impl TransactionsQueue {
                 let transaction_status: TransactionStatus;
 
                 if receipt.status() {
-                    transaction_status = TransactionStatus::Mined;
+                    transaction_status = TransactionStatus::MINED;
                     info!(
                         "Transaction {} successfully mined for relayer: {}",
                         id, self.relayer.name
                     );
                 } else {
-                    transaction_status = TransactionStatus::Failed;
+                    transaction_status = TransactionStatus::FAILED;
                     info!("Transaction {} failed on-chain for relayer: {}", id, self.relayer.name);
                 }
 

@@ -20,14 +20,14 @@ impl TransactionApi {
         Self { client }
     }
 
-    pub async fn get_transaction(
+    pub async fn get(
         &self,
         transaction_id: &TransactionId,
     ) -> ApiResult<Option<Transaction>> {
         self.client.get_or_none(&format!("transactions/{}", transaction_id)).await
     }
 
-    pub async fn get_transactions(
+    pub async fn get_all(
         &self,
         relayer_id: &RelayerId,
         paging: &PagingContext,
@@ -37,7 +37,7 @@ impl TransactionApi {
             .await
     }
 
-    pub async fn send_transaction(
+    pub async fn send(
         &self,
         relayer_id: &RelayerId,
         transaction: &RelayTransactionRequest,
@@ -59,7 +59,7 @@ impl TransactionApi {
             .await
     }
 
-    pub async fn cancel_transaction(
+    pub async fn cancel(
         &self,
         transaction_id: &TransactionId,
         rate_limit_key: Option<String>,
@@ -77,7 +77,7 @@ impl TransactionApi {
             .await
     }
 
-    pub async fn replace_transaction(
+    pub async fn replace(
         &self,
         transaction_id: &TransactionId,
         replacement: &RelayTransactionRequest,
@@ -100,18 +100,18 @@ impl TransactionApi {
             .await
     }
 
-    pub async fn get_transaction_status(
+    pub async fn get_status(
         &self,
         transaction_id: &TransactionId,
     ) -> ApiResult<Option<RelayTransactionStatusResult>> {
         self.client.get_or_none(&format!("transactions/status/{}", transaction_id)).await
     }
 
-    pub async fn get_transactions_inmempool_count(&self, relayer_id: &RelayerId) -> ApiResult<u32> {
+    pub async fn get_inmempool_count(&self, relayer_id: &RelayerId) -> ApiResult<u32> {
         self.client.get(&format!("transactions/relayers/{}/inmempool/count", relayer_id)).await
     }
 
-    pub async fn get_transactions_pending_count(&self, relayer_id: &RelayerId) -> ApiResult<u32> {
+    pub async fn get_pending_count(&self, relayer_id: &RelayerId) -> ApiResult<u32> {
         self.client.get(&format!("transactions/relayers/{}/pending/count", relayer_id)).await
     }
 }
