@@ -288,7 +288,11 @@ impl TestRunner {
             info!("Transaction {} status: {:?}", transaction_id, result);
 
             match result.status {
-                TransactionStatus::CONFIRMED | TransactionStatus::MINED => {
+                TransactionStatus::CONFIRMED
+                | TransactionStatus::MINED
+                | TransactionStatus::DROPPED
+                | TransactionStatus::CANCELLED
+                | TransactionStatus::REPLACED => {
                     info!("Transaction {} completed successfully", transaction_id);
                     let transaction = self
                         .relayer_client

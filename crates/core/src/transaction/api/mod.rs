@@ -8,6 +8,7 @@ use axum::{
 use crate::app_state::AppState;
 
 mod cancel_transaction;
+pub use cancel_transaction::CancelTransactionResponse;
 mod get_relayer_transactions;
 mod get_transaction_by_id;
 mod get_transaction_status;

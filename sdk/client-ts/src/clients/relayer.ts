@@ -210,12 +210,12 @@ export class RelayerClient {
        * cancel a transaction
        * @param transactionId The transaction id
        * @param rateLimitKey The rate limit key if you want rate limit feature on
-       * @returns boolean
+       * @returns TransactionSent - The cancel transaction details
        */
       cancel: (
         transactionId: string,
         rateLimitKey?: string | undefined
-      ): Promise<boolean> => {
+      ): Promise<TransactionSent> => {
         return cancelTransaction(
           transactionId,
           rateLimitKey,
@@ -260,6 +260,12 @@ export class RelayerClient {
               return result.receipt;
             case TransactionStatus.EXPIRED:
               throw new Error('Transaction expired');
+            case TransactionStatus.CANCELLED:
+              throw new Error('Transaction was cancelled');
+            case TransactionStatus.REPLACED:
+              throw new Error('Transaction was replaced');
+            case TransactionStatus.DROPPED:
+              throw new Error('Transaction was dropped from mempool');
             default:
               throw new Error(`Unknown transaction status ${result.status}`);
           }

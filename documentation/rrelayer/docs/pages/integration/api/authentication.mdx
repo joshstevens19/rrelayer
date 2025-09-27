@@ -1,12 +1,8 @@
 # Authentication API
 
-The Authentication API provides endpoints for verifying API access and checking server status.
-
-## Authentication Methods
-
 rrelayer supports multiple authentication methods:
 
-### Basic Authentication
+## Basic Authentication
 
 Use HTTP Basic Authentication with username and password:
 
@@ -16,7 +12,25 @@ curl https://your-rrelayer.com/api/relayers \
   -u "username:password"
 ```
 
-### API Key Authentication
+Basic authenticated requests must include proper authentication headers:
+
+```
+Authorization: Basic <base64-encoded-credentials>
+```
+
+
+Basic authentication is configured in your rrelayer.yaml:
+
+```yaml
+api_config:
+  port: 3000
+  authentication_username: "${RRELAYER_AUTH_USERNAME}"
+  authentication_password: "${RRELAYER_AUTH_PASSWORD}"
+```
+
+you can read more about that [here](/config/api-config)
+
+## API Key Authentication
 
 Use API keys in the x-rrelayer-api-key header:
 
@@ -25,16 +39,28 @@ curl https://your-rrelayer.com/api/relayers \
   -H "x-rrelayer-api-key: your-api-key"
 ```
 
-### Configuration
+API key authentication is configured in your rrelayer.yaml:
 
-Authentication is configured in your rrelayer.yaml:
-
-```yaml
-api_config:
-  port: 3000
-  authentication_username: "${RRELAYER_AUTH_USERNAME}"
-  authentication_password: "${RRELAYER_AUTH_PASSWORD}"
+```yaml [rrelayer.yaml]
+...
+networks: // [!code focus]
+  - name: local_anvil
+    chain_id: 31337
+    provider_urls:
+      - http://127.0.0.1:8545
+    block_explorer_url: http://localhost:8545
+    api_keys: // [!code focus]
+    - relayer: "0x6f3e343161c4b905342015ad20a5c492adfb730e" // [!code focus]
+      keys: // [!code focus]
+       - "${API_KEY_1}" // [!code focus]
+       - "${API_KEY_2}" // [!code focus]
+    - relayer: "0x70e0ba845a1a0f2da3359c97e0285013525ffc49" // [!code focus]
+      keys: // [!code focus]
+       - "${API_KEY_3}" // [!code focus]
 ```
+
+you can read how to set APIs keys in [here](/config/networks/api-keys)
+
 
 ## Status Check
 
@@ -49,48 +75,45 @@ GET /api/auth/status
 
 ```json
 {
-  "status": "ok",
-  "version": "1.0.0",
-  "timestamp": "2025-09-26T10:30:00Z",
-  "uptime_seconds": 3600
+  "authenticated_with": "BASIC"
 }
 ```
 
+OR
+
+```json
+  {
+    "authenticated_with": "APIKEY",
+    "api_key_access": [
+      {
+        "chain_id": 1,
+        "relayers": ["0x123...", "0x456..."]
+      },
+      {
+        "chain_id": 137,
+        "relayers": ["0x789..."]
+      }
+    ]
+  }
+```
+
 ### Example
+
+#### Basic Auth
 
 ```bash
 curl https://your-rrelayer.com/api/auth/status \
   -u "username:password"
 ```
 
-## Authentication Headers
+#### API Key Auth
 
-All authenticated requests must include proper authentication headers:
-
-### Basic Auth Header
-
-```
-Authorization: Basic <base64-encoded-credentials>
-```
-
-Example:
 ```bash
-# username:password encoded as base64
-curl https://your-rrelayer.com/api/relayers \
-  -H "Authorization: Basic dXNlcm5hbWU6cGFzc3dvcmQ="
+curl https://your-rrelayer.com/api/auth/status \
+  -H "x-rrelayer-api-key: your-api-key"
 ```
 
-### API Key Header
-
-```
-x-rrelayer-api-key: <api-key>
-```
-
-Example:
-```bash
-curl https://your-rrelayer.com/api/relayers \
-  -H "x-rrelayer-api-key: sk_1234567890abcdef"
-```
+Will throw a 401 http error if none or valid.
 
 ## Rate Limiting Headers
 
@@ -108,47 +131,6 @@ curl https://your-rrelayer.com/api/transactions/relayers/0x.../send \
   -H "Content-Type: application/json" \
   -d '{"to": "0x...", "value": "1000000000000000000"}'
 ```
-
-## Error Responses
-
-### Authentication Errors
-
-| Status | Code | Description |
-|--------|------|-------------|
-| 401 | `UNAUTHORIZED` | Missing or invalid credentials |
-| 403 | `FORBIDDEN` | Valid credentials but insufficient permissions |
-
-### Error Response Format
-
-```json
-{
-  "error": "Authentication required",
-  "code": "UNAUTHORIZED"
-}
-```
-
-## Security Best Practices
-
-### Credential Management
-
-1. **Use environment variables** for credentials
-2. **Rotate credentials regularly**
-3. **Use HTTPS** for all API calls
-4. **Store credentials securely**
-
-### API Key Security
-
-1. **Generate strong API keys** (min 32 characters)
-2. **Use different keys** for different environments
-3. **Monitor API key usage**
-4. **Revoke unused keys**
-
-### Network Security
-
-1. **Use HTTPS only** for production
-2. **Implement IP whitelisting** if possible
-3. **Monitor for unusual activity**
-4. **Use rate limiting** to prevent abuse
 
 ## Development vs Production
 
@@ -176,30 +158,4 @@ Set environment variables:
 ```bash
 export RRELAYER_AUTH_USERNAME="admin_$(openssl rand -hex 16)"
 export RRELAYER_AUTH_PASSWORD="$(openssl rand -base64 32)"
-```
-
-## Testing Authentication
-
-### Verify Credentials
-
-Test your authentication setup:
-
-```bash
-# Test basic auth
-curl -f https://your-rrelayer.com/api/auth/status \
-  -u "username:password"
-
-# Test with wrong credentials (should fail)
-curl -f https://your-rrelayer.com/api/auth/status \
-  -u "wrong:credentials"
-```
-
-### Check Headers
-
-Verify proper headers are being sent:
-
-```bash
-# Show request headers
-curl -v https://your-rrelayer.com/api/auth/status \
-  -u "username:password"
 ```

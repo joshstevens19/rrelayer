@@ -150,6 +150,79 @@ impl AppState {
         false
     }
 
+    pub fn validate_api_key_and_get_relayers(
+        &self,
+        headers: &HeaderMap,
+        chain_id: &ChainId,
+    ) -> Option<Vec<EvmAddress>> {
+        let api_key = headers.get("x-rrelayer-api-key").and_then(|v| v.to_str().ok())?;
+
+        let api_keys = self.find_api_keys(chain_id)?;
+
+        let mut accessible_relayers = Vec::new();
+        for api_key_config in api_keys {
+            if api_key_config.keys.contains(&api_key.to_string()) {
+                accessible_relayers.push(api_key_config.relayer);
+            }
+        }
+
+        if accessible_relayers.is_empty() {
+            None
+        } else {
+            Some(accessible_relayers)
+        }
+    }
+
+    pub fn is_api_key_valid_across_any_chain(&self, headers: &HeaderMap) -> bool {
+        let api_key = match headers.get("x-rrelayer-api-key").and_then(|v| v.to_str().ok()) {
+            Some(key) => key,
+            None => return false,
+        };
+
+        for (_, api_keys) in &*self.api_keys {
+            for api_key_config in api_keys {
+                if api_key_config.keys.contains(&api_key.to_string()) {
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
+
+    pub fn get_api_key_access(
+        &self,
+        headers: &HeaderMap,
+    ) -> Option<Vec<crate::authentication::api::ApiKeyAccess>> {
+        let api_key = headers.get("x-rrelayer-api-key").and_then(|v| v.to_str().ok())?;
+
+        let mut access_list = Vec::new();
+
+        // Check all chains for this API key
+        for (chain_id, api_keys) in &*self.api_keys {
+            let mut relayers_for_chain = Vec::new();
+
+            for api_key_config in api_keys {
+                if api_key_config.keys.contains(&api_key.to_string()) {
+                    relayers_for_chain.push(api_key_config.relayer);
+                }
+            }
+
+            if !relayers_for_chain.is_empty() {
+                access_list.push(crate::authentication::api::ApiKeyAccess {
+                    chain_id: *chain_id,
+                    relayers: relayers_for_chain,
+                });
+            }
+        }
+
+        if access_list.is_empty() {
+            None
+        } else {
+            Some(access_list)
+        }
+    }
+
     pub fn restricted_addresses(
         &self,
         relayer: &EvmAddress,

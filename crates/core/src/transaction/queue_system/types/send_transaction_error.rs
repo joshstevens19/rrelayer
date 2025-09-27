@@ -40,4 +40,7 @@ pub enum TransactionQueueSendTransactionError {
 
     #[error("Safe proxy error: {0}")]
     SafeProxyError(#[from] SafeProxyError),
+
+    #[error("No transaction found in queue")]
+    NoTransactionInQueue,
 }

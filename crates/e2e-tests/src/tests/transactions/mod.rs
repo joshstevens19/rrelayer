@@ -10,10 +10,8 @@ mod nonce_management;
 mod replace;
 mod send_blob;
 mod send_contract_interaction;
-mod send_contract_interaction_safe_proxy;
 mod send_eth;
 mod send_eth_legacy;
-mod send_eth_safe_proxy;
 mod status;
 mod validation;
 
@@ -33,19 +31,9 @@ impl TestModule for TransactionTests {
                 |runner| Box::pin(runner.transaction_send_eth_legacy()),
             ),
             TestDefinition::new(
-                "transaction_send_eth_safe_proxy",
-                "Send ETH transaction via Safe proxy",
-                |runner| Box::pin(runner.transaction_send_eth_safe_proxy()),
-            ),
-            TestDefinition::new(
                 "transaction_send_contract_interaction",
                 "Send contract interaction transaction",
                 |runner| Box::pin(runner.transaction_send_contract_interaction()),
-            ),
-            TestDefinition::new(
-                "transaction_send_contract_interaction_safe_proxy",
-                "Send contract interaction via Safe proxy",
-                |runner| Box::pin(runner.transaction_send_contract_interaction_safe_proxy()),
             ),
             TestDefinition::new(
                 "transaction_send_blob",

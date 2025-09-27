@@ -6,7 +6,6 @@
 
 ## TODO List
 
-- Change the TS sdk to work with the changes in the playground
 - Finish documentation
 - AI write go and python SDK
 - Internal documentation in the README.MD throughout
@@ -21,6 +20,7 @@
 - Testing loading up tenderly gas
 - Testing handling custom gas with http call
 - rrelayer auth without being in project
+- look at signers in the networks
 
 
 # Idea for later

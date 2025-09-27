@@ -17,6 +17,9 @@ pub enum TransactionStatus {
     CONFIRMED,
     FAILED,
     EXPIRED,
+    CANCELLED,
+    DROPPED,
+    REPLACED,
 }
 
 impl Display for TransactionStatus {
@@ -34,6 +37,9 @@ impl TransactionStatus {
             TransactionStatus::CONFIRMED => "CONFIRMED".to_string(),
             TransactionStatus::FAILED => "FAILED".to_string(),
             TransactionStatus::EXPIRED => "EXPIRED".to_string(),
+            TransactionStatus::CANCELLED => "CANCELLED".to_string(),
+            TransactionStatus::DROPPED => "DROPPED".to_string(),
+            TransactionStatus::REPLACED => "REPLACED".to_string(),
         }
     }
 }
@@ -51,6 +57,9 @@ impl<'a> FromSql<'a> for TransactionStatus {
                 "CONFIRMED" => Ok(TransactionStatus::CONFIRMED),
                 "FAILED" => Ok(TransactionStatus::FAILED),
                 "EXPIRED" => Ok(TransactionStatus::EXPIRED),
+                "CANCELLED" => Ok(TransactionStatus::CANCELLED),
+                "DROPPED" => Ok(TransactionStatus::DROPPED),
+                "REPLACED" => Ok(TransactionStatus::REPLACED),
                 _ => Err(format!("Unknown TransactionStatus: {}", status).into()),
             }
         } else if *ty == Type::TEXT
@@ -68,6 +77,9 @@ impl<'a> FromSql<'a> for TransactionStatus {
                 "CONFIRMED" => Ok(TransactionStatus::CONFIRMED),
                 "FAILED" => Ok(TransactionStatus::FAILED),
                 "EXPIRED" => Ok(TransactionStatus::EXPIRED),
+                "CANCELLED" => Ok(TransactionStatus::CANCELLED),
+                "DROPPED" => Ok(TransactionStatus::DROPPED),
+                "REPLACED" => Ok(TransactionStatus::REPLACED),
                 _ => Err(format!("Unknown TransactionStatus: {}", status).into()),
             }
         } else {
@@ -98,6 +110,9 @@ impl ToSql for TransactionStatus {
             TransactionStatus::CONFIRMED => "CONFIRMED",
             TransactionStatus::FAILED => "FAILED",
             TransactionStatus::EXPIRED => "EXPIRED",
+            TransactionStatus::CANCELLED => "CANCELLED",
+            TransactionStatus::DROPPED => "DROPPED",
+            TransactionStatus::REPLACED => "REPLACED",
         };
 
         out.extend_from_slice(status_str.as_bytes());

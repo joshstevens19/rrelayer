@@ -86,11 +86,27 @@ GET /api/transactions/{transaction_id}
   "transaction_hash": "0xabcdef123456789abcdef123456789abcdef123456789abcdef123456789abcdef",
   "queued_at": "2025-09-26T10:29:30Z",
   "sent_at": "2025-09-26T10:30:00Z",
+  "mined_at": "2025-09-26T10:31:30Z",
   "confirmed_at": "2025-09-26T10:32:00Z",
   "expires_at": "2025-09-26T11:30:00Z",
   "external_id": "order_12345",
   "nonce": 42,
-  "is_noop": false
+  "is_noop": false,
+  "cancelled_by_transaction_id": null
+}
+```
+
+#### Additional Fields for Cancelled Transactions
+
+For transactions with status `CANCELLED`, additional fields are included:
+
+```json
+{
+  "id": "tx_original456",
+  "status": "CANCELLED",
+  "is_noop": true,
+  "cancelled_by_transaction_id": "tx_cancel789",
+  ...
 }
 ```
 
@@ -132,11 +148,14 @@ GET /api/transactions/status/{transaction_id}
 | Status | Description |
 |--------|-------------|
 | `PENDING` | Transaction is queued and waiting to be sent |
-| `INMEMPOOL` | Transaction has been sent to the blockchain |
+| `INMEMPOOL` | Transaction has been sent to the blockchain mempool |
 | `MINED` | Transaction has been included in a block |
 | `CONFIRMED` | Transaction has reached required confirmations |
-| `FAILED` | Transaction failed |
+| `FAILED` | Transaction failed on-chain |
 | `EXPIRED` | Transaction expired before being mined |
+| `CANCELLED` | Transaction was cancelled by a cancel operation |
+| `REPLACED` | Transaction was replaced by a replace operation |
+| `DROPPED` | Transaction was dropped from mempool (e.g., failed cancel/replace) |
 
 ### Example
 
@@ -147,7 +166,7 @@ curl https://your-rrelayer.com/api/transactions/status/tx_abc123def456 \
 
 ## Replace Transaction
 
-Replace a pending transaction with a new one (higher gas price).
+Replace a pending or in-mempool transaction with new transaction parameters.
 
 ### Endpoint
 ```
@@ -165,6 +184,13 @@ PUT /api/transactions/replace/{transaction_id}
 }
 ```
 
+### Behavior
+
+- **PENDING transactions**: Original transaction parameters are updated in-place and marked with new values
+- **INMEMPOOL transactions**: A replacement transaction is created with the same nonce and higher gas price to compete on-chain
+  - If replacement transaction wins: Original becomes `REPLACED`, replacement transaction becomes `MINED`
+  - If original transaction wins: Original becomes `MINED`, replacement transaction becomes `DROPPED`
+
 ### Response
 
 ```json
@@ -173,6 +199,15 @@ PUT /api/transactions/replace/{transaction_id}
   "hash": "0xdef456ghi789def456ghi789def456ghi789def456ghi789def456ghi789def456"
 }
 ```
+
+### Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `string` | ID of the replacement transaction created |
+| `hash` | `string` | Transaction hash of the replacement transaction (for INMEMPOOL only) |
+
+**Note**: For PENDING transactions that are replaced immediately, the response contains the same transaction ID with updated parameters, and `hash` will be `null` until sent.
 
 ### Example
 
@@ -189,12 +224,19 @@ curl -X PUT https://your-rrelayer.com/api/transactions/replace/tx_abc123def456 \
 
 ## Cancel Transaction
 
-Cancel a pending transaction.
+Cancel a pending or in-mempool transaction.
 
 ### Endpoint
 ```
 PUT /api/transactions/cancel/{transaction_id}
 ```
+
+### Behavior
+
+- **PENDING transactions**: Immediately removed from queue and marked as `CANCELLED`
+- **INMEMPOOL transactions**: A cancel transaction is created with the same nonce and higher gas price to compete on-chain
+  - If cancel transaction wins: Original becomes `CANCELLED`, cancel transaction becomes `MINED`
+  - If original transaction wins: Original becomes `MINED`, cancel transaction becomes `DROPPED`
 
 ### Response
 
@@ -204,6 +246,15 @@ PUT /api/transactions/cancel/{transaction_id}
   "hash": "0xcancel789cancel789cancel789cancel789cancel789cancel789cancel789cancel"
 }
 ```
+
+### Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `string` | ID of the cancel transaction created |
+| `hash` | `string` | Transaction hash of the cancel transaction (for INMEMPOOL only) |
+
+**Note**: For PENDING transactions that are cancelled immediately, `hash` will be `null`.
 
 ### Example
 
@@ -304,6 +355,52 @@ curl https://your-rrelayer.com/api/transactions/relayers/0x742d35.../pending/cou
   "error": "Transaction not found",
   "code": "NOT_FOUND"
 }
+```
+
+## Transaction Competition and Race Conditions
+
+When cancelling or replacing transactions that are already in the blockchain mempool (status `INMEMPOOL`), rrelayer creates competing transactions with the same nonce and higher gas prices.
+
+### Competition Resolution
+
+The blockchain will only mine one transaction per nonce. The resolution depends on which transaction gets mined first:
+
+#### Cancel Operations
+- **Cancel wins**: Original transaction becomes `CANCELLED` with `is_noop: true` and `cancelled_by_transaction_id` set
+- **Original wins**: Original transaction becomes `MINED`, cancel transaction becomes `DROPPED`
+
+#### Replace Operations  
+- **Replacement wins**: Original transaction becomes `REPLACED`, replacement transaction becomes `MINED`
+- **Original wins**: Original transaction becomes `MINED`, replacement transaction becomes `DROPPED`
+
+### Monitoring Competition Results
+
+You can monitor the outcome by:
+
+1. **Checking transaction status** of the original transaction
+2. **Following the relationship** using `cancelled_by_transaction_id` field
+3. **Monitoring both transactions** if you need to track the competing transaction
+
+### Example: Monitoring a Cancel Operation
+
+```bash
+# 1. Send a transaction
+POST /api/transactions/relayers/{relayer_id}/send
+# Response: {"id": "tx_original", "hash": "0x..."}
+
+# 2. Cancel the transaction (while INMEMPOOL)
+PUT /api/transactions/cancel/tx_original  
+# Response: {"id": "tx_cancel", "hash": "0x..."}
+
+# 3. Monitor the original transaction status
+GET /api/transactions/status/tx_original
+# Possible outcomes:
+# - "status": "CANCELLED" (cancel won)
+# - "status": "MINED" (original won)
+
+# 4. If cancelled, check the relationship
+GET /api/transactions/tx_original
+# Response includes: "cancelled_by_transaction_id": "tx_cancel"
 ```
 
 ## Rate Limiting

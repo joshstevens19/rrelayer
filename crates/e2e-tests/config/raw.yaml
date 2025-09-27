@@ -46,7 +46,7 @@ networks:
       disable_personal_sign: false
       disable_typed_data_sign: false
       disable_transactions: false
-  # TODO: need to test these
+  # TODO: need to test these + AUTH TEST ON API KEYS
   api_keys:
     - relayer: "0x6f3e343161c4b905342015ad20a5c492adfb730e"
       keys:

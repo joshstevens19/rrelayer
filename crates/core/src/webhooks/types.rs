@@ -41,6 +41,9 @@ impl From<TransactionStatus> for WebhookEventType {
             TransactionStatus::CONFIRMED => WebhookEventType::TransactionConfirmed,
             TransactionStatus::FAILED => WebhookEventType::TransactionFailed,
             TransactionStatus::EXPIRED => WebhookEventType::TransactionExpired,
+            TransactionStatus::CANCELLED => WebhookEventType::TransactionCancelled,
+            TransactionStatus::DROPPED => WebhookEventType::TransactionFailed, // DROPPED transactions are essentially failed
+            TransactionStatus::REPLACED => WebhookEventType::TransactionReplaced,
         }
     }
 }

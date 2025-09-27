@@ -152,6 +152,25 @@ impl HttpClient {
         Ok(response.json().await?)
     }
 
+    pub async fn put_with_headers<T, B>(
+        &self,
+        endpoint: &str,
+        body: &B,
+        headers: HeaderMap,
+    ) -> ApiResult<T>
+    where
+        T: DeserializeOwned,
+        B: Serialize,
+    {
+        let url = self.build_url(endpoint);
+        let headers = self.build_headers(Some(headers));
+
+        let response =
+            self.client.put(&url).headers(headers).json(body).send().await?.error_for_status()?;
+
+        Ok(response.json::<T>().await?)
+    }
+
     pub async fn put_status<B>(&self, endpoint: &str, body: &B) -> ApiResult<()>
     where
         B: Serialize,

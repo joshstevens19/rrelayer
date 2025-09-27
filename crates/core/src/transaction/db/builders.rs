@@ -34,5 +34,6 @@ pub fn build_transaction_from_transaction_view(row: &Row) -> Transaction {
         sent_with_max_fee_per_gas: row.get("sent_max_fee_per_gas"),
         is_noop: to == from,
         external_id: row.get("external_id"),
+        cancelled_by_transaction_id: row.get("cancelled_by_transaction_id"),
     }
 }

@@ -4,9 +4,10 @@ use std::{
 };
 
 use super::types::{
-    EditableTransaction, MoveInmempoolTransactionToMinedError,
-    MovePendingTransactionToInmempoolError, SendTransactionGasPriceError,
-    TransactionQueueSendTransactionError, TransactionSentWithRelayer, TransactionsQueueSetup,
+    CompetitionResolutionResult, CompetitionType, CompetitiveTransaction, EditableTransaction,
+    MoveInmempoolTransactionToMinedError, MovePendingTransactionToInmempoolError,
+    SendTransactionGasPriceError, TransactionQueueSendTransactionError, TransactionSentWithRelayer,
+    TransactionsQueueSetup,
 };
 use crate::transaction::types::{TransactionNonce, TransactionValue};
 use crate::{
@@ -40,7 +41,7 @@ use tracing::info;
 
 pub struct TransactionsQueue {
     pending_transactions: Mutex<VecDeque<Transaction>>,
-    inmempool_transactions: Mutex<VecDeque<Transaction>>,
+    inmempool_transactions: Mutex<VecDeque<CompetitiveTransaction>>,
     mined_transactions: Mutex<HashMap<TransactionId, Transaction>>,
     evm_provider: EvmProvider,
     relayer: Relayer,
@@ -148,8 +149,8 @@ impl TransactionsQueue {
                 let transactions = self.inmempool_transactions.lock().await;
                 let result = transactions
                     .iter()
-                    .find(|t| t.id == *id)
-                    .map(|transaction| EditableTransaction::to_inmempool(transaction.clone()));
+                    .find(|t| t.original.id == *id)
+                    .map(|comp_tx| EditableTransaction::to_inmempool(comp_tx.original.clone()));
 
                 if result.is_some() {
                     info!(
@@ -182,7 +183,7 @@ impl TransactionsQueue {
         if let Some(transaction) = item {
             if transaction.id == transaction_sent.id {
                 let mut inmempool_transactions = self.inmempool_transactions.lock().await;
-                inmempool_transactions.push_back(Transaction {
+                let updated_transaction = Transaction {
                     known_transaction_hash: Some(transaction_sent.hash),
                     status: TransactionStatus::INMEMPOOL,
                     sent_with_max_fee_per_gas: Some(transaction_sent.sent_with_gas.max_fee),
@@ -192,7 +193,8 @@ impl TransactionsQueue {
                     sent_with_gas: Some(transaction_sent.sent_with_gas.clone()),
                     sent_at: Some(Utc::now()),
                     ..transaction
-                });
+                };
+                inmempool_transactions.push_back(CompetitiveTransaction::new(updated_transaction));
 
                 transactions.pop_front();
                 info!("Successfully moved transaction {} to inmempool for relayer: {}. Pending: {}, Inmempool: {}",
@@ -233,10 +235,51 @@ impl TransactionsQueue {
         );
     }
 
+    pub async fn remove_pending_transaction_by_id(
+        &mut self,
+        transaction_id: &TransactionId,
+    ) -> bool {
+        let mut transactions = self.pending_transactions.lock().await;
+        if let Some(pos) = transactions.iter().position(|tx| tx.id == *transaction_id) {
+            transactions.remove(pos);
+            info!(
+                "Removed pending transaction {} from relayer {}: {} remaining",
+                transaction_id,
+                self.relayer.name,
+                transactions.len()
+            );
+            true
+        } else {
+            false
+        }
+    }
+
+    pub async fn add_competitor_to_inmempool_transaction(
+        &mut self,
+        original_transaction_id: &TransactionId,
+        competitor_transaction: Transaction,
+        competition_type: CompetitionType,
+    ) -> Result<(), TransactionQueueSendTransactionError> {
+        let mut transactions = self.inmempool_transactions.lock().await;
+
+        if let Some(comp_tx) = transactions.front_mut() {
+            if comp_tx.original.id == *original_transaction_id {
+                comp_tx.add_competitor(competitor_transaction, competition_type);
+                info!(
+                    "Added competitor to inmempool transaction {} for relayer {}",
+                    original_transaction_id, self.relayer.name
+                );
+                return Ok(());
+            }
+        }
+
+        Err(TransactionQueueSendTransactionError::NoTransactionInQueue)
+    }
+
     pub async fn get_next_inmempool_transaction(&self) -> Option<Transaction> {
         let transactions = self.inmempool_transactions.lock().await;
 
-        transactions.front().cloned()
+        transactions.front().map(|comp_tx| comp_tx.get_active_transaction().clone())
     }
 
     pub async fn get_inmempool_transaction_count(&self) -> usize {
@@ -251,19 +294,33 @@ impl TransactionsQueue {
         transaction_sent: &TransactionSentWithRelayer,
     ) {
         let mut transactions = self.inmempool_transactions.lock().await;
-        if let Some(transaction) = transactions.front_mut() {
-            if transaction.id == transaction_sent.id {
+        if let Some(comp_tx) = transactions.front_mut() {
+            if comp_tx.original.id == transaction_sent.id {
                 info!(
                     "Updating inmempool transaction {} with new gas values for relayer: {}",
                     transaction_sent.id, self.relayer.name
                 );
-                transaction.known_transaction_hash = Some(transaction_sent.hash);
-                transaction.sent_with_max_fee_per_gas =
+                comp_tx.original.known_transaction_hash = Some(transaction_sent.hash);
+                comp_tx.original.sent_with_max_fee_per_gas =
                     Some(transaction_sent.sent_with_gas.max_fee);
-                transaction.sent_with_max_priority_fee_per_gas =
+                comp_tx.original.sent_with_max_priority_fee_per_gas =
                     Some(transaction_sent.sent_with_gas.max_priority_fee);
-                transaction.sent_with_gas = Some(transaction_sent.sent_with_gas.clone());
-                transaction.sent_at = Some(Utc::now());
+                comp_tx.original.sent_with_gas = Some(transaction_sent.sent_with_gas.clone());
+                comp_tx.original.sent_at = Some(Utc::now());
+            } else if let Some((ref mut competitor, _)) = comp_tx.competitive {
+                if competitor.id == transaction_sent.id {
+                    info!(
+                        "Updating competitive transaction {} with new gas values for relayer: {}",
+                        transaction_sent.id, self.relayer.name
+                    );
+                    competitor.known_transaction_hash = Some(transaction_sent.hash);
+                    competitor.sent_with_max_fee_per_gas =
+                        Some(transaction_sent.sent_with_gas.max_fee);
+                    competitor.sent_with_max_priority_fee_per_gas =
+                        Some(transaction_sent.sent_with_gas.max_priority_fee);
+                    competitor.sent_with_gas = Some(transaction_sent.sent_with_gas.clone());
+                    competitor.sent_at = Some(Utc::now());
+                }
             }
         }
     }
@@ -274,8 +331,8 @@ impl TransactionsQueue {
         transaction_sent: &TransactionSentWithRelayer,
     ) {
         let mut transactions = self.inmempool_transactions.lock().await;
-        if let Some(transaction) = transactions.front_mut() {
-            if transaction.id == *transaction_id {
+        if let Some(comp_tx) = transactions.front_mut() {
+            if let Some(transaction) = comp_tx.get_transaction_by_id_mut(transaction_id) {
                 info!(
                     "Updating inmempool transaction {} with no-op details for relayer: {}",
                     transaction_id, self.relayer.name
@@ -298,8 +355,8 @@ impl TransactionsQueue {
         replacement_transaction: &Transaction,
     ) {
         let mut transactions = self.inmempool_transactions.lock().await;
-        if let Some(transaction) = transactions.front_mut() {
-            if transaction.id == *transaction_id {
+        if let Some(comp_tx) = transactions.front_mut() {
+            if let Some(transaction) = comp_tx.get_transaction_by_id_mut(transaction_id) {
                 info!(
                     "Replacing inmempool transaction {} for relayer: {}",
                     transaction_id, self.relayer.name
@@ -336,7 +393,7 @@ impl TransactionsQueue {
         &mut self,
         id: &TransactionId,
         receipt: &AnyTransactionReceipt,
-    ) -> Result<TransactionStatus, MoveInmempoolTransactionToMinedError> {
+    ) -> Result<CompetitionResolutionResult, MoveInmempoolTransactionToMinedError> {
         info!(
             "Moving transaction {} from inmempool to mined for relayer: {} with receipt status: {}",
             id,
@@ -347,8 +404,8 @@ impl TransactionsQueue {
         let mut transactions = self.inmempool_transactions.lock().await;
         let item = transactions.front().cloned();
 
-        if let Some(transaction) = item {
-            if transaction.id == *id {
+        if let Some(comp_tx) = item {
+            if let Some(winning_transaction) = comp_tx.get_transaction_by_id(id) {
                 let transaction_status: TransactionStatus;
 
                 if receipt.status() {
@@ -362,28 +419,108 @@ impl TransactionsQueue {
                     info!("Transaction {} failed on-chain for relayer: {}", id, self.relayer.name);
                 }
 
+                let (winner_transaction, loser_transaction, loser_status) =
+                    if comp_tx.original.id == *id {
+                        let loser_status = if let Some((_, comp_type)) = &comp_tx.competitive {
+                            match comp_type {
+                                CompetitionType::Cancel => TransactionStatus::DROPPED,
+                                CompetitionType::Replace => TransactionStatus::DROPPED,
+                            }
+                        } else {
+                            TransactionStatus::DROPPED
+                        };
+
+                        let winner = Transaction {
+                            status: transaction_status.clone(),
+                            mined_at: Some(Utc::now()),
+                            cancelled_by_transaction_id: None,
+                            ..comp_tx.original
+                        };
+
+                        (winner, comp_tx.competitive.map(|(tx, _)| tx), loser_status)
+                    } else {
+                        if let Some((competitor, comp_type)) = comp_tx.competitive {
+                            let (loser_status, loser_transaction) = match comp_type {
+                                CompetitionType::Cancel => {
+                                    // When cancel wins, original transaction becomes a cancelled no-op
+                                    let cancelled_original = Transaction {
+                                        status: TransactionStatus::CANCELLED,
+                                        is_noop: true,
+                                        to: self.relay_address(),
+                                        value: TransactionValue::zero(),
+                                        data: TransactionData::empty(),
+                                        cancelled_by_transaction_id: Some(competitor.id),
+                                        ..comp_tx.original
+                                    };
+                                    (TransactionStatus::CANCELLED, cancelled_original)
+                                }
+                                CompetitionType::Replace => {
+                                    let replaced_original = Transaction {
+                                        status: TransactionStatus::REPLACED,
+                                        ..comp_tx.original
+                                    };
+                                    (TransactionStatus::REPLACED, replaced_original)
+                                }
+                            };
+
+                            let winner = Transaction {
+                                status: transaction_status.clone(),
+                                mined_at: Some(Utc::now()),
+                                ..competitor
+                            };
+
+                            (winner, Some(loser_transaction), loser_status)
+                        } else {
+                            return Err(
+                                MoveInmempoolTransactionToMinedError::TransactionIdDoesNotMatch(
+                                    self.relayer.id,
+                                    *id,
+                                    comp_tx.original,
+                                ),
+                            );
+                        }
+                    };
+
                 let mut mining_transactions = self.mined_transactions.lock().await;
-                mining_transactions.insert(
-                    transaction.id,
-                    Transaction {
-                        status: transaction_status.clone(),
-                        mined_at: Some(Utc::now()),
-                        ..transaction
-                    },
-                );
+                mining_transactions.insert(winner_transaction.id, winner_transaction.clone());
+
+                // Log competition resolution but don't put loser transactions in mined queue
+                // since they weren't actually mined - they were cancelled/dropped
+                let loser_for_result = loser_transaction.clone();
+                if let Some(loser) = loser_transaction {
+                    info!(
+                        "Competition resolved for relayer {} - Winner: {} ({}), Loser: {} ({})",
+                        self.relayer.name,
+                        winner_transaction.id,
+                        transaction_status,
+                        loser.id,
+                        loser_status
+                    );
+                } else {
+                    info!(
+                        "No competition - transaction {} mined normally for relayer: {}",
+                        winner_transaction.id, self.relayer.name
+                    );
+                }
 
                 transactions.pop_front();
                 info!("Successfully moved transaction {} to mined status for relayer: {}. Inmempool: {}, Mined: {}",
                     id, self.relayer.name, transactions.len(), mining_transactions.len());
 
-                Ok(transaction_status)
+                Ok(CompetitionResolutionResult {
+                    winner: winner_transaction,
+                    winner_status: transaction_status,
+                    loser: loser_for_result,
+                })
             } else {
-                info!("Transaction ID mismatch when moving to mined for relayer: {}. Expected: {}, Found: {}",
-                    self.relayer.name, id, transaction.id);
+                info!(
+                    "Transaction ID {} not found in competitive transaction for relayer: {}",
+                    id, self.relayer.name
+                );
                 Err(MoveInmempoolTransactionToMinedError::TransactionIdDoesNotMatch(
                     self.relayer.id,
                     *id,
-                    transaction.clone(),
+                    comp_tx.original,
                 ))
             }
         } else {
@@ -403,6 +540,11 @@ impl TransactionsQueue {
         }
 
         None
+    }
+
+    pub async fn is_transaction_mined(&self, id: &TransactionId) -> bool {
+        let transactions = self.mined_transactions.lock().await;
+        transactions.contains_key(id)
     }
 
     pub async fn move_mining_to_confirmed(&mut self, id: &TransactionId) {
@@ -842,7 +984,6 @@ impl TransactionsQueue {
                 })?
         };
 
-        // TODO: look at this for replacement and cancels
         let mut estimated_gas_limit = if let Some(gas_limit) = transaction.gas_limit {
             gas_limit
         } else {

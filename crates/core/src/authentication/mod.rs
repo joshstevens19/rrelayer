@@ -1,4 +1,4 @@
-mod api;
+pub mod api;
 pub use api::create_basic_auth_routes;
 
 mod basic_auth;

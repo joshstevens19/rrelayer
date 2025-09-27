@@ -316,7 +316,7 @@ async fn handle_cancel(tx_id: &TransactionId, sdk: &SDK) -> Result<(), Transacti
 
     let cancelled = sdk.transaction.cancel(tx_id, None).await?;
 
-    if cancelled {
+    if cancelled.success {
         println!("Transaction cancelled..");
         return Ok(());
     }
@@ -335,9 +335,9 @@ async fn handle_replace(
 ) -> Result<(), TransactionError> {
     println!("Replacing transaction: {}", tx_id);
 
-    let replaced = sdk.transaction.replace(tx_id, transaction, None).await?;
+    let replace_result = sdk.transaction.replace(tx_id, transaction, None).await?;
 
-    if replaced {
+    if replace_result.success {
         println!("Transaction replaced..");
         return Ok(());
     }

@@ -2,6 +2,7 @@ use super::send_transaction::RelayTransactionRequest;
 use crate::app_state::NetworkValidateAction;
 use crate::rate_limiting::{RateLimitOperation, RateLimiter};
 use crate::shared::{not_found, unauthorized, HttpError};
+use crate::transaction::queue_system::ReplaceTransactionResult;
 use crate::{
     app_state::AppState,
     transaction::{get_transaction_by_id, types::TransactionId},
@@ -14,13 +15,13 @@ use axum::{
 use std::sync::Arc;
 
 /// API endpoint to replace an existing pending transaction.
-// TODO: should return a new tx hash
+/// Returns the new transaction ID and hash for tracking the replacement.
 pub async fn replace_transaction(
     State(state): State<Arc<AppState>>,
     Path(transaction_id): Path<TransactionId>,
     headers: HeaderMap,
     Json(replace_with): Json<RelayTransactionRequest>,
-) -> Result<Json<bool>, HttpError> {
+) -> Result<Json<ReplaceTransactionResult>, HttpError> {
     state.validate_allowed_passed_basic_auth(&headers)?;
 
     let transaction = get_transaction_by_id(&state.cache, &state.db, transaction_id)
@@ -49,7 +50,7 @@ pub async fn replace_transaction(
     )
     .await?;
 
-    let status = state
+    let result = state
         .transactions_queues
         .lock()
         .await
@@ -60,5 +61,5 @@ pub async fn replace_transaction(
         reservation.commit();
     }
 
-    Ok(Json(status))
+    Ok(Json(result))
 }

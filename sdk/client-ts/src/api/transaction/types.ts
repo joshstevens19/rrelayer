@@ -8,6 +8,9 @@ export enum TransactionStatus {
   CONFIRMED = 'CONFIRMED',
   FAILED = 'FAILED',
   EXPIRED = 'EXPIRED',
+  CANCELLED = 'CANCELLED',
+  REPLACED = 'REPLACED',
+  DROPPED = 'DROPPED',
 }
 
 export enum TransactionSpeed {
@@ -43,6 +46,7 @@ export interface Transaction {
   maxFee?: string | null;
   isNoop: boolean;
   externalId?: string | null;
+  cancelledByTransactionId?: string | null;
 }
 
 export interface TransactionToSend {
@@ -56,5 +60,5 @@ export interface TransactionToSend {
 
 export interface TransactionSent {
   id: string;
-  hash: Hash;
+  hash: Hash | null;
 }

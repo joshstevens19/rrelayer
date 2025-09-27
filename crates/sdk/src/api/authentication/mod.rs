@@ -1,13 +1,6 @@
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-
 use crate::api::{http::HttpClient, types::ApiResult};
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct StatusResponse {
-    pub authenticated: bool,
-    pub message: String,
-}
+use rrelayer_core::authentication::api::StatusResponse;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct Authentication {

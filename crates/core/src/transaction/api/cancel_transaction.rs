@@ -10,15 +10,22 @@ use axum::{
     extract::{Path, State},
     Json,
 };
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CancelTransactionResponse {
+    pub success: bool,
+    pub cancel_transaction_id: Option<TransactionId>,
+}
+
 /// API endpoint to cancel a pending transaction.
-// TODO: should return a new tx hash
+/// Creates a new cancel transaction instead of overwriting the original.
 pub async fn cancel_transaction(
     State(state): State<Arc<AppState>>,
     Path(transaction_id): Path<TransactionId>,
     headers: HeaderMap,
-) -> Result<Json<bool>, HttpError> {
+) -> Result<Json<CancelTransactionResponse>, HttpError> {
     state.validate_allowed_passed_basic_auth(&headers)?;
 
     let transaction = get_transaction_by_id(&state.cache, &state.db, transaction_id)
@@ -47,11 +54,15 @@ pub async fn cancel_transaction(
     )
     .await?;
 
-    let status = state.transactions_queues.lock().await.cancel_transaction(&transaction).await?;
+    let cancel_result =
+        state.transactions_queues.lock().await.cancel_transaction(&transaction).await?;
 
     if let Some(reservation) = rate_limit_reservation {
         reservation.commit();
     }
 
-    Ok(Json(status))
+    Ok(Json(CancelTransactionResponse {
+        success: cancel_result.success,
+        cancel_transaction_id: cancel_result.cancel_transaction_id,
+    }))
 }

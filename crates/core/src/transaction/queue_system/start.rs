@@ -6,7 +6,8 @@ use tracing::{error, info, warn};
 
 use super::{transactions_queues::TransactionsQueues, types::TransactionRelayerSetup};
 use crate::transaction::queue_system::types::{
-    ProcessInmempoolTransactionError, ProcessMinedTransactionError, ProcessPendingTransactionError,
+    CompetitionType, CompetitiveTransaction, ProcessInmempoolTransactionError,
+    ProcessMinedTransactionError, ProcessPendingTransactionError,
 };
 use crate::webhooks::WebhookManager;
 use crate::{
@@ -223,6 +224,91 @@ async fn repopulate_transaction_queue(
     Ok(transactions_queue)
 }
 
+/// Reconstructs competitive transactions from the database for inmempool status.
+///
+/// This function handles the complex logic of rebuilding the competitive transaction
+/// structure from individual database records by:
+/// 1. Loading all INMEMPOOL transactions
+/// 2. Identifying competitions via cancelled_by_transaction_id linkage
+/// 3. Determining competition type based on transaction content
+/// 4. Building proper CompetitiveTransaction objects
+async fn repopulate_competitive_transaction_queue(
+    db: &PostgresClient,
+    relayer_id: &RelayerId,
+) -> Result<VecDeque<CompetitiveTransaction>, RepopulateTransactionsQueueError> {
+    // Load all INMEMPOOL transactions
+    let inmempool_transactions =
+        repopulate_transaction_queue(db, relayer_id, &TransactionStatus::INMEMPOOL).await?;
+
+    let mut competitive_queue: VecDeque<CompetitiveTransaction> = VecDeque::new();
+    let mut processed_transaction_ids = std::collections::HashSet::new();
+
+    for transaction in &inmempool_transactions {
+        // Skip if we already processed this transaction as part of a competition
+        if processed_transaction_ids.contains(&transaction.id) {
+            continue;
+        }
+
+        // Check if this transaction has a competitor
+        if let Some(cancel_tx_id) = &transaction.cancelled_by_transaction_id {
+            // This is an original transaction with a competitor
+            // Find the competitor transaction
+            if let Some(competitor) =
+                inmempool_transactions.iter().find(|tx| tx.id == *cancel_tx_id)
+            {
+                // Determine competition type based on transaction content
+                let is_empty_data = competitor.data.clone().into_inner().is_empty();
+                let competition_type =
+                    if competitor.is_noop || (competitor.value.is_zero() && is_empty_data) {
+                        CompetitionType::Cancel
+                    } else {
+                        CompetitionType::Replace
+                    };
+
+                // Create competitive transaction with original and competitor
+                let mut comp_tx = CompetitiveTransaction::new(transaction.clone());
+                comp_tx.add_competitor(competitor.clone(), competition_type.clone());
+
+                competitive_queue.push_back(comp_tx);
+
+                // Mark both transactions as processed
+                processed_transaction_ids.insert(transaction.id);
+                processed_transaction_ids.insert(competitor.id);
+
+                info!("Reconstructed competitive transaction: original {} with competitor {} (type: {:?})",
+                    transaction.id, competitor.id, competition_type);
+            } else {
+                warn!("Transaction {} has cancelled_by_transaction_id {} but competitor not found in INMEMPOOL",
+                    transaction.id, cancel_tx_id);
+
+                // Add as single transaction since competitor not found
+                competitive_queue.push_back(CompetitiveTransaction::new(transaction.clone()));
+                processed_transaction_ids.insert(transaction.id);
+            }
+        } else {
+            // Check if this transaction is a competitor for another transaction
+            let is_competitor = inmempool_transactions
+                .iter()
+                .any(|tx| tx.cancelled_by_transaction_id.as_ref() == Some(&transaction.id));
+
+            if !is_competitor {
+                // This is a standalone transaction with no competition
+                competitive_queue.push_back(CompetitiveTransaction::new(transaction.clone()));
+                processed_transaction_ids.insert(transaction.id);
+            }
+            // If it is a competitor, it will be processed when we encounter the original
+        }
+    }
+
+    info!(
+        "Reconstructed {} competitive transactions for relayer {}",
+        competitive_queue.len(),
+        relayer_id
+    );
+
+    Ok(competitive_queue)
+}
+
 /// Loads all relayers from the database.
 async fn load_relayers(db: &PostgresClient) -> Result<Vec<Relayer>, PostgresError> {
     let mut relayers: Vec<Relayer> = Vec::new();
@@ -311,12 +397,7 @@ pub async fn startup_transactions_queues(
                         &TransactionStatus::PENDING,
                     )
                     .await?,
-                    repopulate_transaction_queue(
-                        &postgres,
-                        &relayer_id,
-                        &TransactionStatus::INMEMPOOL,
-                    )
-                    .await?,
+                    repopulate_competitive_transaction_queue(&postgres, &relayer_id).await?,
                     mined_transactions
                         .into_iter()
                         .map(|transaction| (transaction.id, transaction))

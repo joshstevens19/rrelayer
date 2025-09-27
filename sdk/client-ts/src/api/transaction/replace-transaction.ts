@@ -1,4 +1,4 @@
-import { postApi } from '../axios-wrapper';
+import { putApi } from '../axios-wrapper';
 import { ApiBaseConfig } from '../types';
 import { TransactionSent, TransactionToSend } from './types';
 import { RATE_LIMIT_HEADER_NAME } from '../index';
@@ -17,7 +17,7 @@ export const replaceTransaction = async (
       };
     }
 
-    const response = await postApi<TransactionSent>(
+    const response = await putApi<TransactionSent>(
       baseConfig,
       `transactions/replace/${transactionId}`,
       {

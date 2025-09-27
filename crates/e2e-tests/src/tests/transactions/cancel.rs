@@ -45,7 +45,7 @@ impl TestRunner {
             .await
             .context("Failed to cancel transaction")?;
 
-        if !cancel_result {
+        if !cancel_result.success {
             return Err(anyhow::anyhow!("Cancel transaction failed"));
         }
 
@@ -58,6 +58,7 @@ impl TestRunner {
             let result = self.relayer_client.get_transaction_status(&send_result.id).await?;
             if result.status == TransactionStatus::MINED
                 || result.status == TransactionStatus::EXPIRED
+                || result.status == TransactionStatus::CANCELLED
             {
                 break;
             } else {

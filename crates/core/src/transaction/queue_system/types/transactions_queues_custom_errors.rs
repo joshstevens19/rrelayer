@@ -213,3 +213,14 @@ pub enum MoveInmempoolTransactionToMinedError {
     #[error("Relayer transaction ID does not match for relayer {0} - tx sent {1} - tx at front of queue {2}")]
     TransactionIdDoesNotMatch(RelayerId, TransactionId, Transaction),
 }
+
+/// Result of moving a transaction from inmempool to mined with competition resolution details
+#[derive(Debug, Clone)]
+pub struct CompetitionResolutionResult {
+    /// The transaction that won the race (was mined)
+    pub winner: Transaction,
+    /// The transaction status of the winner
+    pub winner_status: TransactionStatus,
+    /// The transaction that lost the race (if there was competition)
+    pub loser: Option<Transaction>,
+}

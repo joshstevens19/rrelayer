@@ -28,8 +28,8 @@ impl PostgresClient {
         for table_name in TRANSACTION_TABLES.iter() {
             trans.execute(
                 format!("
-                INSERT INTO {}(id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit, speed, status, expires_at, queued_at, hash, external_id)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16);
+                INSERT INTO {}(id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit, speed, status, expires_at, queued_at, hash, external_id, cancelled_by_transaction_id)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17);
             ", table_name).as_str(),
                 &[&transaction.id,
                     &relayer_id,
@@ -46,7 +46,8 @@ impl PostgresClient {
                     &transaction.expires_at,
                     &transaction.queued_at,
                     &transaction.known_transaction_hash,
-                    &transaction.external_id
+                    &transaction.external_id,
+                    &transaction.cancelled_by_transaction_id
                 ],
             )
                 .await?;
@@ -483,7 +484,8 @@ impl PostgresClient {
                         hash = $17,
                         sent_max_fee_per_gas = $18,
                         sent_max_priority_fee_per_gas = $19,
-                        external_id = $20
+                        external_id = $20,
+                        cancelled_by_transaction_id = $21
                     WHERE id = $1
                 ",
                 &[
@@ -507,6 +509,7 @@ impl PostgresClient {
                     &transaction.sent_with_max_fee_per_gas,
                     &transaction.sent_with_max_priority_fee_per_gas,
                     &transaction.external_id,
+                    &transaction.cancelled_by_transaction_id,
                 ],
             )
             .await

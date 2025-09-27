@@ -34,7 +34,7 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
         DO $$
         BEGIN
             IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'tx_status' AND typtype = 'e') THEN
-                CREATE TYPE relayer.tx_status AS ENUM ('PENDING', 'INMEMPOOL', 'MINED', 'CONFIRMED', 'FAILED', 'EXPIRED');
+                CREATE TYPE relayer.tx_status AS ENUM ('PENDING', 'INMEMPOOL', 'MINED', 'CONFIRMED', 'FAILED', 'EXPIRED', 'CANCELLED', 'DROPPED', 'REPLACED');
             END IF;
         END;
         $$;
@@ -67,9 +67,13 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
             sent_at TIMESTAMPTZ NULL,
             confirmed_at TIMESTAMPTZ NULL,
             external_id VARCHAR(255) NULL,
+            cancelled_by_transaction_id UUID NULL,
             CONSTRAINT fk_relayer_transaction_relayer_id
                FOREIGN KEY (relayer_id)
-                   REFERENCES relayer.record (id)
+                   REFERENCES relayer.record (id),
+            CONSTRAINT fk_relayer_transaction_cancelled_by
+               FOREIGN KEY (cancelled_by_transaction_id)
+                   REFERENCES relayer.transaction (id)
         );
 
         CREATE TABLE IF NOT EXISTS relayer.transaction_audit_log (
@@ -101,6 +105,7 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
             sent_at TIMESTAMPTZ NULL,
             confirmed_at TIMESTAMPTZ NULL,
             external_id VARCHAR(255) NULL,
+            cancelled_by_transaction_id UUID NULL,
             CONSTRAINT fk_relayer_transaction_audit_log_relayer_id
                FOREIGN KEY (relayer_id)
                    REFERENCES relayer.record (id)
@@ -117,6 +122,9 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
 
         CREATE INDEX IF NOT EXISTS idx_transaction_status 
         ON relayer.transaction(status);
+
+        CREATE INDEX IF NOT EXISTS idx_transaction_cancelled_by 
+        ON relayer.transaction(cancelled_by_transaction_id) WHERE cancelled_by_transaction_id IS NOT NULL;
 
         CREATE INDEX IF NOT EXISTS idx_relayer_chain_deleted 
         ON relayer.record(chain_id, deleted);

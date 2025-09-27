@@ -1,3 +1,4 @@
+use super::CompetitiveTransaction;
 use crate::{
     provider::EvmProvider,
     relayer::Relayer,
@@ -15,7 +16,7 @@ pub struct TransactionsQueueSetup {
     pub evm_provider: EvmProvider,
     pub nonce_manager: NonceManager,
     pub pending_transactions: VecDeque<Transaction>,
-    pub inmempool_transactions: VecDeque<Transaction>,
+    pub inmempool_transactions: VecDeque<CompetitiveTransaction>,
     pub mined_transactions: HashMap<TransactionId, Transaction>,
     pub safe_proxy_manager: Arc<SafeProxyManager>,
 }
@@ -26,7 +27,7 @@ impl TransactionsQueueSetup {
         evm_provider: EvmProvider,
         nonce_manager: NonceManager,
         pending_transactions: VecDeque<Transaction>,
-        inmempool_transactions: VecDeque<Transaction>,
+        inmempool_transactions: VecDeque<CompetitiveTransaction>,
         mined_transactions: HashMap<TransactionId, Transaction>,
         safe_proxy_manager: Arc<SafeProxyManager>,
     ) -> Self {

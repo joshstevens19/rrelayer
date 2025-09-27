@@ -104,6 +104,9 @@ pub struct Transaction {
 
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub external_id: Option<String>,
+
+    #[serde(rename = "cancelledByTransactionId", skip_serializing_if = "Option::is_none", default)]
+    pub cancelled_by_transaction_id: Option<TransactionId>,
 }
 
 impl Display for Transaction {

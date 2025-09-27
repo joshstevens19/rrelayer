@@ -259,7 +259,7 @@ impl TestRunner {
             .await
             .context("Failed to cancel transaction")?;
 
-        if !cancel_result {
+        if !cancel_result.success {
             return Err(anyhow::anyhow!("Cancel transaction failed"));
         }
 

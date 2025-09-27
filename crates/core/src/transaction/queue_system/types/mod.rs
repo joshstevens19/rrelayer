@@ -23,9 +23,19 @@ pub use transactions_queue_setup::TransactionsQueueSetup;
 mod transaction_sent_with_relayer;
 pub use transaction_sent_with_relayer::TransactionSentWithRelayer;
 
+mod cancel_transaction_result;
+pub use cancel_transaction_result::CancelTransactionResult;
+
 mod transactions_queues_custom_errors;
 pub use transactions_queues_custom_errors::{
-    AddTransactionError, CancelTransactionError, MoveInmempoolTransactionToMinedError,
-    MovePendingTransactionToInmempoolError, ProcessInmempoolTransactionError,
-    ProcessMinedTransactionError, ProcessPendingTransactionError, ReplaceTransactionError,
+    AddTransactionError, CancelTransactionError, CompetitionResolutionResult,
+    MoveInmempoolTransactionToMinedError, MovePendingTransactionToInmempoolError,
+    ProcessInmempoolTransactionError, ProcessMinedTransactionError, ProcessPendingTransactionError,
+    ReplaceTransactionError,
 };
+
+mod competitive_transaction;
+pub use competitive_transaction::{CompetitionResult, CompetitionType, CompetitiveTransaction};
+
+mod replace_transaction_result;
+pub use replace_transaction_result::ReplaceTransactionResult;

@@ -65,8 +65,9 @@ impl PostgresClient {
                     .ok_or_else(|| CreateRelayerError::RelayerNotFound(clone_relayer_id.clone()))?;
 
                 self.execute(
-                    "INSERT INTO relayer.record (id, name, chain_id, wallet_index, max_gas_price_cap, paused, eip_1559_enabled)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+                    "
+                    INSERT INTO relayer.record (id, name, chain_id, wallet_index, max_gas_price_cap, paused, eip_1559_enabled)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7)",
                     &[
                         &new_relayer_id,
                         &name,

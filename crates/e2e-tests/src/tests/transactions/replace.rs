@@ -1,7 +1,7 @@
 use crate::tests::test_runner::TestRunner;
 use anyhow::Context;
 use rrelayer_core::transaction::api::{RelayTransactionRequest, TransactionSpeed};
-use rrelayer_core::transaction::types::TransactionData;
+use rrelayer_core::transaction::types::{TransactionData, TransactionStatus};
 use tracing::info;
 
 impl TestRunner {
@@ -53,16 +53,39 @@ impl TestRunner {
             .replace(transaction_id, &replacement_request, None)
             .await
             .context("Failed to replace transaction")?;
-        info!("[SUCCESS] Transaction replacement result: {}", replace_result);
+        info!("[SUCCESS] Transaction replacement result: {:?}", replace_result);
 
-        if !replace_result {
+        if !replace_result.success {
             return Err(anyhow::anyhow!("Replace transaction failed"));
         }
 
-        self.anvil_manager.mine_block().await?;
+        self.anvil_manager.mine_and_wait().await?;
+        self.anvil_manager.mine_and_wait().await?;
+        self.anvil_manager.mine_and_wait().await?;
+        self.anvil_manager.mine_and_wait().await?;
+        self.anvil_manager.mine_and_wait().await?;
+        self.anvil_manager.mine_and_wait().await?;
+        self.anvil_manager.mine_and_wait().await?;
+        self.anvil_manager.mine_and_wait().await?;
+        self.anvil_manager.mine_and_wait().await?;
+        self.anvil_manager.mine_and_wait().await?;
+        self.anvil_manager.mine_and_wait().await?;
 
-        let transaction = self.relayer_client.get_transaction(&send_result.id).await?;
-        self.relayer_client.sent_transaction_compare(replacement_request, transaction)?;
+        let first_transaction = self.relayer_client.get_transaction(&send_result.id).await?;
+        let replace_transaction = self
+            .relayer_client
+            .get_transaction(&replace_result.replace_transaction_id.unwrap())
+            .await?;
+
+        if first_transaction.status != TransactionStatus::REPLACED {
+            return Err(anyhow::anyhow!("First transaction is not cancelled"));
+        }
+
+        if replace_transaction.status != TransactionStatus::MINED {
+            return Err(anyhow::anyhow!("Replace transaction is not mined"));
+        }
+
+        self.relayer_client.sent_transaction_compare(replacement_request, replace_transaction)?;
 
         info!("[SUCCESS] Transaction replace operation works correctly");
         Ok(())

@@ -1,7 +1,8 @@
 use crate::api::{http::HttpClient, types::ApiResult};
 use reqwest::header::{HeaderMap, HeaderValue};
-use rrelayer_core::transaction::api::RelayTransactionStatusResult;
+use rrelayer_core::transaction::api::{CancelTransactionResponse, RelayTransactionStatusResult};
 use rrelayer_core::transaction::api::{RelayTransactionRequest, SendTransactionResult};
+use rrelayer_core::transaction::queue_system::ReplaceTransactionResult;
 use rrelayer_core::{
     RATE_LIMIT_HEADER_NAME,
     common_types::{PagingContext, PagingResult},
@@ -60,7 +61,7 @@ impl TransactionApi {
         &self,
         transaction_id: &TransactionId,
         rate_limit_key: Option<String>,
-    ) -> ApiResult<bool> {
+    ) -> ApiResult<CancelTransactionResponse> {
         let mut headers = HeaderMap::new();
         if let Some(rate_limit_key) = rate_limit_key.as_ref() {
             headers.insert(
@@ -70,7 +71,7 @@ impl TransactionApi {
         }
 
         self.client
-            .post_with_headers(&format!("transactions/cancel/{}", transaction_id), &(), headers)
+            .put_with_headers(&format!("transactions/cancel/{}", transaction_id), &(), headers)
             .await
     }
 
@@ -79,7 +80,7 @@ impl TransactionApi {
         transaction_id: &TransactionId,
         replacement: &RelayTransactionRequest,
         rate_limit_key: Option<String>,
-    ) -> ApiResult<bool> {
+    ) -> ApiResult<ReplaceTransactionResult> {
         let mut headers = HeaderMap::new();
         if let Some(rate_limit_key) = rate_limit_key.as_ref() {
             headers.insert(
@@ -89,7 +90,7 @@ impl TransactionApi {
         }
 
         self.client
-            .post_with_headers(
+            .put_with_headers(
                 &format!("transactions/replace/{}", transaction_id),
                 replacement,
                 headers,
