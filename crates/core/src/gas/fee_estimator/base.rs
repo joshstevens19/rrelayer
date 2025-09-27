@@ -42,10 +42,11 @@ pub struct GasPriceResult {
 impl GasPriceResult {
     /// Calculates the effective gas price for legacy transactions.
     ///
-    /// For EIP-1559 transactions, the effective gas price is the sum of
-    /// the base fee and priority fee (max fee per gas).
+    /// For legacy transactions, use max_fee_per_gas as the gas price since it represents
+    /// the maximum total amount willing to pay per gas unit. This is equivalent to the
+    /// legacy gas_price field and maintains proper EIP-1559 to legacy conversion.
     pub fn legacy_gas_price(&self) -> GasPrice {
-        GasPrice::new(self.max_fee.into_u128() + self.max_priority_fee.into_u128())
+        GasPrice::new(self.max_fee.into_u128())
     }
 }
 

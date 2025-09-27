@@ -1,5 +1,8 @@
 use crate::shared::utils::{format_token_amount, format_wei_to_eth};
 use crate::transaction::queue_system::TransactionToSend;
+
+// Helper constant for gwei to wei conversion
+const GWEI_TO_WEI: u128 = 1_000_000_000;
 use crate::transaction::types::{TransactionData, TransactionSpeed, TransactionValue};
 use crate::{
     network::ChainId,
@@ -673,7 +676,7 @@ impl AutomaticTopUpTask {
         info!(
             "Estimated transaction cost: {} ETH (gas price: {} gwei, limit: {})",
             format_wei_to_eth(&total_cost),
-            U256::from(gas_price) / U256::from(1_000_000_000u64),
+            U256::from(gas_price) / U256::from(GWEI_TO_WEI),
             gas_limit
         );
 

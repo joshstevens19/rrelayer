@@ -91,7 +91,7 @@ pub async fn blob_gas_oracle(
             continue;
         }
 
-        rrelayer_info!("Getting initial blob gas price for provider: {}", provider.name);
+        info!("Getting initial blob gas price for provider: {}", provider.name);
         let cache = Arc::clone(&blob_gas_oracle_cache);
         let provider = provider.clone();
 
@@ -127,7 +127,7 @@ pub async fn blob_gas_oracle(
         let provider = Arc::new(provider.clone());
 
         tokio::spawn(async move {
-            let mut interval = time::interval(Duration::from_secs(20));
+            let mut interval = time::interval(Duration::from_secs(5));
             loop {
                 interval.tick().await;
 

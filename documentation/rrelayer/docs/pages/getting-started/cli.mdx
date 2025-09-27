@@ -57,7 +57,26 @@ Options:
 
 ## auth
 
+Authentication
+
 TODO
+
+```bash
+Usage: rrelayer auth [OPTIONS] <COMMAND>
+
+Commands:
+  status       Show authentication status
+  login        Login and store credentials securely
+  logout       Logout and remove stored credentials
+  list         List all stored profiles
+  gen-api-key  Generate an API key which you can then use in the network config This will not add it to your project for you
+  help         Print this message or the help of the given subcommand(s)
+
+Options:
+  -p, --path <PATH>  optional - The path to create the project in, default will be where the command is run
+  -h, --help         Print help
+  -V, --version      Print version
+```
 
 ## start
 

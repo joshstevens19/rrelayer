@@ -6,7 +6,7 @@ use crate::common_types::EvmAddress;
 use crate::network::ChainId;
 use crate::shared::{unauthorized, HttpError};
 use crate::transaction::types::TransactionValue;
-use crate::yaml::{ApiKey, NetworkPermissionsConfig};
+use crate::yaml::{ApiKey, NetworkPermissionsConfig, NetworkSetupConfig};
 use crate::{
     gas::{BlobGasOracleCache, GasOracleCache},
     postgres::PostgresClient,
@@ -63,6 +63,8 @@ pub struct AppState {
     pub network_permissions: Arc<Vec<(ChainId, Vec<NetworkPermissionsConfig>)>>,
     /// The API keys mapped to be able to be used
     pub api_keys: Arc<Vec<(ChainId, Vec<ApiKey>)>>,
+    /// Network configurations to check feature availability
+    pub network_configs: Arc<Vec<NetworkSetupConfig>>,
 }
 
 pub enum NetworkValidateAction {

@@ -1,3 +1,4 @@
+use crate::gas::BLOB_GAS_PER_BLOB;
 use crate::provider::layer_extensions::{RpcLoggingLayer, RpcLoggingService};
 use crate::wallet::{
     AwsKmsWalletManager, MnemonicWalletManager, PrivyWalletManager, TurnkeyWalletManager,
@@ -384,28 +385,19 @@ impl EvmProvider {
         &self,
     ) -> Result<BlobGasEstimatorResult, anyhow::Error> {
         let base_fee_per_blob_gas = match self.rpc_client().get_blob_base_fee().await {
-            Ok(fee) => fee, // This is already a u128 value
+            Ok(fee) => fee,
             Err(_) => return Err(anyhow::anyhow!("Chain does not support blob transactions")),
         };
 
-        // Base price calculations
-        // Blob gas for a single blob is 128KB (131,072 gas units)
-        let blob_gas_per_blob = 131_072; // 128 * 1024
-
-        // Calculate fees with different multipliers for speeds
-        let super_fast_multiplier = 1.5;
-        let fast_multiplier = 1.2;
-        let slow_multiplier = 0.8;
-
-        let super_fast_price = (base_fee_per_blob_gas as f64 * super_fast_multiplier) as u128;
-        let fast_price = (base_fee_per_blob_gas as f64 * fast_multiplier) as u128;
+        let super_fast_price = (base_fee_per_blob_gas as f64 * 1.5) as u128;
+        let fast_price = (base_fee_per_blob_gas as f64 * 1.2) as u128;
         let medium_price = base_fee_per_blob_gas;
-        let slow_price = (base_fee_per_blob_gas as f64 * slow_multiplier) as u128;
+        let slow_price = (base_fee_per_blob_gas as f64 * 0.8) as u128;
 
-        let super_fast_total = super_fast_price * blob_gas_per_blob;
-        let fast_total = fast_price * blob_gas_per_blob;
-        let medium_total = medium_price * blob_gas_per_blob;
-        let slow_total = slow_price * blob_gas_per_blob;
+        let super_fast_total = super_fast_price * BLOB_GAS_PER_BLOB;
+        let fast_total = fast_price * BLOB_GAS_PER_BLOB;
+        let medium_total = medium_price * BLOB_GAS_PER_BLOB;
+        let slow_total = slow_price * BLOB_GAS_PER_BLOB;
 
         Ok(BlobGasEstimatorResult {
             super_fast: BlobGasPriceResult {

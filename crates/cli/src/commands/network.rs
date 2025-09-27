@@ -108,6 +108,7 @@ async fn handle_add(project_path: &ProjectLocation) -> Result<(), NetworkError> 
         confirmations: None,
         permissions: None,
         api_keys: None,
+        enable_sending_blobs: Some(true),
     });
 
     project_path.overwrite_setup_config(setup_config)?;

@@ -27,7 +27,7 @@ use crate::{
             startup_transactions_queues, StartTransactionsQueuesError, TransactionsQueues,
         },
     },
-    ApiConfig, RateLimitConfig, SafeProxyConfig,
+    ApiConfig, RateLimitConfig, SafeProxyConfig, SetupConfig,
 };
 use axum::extract::State;
 use axum::http::HeaderMap;
@@ -166,6 +166,7 @@ async fn start_api(
     db: Arc<PostgresClient>,
     safe_proxy_manager: Arc<SafeProxyManager>,
     relayer_internal_only: RelayersInternalOnly,
+    config: &SetupConfig,
 ) -> Result<(), StartApiError> {
     let app_state = Arc::new(AppState {
         db: db.clone(),
@@ -182,6 +183,7 @@ async fn start_api(
         relayer_internal_only: Arc::new(relayer_internal_only),
         network_permissions: Arc::new(network_permissions),
         api_keys: Arc::new(api_keys),
+        network_configs: Arc::new(config.networks.clone()),
     });
 
     let cors = CorsLayer::new()
@@ -372,7 +374,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
     };
 
     start_api(
-        config.api_config,
+        config.api_config.clone(),
         config.rate_limits.clone(),
         network_permissions,
         api_keys,
@@ -386,6 +388,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
         postgres_client,
         safe_proxy_manager,
         relayer_internal_only,
+        &config,
     )
     .await?;
 

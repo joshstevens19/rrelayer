@@ -1,3 +1,4 @@
+use alloy::primitives::utils::parse_units;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
@@ -35,12 +36,16 @@ struct EtherscanApiResponse {
 
 impl EtherscanGasOracleResult {
     fn parse_gwei_to_wei(gwei_str: &str) -> Result<u128, GasEstimatorError> {
-        let gwei: f64 = gwei_str.parse().map_err(|_| {
-            GasEstimatorError::CustomError(format!("Failed to parse gas price: {}", gwei_str))
-        })?;
-
-        // Convert Gwei to Wei (multiply by 10^9)
-        Ok((gwei * 1_000_000_000.0) as u128)
+        // Convert Gwei to Wei using parse_units for clarity
+        parse_units(gwei_str, "gwei")
+            .map_err(|e| {
+                GasEstimatorError::CustomError(format!(
+                    "Failed to parse gas price '{}': {}",
+                    gwei_str, e
+                ))
+            })?
+            .try_into()
+            .map_err(|_| GasEstimatorError::CustomError("Gwei value too large".to_string()))
     }
 
     pub fn to_base_result(&self) -> Result<GasEstimatorResult, GasEstimatorError> {
@@ -54,7 +59,7 @@ impl EtherscanGasOracleResult {
 
         // Calculate priority fees by subtracting base fee from total
         // Ensure priority fee is at least 1 gwei to avoid zero or negative values
-        let min_priority_fee = 1_000_000_000u128; // 1 gwei
+        let min_priority_fee = parse_units("1", "gwei").unwrap().try_into().unwrap(); // 1 gwei minimum
 
         let safe_priority = std::cmp::max(safe_total.saturating_sub(base_fee), min_priority_fee);
         let propose_priority =

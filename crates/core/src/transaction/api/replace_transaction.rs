@@ -1,7 +1,7 @@
 use super::send_transaction::RelayTransactionRequest;
 use crate::app_state::NetworkValidateAction;
 use crate::rate_limiting::{RateLimitOperation, RateLimiter};
-use crate::shared::{not_found, unauthorized, HttpError};
+use crate::shared::{internal_server_error, not_found, unauthorized, HttpError};
 use crate::transaction::queue_system::ReplaceTransactionResult;
 use crate::{
     app_state::AppState,
@@ -41,6 +41,20 @@ pub async fn replace_transaction(
         &transaction.value,
         NetworkValidateAction::Transaction,
     )?;
+
+    // Check if blob transactions are enabled for this network
+    if replace_with.blobs.is_some() {
+        let network_config =
+            state.network_configs.iter().find(|n| n.chain_id == transaction.chain_id).ok_or_else(
+                || internal_server_error(Some("Network configuration not found".to_string())),
+            )?;
+
+        if !network_config.enable_sending_blobs.unwrap_or(false) {
+            return Err(internal_server_error(Some(
+                "Blob transactions are not enabled for this network".to_string(),
+            )));
+        }
+    }
 
     let rate_limit_reservation = RateLimiter::check_and_reserve_rate_limit(
         &state,

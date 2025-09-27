@@ -15,16 +15,9 @@
 
 ## BUG
 
-- Look over the gas logic again maybe add some max to protect over speeding huge amounts of ETH incase it gets its wrong (also legacy and EIP-1559)
-- Testing loading up infura gas
-- Testing loading up tenderly gas
+- Look at if you run out of funds inmempool to bump and what it should do.. just keep retrying or?
+- Testing loading up ALL supported gas providers so it works
 - Testing handling custom gas with http call
 - rrelayer auth without being in project
 - look at signers in the networks
 
-
-# Idea for later
-
-- safe signers and submitters logic + look at account abstracted accounts
-- ability to put your signing provider in other places like auto-top-up
-- more complex allowlist aka methods etc

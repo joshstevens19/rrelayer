@@ -1,7 +1,11 @@
+use alloy::primitives::utils::parse_units;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use super::base::{BaseGasFeeEstimator, GasEstimatorError, GasEstimatorResult, GasPriceResult};
+
+// Helper constant for gwei to wei conversion
+const GWEI_TO_WEI: u128 = 1_000_000_000;
 use crate::{
     gas::types::{MaxFee, MaxPriorityFee},
     network::ChainId,
@@ -68,35 +72,35 @@ impl BlockNativeGasEstimateResult {
 
         let slow_result = GasPriceResult {
             max_priority_fee: MaxPriorityFee::new(
-                slow.max_priority_fee_per_gas as u128 * 1_000_000_000,
+                slow.max_priority_fee_per_gas as u128 * GWEI_TO_WEI,
             ),
-            max_fee: MaxFee::new(slow.max_fee_per_gas as u128 * 1_000_000_000),
+            max_fee: MaxFee::new(slow.max_fee_per_gas as u128 * GWEI_TO_WEI),
             min_wait_time_estimate: None,
             max_wait_time_estimate: None,
         };
 
         let medium_result = GasPriceResult {
             max_priority_fee: MaxPriorityFee::new(
-                medium.max_priority_fee_per_gas as u128 * 1_000_000_000,
+                medium.max_priority_fee_per_gas as u128 * GWEI_TO_WEI,
             ),
-            max_fee: MaxFee::new(medium.max_fee_per_gas as u128 * 1_000_000_000),
+            max_fee: MaxFee::new(medium.max_fee_per_gas as u128 * GWEI_TO_WEI),
             min_wait_time_estimate: None,
             max_wait_time_estimate: None,
         };
 
         let fast_result = GasPriceResult {
             max_priority_fee: MaxPriorityFee::new(
-                fast.max_priority_fee_per_gas as u128 * 1_000_000_000,
+                fast.max_priority_fee_per_gas as u128 * GWEI_TO_WEI,
             ),
-            max_fee: MaxFee::new(fast.max_fee_per_gas as u128 * 1_000_000_000),
+            max_fee: MaxFee::new(fast.max_fee_per_gas as u128 * GWEI_TO_WEI),
             min_wait_time_estimate: None,
             max_wait_time_estimate: None,
         };
 
         // For super fast, add 20% buffer to the highest confidence estimate
         let super_fast_priority =
-            (super_fast.max_priority_fee_per_gas as u128 * 120 / 100) * 1_000_000_000;
-        let super_fast_max = (super_fast.max_fee_per_gas as u128 * 120 / 100) * 1_000_000_000;
+            (super_fast.max_priority_fee_per_gas as u128 * 120 / 100) * GWEI_TO_WEI;
+        let super_fast_max = (super_fast.max_fee_per_gas as u128 * 120 / 100) * GWEI_TO_WEI;
 
         let super_fast_result = GasPriceResult {
             max_priority_fee: MaxPriorityFee::new(super_fast_priority),

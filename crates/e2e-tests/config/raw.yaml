@@ -12,6 +12,7 @@ networks:
   provider_urls:
     - http://127.0.0.1:8545
   block_explorer_url: http://localhost:8545
+  enable_blobs: true
   automatic_top_up:
     from:
       # safe: "0xcfe267de230a234c5937f18f239617b7038ec271" # NEED TO TEST

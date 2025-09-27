@@ -77,6 +77,20 @@ pub async fn send_transaction(
         NetworkValidateAction::Transaction,
     )?;
 
+    // Check if blob transactions are enabled for this network
+    if transaction.blobs.is_some() {
+        let network_config =
+            state.network_configs.iter().find(|n| n.chain_id == relayer.chain_id).ok_or_else(
+                || internal_server_error(Some("Network configuration not found".to_string())),
+            )?;
+
+        if !network_config.enable_sending_blobs.unwrap_or(false) {
+            return Err(internal_server_error(Some(
+                "Blob transactions are not enabled for this network".to_string(),
+            )));
+        }
+    }
+
     let rate_limit_reservation = RateLimiter::check_and_reserve_rate_limit(
         &state,
         &headers,

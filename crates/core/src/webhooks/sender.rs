@@ -15,7 +15,7 @@ use std::{
     sync::Arc,
     time::{Duration, SystemTime},
 };
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
 
 pub struct WebhookSender {
     client: Client,
@@ -37,7 +37,7 @@ impl WebhookSender {
     }
 
     pub async fn send_webhook(&self, mut delivery: WebhookDelivery) -> WebhookDelivery {
-        rrelayer_info!(
+        info!(
             "Sending webhook {} to {} for event {} (attempt {}/{})",
             delivery.id,
             delivery.webhook_config.endpoint,
@@ -61,11 +61,9 @@ impl WebhookSender {
                 let status_code = response.status().as_u16() as i32;
                 if response.status().is_success() {
                     let response_text = response.text().await.unwrap_or_default();
-                    rrelayer_info!(
+                    info!(
                         "Webhook {} delivered successfully to {} (status: {})",
-                        delivery.id,
-                        delivery.webhook_config.endpoint,
-                        status_code
+                        delivery.id, delivery.webhook_config.endpoint, status_code
                     );
                     delivery.mark_completed();
 

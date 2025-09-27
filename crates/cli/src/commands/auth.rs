@@ -2,6 +2,8 @@ use crate::credentials::{self, StoredCredentials};
 use crate::error::CliError;
 use clap::Subcommand;
 use dialoguer::{Input, Password};
+use rand::Rng;
+use rand::distributions::Alphanumeric;
 use rrelayer_sdk::SDK;
 
 #[derive(Subcommand)]
@@ -22,6 +24,9 @@ pub enum AuthCommand {
     },
     /// List all stored profiles
     List,
+    /// Generate an API key which you can then use in the network config
+    /// This will not add it to your project for you
+    GenApiKey,
 }
 
 pub async fn handle_auth_command(cmd: &AuthCommand) -> Result<(), CliError> {
@@ -39,6 +44,17 @@ pub async fn handle_auth_command(cmd: &AuthCommand) -> Result<(), CliError> {
         }
         AuthCommand::List => {
             list_profiles().await?;
+        }
+        AuthCommand::GenApiKey => {
+            let key = rand::thread_rng()
+                .sample_iter(&Alphanumeric)
+                .take(8)
+                .map(char::from)
+                .collect::<String>();
+            println!(
+                "API key generated - note you have to config it in the networks yaml - {}",
+                key
+            );
         }
     }
 

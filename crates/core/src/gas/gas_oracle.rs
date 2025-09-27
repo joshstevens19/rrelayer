@@ -80,10 +80,10 @@ pub async fn gas_oracle(
         let _ = task.await;
     }
 
-    rrelayer_info!("Initial gas price collection completed for all providers");
+    info!("Initial gas price collection completed for all providers");
 
     for provider in providers.iter() {
-        rrelayer_info!("Starting gas_oracle interval for provider: {}", provider.name);
+        info!("Starting gas_oracle interval for provider: {}", provider.name);
         let cache = Arc::clone(&gas_oracle_cache);
         let provider = Arc::new(provider.clone());
 

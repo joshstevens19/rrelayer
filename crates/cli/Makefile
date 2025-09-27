@@ -1,5 +1,5 @@
 help:
-	cargo run -- tx fund --help
+	cargo run -- auth --help
 new:
 	cargo run -- new --path $(CURDIR)/../../playground
 start:

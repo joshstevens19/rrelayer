@@ -231,6 +231,8 @@ pub struct NetworkSetupConfig {
     pub api_keys: Option<Vec<ApiKey>>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub confirmations: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub enable_sending_blobs: Option<bool>,
 }
 
 impl From<NetworkSetupConfig> for Network {
