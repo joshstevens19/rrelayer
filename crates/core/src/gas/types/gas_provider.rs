@@ -4,6 +4,8 @@ use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum GasProvider {
+    BLOCKNATIVE,
+    ETHERSCAN,
     INFURA,
     TENDERLY,
     CUSTOM,
@@ -18,7 +20,9 @@ impl FromStr for GasProvider {
     type Err = ConversionError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
+        match s.to_uppercase().as_str() {
+            "BLOCKNATIVE" => Ok(GasProvider::BLOCKNATIVE),
+            "ETHERSCAN" => Ok(GasProvider::ETHERSCAN),
             "INFURA" => Ok(GasProvider::INFURA),
             "TENDERLY" => Ok(GasProvider::TENDERLY),
             "CUSTOM" => Ok(GasProvider::CUSTOM),

@@ -9,7 +9,8 @@ use thiserror::Error;
 use tracing::error;
 
 use crate::gas::{
-    deserialize_gas_provider, CustomGasFeeEstimator, GasProvider, InfuraGasProviderSetupConfig,
+    deserialize_gas_provider, BlockNativeGasProviderSetupConfig, CustomGasFeeEstimator,
+    EtherscanGasProviderSetupConfig, GasProvider, InfuraGasProviderSetupConfig,
     TenderlyGasProviderSetupConfig,
 };
 use crate::network::{ChainId, Network};
@@ -240,6 +241,10 @@ impl From<NetworkSetupConfig> for Network {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GasProviders {
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub blocknative: Option<BlockNativeGasProviderSetupConfig>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub etherscan: Option<EtherscanGasProviderSetupConfig>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub infura: Option<InfuraGasProviderSetupConfig>,
     #[serde(skip_serializing_if = "Option::is_none", default)]

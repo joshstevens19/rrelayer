@@ -88,7 +88,7 @@ pub async fn gas_oracle(
         let provider = Arc::new(provider.clone());
 
         tokio::spawn(async move {
-            let mut interval = time::interval(Duration::from_secs(10));
+            let mut interval = time::interval(Duration::from_secs(5));
             loop {
                 interval.tick().await;
 

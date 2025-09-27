@@ -8,7 +8,10 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use super::infura::InfuraGasFeeEstimator;
+use super::{
+    blocknative::BlockNativeGasFeeEstimator, etherscan::EtherscanGasFeeEstimator,
+    infura::InfuraGasFeeEstimator,
+};
 use crate::gas::fee_estimator::fallback::FallbackGasFeeEstimator;
 use crate::{
     create_retry_client,
@@ -115,6 +118,16 @@ pub async fn get_gas_estimator(
     if let Some(setup_gas_providers) = &setup_config.gas_providers {
         if let Some(network_gas_provider) = &network.gas_provider {
             match network_gas_provider {
+                GasProvider::BLOCKNATIVE => {
+                    if let Some(setup) = &setup_gas_providers.blocknative {
+                        return Ok(Arc::new(BlockNativeGasFeeEstimator::new(setup.clone())?));
+                    }
+                }
+                GasProvider::ETHERSCAN => {
+                    if let Some(setup) = &setup_gas_providers.etherscan {
+                        return Ok(Arc::new(EtherscanGasFeeEstimator::new(setup.clone())?));
+                    }
+                }
                 GasProvider::TENDERLY => {
                     if let Some(setup) = &setup_gas_providers.tenderly {
                         return Ok(Arc::new(TenderlyGasFeeEstimator::new(&setup.api_key)));

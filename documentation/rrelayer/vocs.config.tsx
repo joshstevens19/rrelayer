@@ -127,8 +127,10 @@ export default defineConfig({
               text: 'Gas Provider',
               link: '/config/networks/gas-provider',
               items: [
+                { text: 'Block Native', link: '/config/networks/gas-provider#block-native' },
                 { text: 'Infura', link: '/config/networks/gas-provider#infura' },
                 { text: 'Tenderly', link: '/config/networks/gas-provider#tenderly' },
+                { text: 'Etherscan', link: '/config/networks/gas-provider#etherscan' },
                 { text: 'Custom', link: '/config/networks/gas-provider#custom' },
                 { text: 'Fallback', link: '/config/networks/gas-provider#fallback' },
               ],
