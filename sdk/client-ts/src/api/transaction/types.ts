@@ -1,5 +1,5 @@
 import { Address, Hash } from 'viem';
-import { GasPriceResult, BlobGasPriceResult } from '../gas';
+import { GasPriceResult, BlobGasPriceResult } from '../network';
 
 export enum TransactionStatus {
   PENDING = 'PENDING',
