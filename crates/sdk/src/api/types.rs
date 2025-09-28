@@ -22,6 +22,12 @@ pub enum ApiSdkError {
 
     #[error("Serialization error: {0}")]
     SerializationError(String),
+
+    #[error("Authentication failed: {0}")]
+    AuthError(String),
+
+    #[error("Rate limit exceeded")]
+    RateLimitError,
 }
 
 pub type ApiResult<T> = Result<T, ApiSdkError>;
