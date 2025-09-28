@@ -7,7 +7,7 @@ use rrelayer_core::signing::{SignTextResult, SignTypedDataResult};
 use rrelayer_core::signing::{SignedTextHistory, SignedTypedDataHistory};
 use std::sync::Arc;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct SignApi {
     client: Arc<HttpClient>,
 }
@@ -68,7 +68,7 @@ impl SignApi {
     /// # Returns
     /// * `Ok(PagingResult<SignedTextHistory>)` - Paginated list of signed text messages
     /// * `Err(ApiSdkError)` - If the API call fails
-    pub async fn get_text_history(
+    pub async fn get_signed_text_history(
         &self,
         relayer_id: &RelayerId,
         paging_context: &PagingContext,
@@ -89,7 +89,7 @@ impl SignApi {
     /// # Returns
     /// * `Ok(PagingResult<SignedTypedDataHistory>)` - Paginated list of signed typed data messages
     /// * `Err(ApiSdkError)` - If the API call fails
-    pub async fn get_typed_data_history(
+    pub async fn get_signed_typed_data_history(
         &self,
         relayer_id: &RelayerId,
         paging_context: &PagingContext,

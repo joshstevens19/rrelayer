@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use crate::api::{http::HttpClient, types::ApiResult};
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct RelayerAllowlist {
     client: Arc<HttpClient>,
 }

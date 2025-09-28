@@ -33,16 +33,13 @@ impl TestRunner {
             blobs: None,
         };
 
-        let send_result =
-            self.relayer_client.sdk.transaction.send(&relayer.id, &tx_request, None).await;
+        let send_result = relayer.transaction().send(&tx_request, None).await;
 
         match send_result {
-            Ok(tx_response) => {
-                return Err(anyhow::anyhow!(
-                    "Transaction sent successfully, but should have failed: {:?}",
-                    tx_response
-                ));
-            }
+            Ok(tx_response) => Err(anyhow::anyhow!(
+                "Transaction sent successfully, but should have failed: {:?}",
+                tx_response
+            )),
             Err(_) => {
                 info!(
                     "[SUCCESS] Transaction was rejected at gas estimation (also valid failure scenario)"

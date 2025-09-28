@@ -11,7 +11,7 @@ mod clone_relayer;
 mod create_relayer;
 mod delete_relayer;
 mod get_allowlist_addresses;
-mod get_relayer_api;
+mod get_relayer;
 mod get_relayers;
 mod pause_relayer;
 mod unpause_relayer;
@@ -20,14 +20,14 @@ mod update_relay_max_gas_price;
 
 pub use clone_relayer::CloneRelayerRequest;
 pub use create_relayer::{CreateRelayerRequest, CreateRelayerResult};
-pub use get_relayer_api::GetRelayerResult;
+pub use get_relayer::GetRelayerResult;
 pub use get_relayers::GetRelayersQuery;
 
 use clone_relayer::clone_relayer;
 use create_relayer::create_relayer;
 use delete_relayer::delete_relayer;
 use get_allowlist_addresses::get_allowlist_addresses;
-use get_relayer_api::get_relayer_api;
+use get_relayer::get_relayer_api;
 use get_relayers::get_relayers;
 use pause_relayer::pause_relayer;
 use unpause_relayer::unpause_relayer;

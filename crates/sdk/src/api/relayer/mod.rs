@@ -12,7 +12,7 @@ use crate::api::{
     types::{ApiResult, ApiSdkError},
 };
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct RelayerApi {
     client: Arc<HttpClient>,
     pub allowlist: RelayerAllowlist,
@@ -52,7 +52,7 @@ impl RelayerApi {
         self.client.get_or_none(&format!("relayers/{}", id)).await
     }
 
-    pub async fn create(&self, chain_id: u64, name: &str) -> ApiResult<CreateRelayerResult> {
+    pub async fn create(&self, chain_id: &u64, name: &str) -> ApiResult<CreateRelayerResult> {
         self.client
             .post(
                 &format!("relayers/{}/new", chain_id.to_string()),
@@ -64,7 +64,7 @@ impl RelayerApi {
     pub async fn clone(
         &self,
         id: &RelayerId,
-        chain_id: u64,
+        chain_id: &u64,
         name: &str,
     ) -> ApiResult<CreateRelayerResult> {
         self.client
@@ -97,5 +97,13 @@ impl RelayerApi {
 
     pub async fn remove_max_gas_price(&self, id: &RelayerId) -> ApiResult<()> {
         self.client.put_status(&format!("relayers/{}/gas/max/0", id), &()).await
+    }
+
+    pub async fn get_pending_count(&self, id: &RelayerId) -> ApiResult<u32> {
+        self.client.get(&format!("transactions/relayers/{}/pending/count", id)).await
+    }
+
+    pub async fn get_inmempool_count(&self, id: &RelayerId) -> ApiResult<u32> {
+        self.client.get(&format!("transactions/relayers/{}/inmempool/count", id)).await
     }
 }

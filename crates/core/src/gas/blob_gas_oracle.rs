@@ -1,15 +1,12 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::{
-    network::ChainId, provider::EvmProvider, rrelayer_error, rrelayer_info,
-    transaction::types::TransactionSpeed,
-};
+use crate::{network::ChainId, provider::EvmProvider, transaction::types::TransactionSpeed};
 use serde::{Deserialize, Serialize};
 use tokio::{
     sync::Mutex,
     time::{self, Duration},
 };
-use tracing::info;
+use tracing::{error, info};
 
 #[derive(Clone, Debug)]
 pub struct BlobGasEstimatorResult {
@@ -100,10 +97,9 @@ pub async fn blob_gas_oracle(
             if let Ok(blob_gas_price) = blob_gas_price_result {
                 cache.lock().await.update_blob_gas_price(provider.chain_id, blob_gas_price).await;
             } else {
-                rrelayer_error!(
+                error!(
                     "Failed to get initial blob gas price for provider: {} - error {:?}",
-                    provider.name,
-                    blob_gas_price_result
+                    provider.name, blob_gas_price_result
                 );
             }
         });

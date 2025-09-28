@@ -12,15 +12,6 @@ impl TestResult {
     pub fn is_success(&self) -> bool {
         matches!(self, TestResult::Passed)
     }
-
-    pub fn status_icon(&self) -> &'static str {
-        match self {
-            TestResult::Passed => "PASS",
-            TestResult::Failed(_) => "FAIL",
-            TestResult::Timeout => "TIMEOUT",
-            TestResult::Skipped(_) => "SKIP",
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -28,6 +19,7 @@ pub struct TestInfo {
     pub name: String,
     pub result: TestResult,
     pub duration: Duration,
+    #[allow(dead_code)]
     pub error_message: Option<String>,
 }
 
@@ -45,6 +37,7 @@ impl TestInfo {
 }
 
 pub struct TestSuite {
+    #[allow(dead_code)]
     pub name: String,
     pub tests: Vec<TestInfo>,
     pub duration: Duration,

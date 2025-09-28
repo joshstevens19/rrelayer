@@ -20,7 +20,7 @@ impl TestRunner {
         let allowed_tx_result = self
             .relayer_client
             .send_transaction(
-                &relayer.id,
+                &relayer.id(),
                 &self.config.anvil_accounts[1],
                 alloy::primitives::utils::parse_ether("0.1")?.into(),
                 TransactionData::empty(),
@@ -37,7 +37,7 @@ impl TestRunner {
         let forbidden_tx_result = self
             .relayer_client
             .send_transaction(
-                &relayer.id,
+                &relayer.id(),
                 &self.config.anvil_accounts[2],
                 alloy::primitives::utils::parse_ether("0.5")?.into(),
                 TransactionData::empty(),
@@ -56,7 +56,7 @@ impl TestRunner {
         let forbidden_native_tx_result = self
             .relayer_client
             .send_transaction(
-                &relayer.id,
+                &relayer.id(),
                 &self.config.anvil_accounts[1],
                 alloy::primitives::utils::parse_ether("0.1")?.into(),
                 TransactionData::empty(),
@@ -77,7 +77,7 @@ impl TestRunner {
 
         let allowed_contract_tx_result = self
             .relayer_client
-            .send_transaction(&relayer.id, &contract_address, TransactionValue::zero(), calldata)
+            .send_transaction(&relayer.id(), &contract_address, TransactionValue::zero(), calldata)
             .await;
 
         if allowed_contract_tx_result.is_err() {

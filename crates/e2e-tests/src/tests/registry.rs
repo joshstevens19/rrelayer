@@ -42,16 +42,4 @@ impl TestRegistry {
 
         tests
     }
-
-    pub fn execute_test<'a>(
-        runner: &'a TestRunner,
-        test_name: &str,
-    ) -> Option<Pin<Box<dyn Future<Output = Result<()>> + 'a>>> {
-        let tests = Self::get_all_tests();
-        if let Some(test_def) = tests.iter().find(|t| t.name == test_name) {
-            Some((test_def.function)(runner))
-        } else {
-            None
-        }
-    }
 }

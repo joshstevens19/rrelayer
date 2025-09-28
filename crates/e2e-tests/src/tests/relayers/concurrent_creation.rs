@@ -40,7 +40,8 @@ impl TestRunner {
                 let index = batch_start + i;
                 info!(
                     "Successfully created concurrent relayer {} at position {}",
-                    relayer.id, index
+                    relayer.id(),
+                    index
                 );
                 all_relayers.push(relayer);
             }
@@ -55,10 +56,11 @@ impl TestRunner {
 
         let mut addresses: std::collections::HashSet<EvmAddress> = std::collections::HashSet::new();
         for relayer in &all_relayers {
-            if !addresses.insert(relayer.address) {
+            let address = relayer.address().await?;
+            if !addresses.insert(address) {
                 return Err(anyhow!(
                     "Duplicate address found: {}. This indicates a race condition!",
-                    relayer.address
+                    address
                 ));
             }
         }

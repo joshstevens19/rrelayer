@@ -1,5 +1,5 @@
 use rrelayer_core::common_types::PagingContext;
-use rrelayer_sdk::SDK;
+use rrelayer_sdk::Client;
 
 use crate::project_location::ProjectLocation;
 use crate::{
@@ -12,27 +12,27 @@ pub async fn handle_list(
     limit: u32,
     offset: u32,
     project_path: &ProjectLocation,
-    sdk: &SDK,
+    client: &Client,
 ) -> Result<(), RelayerManagementError> {
     if let Some(network) = network {
         let chain_id = get_chain_id_for_network(&network, project_path).await?;
-        log_relayers(sdk, Some(chain_id), limit, offset).await?;
+        log_relayers(client, Some(chain_id), limit, offset).await?;
         return Ok(());
     } else {
-        log_relayers(sdk, None, limit, offset).await?;
+        log_relayers(client, None, limit, offset).await?;
     }
 
     Ok(())
 }
 
 async fn log_relayers(
-    sdk: &SDK,
+    client: &Client,
     chain_id: Option<u64>,
     limit: u32,
     offset: u32,
 ) -> Result<(), RelayerManagementError> {
     let paging_context = PagingContext::new(limit, offset);
-    let result = sdk.relayer.get_all(chain_id, &paging_context).await?;
+    let result = client.relayer().get_all(&paging_context, chain_id).await?;
 
     if result.items.is_empty() {
         println!("No relayers found.");

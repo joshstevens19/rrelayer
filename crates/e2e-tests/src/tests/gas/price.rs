@@ -15,9 +15,9 @@ impl TestRunner {
 
         let gas_prices = self
             .relayer_client
-            .sdk
-            .network
-            .get_gas_prices(self.config.chain_id)
+            .client
+            .network()
+            .get_gas_prices(&self.config.chain_id)
             .await
             .context("Failed to get gas prices")?;
 

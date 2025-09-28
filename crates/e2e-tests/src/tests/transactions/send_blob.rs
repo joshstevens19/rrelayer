@@ -30,8 +30,7 @@ impl TestRunner {
             blobs: Some(vec![hex_blob]),
         };
 
-        let blob_result =
-            self.relayer_client.sdk.transaction.send(&relayer.id, &tx_request, None).await?;
+        let blob_result = relayer.transaction().send(&tx_request, None).await?;
 
         let result = self.wait_for_transaction_completion(&blob_result.id).await?;
 

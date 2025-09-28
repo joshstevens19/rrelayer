@@ -1,4 +1,4 @@
-mod enable_disable;
+mod all;
 
 use crate::tests::registry::{TestDefinition, TestModule};
 

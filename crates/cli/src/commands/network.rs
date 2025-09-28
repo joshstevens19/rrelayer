@@ -3,7 +3,7 @@ use clap::{Args, Subcommand};
 use dialoguer::{Confirm, Input};
 use prettytable::{Cell, Row, Table, format};
 use rrelayer_core::{NetworkSetupConfig, create_retry_client, gas::GasPriceResult, get_chain_id};
-use rrelayer_sdk::SDK;
+use rrelayer_sdk::Client;
 
 use crate::project_location::ProjectLocation;
 use crate::{commands::error::NetworkError, console::print_table};
@@ -28,13 +28,13 @@ pub struct AddArgs {}
 pub async fn handle_network(
     command: &NetworkCommands,
     project_path: &ProjectLocation,
-    sdk: &SDK,
+    client: &Client,
 ) -> Result<(), NetworkError> {
     match &command {
         NetworkCommands::Add(_) => handle_add(project_path).await,
-        NetworkCommands::List => handle_list(sdk).await,
+        NetworkCommands::List => handle_list(client).await,
         NetworkCommands::Gas { name: network_name } => {
-            handle_gas(network_name, project_path, sdk).await
+            handle_gas(network_name, project_path, client).await
         }
     }
 }
@@ -121,8 +121,8 @@ async fn handle_add(project_path: &ProjectLocation) -> Result<(), NetworkError> 
     Ok(())
 }
 
-async fn handle_list(sdk: &SDK) -> Result<(), NetworkError> {
-    let networks = sdk.network.get_all().await?;
+async fn handle_list(client: &Client) -> Result<(), NetworkError> {
+    let networks = client.network().get_all().await?;
 
     if networks.is_empty() {
         println!("No networks found.");
@@ -164,11 +164,11 @@ fn get_wait_time(result: &GasPriceResult) -> String {
 async fn handle_gas(
     network_name: &str,
     project_path: &ProjectLocation,
-    sdk: &SDK,
+    client: &Client,
 ) -> Result<(), NetworkError> {
     let chain_id = get_chain_id_for_network(network_name, project_path).await?;
 
-    let gas_prices = sdk.network.get_gas_prices(chain_id).await?;
+    let gas_prices = client.network().get_gas_prices(&chain_id).await?;
     match gas_prices {
         None => {
             println!("No gas prices found for chain ID: {}", chain_id);

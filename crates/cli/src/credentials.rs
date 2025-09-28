@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
-// Simple file-based credential storage (like npm)
 fn get_storage_dir() -> Result<PathBuf, CredentialError> {
     let home_dir = std::env::var("HOME").map_err(|_| CredentialError::NotFound)?;
     let storage_dir = PathBuf::from(home_dir).join(".rrelayer");
@@ -112,8 +111,4 @@ pub fn add_profile_to_list(_profile_name: &str) -> Result<(), CredentialError> {
 pub fn remove_profile_from_list(_profile_name: &str) -> Result<(), CredentialError> {
     // No-op for file-based storage - profiles are auto-discovered
     Ok(())
-}
-
-pub fn get_default_profile() -> String {
-    "default".to_string()
 }

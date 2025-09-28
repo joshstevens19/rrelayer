@@ -1,10 +1,8 @@
-use alloy::primitives::utils::parse_units;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use super::base::{BaseGasFeeEstimator, GasEstimatorError, GasEstimatorResult, GasPriceResult};
 
-// Helper constant for gwei to wei conversion
 const GWEI_TO_WEI: u128 = 1_000_000_000;
 use crate::{
     gas::types::{MaxFee, MaxPriorityFee},

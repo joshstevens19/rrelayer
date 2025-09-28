@@ -25,12 +25,12 @@ use super::{
     start::spawn_processing_tasks_for_relayer,
     transactions_queue::TransactionsQueue,
     types::{
-        AddTransactionError, CancelTransactionError, CancelTransactionResult,
-        CompetitionResolutionResult, CompetitionType, EditableTransactionType,
-        ProcessInmempoolStatus, ProcessInmempoolTransactionError, ProcessMinedStatus,
-        ProcessMinedTransactionError, ProcessPendingStatus, ProcessPendingTransactionError,
-        ProcessResult, ReplaceTransactionError, ReplaceTransactionResult, TransactionRelayerSetup,
-        TransactionToSend, TransactionsQueueSetup,
+        AddTransactionError, CancelTransactionError, CancelTransactionResult, CompetitionType,
+        EditableTransactionType, ProcessInmempoolStatus, ProcessInmempoolTransactionError,
+        ProcessMinedStatus, ProcessMinedTransactionError, ProcessPendingStatus,
+        ProcessPendingTransactionError, ProcessResult, ReplaceTransactionError,
+        ReplaceTransactionResult, TransactionRelayerSetup, TransactionToSend,
+        TransactionsQueueSetup,
     },
 };
 use crate::transaction::api::RelayTransactionRequest;

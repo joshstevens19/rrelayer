@@ -24,7 +24,7 @@ impl HealthApi {
     }
 }
 
-pub use authentication::Authentication;
+pub use authentication::AuthenticationApi;
 pub use network::NetworkApi;
 pub use relayer::RelayerApi;
 pub use sign::SignApi;

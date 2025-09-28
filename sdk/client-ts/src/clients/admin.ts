@@ -6,7 +6,7 @@ import {
   updateRelayerMaxGasPrice,
   removeRelayerMaxGasPrice,
   getTransactionsPendingCount,
-  TransactionSpeed,
+  TransactionSpeed, CreateRelayerResult, cloneRelayer,
 } from '../api';
 import { RelayerClient } from './relayer';
 import { TransactionCountType } from './types';
@@ -75,6 +75,9 @@ export class AdminRelayerClient extends RelayerClient {
     return removeRelayerMaxGasPrice(this.id, this._apiBaseConfig);
   }
 
+  /**
+   * Transaction methods
+   */
   public get transaction() {
     return {
       ...super.transaction,
@@ -94,5 +97,13 @@ export class AdminRelayerClient extends RelayerClient {
         }
       },
     };
+  }
+
+  /**
+   * Remove the max gas price for a relayer
+   * @returns CreateRelayerResult The clone relayer creation information
+   */
+  public clone(chainId: number, name: string): Promise<CreateRelayerResult> {
+    return cloneRelayer(this.id, chainId, name, this._apiBaseConfig);
   }
 }

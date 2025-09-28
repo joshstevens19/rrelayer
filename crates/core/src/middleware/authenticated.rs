@@ -3,7 +3,7 @@ use axum::{
     extract::FromRequestParts,
     http::{request::Parts, StatusCode},
 };
-use tracing::log::error;
+use tracing::error;
 
 /// Marker type indicating that a request has been authenticated.
 ///

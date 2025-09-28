@@ -1,37 +1,37 @@
 # Why rrelayer?
 
-## Why do we need a relayer in general?
+## Why do we need rrelayer in general?
 
-As we keep moving forward in the web3 space we are seeing more and more that abstracting away the complexity of the blockchain is a good thing and paying for gas is a bad UX.
-
-With L2 solutions opening up scaling bringing down transaction prices gasless transactions are becoming more and more important. Lets also note here that with the rise on L2 solutions
-these systems have to submit back the state or proofs to the main chain, this is where this relayer software can also come in for general purpose use.
-
-We see that over the next year or so the want to be able to have infrastructure that can handle these gasless transactions will become more and more needed. Not even gasless just a system which
-can get a bunch of transactions on a chain without worrying about writing scripts all the time for it.
+Managing blockchain transactions is essential for developers building Web3 applications, DeFi protocols, and enterprise blockchain integrations.
+Building the necessary transaction infrastructure, however, presents significant challenges.
+It is complex, time-consuming, and can divert focus from core business logic and application development.
+As applications scale and require reliable transaction processing with gas optimization, nonce management, and multi-chain support, the need for robust, easily deployable transaction relay solutions grows.
+While some transaction relay tools exist, most are proprietary SaaS solutions, so creating an opensource, self-hosted relayer provides critical infrastructure independence for the Web3 ecosystem.
 
 ## The Problems
 
-We have some good existing solutions for relaying transactions but they are always behind a SaaS or a centralized service, on top of this they are not opensource and are not easy to customize or extend.
-Most of these providers have a pricing model (which they should) but these can become expensive and a bottleneck for people building new applications. This means if your application hits x amount an hour
-its now a bigger bill with the provider over just paying more gas on your side. Remember that the services provided only give you the software the gas itself is down to your business to pay.
+Traditional transaction management requires developers to handle gas estimation, nonce tracking, transaction queuing, wallet security, and retry logic manually. This complexity can delay application development and introduce reliability issues, especially when scaling across multiple chains or handling high transaction volumes. Additionally, existing SaaS providers often impose rate limits, usage-based pricing, and vendor lock-in that can become prohibitively expensive as applications grow.
 
-With L2 solutions becoming cheaper and cheaper being able to pay for the users gas is going to become more and more important. We need a system that can handle this openly and freely but without rate limits.
-When you run your own infrastructure you can control the rate limits and the costs.
+Effective transaction infrastructure should be simple to deploy and operate, requiring minimal configuration for basic relay needs, while providing enterprise-grade features for production applications. Modern Web3 applications require sophisticated transaction management including gas price optimization, automatic retry mechanisms, comprehensive monitoring, and support for advanced transaction types like EIP-4844 blobs.
+
+The proven success of Rust-based blockchain tools like Foundry, Reth, and Alloy demonstrates significant performance advantages over existing solutions, which rrelayer leverages for maximum transaction throughput and reliability.
 
 ## Developer Experience
 
-rrelayer has tried to abstract everything away for you to make it as easy as just following some steps to get setup. Running a rust server is extremely cheap and easy to do.
-We have guides in how to deploy it to most major cloud providers.
+rrelayer dramatically enhances the developer experience by eliminating transaction management complexity entirely.
+Its straightforward REST API allows developers to submit transactions with a single HTTP call, enabling them to focus entirely on application logic rather than blockchain infrastructure specifics.
+The comprehensive SDK support for TypeScript, Rust, and direct API integration means developers can use familiar tools and patterns.
+For advanced use cases, rrelayer provides enterprise-grade features like multiple wallet providers, gas optimization strategies, and comprehensive monitoring without requiring infrastructure expertise.
 
-On top of this we have integrated with the most popular web3 libraries to make it as easy as possible to integrate with your application with the tools you know.
-With a few lines of code you can be relaying transactions.
+## Infrastructure Control
 
-## Stability
-
-When building solid foundation systems being in control of your stability is critical, with rrelayer being opensource and extendable you can can be in control of the direction you take, the costing you pay,
-the stability of the system and the features you need.
+Self-hosting rrelayer provides complete control over transaction infrastructure, costs, and reliability.
+Unlike SaaS providers that impose usage limits and escalating costs, rrelayer allows unlimited transaction volume at predictable infrastructure costs.
+This control becomes critical for high-volume applications, enterprise deployments, and applications requiring custom gas strategies or specialized wallet configurations.
+Being opensource and extensible means you can adapt rrelayer to specific requirements and maintain long-term infrastructure independence.
 
 ## Performance
 
-We built this in rust for this exact purpose rust was built to be a beast in a task like this. Performance will be blazing fast and always be the fastest solution around.
+Rust was chosen for developing rrelayer due to its exceptional performance and memory safety characteristics. Its zero-cost abstractions and efficient concurrency model enable rrelayer to handle thousands of concurrent transactions with minimal latency and resource usage. This makes rrelayer ideal for high-throughput applications, real-time trading systems, and enterprise-scale transaction processing where performance directly impacts user experience and operational costs.
+
+"Performance and reliability are everything in transaction infrastructure."

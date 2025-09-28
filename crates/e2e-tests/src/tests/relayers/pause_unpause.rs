@@ -21,7 +21,7 @@ impl TestRunner {
         let normal_result = self
             .relayer_client
             .send_transaction(
-                &relayer.id,
+                &relayer.id(),
                 &self.config.anvil_accounts[1],
                 alloy::primitives::utils::parse_ether("0.5")?.into(),
                 TransactionData::empty(),
@@ -35,9 +35,9 @@ impl TestRunner {
             ));
         }
 
-        self.relayer_client.sdk.relayer.pause(&relayer.id).await?;
+        relayer.pause().await?;
 
-        let paused_config = self.relayer_client.sdk.relayer.get(&relayer.id).await?;
+        let paused_config = self.relayer_client.client.relayer().get(&relayer.id()).await?;
         if let Some(config) = paused_config {
             if !config.relayer.paused {
                 return Err(anyhow!("Relayer should be paused, but is not"));
@@ -47,7 +47,7 @@ impl TestRunner {
         let paused_result = self
             .relayer_client
             .send_transaction(
-                &relayer.id,
+                &relayer.id(),
                 &self.config.anvil_accounts[1],
                 alloy::primitives::utils::parse_ether("0.5")?.into(),
                 TransactionData::empty(),
@@ -58,9 +58,9 @@ impl TestRunner {
             return Err(anyhow!("Transaction should fail when relayer is paused, but succeeded"));
         }
 
-        self.relayer_client.sdk.relayer.unpause(&relayer.id).await?;
+        relayer.unpause().await?;
 
-        let unpaused_config = self.relayer_client.sdk.relayer.get(&relayer.id).await?;
+        let unpaused_config = self.relayer_client.client.relayer().get(&relayer.id()).await?;
         if let Some(config) = unpaused_config {
             if config.relayer.paused {
                 return Err(anyhow!("Relayer should not be paused, but is"));
@@ -70,7 +70,7 @@ impl TestRunner {
         let unpaused_result = self
             .relayer_client
             .send_transaction(
-                &relayer.id,
+                &relayer.id(),
                 &self.config.anvil_accounts[1],
                 alloy::primitives::utils::parse_ether("0.5")?.into(),
                 TransactionData::empty(),

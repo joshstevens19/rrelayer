@@ -10,32 +10,39 @@ use rrelayer_core::{
     transaction::api::{RelayTransactionRequest, SendTransactionResult},
     transaction::types::{TransactionData, TransactionId, TransactionValue},
 };
-use rrelayer_sdk::SDK;
+use rrelayer_sdk::{Client, CreateClientAuth, CreateClientConfig};
 use tracing::info;
 
 #[derive(Clone)]
-pub struct RelayerClient {
-    pub sdk: SDK,
+pub struct E2ERelayerClient {
+    pub client: Client,
 }
 
-impl RelayerClient {
+impl E2ERelayerClient {
     pub fn new(config: &E2ETestConfig) -> Self {
         let username = std::env::var("RRELAYER_AUTH_USERNAME")
             .expect("RRELAYER_AUTH_USERNAME needs to be set");
         let password = std::env::var("RRELAYER_AUTH_PASSWORD")
             .expect("RRELAYER_AUTH_PASSWORD needs to be set");
 
-        let sdk = SDK::new(config.rrelayer_base_url.clone(), username, password);
+        let sdk = Client::new(CreateClientConfig {
+            server_url: config.rrelayer_base_url.clone(),
+            auth: CreateClientAuth { username, password },
+        });
 
-        Self { sdk }
+        Self { client: sdk }
     }
 
     /// Create a new relayer for the test chain
     pub async fn create_relayer(&self, name: &str, chain_id: u64) -> Result<CreateRelayerResult> {
         info!("Creating relayer: {} on chain {}", name, chain_id);
 
-        let result =
-            self.sdk.relayer.create(chain_id, name).await.context("Failed to create relayer")?;
+        let result = self
+            .client
+            .relayer()
+            .create(&chain_id, name)
+            .await
+            .context("Failed to create relayer")?;
 
         info!("Created relayer: {:?}", result);
 
@@ -129,10 +136,11 @@ impl RelayerClient {
 
         info!("Transaction request: {:?}", request);
 
-        let result = self
-            .sdk
-            .transaction
-            .send(&relayer_id, &request, rate_limit_key)
+        let relayer_client = self.client.get_relayer_client(relayer_id, None).await?;
+
+        let result = relayer_client
+            .transaction()
+            .send(&request, rate_limit_key)
             .await
             .context("Failed to send transaction")?;
 
@@ -148,8 +156,8 @@ impl RelayerClient {
         info!("Getting transaction status for: {}", transaction_id);
 
         let result = self
-            .sdk
-            .transaction
+            .client
+            .transaction()
             .get_status(&transaction_id)
             .await
             .context("Failed to get transaction status")?;
@@ -165,8 +173,8 @@ impl RelayerClient {
         info!("Getting transaction status for: {}", transaction_id);
 
         let result = self
-            .sdk
-            .transaction
+            .client
+            .transaction()
             .get(&transaction_id)
             .await
             .context("Failed to get transaction status")?;

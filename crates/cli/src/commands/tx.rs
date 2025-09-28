@@ -1,3 +1,4 @@
+use crate::commands::error::TransactionError;
 use alloy::network::EthereumWallet;
 use alloy::primitives::utils::parse_units;
 use alloy::providers::{Provider, ProviderBuilder};
@@ -15,10 +16,8 @@ use rrelayer_core::{
         Transaction, TransactionData, TransactionId, TransactionSpeed, TransactionValue,
     },
 };
-use rrelayer_sdk::SDK;
+use rrelayer_sdk::{AdminRelayerClient, Client, TransactionCountType};
 use std::io::{self, Write};
-
-use crate::commands::error::TransactionError;
 
 sol! {
     #[sol(rpc)]
@@ -142,30 +141,38 @@ pub enum TxStatus {
     Success,
 }
 
-pub async fn handle_tx(command: &TxCommand, sdk: &SDK) -> Result<(), TransactionError> {
+pub async fn handle_tx(command: &TxCommand, client: &Client) -> Result<(), TransactionError> {
     match command {
-        TxCommand::Get { tx_id } => handle_get(tx_id, sdk).await,
+        TxCommand::Get { tx_id } => handle_get(tx_id, client).await,
         TxCommand::Withdraw { relayer_id, to, amount, token, decimals } => {
-            handle_withdraw(relayer_id, to, amount, token, *decimals, sdk).await
+            let relayer_client = client.get_relayer_client(relayer_id, None).await?;
+            handle_withdraw(to, amount, token, *decimals, relayer_client).await
         }
-        TxCommand::Status { tx_id } => handle_status(tx_id, sdk).await,
+        TxCommand::Status { tx_id } => handle_status(tx_id, client).await,
         TxCommand::List { relayer_id, status, limit, offset } => {
-            handle_list(relayer_id, status, *limit, *offset, sdk).await
+            let relayer_client = client.get_relayer_client(relayer_id, None).await?;
+            handle_list(status, *limit, *offset, relayer_client).await
         }
-        TxCommand::Queue { relayer_id } => handle_queue(relayer_id, sdk).await,
-        TxCommand::Cancel { tx_id } => handle_cancel(tx_id, sdk).await,
-        TxCommand::Replace { tx_id, transaction } => handle_replace(tx_id, transaction, sdk).await,
+        TxCommand::Queue { relayer_id } => {
+            let relayer_client = client.get_relayer_client(relayer_id, None).await?;
+            handle_queue(relayer_client).await
+        }
+        TxCommand::Cancel { tx_id } => handle_cancel(tx_id, client).await,
+        TxCommand::Replace { tx_id, transaction } => {
+            handle_replace(tx_id, transaction, client).await
+        }
         TxCommand::Send { relayer_id, transaction } => {
-            handle_send(relayer_id, transaction, sdk).await
+            let relayer_client = client.get_relayer_client(relayer_id, None).await?;
+            handle_send(transaction, relayer_client).await
         }
         TxCommand::Fund { relayer_id, amount, token, decimals } => {
-            handle_fund(relayer_id, amount, token, *decimals, sdk).await
+            handle_fund(relayer_id, amount, token, *decimals, client).await
         }
     }
 }
 
-async fn handle_get(tx_id: &TransactionId, sdk: &SDK) -> Result<(), TransactionError> {
-    let tx = sdk.transaction.get(tx_id).await?;
+async fn handle_get(tx_id: &TransactionId, client: &Client) -> Result<(), TransactionError> {
+    let tx = client.transaction().get(tx_id).await?;
     if let Some(tx) = tx {
         log_transactions(vec![tx])?;
     } else {
@@ -175,12 +182,11 @@ async fn handle_get(tx_id: &TransactionId, sdk: &SDK) -> Result<(), TransactionE
 }
 
 async fn handle_withdraw(
-    relayer_id: &RelayerId,
     to: &EvmAddress,
     amount: &str,
     token: &Option<EvmAddress>,
     decimals: u8,
-    sdk: &SDK,
+    client: AdminRelayerClient,
 ) -> Result<(), TransactionError> {
     let amount_wei = parse_units(amount, decimals)
         .map_err(|e| {
@@ -199,10 +205,9 @@ async fn handle_withdraw(
         Some(token_address) => {
             let call = IERC20::transferCall { to: (*to).into(), amount: amount_wei };
 
-            let tx = sdk
-                .transaction
+            let tx = client
+                .transaction()
                 .send(
-                    relayer_id,
                     &RelayTransactionRequest {
                         to: *token_address,
                         value: TransactionValue::zero(),
@@ -220,11 +225,9 @@ async fn handle_withdraw(
             println!("Transaction hash: {}", tx.hash);
         }
         None => {
-            // Native ETH transfer
-            let tx = sdk
-                .transaction
+            let tx = client
+                .transaction()
                 .send(
-                    relayer_id,
                     &RelayTransactionRequest {
                         to: *to,
                         value: TransactionValue::new(amount_wei),
@@ -246,8 +249,8 @@ async fn handle_withdraw(
     Ok(())
 }
 
-async fn handle_status(tx_id: &TransactionId, sdk: &SDK) -> Result<(), TransactionError> {
-    let status = sdk.transaction.get_status(tx_id).await?;
+async fn handle_status(tx_id: &TransactionId, client: &Client) -> Result<(), TransactionError> {
+    let status = client.transaction().get_status(tx_id).await?;
     match status {
         None => {
             println!("Can not find transaction id {}", tx_id)
@@ -264,15 +267,14 @@ async fn handle_status(tx_id: &TransactionId, sdk: &SDK) -> Result<(), Transacti
 }
 
 async fn handle_list(
-    relayer_id: &RelayerId,
     // TODO: handle status filtering
     _status: &Option<TxStatus>,
     limit: u32,
     offset: u32,
-    sdk: &SDK,
+    client: AdminRelayerClient,
 ) -> Result<(), TransactionError> {
     let paging_context = PagingContext::new(limit, offset);
-    let transactions = sdk.transaction.get_all(relayer_id, &paging_context).await?;
+    let transactions = client.transaction().get_all(&paging_context).await?;
 
     log_transactions(transactions.items)?;
 
@@ -283,10 +285,11 @@ async fn handle_list(
     Ok(())
 }
 
-async fn handle_queue(relayer_id: &RelayerId, sdk: &SDK) -> Result<(), TransactionError> {
+async fn handle_queue(client: AdminRelayerClient) -> Result<(), TransactionError> {
+    let transaction_api = client.transaction();
     let (pending_result, mempool_result) = tokio::join!(
-        sdk.transaction.get_pending_count(relayer_id),
-        sdk.transaction.get_inmempool_count(relayer_id)
+        transaction_api.get_count(TransactionCountType::Pending),
+        transaction_api.get_count(TransactionCountType::Inmempool),
     );
 
     let pending_count = pending_result?;
@@ -295,7 +298,7 @@ async fn handle_queue(relayer_id: &RelayerId, sdk: &SDK) -> Result<(), Transacti
     println!("┌─────────────────────────────────────────────────────────────────────");
     println!("│ TRANSACTION QUEUE STATUS");
     println!("├─────────────────────────────────────────────────────────────────────");
-    println!("│ Relayer ID:        {}", relayer_id);
+    println!("│ Relayer ID:        {}", client.id());
     println!("│ Pending:           {} transactions", pending_count);
     println!("│ In Mempool:        {} transactions", mempool_count);
     println!("│ Total Queued:      {} transactions", pending_count + mempool_count);
@@ -311,51 +314,64 @@ async fn handle_queue(relayer_id: &RelayerId, sdk: &SDK) -> Result<(), Transacti
     Ok(())
 }
 
-async fn handle_cancel(tx_id: &TransactionId, sdk: &SDK) -> Result<(), TransactionError> {
+async fn handle_cancel(tx_id: &TransactionId, client: &Client) -> Result<(), TransactionError> {
     println!("Canceling transaction: {}", tx_id);
 
-    let cancelled = sdk.transaction.cancel(tx_id, None).await?;
+    let tx = client.transaction().get(tx_id).await?;
+    if let Some(tx) = tx {
+        let relayer_client = client.get_relayer_client(&tx.relayer_id, None).await?;
+        let cancelled = relayer_client.transaction().cancel(tx_id, None).await?;
 
-    if cancelled.success {
-        println!("Transaction cancelled..");
-        return Ok(());
+        if cancelled.success {
+            println!("Transaction cancelled..");
+            return Ok(());
+        }
+
+        println!(
+            "Transaction could not be cancelled this can be due to the other transaction has already been mined.."
+        );
+
+        Ok(())
+    } else {
+        println!("Transaction {} not found.", tx_id);
+        Ok(())
     }
-
-    println!(
-        "Transaction could not be cancelled this can be due to the other transaction has already been mined.."
-    );
-
-    Ok(())
 }
 
 async fn handle_replace(
     tx_id: &TransactionId,
     transaction: &RelayTransactionRequest,
-    sdk: &SDK,
+    client: &Client,
 ) -> Result<(), TransactionError> {
     println!("Replacing transaction: {}", tx_id);
 
-    let replace_result = sdk.transaction.replace(tx_id, transaction, None).await?;
+    let tx = client.transaction().get(tx_id).await?;
+    if let Some(tx) = tx {
+        let relayer_client = client.get_relayer_client(&tx.relayer_id, None).await?;
+        let replace_result = relayer_client.transaction().replace(tx_id, transaction, None).await?;
 
-    if replace_result.success {
-        println!("Transaction replaced..");
-        return Ok(());
+        if replace_result.success {
+            println!("Transaction replaced..");
+            return Ok(());
+        }
+
+        println!(
+            "Transaction could not be cancelled this can be due to the other transaction has already been mined.."
+        );
+        Ok(())
+    } else {
+        println!("Transaction {} not found.", tx_id);
+        Ok(())
     }
-
-    println!(
-        "Transaction could not be cancelled this can be due to the other transaction has already been mined.."
-    );
-    Ok(())
 }
 
 async fn handle_send(
-    relayer_id: &RelayerId,
     transaction: &RelayTransactionRequest,
-    sdk: &SDK,
+    client: AdminRelayerClient,
 ) -> Result<(), TransactionError> {
     println!("Sending transaction: {:?}", transaction);
 
-    let tx = sdk.transaction.send(relayer_id, transaction, None).await?;
+    let tx = client.transaction().send(transaction, None).await?;
 
     println!("Transaction sent..");
     println!("Transaction id: {}", tx.id);
@@ -369,9 +385,9 @@ async fn handle_fund(
     amount: &str,
     token: &Option<EvmAddress>,
     decimals: u8,
-    sdk: &SDK,
+    client: &Client,
 ) -> Result<(), TransactionError> {
-    let result = sdk.relayer.get(relayer_id).await?.ok_or_else(|| {
+    let result = client.relayer().get(relayer_id).await?.ok_or_else(|| {
         TransactionError::CommandFailed(format!("Relayer {} not found", relayer_id))
     })?;
 
@@ -384,7 +400,7 @@ async fn handle_fund(
         })?
         .into();
 
-    let network = sdk.network.get_all().await?;
+    let network = client.network().get_all().await?;
     let network = network.into_iter().find(|n| n.chain_id == chain_id).expect("Network not found");
 
     println!("┌─────────────────────────────────────────────────────────────────────");

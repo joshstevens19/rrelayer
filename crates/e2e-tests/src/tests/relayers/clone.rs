@@ -20,29 +20,28 @@ impl TestRunner {
 
         let created_relayer = self
             .relayer_client
-            .sdk
-            .relayer
-            .get(&relayer.id)
+            .client
+            .relayer()
+            .get(&relayer.id())
             .await?
             .context("Relayer should exist")?;
 
-        if created_relayer.relayer.id != relayer.id {
+        if created_relayer.relayer.id != *relayer.id() {
             return Err(anyhow!("Relayer should exist"));
         }
 
-        let cloned_relayer = self
-            .relayer_client
-            .sdk
-            .relayer
-            .clone(&relayer.id, 31337, "cloned-test-relayer")
-            .await?;
-        if cloned_relayer.id == relayer.id {
+        let cloned_relayer = relayer.clone_relayer(&31337, "cloned-test-relayer").await?;
+
+        if cloned_relayer.id == *relayer.id() {
             return Err(anyhow!("Relayer should have been cloned and have its own ID"));
         }
 
-        if cloned_relayer.address != relayer.address {
+        if cloned_relayer.address != relayer.address().await? {
             return Err(anyhow!("Relayer should have been cloned and have the shared address"));
         }
+
+        let cloned_relayer_client =
+            self.relayer_client.client.get_relayer_client(&cloned_relayer.id, None).await?;
 
         let recipient = &self.config.anvil_accounts[1];
         info!("Sending ETH transfer to {} from the new cloned one", recipient);
@@ -65,11 +64,9 @@ impl TestRunner {
         self.relayer_client.sent_transaction_compare(tx_response.1, result.0)?;
 
         let paging = PagingContext { limit: 10, offset: 0 };
-        let first_relayer_transactions = self
-            .relayer_client
-            .sdk
-            .transaction
-            .get_all(&relayer.id, &paging)
+        let first_relayer_transactions = relayer
+            .transaction()
+            .get_all(&paging)
             .await
             .context("Failed to get relayer transactions")?;
 
@@ -78,11 +75,9 @@ impl TestRunner {
             first_relayer_transactions.items.len()
         );
 
-        let cloned_relayer_transactions = self
-            .relayer_client
-            .sdk
-            .transaction
-            .get_all(&cloned_relayer.id, &paging)
+        let cloned_relayer_transactions = cloned_relayer_client
+            .transaction()
+            .get_all(&paging)
             .await
             .context("Failed to get relayer transactions")?;
 

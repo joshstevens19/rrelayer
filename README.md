@@ -7,8 +7,8 @@
 ## TODO List
 
 - Finish documentation - in-progress
-- AI write go and python SDK
 - Internal documentation in the README.MD throughout
+- AI write go and python SDK
 - Publish NPM packages for TS package + Go + Python + Rust
 
 ## BUG

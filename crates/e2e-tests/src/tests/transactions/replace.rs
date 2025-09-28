@@ -27,11 +27,9 @@ impl TestRunner {
             blobs: None,
         };
 
-        let send_result = self
-            .relayer_client
-            .sdk
-            .transaction
-            .send(&relayer.id, &tx_request, None)
+        let send_result = relayer
+            .transaction()
+            .send(&tx_request, None)
             .await
             .context("Failed to send transaction")?;
 
@@ -46,10 +44,8 @@ impl TestRunner {
             blobs: None,
         };
 
-        let replace_result = self
-            .relayer_client
-            .sdk
-            .transaction
+        let replace_result = relayer
+            .transaction()
             .replace(transaction_id, &replacement_request, None)
             .await
             .context("Failed to replace transaction")?;
@@ -78,11 +74,17 @@ impl TestRunner {
             .await?;
 
         if first_transaction.status != TransactionStatus::REPLACED {
-            return Err(anyhow::anyhow!("First transaction is not cancelled"));
+            return Err(anyhow::anyhow!(format!(
+                "First transaction {} is not replaced it is {}",
+                first_transaction.id, first_transaction.status
+            )));
         }
 
         if replace_transaction.status != TransactionStatus::MINED {
-            return Err(anyhow::anyhow!("Replace transaction is not mined"));
+            return Err(anyhow::anyhow!(format!(
+                "Replace transaction {} is not mined it is {}",
+                replace_transaction.id, replace_transaction.status
+            )));
         }
 
         self.relayer_client.sent_transaction_compare(replacement_request, replace_transaction)?;

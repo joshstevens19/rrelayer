@@ -5,9 +5,9 @@ use reqwest::{
 };
 use serde::{Serialize, de::DeserializeOwned};
 
-use crate::api::types::{ApiBaseConfig, ApiResult};
+use crate::api::types::{ApiBaseConfig, ApiResult, AuthConfig};
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct HttpClient {
     client: Client,
     base_config: ApiBaseConfig,
@@ -30,10 +30,22 @@ impl HttpClient {
         let mut headers = HeaderMap::new();
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
 
-        let credentials = format!("{}:{}", self.base_config.username, self.base_config.password);
-        let encoded = general_purpose::STANDARD.encode(credentials);
-        headers
-            .insert(AUTHORIZATION, HeaderValue::from_str(&format!("Basic {}", encoded)).unwrap());
+        match &self.base_config.auth {
+            AuthConfig::BasicAuth { username, password } => {
+                let credentials = format!("{}:{}", username, password);
+                let encoded = general_purpose::STANDARD.encode(credentials);
+                headers.insert(
+                    AUTHORIZATION,
+                    HeaderValue::from_str(&format!("Basic {}", encoded)).unwrap(),
+                );
+            }
+            AuthConfig::ApiKey { api_key } => {
+                headers.insert(
+                    AUTHORIZATION,
+                    HeaderValue::from_str(&format!("Bearer {}", api_key)).unwrap(),
+                );
+            }
+        }
 
         if let Some(additional) = additional_headers {
             for (key, value) in additional {

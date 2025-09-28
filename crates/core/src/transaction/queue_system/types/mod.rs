@@ -35,7 +35,7 @@ pub use transactions_queues_custom_errors::{
 };
 
 mod competitive_transaction;
-pub use competitive_transaction::{CompetitionResult, CompetitionType, CompetitiveTransaction};
+pub use competitive_transaction::{CompetitionType, CompetitiveTransaction};
 
 mod replace_transaction_result;
 pub use replace_transaction_result::ReplaceTransactionResult;

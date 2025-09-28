@@ -124,11 +124,6 @@ impl Transaction {
         self.sent_at.is_some()
     }
 
-    fn is_eip1559(&self) -> bool {
-        self.sent_with_max_priority_fee_per_gas.is_some()
-            && self.sent_with_max_fee_per_gas.is_some()
-    }
-
     /// Converts this transaction to an EIP-1559 typed transaction.
     ///
     /// Creates an EIP-1559 transaction with max priority fee and max fee per gas.

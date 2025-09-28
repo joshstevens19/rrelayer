@@ -15,7 +15,7 @@ export const getRelayerAllowlistAddress = async (
 
     return response.data;
   } catch (error) {
-    console.error('Failed to deleteRelayerAllowlistAddress:', error);
+    console.error('Failed to getRelayerAllowlistAddress:', error);
     throw error;
   }
 };

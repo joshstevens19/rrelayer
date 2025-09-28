@@ -1,6 +1,5 @@
 use alloy::primitives::utils::{parse_units, ParseUnits};
 use alloy::primitives::U256;
-use alloy::providers::Provider;
 use regex::{Captures, Regex};
 use serde::de::Visitor;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};

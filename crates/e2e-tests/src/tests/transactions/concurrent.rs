@@ -7,7 +7,7 @@ use tracing::info;
 impl TestRunner {
     /// run single with:
     /// RRELAYER_PROVIDERS="raw" make run-test-debug TEST=transaction_concurrent
-    /// RRELAYER_PROVIDERS="privy" make run-test-debug TEST=transaction_concurrent  
+    /// RRELAYER_PROVIDERS="privy" make run-test-debug TEST=transaction_concurrent
     /// RRELAYER_PROVIDERS="aws_secret_manager" make run-test-debug TEST=transaction_concurrent
     /// RRELAYER_PROVIDERS="aws_kms" make run-test-debug TEST=transaction_concurrent
     /// RRELAYER_PROVIDERS="gcp_secret_manager" make run-test-debug TEST=transaction_concurrent
@@ -16,6 +16,7 @@ impl TestRunner {
         info!("Testing concurrent transactions...");
 
         let relayer = self.create_and_fund_relayer("concurrent-relayer").await?;
+
         info!("Created relayer: {:?}", relayer);
 
         let mut tx_requests = Vec::new();
@@ -35,12 +36,10 @@ impl TestRunner {
         let mut handles = Vec::new();
 
         for (i, tx_request) in tx_requests.into_iter().enumerate() {
-            let relayer_client = self.relayer_client.clone();
-            let relayer_id = relayer.id;
+            let relayer_clone = relayer.clone();
 
             let handle = tokio::spawn(async move {
-                let result =
-                    relayer_client.sdk.transaction.send(&relayer_id, &tx_request, None).await;
+                let result = relayer_clone.transaction().send(&tx_request, None).await;
                 (i, result)
             });
 
@@ -84,7 +83,8 @@ impl TestRunner {
 
             let mut all_mined = true;
             for tx_id in &transaction_ids {
-                if let Some(tx) = self.relayer_client.sdk.transaction.get(tx_id).await? {
+                let relayer_clone = relayer.clone();
+                if let Some(tx) = &relayer_clone.transaction().get(tx_id).await? {
                     if tx.status != TransactionStatus::MINED {
                         all_mined = false;
                         break;

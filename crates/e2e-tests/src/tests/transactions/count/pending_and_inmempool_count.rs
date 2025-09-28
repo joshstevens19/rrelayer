@@ -1,6 +1,7 @@
 use crate::tests::test_runner::TestRunner;
 use anyhow::{anyhow, Context};
 use rrelayer_core::transaction::types::TransactionData;
+use rrelayer_sdk::TransactionCountType;
 use std::time::Duration;
 use tracing::info;
 
@@ -18,11 +19,9 @@ impl TestRunner {
         let relayer = self.create_and_fund_relayer("limits-test-relayer").await?;
         info!("Created relayer: {:?}", relayer);
 
-        let pending_count = self
-            .relayer_client
-            .sdk
-            .transaction
-            .get_pending_count(&relayer.id)
+        let pending_count = relayer
+            .transaction()
+            .get_count(TransactionCountType::Pending)
             .await
             .context("Failed to get pending count")?;
 
@@ -30,11 +29,9 @@ impl TestRunner {
             return Err(anyhow!("New relayer should not have transaction pending"));
         }
 
-        let inmempool_count = self
-            .relayer_client
-            .sdk
-            .transaction
-            .get_inmempool_count(&relayer.id)
+        let inmempool_count = relayer
+            .transaction()
+            .get_count(TransactionCountType::Inmempool)
             .await
             .context("Failed to get inmempool count")?;
 
@@ -48,7 +45,7 @@ impl TestRunner {
             let tx_response = self
                 .relayer_client
                 .send_transaction(
-                    &relayer.id,
+                    &relayer.id(),
                     &self.config.anvil_accounts[4],
                     alloy::primitives::utils::parse_ether("0.01")?.into(),
                     TransactionData::empty(),
@@ -58,11 +55,9 @@ impl TestRunner {
             info!("[SUCCESS] Sent transaction {}: {:?}", i + 1, tx_response);
         }
 
-        let pending_count = self
-            .relayer_client
-            .sdk
-            .transaction
-            .get_pending_count(&relayer.id)
+        let pending_count = relayer
+            .transaction()
+            .get_count(TransactionCountType::Pending)
             .await
             .context("Failed to get pending count")?;
 
@@ -72,11 +67,9 @@ impl TestRunner {
 
         self.mine_and_wait().await?;
 
-        let pending_count = self
-            .relayer_client
-            .sdk
-            .transaction
-            .get_pending_count(&relayer.id)
+        let pending_count = relayer
+            .transaction()
+            .get_count(TransactionCountType::Pending)
             .await
             .context("Failed to get pending count")?;
 
@@ -84,11 +77,9 @@ impl TestRunner {
             return Err(anyhow!("Expected 0 pending transactions, got {}", pending_count));
         }
 
-        let inmempool_count = self
-            .relayer_client
-            .sdk
-            .transaction
-            .get_inmempool_count(&relayer.id)
+        let inmempool_count = relayer
+            .transaction()
+            .get_count(TransactionCountType::Inmempool)
             .await
             .context("Failed to get inmempool count")?;
 
@@ -100,11 +91,9 @@ impl TestRunner {
 
         let mut attempts = 0;
         loop {
-            let inmempool_count = self
-                .relayer_client
-                .sdk
-                .transaction
-                .get_inmempool_count(&relayer.id)
+            let inmempool_count = relayer
+                .transaction()
+                .get_count(TransactionCountType::Inmempool)
                 .await
                 .context("Failed to get inmempool count")?;
 

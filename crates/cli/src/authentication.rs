@@ -1,9 +1,9 @@
 use crate::error::CliError;
 use crate::print_error_message;
-use rrelayer_sdk::SDK;
+use rrelayer_sdk::Client;
 
-pub async fn check_api_running(sdk: &SDK) -> Result<(), CliError> {
-    match sdk.health.check().await {
+pub async fn check_api_running(client: &Client) -> Result<(), CliError> {
+    match client.health().await {
         Ok(_) => Ok(()),
         Err(e) => {
             print_error_message("Error: API server is not running or is unreachable.");
@@ -17,10 +17,10 @@ pub async fn check_api_running(sdk: &SDK) -> Result<(), CliError> {
     }
 }
 
-pub async fn check_authenticate(sdk: &SDK) -> Result<(), CliError> {
-    check_api_running(sdk).await?;
+pub async fn check_authenticate(client: &Client) -> Result<(), CliError> {
+    check_api_running(client).await?;
 
-    match sdk.test_auth().await {
+    match client.authenticated().await {
         Ok(_) => Ok(()),
         Err(e) => {
             print_error_message(&format!("❌ Basic authentication failed: {}", e));

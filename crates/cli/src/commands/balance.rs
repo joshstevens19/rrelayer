@@ -1,15 +1,15 @@
 use alloy::{primitives::U256, providers::Provider, sol};
 use rrelayer_core::{common_types::EvmAddress, create_retry_client, relayer::RelayerId};
-use rrelayer_sdk::SDK;
+use rrelayer_sdk::Client;
 
 use crate::commands::error::BalanceError;
 
 pub async fn handle_balance(
     relayer_id: &RelayerId,
     token: &Option<EvmAddress>,
-    sdk: &SDK,
+    client: &Client,
 ) -> Result<(), BalanceError> {
-    let relayer_result = sdk.relayer.get(relayer_id).await?;
+    let relayer_result = client.relayer().get(relayer_id).await?;
     match relayer_result {
         None => {
             println!("Relayer {} not found", relayer_id);

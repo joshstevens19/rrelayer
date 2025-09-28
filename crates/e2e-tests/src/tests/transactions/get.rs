@@ -27,23 +27,16 @@ impl TestRunner {
             blobs: None,
         };
 
-        let send_result = self
-            .relayer_client
-            .sdk
-            .transaction
-            .send(&relayer.id, &tx_request, None)
+        let send_result = relayer
+            .transaction()
+            .send(&tx_request, None)
             .await
             .context("Failed to send transaction")?;
 
         let transaction_id = &send_result.id;
 
-        let retrieved_tx = self
-            .relayer_client
-            .sdk
-            .transaction
-            .get(transaction_id)
-            .await
-            .context("Failed to get transaction")?;
+        let retrieved_tx =
+            relayer.transaction().get(transaction_id).await.context("Failed to get transaction")?;
 
         if let Some(tx) = retrieved_tx {
             self.relayer_client.sent_transaction_compare(tx_request, tx)?;

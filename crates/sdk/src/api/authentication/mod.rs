@@ -3,11 +3,11 @@ use rrelayer_core::authentication::api::StatusResponse;
 use std::sync::Arc;
 
 #[derive(Clone)]
-pub struct Authentication {
+pub struct AuthenticationApi {
     client: Arc<HttpClient>,
 }
 
-impl Authentication {
+impl AuthenticationApi {
     pub fn new(client: Arc<HttpClient>) -> Self {
         Self { client }
     }

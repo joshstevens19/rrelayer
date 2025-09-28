@@ -39,6 +39,7 @@ export interface CreateRelayerClientConfig {
   serverUrl: string;
   relayerId: string;
   apiKey: string;
+  providerUrl: string;
   speed?: TransactionSpeed;
 }
 
@@ -104,6 +105,7 @@ export class Client {
        * @returns Network array
        */
       get: async (chainId: number): Promise<Network | null> => {
+        // TODO: use get network endpoint
         let networks = await getAllNetworks(apiBaseConfig);
         return networks.find((network) => network.chainId === chainId) || null;
       },
@@ -216,7 +218,7 @@ export const createRelayerClient = (
 ): RelayerClient => {
   return new RelayerClient({
     serverUrl: config.serverUrl,
-    providerUrl: 'TODO',
+    providerUrl: config.providerUrl,
     relayerId: config.relayerId,
     auth: {
       apiKey: config.apiKey,

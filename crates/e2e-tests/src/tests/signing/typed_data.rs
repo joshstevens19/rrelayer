@@ -59,11 +59,9 @@ impl TestRunner {
         let typed_data: TypedData =
             serde_json::from_value(typed_data_json).context("Failed to create typed data")?;
 
-        let sign_result = self
-            .relayer_client
-            .sdk
-            .sign
-            .sign_typed_data(&relayer.id, &typed_data, None)
+        let sign_result = relayer
+            .sign()
+            .typed_data(&typed_data, None)
             .await
             .context("Failed to sign typed data")?;
 
@@ -72,11 +70,9 @@ impl TestRunner {
         info!("[SUCCESS] Got typed data signature: {:?}", sign_result.signature);
 
         let paging = PagingContext { limit: 10, offset: 0 };
-        let history = self
-            .relayer_client
-            .sdk
-            .sign
-            .get_typed_data_history(&relayer.id, &paging)
+        let history = relayer
+            .sign()
+            .typed_data_history(&paging)
             .await
             .context("Failed to get typed data signing history")?;
 

@@ -27,20 +27,16 @@ impl TestRunner {
             blobs: None,
         };
 
-        let send_result = self
-            .relayer_client
-            .sdk
-            .transaction
-            .send(&relayer.id, &tx_request, None)
+        let send_result = relayer
+            .transaction()
+            .send(&tx_request, None)
             .await
             .context("Failed to send transaction")?;
 
         let transaction_id = &send_result.id;
 
-        let cancel_result = self
-            .relayer_client
-            .sdk
-            .transaction
+        let cancel_result = relayer
+            .transaction()
             .cancel(transaction_id, None)
             .await
             .context("Failed to cancel transaction")?;

@@ -64,12 +64,7 @@ impl TestRunner {
             serde_json::from_value(typed_data_json).context("Failed to create typed data")?;
 
         for _ in 0..5 {
-            let sign_result = self
-                .relayer_client
-                .sdk
-                .sign
-                .sign_typed_data(&relayer.id, &typed_data, relay_key.clone())
-                .await;
+            let sign_result = relayer.sign().typed_data(&typed_data, relay_key.clone()).await;
 
             match sign_result {
                 Ok(_) => successful_typed_signing += 1,
@@ -84,12 +79,7 @@ impl TestRunner {
         let mut successful_signing = 0;
 
         for _ in 0..5 {
-            let sign_result = self
-                .relayer_client
-                .sdk
-                .sign
-                .sign_text(&relayer.id, "Hello, RRelayer!", relay_key.clone())
-                .await;
+            let sign_result = relayer.sign().text("Hello, RRelayer!", relay_key.clone()).await;
 
             match sign_result {
                 Ok(_) => successful_signing += 1,
@@ -104,12 +94,7 @@ impl TestRunner {
         info!("Sleep for 60 seconds to allow the rate limit to expire");
         tokio::time::sleep(Duration::from_secs(60)).await;
 
-        let sign_result = self
-            .relayer_client
-            .sdk
-            .sign
-            .sign_typed_data(&relayer.id, &typed_data, relay_key.clone())
-            .await;
+        let sign_result = relayer.sign().typed_data(&typed_data, relay_key.clone()).await;
 
         match sign_result {
             Ok(_) => {}

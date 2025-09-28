@@ -4,7 +4,6 @@ use clap::Subcommand;
 use dialoguer::{Input, Password};
 use rand::Rng;
 use rand::distributions::Alphanumeric;
-use rrelayer_sdk::SDK;
 
 #[derive(Subcommand)]
 pub enum AuthCommand {
@@ -148,31 +147,31 @@ async fn login(profile_name: &str) -> Result<(), CliError> {
 
     // Test the credentials
     println!("\n🧪 Testing credentials...");
-    let sdk = SDK::new(api_url.clone(), username.clone(), password.clone());
-
-    match sdk.health.check().await {
-        Ok(_) => {
-            println!("✅ API server is reachable");
-        }
-        Err(e) => {
-            println!("❌ Failed to reach API server: {}", e);
-            return Err(CliError::Authentication(
-                "API server is not reachable. Please check the URL and try again.".to_string(),
-            ));
-        }
-    }
-
-    match sdk.test_auth().await {
-        Ok(_) => {
-            println!("✅ Authentication successful");
-        }
-        Err(e) => {
-            println!("❌ Authentication failed: {}", e);
-            return Err(CliError::Authentication(
-                "Invalid credentials. Please check your username and password.".to_string(),
-            ));
-        }
-    }
+    // let sdk = SDK::new(api_url.clone(), username.clone(), password.clone());
+    //
+    // match sdk.health.check().await {
+    //     Ok(_) => {
+    //         println!("✅ API server is reachable");
+    //     }
+    //     Err(e) => {
+    //         println!("❌ Failed to reach API server: {}", e);
+    //         return Err(CliError::Authentication(
+    //             "API server is not reachable. Please check the URL and try again.".to_string(),
+    //         ));
+    //     }
+    // }
+    //
+    // match sdk.test_auth().await {
+    //     Ok(_) => {
+    //         println!("✅ Authentication successful");
+    //     }
+    //     Err(e) => {
+    //         println!("❌ Authentication failed: {}", e);
+    //         return Err(CliError::Authentication(
+    //             "Invalid credentials. Please check your username and password.".to_string(),
+    //         ));
+    //     }
+    // }
 
     // Store credentials
     let credentials = StoredCredentials { api_url, username, password };

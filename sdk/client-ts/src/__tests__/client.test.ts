@@ -252,6 +252,7 @@ describe('Client E2E Tests', () => {
 
       const relayerClient = await createRelayerClient({
         serverUrl: TEST_CONFIG.SERVER_URL,
+        providerUrl: TEST_CONFIG.PROVIDER_URL,
         relayerId: testRelayer.id,
         apiKey: 'test-api-key', // Use a test API key for now
       });

@@ -1,5 +1,5 @@
 use rrelayer_core::relayer::RelayerId;
-use rrelayer_sdk::SDK;
+use rrelayer_sdk::Client;
 
 use crate::commands::error::RelayerManagementError;
 use crate::commands::network::get_chain_id_for_network;
@@ -10,7 +10,7 @@ pub async fn handle_clone(
     name: &str,
     network: &str,
     project_path: &ProjectLocation,
-    sdk: &SDK,
+    client: &Client,
 ) -> Result<(), RelayerManagementError> {
     let setup_config = project_path.setup_config(false)?;
     if !setup_config.networks.iter().any(|n| n.name == network) {
@@ -18,9 +18,11 @@ pub async fn handle_clone(
         return Ok(());
     }
 
+    let client = client.get_relayer_client(relayer_id, None).await?;
+
     let chain_id = get_chain_id_for_network(&network, project_path).await?;
 
-    let result = sdk.relayer.clone(relayer_id, chain_id, name).await?;
+    let result = client.clone_relayer(&chain_id, name).await?;
 
     println!("\n✅  Relayer cloned successfully!");
     println!("┌─────────────────────────────────────────────────");

@@ -4,7 +4,6 @@ use crate::relayer::RelayerId;
 use crate::transaction::types::TransactionId;
 use crate::{
     postgres::PostgresClient,
-    rrelayer_error, rrelayer_info,
     webhooks::db::{
         CreateWebhookDeliveryRequest, UpdateWebhookDeliveryRequest, WebhookDeliveryStatus,
     },
@@ -15,7 +14,7 @@ use std::{
     sync::Arc,
     time::{Duration, SystemTime},
 };
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 pub struct WebhookSender {
     client: Client,
@@ -151,12 +150,9 @@ impl WebhookSender {
         delivery.mark_attempt(now, next_retry_delay);
 
         if !delivery.should_retry() {
-            rrelayer_error!(
+            error!(
                 "Webhook {} to {} permanently failed after {} attempts: {}",
-                delivery.id,
-                delivery.webhook_config.endpoint,
-                delivery.attempts,
-                error
+                delivery.id, delivery.webhook_config.endpoint, delivery.attempts, error
             );
             delivery.mark_failed(error.clone());
 
@@ -223,7 +219,7 @@ impl WebhookSender {
             match handle.await {
                 Ok(delivery) => results.push(delivery),
                 Err(e) => {
-                    rrelayer_error!("Webhook delivery task panicked: {}", e);
+                    error!("Webhook delivery task panicked: {}", e);
                 }
             }
         }

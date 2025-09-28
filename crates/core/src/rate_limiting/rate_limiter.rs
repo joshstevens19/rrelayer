@@ -118,7 +118,7 @@ impl RateLimiter {
         headers: &HeaderMap,
         relayer_address: &EvmAddress,
         operation: RateLimitOperation,
-    ) -> Result<RateLimitReservation, RateLimitError> {
+    ) -> Result<RateLimitReservation<'_>, RateLimitError> {
         let context = self.detector.detect(headers, relayer_address)?;
 
         // First check relayer limits (ALL usage on this relayer, regardless of user)

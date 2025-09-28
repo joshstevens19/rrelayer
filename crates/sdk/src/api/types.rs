@@ -3,8 +3,13 @@ use thiserror::Error;
 #[derive(Debug, Clone)]
 pub struct ApiBaseConfig {
     pub server_url: String,
-    pub username: String,
-    pub password: String,
+    pub auth: AuthConfig,
+}
+
+#[derive(Debug, Clone)]
+pub enum AuthConfig {
+    BasicAuth { username: String, password: String },
+    ApiKey { api_key: String },
 }
 
 #[derive(Error, Debug)]

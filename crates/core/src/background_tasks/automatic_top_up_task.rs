@@ -977,7 +977,7 @@ pub async fn run_automatic_top_up_task(
     transactions_queues: Arc<tokio::sync::Mutex<TransactionsQueues>>,
     safe_proxy_manager: Arc<SafeProxyManager>,
 ) {
-    info!("Starting automatic top-up task");
+    info!("Starting automatic top-up background task");
 
     let mut top_up_task = AutomaticTopUpTask::new(
         postgres_client,
@@ -991,4 +991,6 @@ pub async fn run_automatic_top_up_task(
     tokio::spawn(async move {
         top_up_task.run().await;
     });
+
+    info!("Started automatic top-up background task");
 }

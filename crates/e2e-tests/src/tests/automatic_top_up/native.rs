@@ -22,14 +22,25 @@ impl TestRunner {
         let relayer3 = self.create_by_index_and_fund_relayer(3).await?;
         info!("relayer3: {:?}", relayer3);
 
-        info!("Created test relayers: {:?}, {:?}, {:?}", relayer1.id, relayer2.id, relayer3.id);
+        info!(
+            "Created test relayers: {:?}, {:?}, {:?}",
+            relayer1.id(),
+            relayer2.id(),
+            relayer3.id()
+        );
 
-        let initial_balance1 =
-            self.contract_interactor.get_eth_balance(&relayer1.address.into_address()).await?;
-        let initial_balance2 =
-            self.contract_interactor.get_eth_balance(&relayer2.address.into_address()).await?;
-        let initial_balance3 =
-            self.contract_interactor.get_eth_balance(&relayer3.address.into_address()).await?;
+        let initial_balance1 = self
+            .contract_interactor
+            .get_eth_balance(&relayer1.address().await.unwrap().into_address())
+            .await?;
+        let initial_balance2 = self
+            .contract_interactor
+            .get_eth_balance(&relayer2.address().await.unwrap().into_address())
+            .await?;
+        let initial_balance3 = self
+            .contract_interactor
+            .get_eth_balance(&relayer3.address().await.unwrap().into_address())
+            .await?;
 
         info!("Initial balances:");
         info!("  Relayer 1: {} ETH", alloy::primitives::utils::format_ether(initial_balance1));
@@ -50,7 +61,7 @@ impl TestRunner {
                 blobs: None,
             };
 
-            self.relayer_client.sdk.transaction.send(&relayer1.id, &tx_request, None).await?;
+            relayer1.transaction().send(&tx_request, None).await?;
         }
 
         if initial_balance2 > drain_amount {
@@ -63,17 +74,23 @@ impl TestRunner {
                 blobs: None,
             };
 
-            self.relayer_client.sdk.transaction.send(&relayer2.id, &tx_request, None).await?;
+            relayer2.transaction().send(&tx_request, None).await?;
         }
 
         self.mine_and_wait().await?;
 
-        let drained_balance1 =
-            self.contract_interactor.get_eth_balance(&relayer1.address.into_address()).await?;
-        let drained_balance2 =
-            self.contract_interactor.get_eth_balance(&relayer2.address.into_address()).await?;
-        let drained_balance3 =
-            self.contract_interactor.get_eth_balance(&relayer3.address.into_address()).await?;
+        let drained_balance1 = self
+            .contract_interactor
+            .get_eth_balance(&relayer1.address().await.unwrap().into_address())
+            .await?;
+        let drained_balance2 = self
+            .contract_interactor
+            .get_eth_balance(&relayer2.address().await.unwrap().into_address())
+            .await?;
+        let drained_balance3 = self
+            .contract_interactor
+            .get_eth_balance(&relayer3.address().await.unwrap().into_address())
+            .await?;
 
         info!("Balances after draining:");
         info!("  Relayer 1: {} ETH", alloy::primitives::utils::format_ether(drained_balance1));
@@ -97,12 +114,18 @@ impl TestRunner {
         self.mine_and_wait().await?;
         self.mine_and_wait().await?;
 
-        let final_balance1 =
-            self.contract_interactor.get_eth_balance(&relayer1.address.into_address()).await?;
-        let final_balance2 =
-            self.contract_interactor.get_eth_balance(&relayer2.address.into_address()).await?;
-        let final_balance3 =
-            self.contract_interactor.get_eth_balance(&relayer3.address.into_address()).await?;
+        let final_balance1 = self
+            .contract_interactor
+            .get_eth_balance(&relayer1.address().await.unwrap().into_address())
+            .await?;
+        let final_balance2 = self
+            .contract_interactor
+            .get_eth_balance(&relayer2.address().await.unwrap().into_address())
+            .await?;
+        let final_balance3 = self
+            .contract_interactor
+            .get_eth_balance(&relayer3.address().await.unwrap().into_address())
+            .await?;
 
         info!("Final balances after top-up:");
         info!("  Relayer 1: {} ETH", alloy::primitives::utils::format_ether(final_balance1));

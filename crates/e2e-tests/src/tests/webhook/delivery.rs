@@ -23,7 +23,7 @@ impl TestRunner {
         webhook_server.clear_webhooks();
 
         let relayer = self.create_and_fund_relayer("webhook-test-relayer").await?;
-        info!("Created relayer for webhook testing: {}", relayer.id);
+        info!("Created relayer for webhook testing: {}", relayer.id());
 
         info!("Test 1: Simple ETH transfer webhook events");
         let tx_request = RelayTransactionRequest {
@@ -35,8 +35,7 @@ impl TestRunner {
             blobs: None,
         };
 
-        let send_result =
-            self.relayer_client.sdk.transaction.send(&relayer.id, &tx_request, None).await?;
+        let send_result = relayer.transaction().send(&tx_request, None).await?;
 
         info!("📨 Transaction submitted: {}", send_result.id);
 
@@ -86,12 +85,7 @@ impl TestRunner {
             blobs: None,
         };
 
-        let contract_send_result = self
-            .relayer_client
-            .sdk
-            .transaction
-            .send(&relayer.id, &contract_tx_request, None)
-            .await?;
+        let contract_send_result = relayer.transaction().send(&contract_tx_request, None).await?;
 
         info!("📨 Contract transaction submitted: {}", contract_send_result.id);
 
@@ -241,20 +235,16 @@ impl TestRunner {
             blobs: None,
         };
 
-        let send_result = self
-            .relayer_client
-            .sdk
-            .transaction
-            .send(&relayer.id, &tx_request, None)
+        let send_result = relayer
+            .transaction()
+            .send(&tx_request, None)
             .await
             .context("Failed to send transaction")?;
 
         let transaction_id = &send_result.id;
 
-        let cancel_result = self
-            .relayer_client
-            .sdk
-            .transaction
+        let cancel_result = relayer
+            .transaction()
             .cancel(transaction_id, None)
             .await
             .context("Failed to cancel transaction")?;
@@ -280,11 +270,9 @@ impl TestRunner {
             blobs: None,
         };
 
-        let send_result = self
-            .relayer_client
-            .sdk
-            .transaction
-            .send(&relayer.id, &tx_request, None)
+        let send_result = relayer
+            .transaction()
+            .send(&tx_request, None)
             .await
             .context("Failed to send transaction")?;
 
@@ -358,8 +346,7 @@ impl TestRunner {
         info!("[SECURE] Testing text signing webhook...");
         let text_to_sign = "Hello, RRelayer webhook test!";
 
-        let sign_text_result =
-            self.relayer_client.sdk.sign.sign_text(&relayer.id, text_to_sign, None).await?;
+        let sign_text_result = relayer.sign().text(text_to_sign, None).await?;
 
         info!("[SUCCESS] Text signed successfully, signature: {:?}", sign_text_result.signature);
 
@@ -431,12 +418,7 @@ impl TestRunner {
 
         let typed_data_parsed: TypedData = serde_json::from_value(typed_data)?;
 
-        let sign_typed_data_result = self
-            .relayer_client
-            .sdk
-            .sign
-            .sign_typed_data(&relayer.id, &typed_data_parsed, None)
-            .await?;
+        let sign_typed_data_result = relayer.sign().typed_data(&typed_data_parsed, None).await?;
 
         info!(
             "[SUCCESS] Typed data signed successfully, signature: {:?}",

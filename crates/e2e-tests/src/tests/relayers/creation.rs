@@ -19,9 +19,9 @@ impl TestRunner {
 
         let relayer = self
             .relayer_client
-            .sdk
-            .relayer
-            .get(&created_relayer.id)
+            .client
+            .relayer()
+            .get(&created_relayer.id())
             .await?
             .context("Failed to fetch relayer")?
             .relayer;
@@ -36,7 +36,7 @@ impl TestRunner {
             return Err(anyhow!("Relayer should always be the same name"));
         }
 
-        if relayer.address != created_relayer.address {
+        if relayer.address != created_relayer.address().await? {
             return Err(anyhow!("Relayer should be the same address"));
         }
 

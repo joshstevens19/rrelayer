@@ -21,7 +21,7 @@ pub async fn run_webhook_manager_task(
         run_webhook_background_tasks(manager_clone).await;
     });
 
-    info!("Webhook manager background task initialized");
+    info!("Started webhook manager background task");
 }
 
 /// Run webhook background tasks without holding the mutex indefinitely

@@ -22,7 +22,7 @@ import {
   getTransactions,
   replaceTransaction,
   sendTransaction,
-  TransactionSpeed,
+  TransactionSpeed, SignedTextHistory, getSignedTextHistory, SignedTypedDataHistory, getSignedTypedDataHistory,
 } from '../api';
 import {
   ApiBaseConfig,
@@ -143,6 +143,16 @@ export class RelayerClient {
         return signText(this.id, message, rateLimitKey, this._apiBaseConfig);
       },
       /**
+       * Get signed text history
+       * @param pagingContext Paging context for pagination
+       * @returns PagingResult<SignedTextHistory>
+       */
+      textHistory: (
+          pagingContext: PagingContext = defaultPagingContext
+      ): Promise<PagingResult<SignedTextHistory>> => {
+        return getSignedTextHistory(this.id, pagingContext, this._apiBaseConfig);
+      },
+      /**
        * Sign typed data
        * @param typedData The typed data to sign
        * @param rateLimitKey Optional rate limit key
@@ -158,6 +168,16 @@ export class RelayerClient {
           rateLimitKey,
           this._apiBaseConfig
         );
+      },
+      /**
+       * Get signed typed data history
+       * @param pagingContext Paging context for pagination
+       * @returns PagingResult<SignedTypedDataHistory>
+       */
+      typedDataHistory: (
+          pagingContext: PagingContext = defaultPagingContext
+      ): Promise<PagingResult<SignedTypedDataHistory>> => {
+        return getSignedTypedDataHistory(this.id, pagingContext, this._apiBaseConfig);
       },
     };
   }

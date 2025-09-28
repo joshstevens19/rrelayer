@@ -29,16 +29,13 @@ impl TestRunner {
             blobs: None,
         };
 
-        let send_result =
-            self.relayer_client.sdk.transaction.send(&relayer.id, &tx_request, None).await?;
+        let send_result = relayer.transaction().send(&tx_request, None).await?;
 
         let mut attempts = 0;
         loop {
             tokio::time::sleep(Duration::from_millis(100)).await;
-            let status = self
-                .relayer_client
-                .sdk
-                .transaction
+            let status = relayer
+                .transaction()
                 .get_status(&send_result.id)
                 .await?
                 .context("Transaction status not found")?;
@@ -54,13 +51,8 @@ impl TestRunner {
             }
         }
 
-        let transaction_before = self
-            .relayer_client
-            .sdk
-            .transaction
-            .get(&send_result.id)
-            .await?
-            .context("Transaction not found")?;
+        let transaction_before =
+            relayer.transaction().get(&send_result.id).await?.context("Transaction not found")?;
         let max_fee_per_gas_before = transaction_before
             .sent_with_max_fee_per_gas
             .context("transaction_before did not have sent_with_max_fee_per_gas")?;
@@ -81,13 +73,8 @@ impl TestRunner {
         self.mine_and_wait().await?;
         self.mine_and_wait().await?;
 
-        let transaction_after = self
-            .relayer_client
-            .sdk
-            .transaction
-            .get(&send_result.id)
-            .await?
-            .context("Transaction not found")?;
+        let transaction_after =
+            relayer.transaction().get(&send_result.id).await?.context("Transaction not found")?;
         let max_fee_per_gas_after = transaction_after
             .sent_with_max_fee_per_gas
             .context("transaction_after did not have sent_with_max_fee_per_gas")?;
@@ -103,10 +90,8 @@ impl TestRunner {
             return Err(anyhow::anyhow!("Gas price did not bump max_priority_fee"));
         }
 
-        let transaction_status = self
-            .relayer_client
-            .sdk
-            .transaction
+        let transaction_status = relayer
+            .transaction()
             .get_status(&send_result.id)
             .await?
             .context("Transaction status not found")?

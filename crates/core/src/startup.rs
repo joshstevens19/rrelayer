@@ -4,8 +4,8 @@ use crate::app_state::RelayersInternalOnly;
 use crate::authentication::{create_basic_auth_routes, inject_basic_auth_status};
 use crate::background_tasks::run_background_tasks;
 use crate::common_types::EvmAddress;
-use crate::gas::{BlobGasOracleCache, GasEstimatorResult, GasOracleCache};
-use crate::network::{create_network_routes, set_networks_cache, ChainId, Network};
+use crate::gas::{BlobGasOracleCache, GasOracleCache};
+use crate::network::{create_network_routes, ChainId};
 use crate::shared::HttpError;
 use crate::webhooks::WebhookManager;
 use crate::yaml::{ApiKey, NetworkPermissionsConfig, ReadYamlError};
@@ -29,14 +29,12 @@ use crate::{
     },
     ApiConfig, RateLimitConfig, SafeProxyConfig, SetupConfig,
 };
-use axum::extract::State;
-use axum::http::HeaderMap;
 use axum::{
     body::{to_bytes, Body},
     http::{HeaderValue, Request, StatusCode},
     middleware,
     middleware::Next,
-    response::{IntoResponse, Response},
+    response::Response,
     routing::get,
     Json, Router,
 };
@@ -262,6 +260,9 @@ pub enum StartError {
 
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
+
+    #[error("To run rrelayer you need to define at least one network in the yaml file")]
+    NoNetworksDefinedInYaml,
 }
 
 pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
@@ -276,20 +277,18 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
         return Err(StartError::NoYamlFileFound);
     }
 
+    let config = read(&yaml_path, false)?;
+
+    if config.networks.len() == 0 {
+        return Err(StartError::NoNetworksDefinedInYaml);
+    }
+
     let postgres = PostgresClient::new().await?;
 
     apply_schema(&postgres).await?;
     info!("Applied database schema");
 
-    let config = read(&yaml_path, false)?;
-
     let cache = Arc::new(Cache::new().await);
-
-    set_networks_cache(
-        &cache,
-        &config.networks.clone().into_iter().map(Network::from).collect::<Vec<Network>>(),
-    )
-    .await;
 
     let providers = Arc::new(load_providers(&project_path, &config).await?);
 
@@ -355,7 +354,6 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
         blob_gas_oracle_cache.clone(),
         providers.clone(),
         postgres_client.clone(),
-        cache.clone(),
         webhook_manager.clone(),
         transaction_queue.clone(),
         safe_proxy_manager.clone(),

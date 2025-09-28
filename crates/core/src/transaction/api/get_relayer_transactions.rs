@@ -1,4 +1,4 @@
-use crate::relayer::{get_relayer, relayer_exists};
+use crate::relayer::get_relayer;
 use crate::shared::{not_found, HttpError};
 use crate::{
     app_state::AppState,

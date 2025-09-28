@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use axum::{
-    middleware,
     routing::{get, post},
     Router,
 };

@@ -1,7 +1,7 @@
 use clap::Subcommand;
 use rrelayer_core::common_types::PagingContext;
 use rrelayer_core::relayer::RelayerId;
-use rrelayer_sdk::SDK;
+use rrelayer_sdk::{AdminRelayerClient, Client};
 
 use crate::commands::error::SigningError;
 
@@ -124,35 +124,35 @@ pub enum TypedDataCommand {
     },
 }
 
-pub async fn handle_sign(command: &SignCommand, sdk: &SDK) -> Result<(), SigningError> {
+pub async fn handle_sign(command: &SignCommand, client: &Client) -> Result<(), SigningError> {
     match command {
         SignCommand::Text { relayer_id, message } => {
-            handle_sign_text(relayer_id, message, sdk).await
+            let relayer_client = client.get_relayer_client(relayer_id, None).await?;
+            handle_sign_text(message, &relayer_client).await
         }
         SignCommand::TypedData { relayer_id, data, file } => {
-            handle_sign_typed_data(relayer_id, data, *file, sdk).await
+            let relayer_client = client.get_relayer_client(relayer_id, None).await?;
+            handle_sign_typed_data(data, *file, &relayer_client).await
         }
         SignCommand::TextHistory { relayer_id, limit, offset } => {
-            handle_text_history(relayer_id, *limit, *offset, sdk).await
+            let relayer_client = client.get_relayer_client(relayer_id, None).await?;
+            handle_text_history(*limit, *offset, &relayer_client).await
         }
         SignCommand::TypedDataHistory { relayer_id, limit, offset } => {
-            handle_typed_data_history(relayer_id, *limit, *offset, sdk).await
+            let relayer_client = client.get_relayer_client(relayer_id, None).await?;
+            handle_typed_data_history(*limit, *offset, &relayer_client).await
         }
     }
 }
 
-async fn handle_sign_text(
-    relayer_id: &RelayerId,
-    message: &str,
-    sdk: &SDK,
-) -> Result<(), SigningError> {
-    println!("Signing message with relayer {}...", relayer_id);
-    let result = sdk.sign.sign_text(relayer_id, message, None).await?;
+async fn handle_sign_text(message: &str, client: &AdminRelayerClient) -> Result<(), SigningError> {
+    println!("Signing message with relayer {}...", client.id());
+    let result = client.sign().text(message, None).await?;
 
     println!("\n┌─────────────────────────────────────────────────────────────────────");
     println!("│ SIGNATURE DETAILS");
     println!("├─────────────────────────────────────────────────────────────────────");
-    println!("│ Relayer:         {}", relayer_id);
+    println!("│ Relayer:         {}", client.id());
     println!("│ Message:         {}", result.message_signed);
     println!("│ Signature:       0x{}", hex::encode(result.signature.as_bytes()));
     println!("└─────────────────────────────────────────────────────────────────────");
@@ -163,10 +163,9 @@ async fn handle_sign_text(
 }
 
 async fn handle_sign_typed_data(
-    relayer_id: &RelayerId,
     typed_data: &str,
     file: bool,
-    sdk: &SDK,
+    client: &AdminRelayerClient,
 ) -> Result<(), SigningError> {
     let typed_data_str =
         if file { std::fs::read_to_string(typed_data)? } else { typed_data.to_string() };
@@ -179,7 +178,7 @@ async fn handle_sign_typed_data(
         }
     };
 
-    let result = sdk.sign.sign_typed_data(relayer_id, &typed_data, None).await?;
+    let result = client.sign().typed_data(&typed_data, None).await?;
 
     let pretty_json =
         serde_json::to_string_pretty(&typed_data).map_err(SigningError::Json)?.to_string();
@@ -195,7 +194,7 @@ async fn handle_sign_typed_data(
     println!("├─────────────────────────────────────────────────────────────────────");
     println!("│ SIGNATURE DETAILS");
     println!("├─────────────────────────────────────────────────────────────────────");
-    println!("│ Relayer:         {}", relayer_id);
+    println!("│ Relayer:         {}", client.id());
 
     if let Some(name) = &typed_data.domain.name {
         println!("│ Domain:          {}", name);
@@ -217,15 +216,14 @@ async fn handle_sign_typed_data(
 }
 
 async fn handle_text_history(
-    relayer_id: &RelayerId,
     limit: u32,
     offset: u32,
-    sdk: &SDK,
+    client: &AdminRelayerClient,
 ) -> Result<(), SigningError> {
-    println!("Retrieving text signing history for relayer {}...", relayer_id);
+    println!("Retrieving text signing history for relayer {}...", client.id());
 
     let paging_context = PagingContext::new(limit, offset);
-    let result = sdk.sign.get_text_history(relayer_id, &paging_context).await?;
+    let result = client.sign().text_history(&paging_context).await?;
 
     if result.items.is_empty() {
         println!("No text signing history found for this relayer.");
@@ -256,15 +254,14 @@ async fn handle_text_history(
 }
 
 async fn handle_typed_data_history(
-    relayer_id: &RelayerId,
     limit: u32,
     offset: u32,
-    sdk: &SDK,
+    client: &AdminRelayerClient,
 ) -> Result<(), SigningError> {
-    println!("Retrieving typed data signing history for relayer {}...", relayer_id);
+    println!("Retrieving typed data signing history for relayer {}...", client.id());
 
     let paging_context = PagingContext::new(limit, offset);
-    let result = sdk.sign.get_typed_data_history(relayer_id, &paging_context).await?;
+    let result = client.sign().typed_data_history(&paging_context).await?;
 
     if result.items.is_empty() {
         println!("No typed data signing history found for this relayer.");

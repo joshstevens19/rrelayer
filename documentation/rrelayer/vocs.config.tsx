@@ -252,9 +252,9 @@ export default defineConfig({
               collapsed: true,
               items: [
                 { text: 'Sign Text Message', link: '/integration/api/sign#sign-text-message' },
+                { text: 'Signed Text History', link: '/integration/api/sign#get-text-signing-history' },
                 { text: 'Sign Typed Data', link: '/integration/api/sign#sign-typed-data-eip-712' },
-                { text: 'Text History', link: '/integration/api/sign#get-text-signing-history' },
-                { text: 'Typed Data History', link: '/integration/api/sign#get-typed-data-signing-history' },
+                { text: 'Signed Typed Data History', link: '/integration/api/sign#get-typed-data-signing-history' },
                 { text: 'EIP-712 Types', link: '/integration/api/sign#eip-712-domain-types' },
               ],
             },

@@ -2,7 +2,6 @@ use std::{env, path::PathBuf, str::FromStr};
 
 use clap::Parser;
 use rrelayer_core::{load_env_from_project_path, setup_info_logger};
-use rrelayer_sdk::SDK;
 
 use crate::authentication::check_authenticate;
 use crate::commands::clone;
@@ -20,6 +19,7 @@ mod console;
 mod credentials;
 use crate::commands::error::ProjectLocationError;
 pub use console::{print_error_message, print_success_message};
+use rrelayer_sdk::{Client, CreateClientAuth, CreateClientConfig};
 
 mod error;
 mod project_location;
@@ -35,41 +35,53 @@ fn resolve_path(override_path: &Option<String>) -> Result<PathBuf, String> {
     path.canonicalize().map_err(|e| format!("Failed to resolve path '{}': {}", path.display(), e))
 }
 
+// TODO: handle
 fn create_sdk_with_basic_auth(
     project_location: &ProjectLocation,
-) -> Result<SDK, ProjectLocationError> {
+) -> Result<Client, ProjectLocationError> {
     use std::env;
 
     // Try environment variables first (for backward compatibility)
     if let (Ok(username), Ok(password)) =
         (env::var("RRELAYER_AUTH_USERNAME"), env::var("RRELAYER_AUTH_PASSWORD"))
     {
-        return Ok(SDK::new(project_location.get_api_url()?, username, password));
+        return Ok(Client::new(CreateClientConfig {
+            server_url: project_location.get_api_url()?,
+            auth: CreateClientAuth { username, password },
+        }));
     }
 
-    // Try to read from rrelayer.yaml file
-    if let Ok(setup_config) = project_location.setup_config(false) {
-        return Ok(SDK::new(
-            project_location.get_api_url()?,
-            setup_config.api_config.authentication_username,
-            setup_config.api_config.authentication_password,
-        ));
-    }
-
-    // Try stored credentials as fallback
-    let default_profile = credentials::get_default_profile();
-    match credentials::load_credentials(&default_profile) {
-        Ok(creds) => Ok(SDK::new(creds.api_url, creds.username, creds.password)),
-        Err(_) => {
-            return Err(ProjectLocationError::ProjectConfig(
-                "No authentication credentials found. Please either:\n\
+    Err(ProjectLocationError::ProjectConfig(
+        "No authentication credentials found. Please either:\n\
                 1. Set RRELAYER_AUTH_USERNAME and RRELAYER_AUTH_PASSWORD environment variables\n\
                 2. Ensure rrelayer.yaml exists with authentication config\n\
                 3. Run 'rrelayer auth login' to store credentials securely"
-                    .to_string(),
-            ));
-        }
-    }
+            .to_string(),
+    ))
+
+    // // Try to read from rrelayer.yaml file
+    // if let Ok(setup_config) = project_location.setup_config(false) {
+    //     return Ok(SDK::new(
+    //         project_location.get_api_url()?,
+    //         setup_config.api_config.authentication_username,
+    //         setup_config.api_config.authentication_password,
+    //     ));
+    // }
+    //
+    // // Try stored credentials as fallback
+    // let default_profile = credentials::get_default_profile();
+    // match credentials::load_credentials(&default_profile) {
+    //     Ok(creds) => Ok(SDK::new(creds.api_url, creds.username, creds.password)),
+    //     Err(_) => {
+    //         return Err(ProjectLocationError::ProjectConfig(
+    //             "No authentication credentials found. Please either:\n\
+    //             1. Set RRELAYER_AUTH_USERNAME and RRELAYER_AUTH_PASSWORD environment variables\n\
+    //             2. Ensure rrelayer.yaml exists with authentication config\n\
+    //             3. Run 'rrelayer auth login' to store credentials securely"
+    //                 .to_string(),
+    //         ));
+    //     }
+    // }
 }
 
 #[tokio::main]
@@ -101,99 +113,99 @@ async fn main() -> Result<(), CliError> {
             load_env_from_project_path(&resolved_path);
 
             let project_location = ProjectLocation::new(resolved_path);
-            let sdk = create_sdk_with_basic_auth(&project_location)?;
+            let client = create_sdk_with_basic_auth(&project_location)?;
 
-            check_authenticate(&sdk).await?;
+            check_authenticate(&client).await?;
 
-            network::handle_network(command, &project_location, &sdk).await?;
+            network::handle_network(command, &project_location, &client).await?;
         }
         Commands::List { path, network, limit, offset } => {
             let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;
             load_env_from_project_path(&resolved_path);
 
             let project_location = ProjectLocation::new(resolved_path);
-            let sdk = create_sdk_with_basic_auth(&project_location)?;
+            let client = create_sdk_with_basic_auth(&project_location)?;
 
-            check_authenticate(&sdk).await?;
+            check_authenticate(&client).await?;
 
-            list::handle_list(network, *limit, *offset, &project_location, &sdk).await?;
+            list::handle_list(network, *limit, *offset, &project_location, &client).await?;
         }
         Commands::Config { path, command } => {
             let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;
             load_env_from_project_path(&resolved_path);
 
             let project_location = ProjectLocation::new(resolved_path);
-            let sdk = create_sdk_with_basic_auth(&project_location)?;
+            let client = create_sdk_with_basic_auth(&project_location)?;
 
-            check_authenticate(&sdk).await?;
+            check_authenticate(&client).await?;
 
-            config::handle_config(command, &sdk).await?;
+            config::handle_config(command, &client).await?;
         }
         Commands::Balance { path, relayer_id, token } => {
             let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;
             load_env_from_project_path(&resolved_path);
 
             let project_location = ProjectLocation::new(resolved_path);
-            let sdk = create_sdk_with_basic_auth(&project_location)?;
+            let client = create_sdk_with_basic_auth(&project_location)?;
 
-            check_authenticate(&sdk).await?;
+            check_authenticate(&client).await?;
 
-            balance::handle_balance(relayer_id, token, &sdk).await?;
+            balance::handle_balance(relayer_id, token, &client).await?;
         }
         Commands::Allowlist { path, command } => {
             let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;
             load_env_from_project_path(&resolved_path);
 
             let project_location = ProjectLocation::new(resolved_path);
-            let sdk = create_sdk_with_basic_auth(&project_location)?;
+            let client = create_sdk_with_basic_auth(&project_location)?;
 
-            check_authenticate(&sdk).await?;
+            check_authenticate(&client).await?;
 
-            allowlist::handle_allowlist(command, &sdk).await?;
+            allowlist::handle_allowlist(command, &client).await?;
         }
         Commands::Create { path, name, network } => {
             let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;
             load_env_from_project_path(&resolved_path);
 
             let project_location = ProjectLocation::new(resolved_path);
-            let sdk = create_sdk_with_basic_auth(&project_location)?;
+            let client = create_sdk_with_basic_auth(&project_location)?;
 
-            check_authenticate(&sdk).await?;
+            check_authenticate(&client).await?;
 
-            create::handle_create(name, network, &project_location, &sdk).await?;
+            create::handle_create(name, network, &project_location, &client).await?;
         }
         Commands::Clone { path, relayer_id, name, network } => {
             let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;
             load_env_from_project_path(&resolved_path);
 
             let project_location = ProjectLocation::new(resolved_path);
-            let sdk = create_sdk_with_basic_auth(&project_location)?;
+            let client = create_sdk_with_basic_auth(&project_location)?;
 
-            check_authenticate(&sdk).await?;
+            check_authenticate(&client).await?;
 
-            clone::handle_clone(relayer_id, name, network, &project_location, &sdk).await?;
+            clone::handle_clone(relayer_id, name, network, &project_location, &client).await?;
         }
         Commands::Sign { path, command } => {
             let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;
             load_env_from_project_path(&resolved_path);
 
             let project_location = ProjectLocation::new(resolved_path);
-            let sdk = create_sdk_with_basic_auth(&project_location)?;
+            let client = create_sdk_with_basic_auth(&project_location)?;
 
-            check_authenticate(&sdk).await?;
+            check_authenticate(&client).await?;
 
-            sign::handle_sign(command, &sdk).await?;
+            sign::handle_sign(command, &client).await?;
         }
         Commands::Tx { path, command } => {
             let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;
             load_env_from_project_path(&resolved_path);
 
             let project_location = ProjectLocation::new(resolved_path);
-            let sdk = create_sdk_with_basic_auth(&project_location)?;
+            let client = create_sdk_with_basic_auth(&project_location)?;
 
-            check_authenticate(&sdk).await?;
+            check_authenticate(&client).await?;
 
-            tx::handle_tx(command, &sdk).await?;
+            tx::handle_tx(command, &client).await?;
         }
     }
 

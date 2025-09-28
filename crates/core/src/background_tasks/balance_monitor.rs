@@ -4,11 +4,10 @@ use alloy::primitives::utils::{format_ether, parse_ether};
 use tokio::sync::Mutex;
 use tracing::{error, info, warn};
 
-use crate::{
-    network::ChainId, postgres::PostgresClient, provider::EvmProvider, shared::cache::Cache,
-    webhooks::WebhookManager,
-};
 use crate::common_types::EvmAddress;
+use crate::{
+    network::ChainId, postgres::PostgresClient, provider::EvmProvider, webhooks::WebhookManager,
+};
 
 fn get_minimum_balance_threshold(chain_id: &ChainId) -> u128 {
     if chain_id.u64() == 1 {
@@ -27,21 +26,25 @@ pub async fn balance_monitor(
 ) {
     info!("Starting balance monitoring background task");
 
-    let mut interval = tokio::time::interval(Duration::from_secs(600));
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(600));
 
-    loop {
-        interval.tick().await;
+        loop {
+            interval.tick().await;
 
-        info!("Starting balance monitoring check");
+            info!("Starting balance monitoring check");
 
-        for provider in providers.iter() {
-            if let Err(e) = check_balances_for_chain(provider, &db, &webhook_manager).await {
-                error!("Failed to check balances for chain {}: {}", provider.chain_id, e);
+            for provider in providers.iter() {
+                if let Err(e) = check_balances_for_chain(provider, &db, &webhook_manager).await {
+                    error!("Failed to check balances for chain {}: {}", provider.chain_id, e);
+                }
             }
-        }
 
-        info!("Completed balance monitoring check");
-    }
+            info!("Completed balance monitoring check");
+        }
+    });
+
+    info!("Started balance monitoring background task");
 }
 
 async fn check_balances_for_chain(

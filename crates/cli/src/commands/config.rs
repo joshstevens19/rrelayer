@@ -1,8 +1,7 @@
+use crate::commands::error::ConfigError;
 use clap::Subcommand;
 use rrelayer_core::relayer::RelayerId;
-use rrelayer_sdk::SDK;
-
-use crate::commands::error::ConfigError;
+use rrelayer_sdk::{AdminRelayerClient, Client};
 
 #[derive(Subcommand)]
 pub enum GasCommand {
@@ -50,23 +49,32 @@ pub enum ConfigCommand {
     },
 }
 
-pub async fn handle_config(command: &ConfigCommand, sdk: &SDK) -> Result<(), ConfigError> {
+pub async fn handle_config(command: &ConfigCommand, client: &Client) -> Result<(), ConfigError> {
     match command {
-        ConfigCommand::Get { relayer_id } => handle_get(relayer_id, sdk).await,
-        ConfigCommand::Pause { relayer_id } => handle_pause(relayer_id, sdk).await,
-        ConfigCommand::Unpause { relayer_id } => handle_unpause(relayer_id, sdk).await,
-        ConfigCommand::Gas { relayer_id, command } => match command {
-            GasCommand::MaxPrice { price } => {
-                handle_update_max_gas_price(relayer_id, *price, sdk).await
+        ConfigCommand::Get { relayer_id } => handle_get(relayer_id, client).await,
+        ConfigCommand::Pause { relayer_id } => {
+            let relayer_client = client.get_relayer_client(relayer_id, None).await?;
+            handle_pause(&relayer_client).await
+        }
+        ConfigCommand::Unpause { relayer_id } => {
+            let relayer_client = client.get_relayer_client(relayer_id, None).await?;
+            handle_unpause(&relayer_client).await
+        }
+        ConfigCommand::Gas { relayer_id, command } => {
+            let relayer_client = client.get_relayer_client(relayer_id, None).await?;
+            match command {
+                GasCommand::MaxPrice { price } => {
+                    handle_update_max_gas_price(*price, &relayer_client).await
+                }
+                GasCommand::Legacy => handle_update_eip1559_status(false, &relayer_client).await,
+                GasCommand::Latest => handle_update_eip1559_status(true, &relayer_client).await,
             }
-            GasCommand::Legacy => handle_update_eip1559_status(relayer_id, false, sdk).await,
-            GasCommand::Latest => handle_update_eip1559_status(relayer_id, true, sdk).await,
-        },
+        }
     }
 }
 
-pub async fn handle_get(relayer_id: &RelayerId, sdk: &SDK) -> Result<(), ConfigError> {
-    let result = sdk.relayer.get(&relayer_id).await?;
+pub async fn handle_get(relayer_id: &RelayerId, client: &Client) -> Result<(), ConfigError> {
+    let result = client.relayer().get(&relayer_id).await?;
     match result {
         Some(result) => {
             let relayer = &result.relayer;
@@ -116,42 +124,40 @@ pub async fn handle_get(relayer_id: &RelayerId, sdk: &SDK) -> Result<(), ConfigE
     Ok(())
 }
 
-async fn handle_pause(relayer_id: &RelayerId, sdk: &SDK) -> Result<(), ConfigError> {
-    sdk.relayer.pause(&relayer_id).await?;
+async fn handle_pause(client: &AdminRelayerClient) -> Result<(), ConfigError> {
+    client.pause().await?;
 
-    println!("Paused relayer {}", relayer_id);
+    println!("Paused relayer {}", client.id());
 
     Ok(())
 }
 
-async fn handle_unpause(relayer_id: &RelayerId, sdk: &SDK) -> Result<(), ConfigError> {
-    sdk.relayer.unpause(&relayer_id).await?;
+async fn handle_unpause(client: &AdminRelayerClient) -> Result<(), ConfigError> {
+    client.unpause().await?;
 
-    println!("Unpaused relayer {}", relayer_id);
+    println!("Unpaused relayer {}", client.id());
 
     Ok(())
 }
 
 async fn handle_update_eip1559_status(
-    relayer_id: &RelayerId,
     status: bool,
-    sdk: &SDK,
+    client: &AdminRelayerClient,
 ) -> Result<(), ConfigError> {
-    sdk.relayer.update_eip1559_status(&relayer_id, status).await?;
+    client.update_eip1559_status(status).await?;
 
-    println!("Updated relayer {} eip1559 status to {}", relayer_id, status);
+    println!("Updated relayer {} eip1559 status to {}", client.id(), status);
 
     Ok(())
 }
 
 async fn handle_update_max_gas_price(
-    relayer_id: &RelayerId,
     cap: u128,
-    sdk: &SDK,
+    client: &AdminRelayerClient,
 ) -> Result<(), ConfigError> {
-    sdk.relayer.update_max_gas_price(&relayer_id, cap).await?;
+    client.update_max_gas_price(cap).await?;
 
-    println!("Updated relayer {} max gas price to {}", relayer_id, cap);
+    println!("Updated relayer {} max gas price to {}", client.id(), cap);
 
     Ok(())
 }

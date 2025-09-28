@@ -27,13 +27,10 @@ impl TestRunner {
             blobs: None,
         };
 
-        let send_result =
-            self.relayer_client.sdk.transaction.send(&relayer.id, &tx_request, None).await?;
+        let send_result = relayer.transaction().send(&tx_request, None).await?;
 
-        let status = self
-            .relayer_client
-            .sdk
-            .transaction
+        let status = relayer
+            .transaction()
             .get_status(&send_result.id)
             .await?
             .context("Transaction status not found")?;

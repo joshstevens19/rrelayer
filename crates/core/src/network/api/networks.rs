@@ -1,10 +1,7 @@
 use std::sync::Arc;
 
 use crate::shared::HttpError;
-use crate::{
-    app_state::AppState,
-    network::{cache::get_networks_cache, types::Network},
-};
+use crate::{app_state::AppState, network::types::Network};
 use axum::http::HeaderMap;
 use axum::{extract::State, Json};
 
@@ -15,7 +12,8 @@ pub async fn networks(
 ) -> Result<Json<Vec<Network>>, HttpError> {
     state.validate_basic_auth_valid(&headers)?;
 
-    let networks = get_networks_cache(&state.cache).await;
+    let all_networks: Vec<Network> =
+        state.network_configs.iter().cloned().map(|n| n.into()).collect();
 
-    Ok(Json(networks))
+    Ok(Json(all_networks))
 }

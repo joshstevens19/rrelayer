@@ -33,13 +33,13 @@ export interface Transaction {
   status: TransactionStatus;
   blobs?: any[] | null;
   txHash?: Hash | null;
-  queuedAt: string;
-  expiresAt: string;
+  queuedAt: Date;
+  expiresAt: Date;
   sentAt?: string | null;
   confirmedAt?: string | null;
   sentWithGas?: GasPriceResult | null;
   sentWithBlobGas?: BlobGasPriceResult | null;
-  minedAt?: string | null;
+  minedAt?: Date | null;
   minedAtBlockNumber?: string | null;
   speed: TransactionSpeed;
   maxPriorityFee?: string | null;

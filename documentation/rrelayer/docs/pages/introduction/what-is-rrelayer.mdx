@@ -1,48 +1,44 @@
 # What is rrelayer?
 
-rrelayer is an open-source relayer built in Rust that enables gasless transactions, transaction migrations, L2 proof transactions, blob storage transactions, and general blockchain automation.
+:::info
+Note rrelayer is actively under development, things will change and bugs will exist - if you find any bugs or have any
+feature requests please open an issue on [github](https://github.com/joshstevens19/rrelayer/issues).
+:::
 
-rrelayer provides a complete out-of-the-box solution for managing Ethereum transactions. It automatically handles gas price fluctuations, bumps transactions when needed, and ensures your transactions get confirmed on-chain.
+rrelayer is an opensource powerful, high-performance blockchain transaction relay service built in Rust, designed for seamless integration with any EVM-compatible network.
+This tool transforms complex blockchain interactions into simple REST API calls, eliminating the need for applications to manage wallets, gas optimization, transaction queuing, or nonce management.
+For enterprise needs, rrelayer provides advanced wallet infrastructure with support for multiple secure signing providers including AWS KMS hardware security modules, Turnkey self-custody solutions, Privy managed wallets, AWS Secrets Manager, GCP Secret Manager, and raw mnemonic development setups.
+It's highly scalable and production-ready, enabling you to build robust Web3 applications with enterprise-grade reliability and focus exclusively on your business logic.
+rrelayer out of the box gives you transaction relay, message signing, automated gas management, and real-time monitoring through intuitive APIs.
 
-## Core Features
+# What can I use rrelayer for?
 
-### 🚀 **High Performance**
+- DApp backends: Handle user transactions without wallet management complexity
+- NFT platforms: Automated minting, transfers, and marketplace operations with reliable execution
+- DeFi protocols: Yield farming automation, liquidation bots, and cross-chain operations
+- Enterprise Web3: Simplified blockchain integration for traditional businesses with audit compliance
+- Development workflows: Consistent APIs for local development and comprehensive E2E testing
+- Gasless transactions: Meta-transaction infrastructure for improved user experience
+- Multi-chain applications: Unified transaction interface across different EVM networks
+- High-frequency operations: Advanced queuing system for batch processing and optimization
+- Production infrastructure: Enterprise-grade transaction reliability with comprehensive monitoring
 
-Built in Rust for maximum performance and reliability, handling thousands of transactions per second with minimal latency.
+# What signing providers do you support?
 
-### ⛽ **Gasless Transactions**
+rrelayer offers comprehensive wallet management through multiple secure signing providers to meet various security and operational requirements:
 
-Enable users to interact with your dApps without needing ETH for gas fees. rrelayer manages all gas payments automatically.
+**Production-Grade Security:**
+- **AWS KMS**: Hardware security modules with enterprise-grade key protection, automatic key creation, and full EIP-4844 blob transaction support
+- **Turnkey**: Self-custody solution with institutional features, cryptographic API authentication, and comprehensive audit trails
+- **AWS Secrets Manager**: Secure mnemonic storage with encrypted at-rest protection and IAM access control
+- **GCP Secret Manager**: Google Cloud-based secret storage with service account authentication and cross-project access
 
-### 🔧 **Multiple Wallet Integrations**
+**Development & Integration:**
+- **Privy**: Managed wallet infrastructure with social login onboarding and API-based key management
+- **Raw Mnemonic**: Simple development setup using BIP39 mnemonics with HD wallet derivation for testing environments
 
-Support for various wallet providers:
+All providers support transaction signing, message signing, and EIP-712 typed data signing. Most providers support EIP-4844 blob transactions except Privy. Choose based on your security requirements from simple development setups to enterprise-grade hardware security modules.
 
-- **Privy** - Social login onboarding
-- **Turnkey** - Enterprise key management
-- **AWS KMS** - Cloud-based key storage
-- **Raw Private Keys** - Direct key control
+# What networks do you support?
 
-### 🌐 **Universal EVM Support**
-
-Deploy across any EVM-compatible network and extend functionality to meet your specific needs.
-
-## Architecture
-
-### Server
-
-The core Rust server handles transaction relaying, accepting transactions and adding them to a processing queue. It monitors network gas changes and includes safeguards for:
-
-- Maximum spending limits
-- Address allowlisting
-- Transaction retry logic
-- RESTful API for programmatic access
-
-The server uses PostgreSQL for data persistence with in-memory caching for high-performance processing.
-
-### SDKs
-
-RRelayer ships with fully-featured SDKs for easy integration:
-
-- **TypeScript** - Complete support for viem and ethers.js
-- **Rust, Go, Python** - Coming soon (use direct API calls for now)
+rrelayer supports any EVM-compatible network out of the box including Ethereum mainnet, Layer 2 solutions like Polygon, Arbitrum, Optimism, Base, testnets, and private networks. If you have a custom EVM chain, you can easily add support by configuring the RPC endpoint and chain ID. No code changes are required, making it truly universal for the entire Ethereum ecosystem.

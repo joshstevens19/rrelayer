@@ -28,14 +28,25 @@ impl TestRunner {
         let relayer3 = self.create_by_index_and_fund_relayer(3).await?;
         info!("relayer3: {:?}", relayer3);
 
-        info!("Created test relayers: {:?}, {:?}, {:?}", relayer1.id, relayer2.id, relayer3.id);
+        info!(
+            "Created test relayers: {:?}, {:?}, {:?}",
+            relayer1.id(),
+            relayer2.id(),
+            relayer3.id()
+        );
 
-        let initial_balance1 =
-            self.contract_interactor.get_token_balance(&relayer1.address.into_address()).await?;
-        let initial_balance2 =
-            self.contract_interactor.get_token_balance(&relayer2.address.into_address()).await?;
-        let initial_balance3 =
-            self.contract_interactor.get_token_balance(&relayer3.address.into_address()).await?;
+        let initial_balance1 = self
+            .contract_interactor
+            .get_token_balance(&relayer1.address().await.unwrap().into_address())
+            .await?;
+        let initial_balance2 = self
+            .contract_interactor
+            .get_token_balance(&relayer2.address().await.unwrap().into_address())
+            .await?;
+        let initial_balance3 = self
+            .contract_interactor
+            .get_token_balance(&relayer3.address().await.unwrap().into_address())
+            .await?;
 
         info!("Initial ERC-20 token balances:");
         info!(
@@ -69,12 +80,18 @@ impl TestRunner {
         self.mine_and_wait().await?;
         self.mine_and_wait().await?;
 
-        let final_balance1 =
-            self.contract_interactor.get_token_balance(&relayer1.address.into_address()).await?;
-        let final_balance2 =
-            self.contract_interactor.get_token_balance(&relayer2.address.into_address()).await?;
-        let final_balance3 =
-            self.contract_interactor.get_token_balance(&relayer3.address.into_address()).await?;
+        let final_balance1 = self
+            .contract_interactor
+            .get_token_balance(&relayer1.address().await.unwrap().into_address())
+            .await?;
+        let final_balance2 = self
+            .contract_interactor
+            .get_token_balance(&relayer2.address().await.unwrap().into_address())
+            .await?;
+        let final_balance3 = self
+            .contract_interactor
+            .get_token_balance(&relayer3.address().await.unwrap().into_address())
+            .await?;
 
         info!("Final ERC-20 token balances after top-up:");
         info!(

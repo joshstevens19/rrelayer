@@ -17,7 +17,7 @@ impl TestRunner {
         let relayer = self.create_and_fund_relayer("eth-transfer-relayer").await?;
         info!("Created relayer: {:?}", relayer);
 
-        self.relayer_client.sdk.relayer.update_eip1559_status(&relayer.id, false).await?;
+        relayer.update_eip1559_status(false).await?;
 
         let recipient = &self.config.anvil_accounts[1];
         info!("Sending ETH transfer to {}", recipient);
@@ -25,7 +25,7 @@ impl TestRunner {
         let tx_response = self
             .relayer_client
             .send_transaction(
-                &relayer.id,
+                &relayer.id(),
                 recipient,
                 alloy::primitives::utils::parse_ether("0.5")?.into(),
                 TransactionData::empty(),

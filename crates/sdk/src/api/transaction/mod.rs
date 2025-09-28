@@ -11,7 +11,7 @@ use rrelayer_core::{
 };
 use std::sync::Arc;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct TransactionApi {
     client: Arc<HttpClient>,
 }

@@ -28,8 +28,10 @@ impl TestRunner {
         }
         info!("[SUCCESS] Contract verified as deployed with code at {}", contract_address);
 
-        let relayer_balance =
-            self.contract_interactor.get_eth_balance(&relayer.address.into_address()).await?;
+        let relayer_balance = self
+            .contract_interactor
+            .get_eth_balance(&relayer.address().await?.into_address())
+            .await?;
         info!(
             "Relayer balance before transaction: {} ETH",
             alloy::primitives::utils::format_ether(relayer_balance)
@@ -40,7 +42,7 @@ impl TestRunner {
 
         let tx_response = self
             .relayer_client
-            .send_transaction(&relayer.id, &contract_address, TransactionValue::zero(), calldata)
+            .send_transaction(&relayer.id(), &contract_address, TransactionValue::zero(), calldata)
             .await
             .context("Failed to send contract interaction")?;
 

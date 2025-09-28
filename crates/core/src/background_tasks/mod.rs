@@ -8,8 +8,8 @@ use crate::background_tasks::{
 use crate::gas::{blob_gas_oracle, gas_oracle, BlobGasOracleCache, GasOracleCache};
 use crate::{
     background_tasks::automatic_top_up_task::run_automatic_top_up_task, provider::EvmProvider,
-    shared::cache::Cache, transaction::queue_system::TransactionsQueues, webhooks::WebhookManager,
-    PostgresClient, SafeProxyManager, SetupConfig,
+    transaction::queue_system::TransactionsQueues, webhooks::WebhookManager, PostgresClient,
+    SafeProxyManager, SetupConfig,
 };
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -21,7 +21,6 @@ pub async fn run_background_tasks(
     blob_gas_oracle_cache: Arc<Mutex<BlobGasOracleCache>>,
     providers: Arc<Vec<EvmProvider>>,
     postgres_client: Arc<PostgresClient>,
-    cache: Arc<Cache>,
     webhook_manager: Option<Arc<Mutex<WebhookManager>>>,
     transactions_queues: Arc<Mutex<TransactionsQueues>>,
     safe_proxy_manager: Arc<SafeProxyManager>,
@@ -49,11 +48,8 @@ pub async fn run_background_tasks(
         safe_proxy_manager,
     );
 
-    let balance_monitor_task = balance_monitor(
-        providers.clone(),
-        postgres_client.clone(),
-        webhook_manager.clone(),
-    );
+    let balance_monitor_task =
+        balance_monitor(providers.clone(), postgres_client.clone(), webhook_manager.clone());
 
     if let Some(webhook_manager) = webhook_manager {
         run_webhook_manager_task(webhook_manager, providers.clone()).await;

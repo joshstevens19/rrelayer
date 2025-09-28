@@ -19,7 +19,7 @@ impl TestRunner {
         let excessive_result = self
             .relayer_client
             .send_transaction(
-                &relayer.id,
+                &relayer.id(),
                 &self.config.anvil_accounts[1],
                 alloy::primitives::utils::parse_ether("100_000")?.into(),
                 TransactionData::empty(),
@@ -35,7 +35,7 @@ impl TestRunner {
         let exact_result = self
             .relayer_client
             .send_transaction(
-                &relayer.id,
+                &relayer.id(),
                 &self.config.anvil_accounts[1],
                 alloy::primitives::utils::parse_ether("10")?.into(),
                 TransactionData::empty(),
@@ -51,7 +51,7 @@ impl TestRunner {
         let just_under_result = self
             .relayer_client
             .send_transaction(
-                &relayer.id,
+                &relayer.id(),
                 &self.config.anvil_accounts[1],
                 alloy::primitives::utils::parse_ether("9.98")?.into(),
                 TransactionData::empty(),

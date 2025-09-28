@@ -15,8 +15,10 @@ impl TestRunner {
         let relayer = self.create_and_fund_relayer("gas-test-relayer").await?;
         info!("Created relayer: {:?}", relayer);
 
-        let balance_before =
-            self.contract_interactor.get_eth_balance(&relayer.address.into_address()).await?;
+        let balance_before = self
+            .contract_interactor
+            .get_eth_balance(&relayer.address().await?.into_address())
+            .await?;
         info!(
             "Relayer balance before transaction: {} ETH",
             alloy::primitives::utils::format_ether(balance_before)
@@ -26,7 +28,7 @@ impl TestRunner {
         let tx_response = self
             .relayer_client
             .send_transaction(
-                &relayer.id,
+                &relayer.id(),
                 &self.config.anvil_accounts[3],
                 transfer_amount.into(),
                 TransactionData::empty(),
@@ -38,8 +40,10 @@ impl TestRunner {
         let completed_tx = self.wait_for_transaction_completion(&tx_response.0.id).await?;
         info!("Transaction completed");
 
-        let balance_after =
-            self.contract_interactor.get_eth_balance(&relayer.address.into_address()).await?;
+        let balance_after = self
+            .contract_interactor
+            .get_eth_balance(&relayer.address().await?.into_address())
+            .await?;
         info!(
             "Relayer balance after transaction: {} ETH",
             alloy::primitives::utils::format_ether(balance_after)

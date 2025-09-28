@@ -336,15 +336,6 @@ impl Clone for WebhookManager {
     }
 }
 
-#[derive(Debug, Default)]
-pub struct WebhookManagerStats {
-    pub total: usize,
-    pub pending: usize,
-    pub completed: usize,
-    pub failed: usize,
-    pub retrying: usize,
-}
-
 impl WebhookManager {
     pub async fn on_transaction_queued(&self, transaction: &Transaction) {
         self.queue_webhook(transaction, WebhookEventType::TransactionQueued).await;

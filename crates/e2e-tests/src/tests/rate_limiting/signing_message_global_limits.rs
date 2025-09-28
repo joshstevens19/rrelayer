@@ -21,12 +21,7 @@ impl TestRunner {
 
         let mut successful_signing = 0;
 
-        let sign_result = self
-            .relayer_client
-            .sdk
-            .sign
-            .sign_text(&relayer.id, "Hello, RRelayer!", relay_key.clone())
-            .await;
+        let sign_result = relayer.sign().text("Hello, RRelayer!", relay_key.clone()).await;
 
         match sign_result {
             Ok(_) => successful_signing += 1,
@@ -36,12 +31,7 @@ impl TestRunner {
         let relayer = self.create_and_fund_relayer("rate-limit-relayer").await?;
         info!("relayer2: {:?}", relayer);
 
-        let sign_result = self
-            .relayer_client
-            .sdk
-            .sign
-            .sign_text(&relayer.id, "Hello, RRelayer!", relay_key.clone())
-            .await;
+        let sign_result = relayer.sign().text("Hello, RRelayer!", relay_key.clone()).await;
 
         match sign_result {
             Ok(_) => successful_signing += 1,
@@ -51,12 +41,7 @@ impl TestRunner {
         let relayer = self.create_and_fund_relayer("rate-limit-relayer").await?;
         info!("relayer3: {:?}", relayer);
 
-        let sign_result = self
-            .relayer_client
-            .sdk
-            .sign
-            .sign_text(&relayer.id, "Hello, RRelayer!", relay_key.clone())
-            .await;
+        let sign_result = relayer.sign().text("Hello, RRelayer!", relay_key.clone()).await;
 
         match sign_result {
             Ok(_) => successful_signing += 1,
@@ -66,12 +51,7 @@ impl TestRunner {
         let relayer = self.create_and_fund_relayer("rate-limit-relayer").await?;
         info!("relayer4: {:?}", relayer);
 
-        let sign_result = self
-            .relayer_client
-            .sdk
-            .sign
-            .sign_text(&relayer.id, "Hello, RRelayer!", relay_key.clone())
-            .await;
+        let sign_result = relayer.sign().text("Hello, RRelayer!", relay_key.clone()).await;
 
         match sign_result {
             Ok(_) => successful_signing += 1,
@@ -81,12 +61,7 @@ impl TestRunner {
         let relayer = self.create_and_fund_relayer("rate-limit-relayer").await?;
         info!("relayer5: {:?}", relayer);
 
-        let sign_result = self
-            .relayer_client
-            .sdk
-            .sign
-            .sign_text(&relayer.id, "Hello, RRelayer!", relay_key.clone())
-            .await;
+        let sign_result = relayer.sign().text("Hello, RRelayer!", relay_key.clone()).await;
 
         match sign_result {
             Ok(_) => successful_signing += 1,
@@ -96,12 +71,7 @@ impl TestRunner {
         let relayer = self.create_and_fund_relayer("rate-limit-relayer").await?;
         info!("relayer6: {:?}", relayer);
 
-        let sign_result = self
-            .relayer_client
-            .sdk
-            .sign
-            .sign_text(&relayer.id, "Hello, RRelayer!", relay_key.clone())
-            .await;
+        let sign_result = relayer.sign().text("Hello, RRelayer!", relay_key.clone()).await;
 
         match sign_result {
             Ok(_) => successful_signing += 1,
@@ -120,12 +90,7 @@ impl TestRunner {
         info!("Sleep for 60 seconds to allow the rate limit to expire");
         tokio::time::sleep(Duration::from_secs(60)).await;
 
-        let sign_result = self
-            .relayer_client
-            .sdk
-            .sign
-            .sign_text(&relayer.id, "Hello, RRelayer!", relay_key.clone())
-            .await;
+        let sign_result = relayer.sign().text("Hello, RRelayer!", relay_key.clone()).await;
 
         match sign_result {
             Ok(_) => {}

@@ -27,21 +27,17 @@ impl TestRunner {
             blobs: None,
         };
 
-        let send_result = self
-            .relayer_client
-            .sdk
-            .transaction
-            .send(&relayer.id, &tx_request, None)
+        let send_result = relayer
+            .transaction()
+            .send(&tx_request, None)
             .await
             .context("Failed to send transaction")?;
 
         let transaction_id = &send_result.id;
         info!("Sent transaction for status testing: {}", transaction_id);
 
-        let status_result = self
-            .relayer_client
-            .sdk
-            .transaction
+        let status_result = relayer
+            .transaction()
             .get_status(transaction_id)
             .await
             .context("Failed to get transaction status")?;
@@ -64,18 +60,28 @@ impl TestRunner {
         self.mine_and_wait().await?;
         self.mine_and_wait().await?;
         self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
 
-        let updated_status = self
-            .relayer_client
-            .sdk
-            .transaction
+        let updated_status = relayer
+            .transaction()
             .get_status(transaction_id)
             .await
             .context("Failed to get updated transaction status")?;
 
         if let Some(status) = updated_status {
             if status.status != TransactionStatus::MINED {
-                return Err(anyhow::anyhow!("Transaction status should be mined at this point"));
+                return Err(anyhow::anyhow!(
+                    "Transaction {} status should be mined at this point but it is {}",
+                    transaction_id,
+                    status.status
+                ));
             }
         }
 

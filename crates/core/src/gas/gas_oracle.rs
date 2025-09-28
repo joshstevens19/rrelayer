@@ -1,15 +1,12 @@
 use std::{collections::HashMap, sync::Arc};
 
 use super::fee_estimator::{GasEstimatorResult, GasPriceResult};
-use crate::{
-    network::ChainId, provider::EvmProvider, rrelayer_error, rrelayer_info,
-    transaction::types::TransactionSpeed,
-};
+use crate::{network::ChainId, provider::EvmProvider, transaction::types::TransactionSpeed};
 use tokio::{
     sync::Mutex,
     time::{self, Duration},
 };
-use tracing::info;
+use tracing::{error, info};
 
 pub struct GasOracleCache {
     gas_prices: Mutex<HashMap<ChainId, GasEstimatorResult>>,
@@ -64,10 +61,9 @@ pub async fn gas_oracle(
                     cache.lock().await.update_gas_price(provider.chain_id, gas_price).await;
                 }
                 Err(err) => {
-                    rrelayer_error!(
+                    error!(
                         "Failed to get initial gas price for provider: {} - error {}",
-                        provider.name,
-                        err
+                        provider.name, err
                     );
                 }
             }
@@ -98,10 +94,12 @@ pub async fn gas_oracle(
                         cache.lock().await.update_gas_price(provider.chain_id, gas_price).await;
                     }
                     Err(err) => {
-                        rrelayer_error!("Failed to get gas price for provider: {} - error {} - try again in 10s", provider.name, err);
+                        error!("Failed to get gas price for provider: {} - error {} - try again in 10s", provider.name, err);
                     }
                 }
             }
         });
     }
+
+    info!("gas_oracle interval started for all providers");
 }

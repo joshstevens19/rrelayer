@@ -24,7 +24,7 @@ impl TestRunner {
         let result = self
             .relayer_client
             .send_transaction(
-                &relayer.id,
+                &relayer.id(),
                 &contract_address,
                 TransactionValue::zero(),
                 TransactionData::from_str("0xdeadbeef").unwrap(), // Invalid function selector - will revert

@@ -5,7 +5,7 @@ use crate::yaml::TurnkeySigningProviderConfig;
 use alloy::consensus::{TxEnvelope, TypedTransaction};
 use alloy::dyn_abi::TypedData;
 use alloy::primitives::{keccak256, PrimitiveSignature};
-use alloy_rlp::{Decodable, Encodable};
+use alloy_rlp::Decodable;
 use async_trait::async_trait;
 use base64::{engine::general_purpose, Engine as _};
 use hex;
@@ -14,7 +14,6 @@ use p256::{
     SecretKey,
 };
 use serde::{Deserialize, Serialize};
-use sha2::Digest;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::time::{SystemTime, UNIX_EPOCH};

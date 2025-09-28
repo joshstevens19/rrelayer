@@ -1,4 +1,4 @@
-use crate::client::{E2ETestConfig, RelayerClient};
+use crate::client::{E2ERelayerClient, E2ETestConfig};
 use crate::infrastructure::{AnvilManager, ContractInteractor, WebhookTestServer};
 use crate::tests::registry;
 use crate::tests::registry::TestRegistry;
@@ -12,13 +12,14 @@ use anyhow::{anyhow, Context};
 use rrelayer_core::common_types::EvmAddress;
 use rrelayer_core::relayer::CreateRelayerResult;
 use rrelayer_core::transaction::types::{Transaction, TransactionId, TransactionStatus};
+use rrelayer_sdk::AdminRelayerClient;
 use std::time::{Duration, Instant};
 use tokio::time::timeout;
 use tracing::{error, info};
 
 pub struct TestRunner {
     pub config: E2ETestConfig,
-    pub relayer_client: RelayerClient,
+    pub relayer_client: E2ERelayerClient,
     pub contract_interactor: ContractInteractor,
     pub anvil_manager: AnvilManager,
     pub webhook_server: Option<WebhookTestServer>,
@@ -28,7 +29,7 @@ pub struct TestRunner {
 
 impl TestRunner {
     pub async fn new(config: E2ETestConfig, anvil_manager: AnvilManager) -> anyhow::Result<Self> {
-        let relayer_client = RelayerClient::new(&config);
+        let relayer_client = E2ERelayerClient::new(&config);
 
         let anvil_url = format!("http://127.0.0.1:{}", config.anvil_port);
         let mut contract_interactor = ContractInteractor::new(&anvil_url).await?;
@@ -167,7 +168,7 @@ impl TestRunner {
         Ok(())
     }
 
-    pub async fn create_relayer(&self, name: &str) -> anyhow::Result<CreateRelayerResult> {
+    pub async fn create_relayer(&self, name: &str) -> anyhow::Result<AdminRelayerClient> {
         let relayer = self
             .relayer_client
             .create_relayer(name, self.config.chain_id)
@@ -181,13 +182,16 @@ impl TestRunner {
 
         self.relayer_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
 
-        Ok(relayer)
+        let relayer_client =
+            self.relayer_client.client.get_relayer_client(&relayer.id, None).await?;
+
+        Ok(relayer_client)
     }
 
     pub async fn create_by_index_and_fund_relayer(
         &self,
         target_index: usize,
-    ) -> anyhow::Result<CreateRelayerResult> {
+    ) -> anyhow::Result<AdminRelayerClient> {
         {
             let relayers = self.created_relayers.lock().unwrap();
             if target_index < relayers.len() {
@@ -195,7 +199,12 @@ impl TestRunner {
                 let relayer = relayers[target_index].clone();
                 self.fund_relayer(&relayer.address, alloy::primitives::utils::parse_ether("10")?)
                     .await?;
-                return Ok(relayers[target_index].clone());
+                let relayer_client = self
+                    .relayer_client
+                    .client
+                    .get_relayer_client(&relayers[target_index].id, None)
+                    .await?;
+                return Ok(relayer_client);
             }
         }
 
@@ -221,7 +230,7 @@ impl TestRunner {
                         self.create_relayer(&relayer_name).await?
                     };
 
-                    info!("Created relayer {} at index {}", relayer.id, i);
+                    info!("Created relayer {} at index {}", relayer.id(), i);
                 }
             } else {
                 let relayer_names: Vec<String> =
@@ -240,13 +249,18 @@ impl TestRunner {
 
         let relayers = self.created_relayers.lock().unwrap();
         if target_index < relayers.len() {
-            Ok(relayers[target_index].clone())
+            let relayer_client = self
+                .relayer_client
+                .client
+                .get_relayer_client(&relayers[target_index].id, None)
+                .await?;
+            Ok(relayer_client)
         } else {
             Err(anyhow!("Failed to create relayer at target index {}", target_index))
         }
     }
 
-    pub async fn create_and_fund_relayer(&self, name: &str) -> anyhow::Result<CreateRelayerResult> {
+    pub async fn create_and_fund_relayer(&self, name: &str) -> anyhow::Result<AdminRelayerClient> {
         let relayer = self
             .relayer_client
             .create_relayer(name, self.config.chain_id)
@@ -265,7 +279,10 @@ impl TestRunner {
 
         self.relayer_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
 
-        Ok(relayer)
+        let relayer_client =
+            self.relayer_client.client.get_relayer_client(&relayer.id, None).await?;
+
+        Ok(relayer_client)
     }
 
     pub async fn wait_for_transaction_completion(
@@ -330,7 +347,7 @@ impl TestRunner {
         self.start_webhook_server().await.unwrap();
         let relayer = self.create_and_fund_relayer("automatic_top_up").await.unwrap();
         self.fund_relayer(
-            &relayer.address,
+            &relayer.address().await.unwrap(),
             alloy::primitives::utils::parse_ether("100000000").unwrap(),
         )
         .await
@@ -378,7 +395,7 @@ impl TestRunner {
         self.start_webhook_server().await.unwrap();
         let relayer = self.create_and_fund_relayer("startup").await.unwrap();
         self.fund_relayer(
-            &relayer.address,
+            &relayer.address().await.unwrap(),
             alloy::primitives::utils::parse_ether("100000000").unwrap(),
         )
         .await

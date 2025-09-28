@@ -60,10 +60,6 @@ impl SigningProvider {
     }
 }
 
-async fn is_rrelayer_ready() -> bool {
-    reqwest::get("http://localhost:3000/health").await.is_ok()
-}
-
 async fn run_single_provider(test_filter: Option<String>) -> Result<(u32, u32, TestSuite)> {
     run_single_provider_with_cleanup(test_filter, false).await
 }
@@ -156,7 +152,7 @@ async fn main() -> Result<()> {
         info!("[TEST] Running all E2E test scenarios...");
     }
 
-    let (passed, failed, _) = run_single_provider(test_filter).await?;
+    let (_, failed, _) = run_single_provider(test_filter).await?;
 
     if failed > 0 {
         std::process::exit(1);

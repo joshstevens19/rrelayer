@@ -29,21 +29,17 @@ impl TestRunner {
                 blobs: None,
             };
 
-            let _ = self
-                .relayer_client
-                .sdk
-                .transaction
-                .send(&relayer.id, &tx_request, None)
+            let _ = relayer
+                .transaction()
+                .send(&tx_request, None)
                 .await
                 .context("Failed to send transaction")?;
         }
 
         let paging = PagingContext { limit: 10, offset: 0 };
-        let relayer_transactions = self
-            .relayer_client
-            .sdk
-            .transaction
-            .get_all(&relayer.id, &paging)
+        let relayer_transactions = relayer
+            .transaction()
+            .get_all(&paging)
             .await
             .context("Failed to get relayer transactions")?;
 

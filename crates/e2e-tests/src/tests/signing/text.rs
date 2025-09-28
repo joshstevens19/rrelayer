@@ -19,24 +19,17 @@ impl TestRunner {
 
         let test_message = "Hello, RRelayer E2E Test!";
 
-        let sign_result = self
-            .relayer_client
-            .sdk
-            .sign
-            .sign_text(&relayer.id, test_message, None)
-            .await
-            .context("Failed to sign text message")?;
+        let sign_result =
+            relayer.sign().text(test_message, None).await.context("Failed to sign text message")?;
 
         info!("Signed message. Signature: {}", sign_result.signature);
 
         info!("[SUCCESS] Got signature: {:?}", sign_result.signature);
 
         let paging = PagingContext { limit: 10, offset: 0 };
-        let history = self
-            .relayer_client
-            .sdk
-            .sign
-            .get_text_history(&relayer.id, &paging)
+        let history = relayer
+            .sign()
+            .text_history(&paging)
             .await
             .context("Failed to get text signing history")?;
 

@@ -1,6 +1,6 @@
 use clap::Subcommand;
 use rrelayer_core::{common_types::PagingContext, relayer::RelayerId};
-use rrelayer_sdk::SDK;
+use rrelayer_sdk::{AdminRelayerClient, Client};
 
 use crate::{commands::error::AllowlistError, console::print_table};
 
@@ -22,10 +22,14 @@ pub enum AllowlistCommand {
     },
 }
 
-pub async fn handle_allowlist(command: &AllowlistCommand, sdk: &SDK) -> Result<(), AllowlistError> {
+pub async fn handle_allowlist(
+    command: &AllowlistCommand,
+    client: &Client,
+) -> Result<(), AllowlistError> {
     match command {
         AllowlistCommand::List { relayer_id, limit, offset } => {
-            handle_allowlist_list(relayer_id, *limit, *offset, sdk).await
+            let relayer_client = client.get_relayer_client(relayer_id, None).await?;
+            handle_allowlist_list(relayer_id, *limit, *offset, &relayer_client).await
         }
     }
 }
@@ -34,10 +38,10 @@ async fn handle_allowlist_list(
     relayer_id: &RelayerId,
     limit: u32,
     offset: u32,
-    sdk: &SDK,
+    client: &AdminRelayerClient,
 ) -> Result<(), AllowlistError> {
     let paging_context = PagingContext::new(limit, offset);
-    let result = sdk.relayer.allowlist.get_all(relayer_id, &paging_context).await?;
+    let result = client.allowlist().get(&paging_context).await?;
 
     if result.items.is_empty() {
         println!(

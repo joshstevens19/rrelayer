@@ -3,6 +3,7 @@ use alloy::primitives::U256;
 use anyhow::{anyhow, Context};
 use rrelayer_core::transaction::api::{RelayTransactionRequest, TransactionSpeed};
 use rrelayer_core::transaction::types::{TransactionData, TransactionValue};
+use rrelayer_sdk::TransactionCountType;
 use tracing::info;
 
 impl TestRunner {
@@ -19,19 +20,15 @@ impl TestRunner {
         let relayer = self.create_and_fund_relayer("tx-counts-relayer").await?;
         info!("Created relayer: {:?}", relayer);
 
-        let initial_pending = self
-            .relayer_client
-            .sdk
-            .transaction
-            .get_pending_count(&relayer.id)
+        let initial_pending = relayer
+            .transaction()
+            .get_count(TransactionCountType::Pending)
             .await
             .context("Failed to get initial pending count")?;
 
-        let initial_inmempool = self
-            .relayer_client
-            .sdk
-            .transaction
-            .get_inmempool_count(&relayer.id)
+        let initial_inmempool = relayer
+            .transaction()
+            .get_count(TransactionCountType::Inmempool)
             .await
             .context("Failed to get initial inmempool count")?;
 
@@ -48,11 +45,9 @@ impl TestRunner {
                 blobs: None,
             };
 
-            let send_result = self
-                .relayer_client
-                .sdk
-                .transaction
-                .send(&relayer.id, &tx_request, None)
+            let send_result = relayer
+                .transaction()
+                .send(&tx_request, None)
                 .await
                 .context(format!("Failed to send transaction {}", i))?;
 
@@ -62,19 +57,15 @@ impl TestRunner {
             self.mine_and_wait().await?;
         }
 
-        let final_pending = self
-            .relayer_client
-            .sdk
-            .transaction
-            .get_pending_count(&relayer.id)
+        let final_pending = relayer
+            .transaction()
+            .get_count(TransactionCountType::Pending)
             .await
             .context("Failed to get final pending count")?;
 
-        let final_inmempool = self
-            .relayer_client
-            .sdk
-            .transaction
-            .get_inmempool_count(&relayer.id)
+        let final_inmempool = relayer
+            .transaction()
+            .get_count(TransactionCountType::Inmempool)
             .await
             .context("Failed to get final inmempool count")?;
 
