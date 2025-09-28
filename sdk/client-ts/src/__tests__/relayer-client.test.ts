@@ -9,7 +9,7 @@ describe('RelayerClient E2E Tests', () => {
 
   beforeAll(async () => {
     if (skipE2E) return;
-    
+
     // Create admin client to create relayers
     adminClient = createClient({
       serverUrl: TEST_CONFIG.SERVER_URL,
@@ -21,7 +21,7 @@ describe('RelayerClient E2E Tests', () => {
 
     // Create a test relayer
     testRelayer = await createTestRelayer(adminClient, 'relayer-client-test');
-    
+
     // Create relayer client with the new relayer
     client = new RelayerClient({
       serverUrl: TEST_CONFIG.SERVER_URL,
@@ -36,7 +36,7 @@ describe('RelayerClient E2E Tests', () => {
 
   afterAll(async () => {
     if (skipE2E || !testRelayer) return;
-    
+
     // Clean up the test relayer
     try {
       await adminClient.relayer.delete(testRelayer.relayerId);
@@ -48,7 +48,7 @@ describe('RelayerClient E2E Tests', () => {
   describe('Basic Relayer Operations', () => {
     test('should get relayer address', async () => {
       if (skipE2E) return;
-      
+
       const address = await client.address();
       expect(typeof address).toBe('string');
       expect(address).toMatch(/^0x[a-fA-F0-9]{40}$/);
@@ -56,7 +56,7 @@ describe('RelayerClient E2E Tests', () => {
 
     test('should get relayer information', async () => {
       if (skipE2E) return;
-      
+
       const info = await client.getInfo();
       expect(info).toHaveProperty('address');
       expect(info).toHaveProperty('chainId');
@@ -65,7 +65,7 @@ describe('RelayerClient E2E Tests', () => {
 
     test('should get relayer balance', async () => {
       if (skipE2E) return;
-      
+
       const balance = await client.getBalanceOf();
       expect(typeof balance).toBe('string');
       expect(parseFloat(balance)).toBeGreaterThanOrEqual(0);
@@ -73,7 +73,7 @@ describe('RelayerClient E2E Tests', () => {
 
     test('should get ethereum provider', () => {
       if (skipE2E) return;
-      
+
       const provider = client.ethereumProvider();
       expect(provider).toBeDefined();
     });
@@ -82,7 +82,7 @@ describe('RelayerClient E2E Tests', () => {
   describe('Allowlist Operations', () => {
     test('should get allowlist addresses', async () => {
       if (skipE2E) return;
-      
+
       const allowlist = await client.allowlist.get();
       expect(allowlist).toHaveProperty('data');
       expect(Array.isArray(allowlist.items)).toBe(true);
@@ -90,7 +90,7 @@ describe('RelayerClient E2E Tests', () => {
 
     test('should get allowlist addresses with pagination', async () => {
       if (skipE2E) return;
-      
+
       const allowlist = await client.allowlist.get({ offset: 1, limit: 10 });
       expect(allowlist).toHaveProperty('data');
       expect(allowlist).toHaveProperty('pagination');
@@ -101,7 +101,7 @@ describe('RelayerClient E2E Tests', () => {
   describe('Transaction Operations', () => {
     test('should get all transactions', async () => {
       if (skipE2E) return;
-      
+
       const transactions = await client.transaction.getAll();
       expect(transactions).toHaveProperty('data');
       expect(Array.isArray(transactions.items)).toBe(true);
@@ -109,8 +109,11 @@ describe('RelayerClient E2E Tests', () => {
 
     test('should get all transactions with pagination', async () => {
       if (skipE2E) return;
-      
-      const transactions = await client.transaction.getAll({ offset: 1, limit: 5 });
+
+      const transactions = await client.transaction.getAll({
+        offset: 1,
+        limit: 5,
+      });
       expect(transactions).toHaveProperty('data');
       expect(transactions).toHaveProperty('pagination');
       expect(transactions.items.length).toBeLessThanOrEqual(5);
@@ -118,14 +121,14 @@ describe('RelayerClient E2E Tests', () => {
 
     test('should handle getting non-existent transaction', async () => {
       if (skipE2E) return;
-      
+
       const transaction = await client.transaction.get('non-existent-tx-id');
       expect(transaction).toBeNull();
     });
 
     test('should handle getting status of non-existent transaction', async () => {
       if (skipE2E) return;
-      
+
       const status = await client.transaction.getStatus('non-existent-tx-id');
       expect(status).toBeNull();
     });
@@ -137,7 +140,7 @@ describe('RelayerClient E2E Tests', () => {
   describe('Signing Operations', () => {
     test('should sign text message', async () => {
       if (skipE2E) return;
-      
+
       const message = 'Hello, World!';
       const result = await client.sign.text(message);
       expect(result).toHaveProperty('signature');
@@ -147,7 +150,7 @@ describe('RelayerClient E2E Tests', () => {
 
     test('should sign text message with rate limit key', async () => {
       if (skipE2E) return;
-      
+
       const message = 'Hello with rate limit!';
       const rateLimitKey = 'test-rate-limit-key';
       const result = await client.sign.text(message, rateLimitKey);
@@ -157,7 +160,7 @@ describe('RelayerClient E2E Tests', () => {
 
     test('should sign typed data', async () => {
       if (skipE2E) return;
-      
+
       const typedData = {
         domain: {
           name: 'Test App',
@@ -187,7 +190,7 @@ describe('RelayerClient E2E Tests', () => {
   describe('Error Handling', () => {
     test('should handle network errors gracefully', async () => {
       if (skipE2E) return;
-      
+
       // Create client with invalid server URL
       const invalidClient = new RelayerClient({
         serverUrl: 'http://invalid-server-url:9999',
@@ -204,7 +207,7 @@ describe('RelayerClient E2E Tests', () => {
 
     test('should handle invalid relayer ID', async () => {
       if (skipE2E) return;
-      
+
       const invalidClient = new RelayerClient({
         serverUrl: TEST_CONFIG.SERVER_URL,
         providerUrl: TEST_CONFIG.PROVIDER_URL,

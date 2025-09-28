@@ -25,12 +25,15 @@ export const createBlobFromString = (message: string): `0x${string}` => {
   const messageBytes = new TextEncoder().encode(message);
 
   if (messageBytes.length >= BLOB_SIZE) {
-    throw new Error(`Message too long: ${messageBytes.length} bytes, max: ${BLOB_SIZE - 1}`);
+    throw new Error(
+      `Message too long: ${messageBytes.length} bytes, max: ${BLOB_SIZE - 1}`
+    );
   }
 
   blobData.set(messageBytes, 0);
 
-  return '0x' + Array.from(blobData)
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('') as `0x${string}`;
+  return ('0x' +
+    Array.from(blobData)
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('')) as `0x${string}`;
 };

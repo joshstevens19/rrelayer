@@ -30,6 +30,8 @@ pub enum WebhookEventType {
     TextSigned,
     /// Typed data (EIP-712) was signed
     TypedDataSigned,
+    /// Relayer balance is below minimum threshold
+    LowBalance,
 }
 
 impl From<TransactionStatus> for WebhookEventType {

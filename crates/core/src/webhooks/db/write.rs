@@ -126,6 +126,7 @@ pub enum WebhookDeliveryEventType {
     TransactionReplaced,
     TextSigned,
     TypedDataSigned,
+    LowBalance,
 }
 
 impl Display for WebhookDeliveryEventType {
@@ -147,6 +148,7 @@ impl WebhookDeliveryEventType {
             WebhookDeliveryEventType::TransactionReplaced => "TRANSACTION_REPLACED".to_string(),
             WebhookDeliveryEventType::TextSigned => "TEXT_SIGNED".to_string(),
             WebhookDeliveryEventType::TypedDataSigned => "TYPED_DATA_SIGNED".to_string(),
+            WebhookDeliveryEventType::LowBalance => "LOW_BALANCE".to_string(),
         }
     }
 }
@@ -168,6 +170,7 @@ impl From<WebhookEventType> for WebhookDeliveryEventType {
             WebhookEventType::TransactionReplaced => WebhookDeliveryEventType::TransactionReplaced,
             WebhookEventType::TextSigned => WebhookDeliveryEventType::TextSigned,
             WebhookEventType::TypedDataSigned => WebhookDeliveryEventType::TypedDataSigned,
+            WebhookEventType::LowBalance => WebhookDeliveryEventType::LowBalance,
         }
     }
 }
@@ -189,6 +192,7 @@ impl<'a> FromSql<'a> for WebhookDeliveryEventType {
                 "TRANSACTION_REPLACED" => Ok(WebhookDeliveryEventType::TransactionReplaced),
                 "TEXT_SIGNED" => Ok(WebhookDeliveryEventType::TextSigned),
                 "TYPED_DATA_SIGNED" => Ok(WebhookDeliveryEventType::TypedDataSigned),
+                "LOW_BALANCE" => Ok(WebhookDeliveryEventType::LowBalance),
                 _ => Err(format!("Unknown WebhookDeliveryEventType: {}", event_type).into()),
             }
         } else if *ty == Type::TEXT
@@ -210,6 +214,7 @@ impl<'a> FromSql<'a> for WebhookDeliveryEventType {
                 "TRANSACTION_REPLACED" => Ok(WebhookDeliveryEventType::TransactionReplaced),
                 "TEXT_SIGNED" => Ok(WebhookDeliveryEventType::TextSigned),
                 "TYPED_DATA_SIGNED" => Ok(WebhookDeliveryEventType::TypedDataSigned),
+                "LOW_BALANCE" => Ok(WebhookDeliveryEventType::LowBalance),
                 _ => Err(format!("Unknown WebhookDeliveryEventType: {}", event_type).into()),
             }
         } else {
@@ -244,6 +249,7 @@ impl ToSql for WebhookDeliveryEventType {
             WebhookDeliveryEventType::TransactionReplaced => "TRANSACTION_REPLACED",
             WebhookDeliveryEventType::TextSigned => "TEXT_SIGNED",
             WebhookDeliveryEventType::TypedDataSigned => "TYPED_DATA_SIGNED",
+            WebhookDeliveryEventType::LowBalance => "LOW_BALANCE",
         };
 
         out.extend_from_slice(event_type_str.as_bytes());

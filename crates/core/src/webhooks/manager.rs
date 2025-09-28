@@ -424,4 +424,103 @@ impl WebhookManager {
         );
         self.queue_signing_webhook(relayer_id, chain_id, payload).await;
     }
+
+    /// Get webhook configurations that should receive low balance alerts for a specific chain
+    pub fn get_webhook_configs_for_chain(&self, chain_id: &ChainId) -> Vec<&WebhookConfig> {
+        self.webhook_configs
+            .iter()
+            .filter(|config| {
+                config.alert_on_low_balances.unwrap_or(false)
+                    && (config.networks.is_empty()
+                        || config.networks.contains(&chain_id.to_string()))
+            })
+            .collect()
+    }
+
+    /// Queue a low balance webhook
+    pub async fn queue_low_balance_webhook(
+        &self,
+        relayer_id: &str,
+        address: &crate::common_types::EvmAddress,
+        chain_id: ChainId,
+        current_balance: u128,
+        minimum_balance: u128,
+        current_balance_formatted: String,
+        minimum_balance_formatted: String,
+    ) {
+        use crate::webhooks::WebhookLowBalancePayload;
+
+        let payload = WebhookLowBalancePayload::new(
+            relayer_id.to_string(),
+            *address,
+            chain_id,
+            current_balance,
+            minimum_balance,
+            current_balance_formatted,
+            minimum_balance_formatted,
+        );
+
+        if let Ok(payload_json) = payload.to_json_value() {
+            self.queue_low_balance_webhook_internal(chain_id, payload.event_type, payload_json)
+                .await;
+        } else {
+            error!("Failed to serialize low balance webhook payload");
+        }
+    }
+
+    async fn queue_low_balance_webhook_internal(
+        &self,
+        chain_id: ChainId,
+        event_type: crate::webhooks::types::WebhookEventType,
+        payload_json: serde_json::Value,
+    ) {
+        if self.webhook_configs.is_empty() {
+            info!("No webhooks configured, skipping low balance webhook for chain {}", chain_id);
+            return;
+        }
+
+        let network_names = self.network_names.read().await;
+        let chain_name =
+            network_names.get(&chain_id).cloned().unwrap_or_else(|| chain_id.to_string());
+
+        let mut deliveries_to_queue = Vec::new();
+
+        for webhook_config in &self.webhook_configs {
+            if webhook_config.alert_on_low_balances.unwrap_or(false)
+                && (webhook_config.networks.is_empty()
+                    || webhook_config.networks.contains(&chain_name))
+            {
+                use crate::webhooks::types::WebhookDelivery;
+                let delivery = WebhookDelivery::new(
+                    webhook_config.clone(),
+                    event_type.clone(),
+                    payload_json.clone(),
+                );
+                deliveries_to_queue.push(delivery);
+            }
+        }
+
+        if deliveries_to_queue.is_empty() {
+            debug!("No webhooks configured for low balance alerts on chain {}", chain_name);
+            return;
+        }
+
+        info!(
+            "Queuing {} low balance webhooks for chain {}",
+            deliveries_to_queue.len(),
+            chain_name
+        );
+
+        let mut pending = self.pending_deliveries.write().await;
+        for delivery in deliveries_to_queue {
+            pending.insert(delivery.id, delivery);
+        }
+
+        tokio::spawn({
+            let manager = self.clone();
+            async move {
+                manager.process_ready_deliveries().await;
+            }
+        });
+    }
 }

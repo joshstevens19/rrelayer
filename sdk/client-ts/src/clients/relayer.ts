@@ -4,7 +4,7 @@ import {
   TransactionReceipt,
   TypedDataDefinition,
   formatEther,
-  defineChain
+  defineChain,
 } from 'viem';
 import * as knownChains from 'viem/chains';
 import {
@@ -22,6 +22,7 @@ import {
   getTransactions,
   replaceTransaction,
   sendTransaction,
+  TransactionSpeed,
 } from '../api';
 import {
   ApiBaseConfig,
@@ -50,14 +51,17 @@ export interface RelayerClientConfig {
         username: string;
         password: string;
       };
+  speed?: TransactionSpeed;
 }
 
 export class RelayerClient {
   public readonly id: string;
+  public readonly speed: TransactionSpeed | undefined = undefined;
   protected readonly _apiBaseConfig: ApiBaseConfig;
   private readonly _ethereumProvider: Provider;
   constructor(config: RelayerClientConfig) {
     this.id = config.relayerId;
+    this.speed = config.speed;
     this._ethereumProvider = new Provider(config.providerUrl, this);
     if ('apiKey' in config.auth) {
       this._apiBaseConfig = {
@@ -229,8 +233,8 @@ export class RelayerClient {
        * @returns transactionId
        */
       send: (
-          transaction: TransactionToSend,
-          rateLimitKey?: string | undefined
+        transaction: TransactionToSend,
+        rateLimitKey?: string | undefined
       ): Promise<TransactionSent> => {
         return sendTransaction(
           this.id,
@@ -292,7 +296,9 @@ export class RelayerClient {
 
   private async getChainById(chainId: number) {
     const chainEntries = Object.values(knownChains);
-    const knownChain = chainEntries.find(chain => 'id' in chain && chain.id === chainId);
+    const knownChain = chainEntries.find(
+      (chain) => 'id' in chain && chain.id === chainId
+    );
 
     if (knownChain) return knownChain;
 

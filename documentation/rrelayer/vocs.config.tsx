@@ -127,12 +127,12 @@ export default defineConfig({
               text: 'Gas Provider',
               link: '/config/networks/gas-provider',
               items: [
+                { text: 'Fallback', link: '/config/networks/gas-provider#fallback' },
                 { text: 'Block Native', link: '/config/networks/gas-provider#block-native' },
                 { text: 'Infura', link: '/config/networks/gas-provider#infura' },
                 { text: 'Tenderly', link: '/config/networks/gas-provider#tenderly' },
                 { text: 'Etherscan', link: '/config/networks/gas-provider#etherscan' },
                 { text: 'Custom', link: '/config/networks/gas-provider#custom' },
-                { text: 'Fallback', link: '/config/networks/gas-provider#fallback' },
               ],
             },
           ],
@@ -149,18 +149,18 @@ export default defineConfig({
           items: [
             {
               text: 'Getting started',
-              link: '',
+              link: '/integration/typescript/getting-started',
             },
             {
               text: 'Viem',
-              link: '',
+              link: '/integration/typescript/viem',
             },
             {
               text: 'Ethers',
-              link: '',
+              link: '/integration/typescript/ethers',
             },
             {
-              text: 'Direct SDK',
+              text: 'SDK',
               link: '',
               items: [
                 {
@@ -188,6 +188,10 @@ export default defineConfig({
                   link: '',
                 },
               ],
+            },
+            {
+              text: 'Vercel',
+              link: '',
             },
           ],
         },
@@ -277,6 +281,14 @@ export default defineConfig({
         { text: 'GCP - coming soon', link: '' },
       ],
     },
-    { text: 'Changelog', link: '/docs/changelog' },
+    {
+      text: 'Coming soon..',
+      items: [
+        { text: 'Triggers - Send transactions based on events emitted', link: '' },
+        { text: 'Cron - Send transactions every n number of hours/days/weeks', link: '' },
+        { text: 'Safe multisig support', link: '' },
+      ],
+    },
+    { text: 'Changelog', link: '/changelog' },
   ],
 });

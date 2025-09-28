@@ -3,7 +3,7 @@ import { AdminRelayerClient } from '../clients/admin';
 import { spawn, ChildProcess } from 'child_process';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import {Address} from "viem";
+import { Address } from 'viem';
 
 const execAsync = promisify(exec);
 
@@ -24,13 +24,38 @@ export const createBasicAuthClient = (): Client => {
   });
 };
 
+// export const createBasicAuthClient2 = async (): Client => {
+//   let blah = createClient({
+//     serverUrl: 'http://localhost:8000',
+//     auth: {
+//       username: 'your_username',
+//       password: 'your_password',
+//     },
+//   });
+//
+//   const relayer = await blah.getRelayerClient('94afb207-bb47-4392-9229-ba87e4d783cb');
+//   blah.getViemHttp()
+// };
+
+// export const blah = async () => {
+//  let relayer = createRelayerClient(
+//      {
+//        serverUrl: 'http://localhost:8000',
+//        relayerId: '94afb207-bb47-4392-9229-ba87e4d783cb',
+//        apiKey: 'YOUR_API_KEY',
+//      }
+//  );
+// }
+
 /**
  * Start Anvil using the make command
  * @returns Promise that resolves when Anvil is started
  */
-export const anvilStart = async (quiet: boolean = false): Promise<ChildProcess> => {
+export const anvilStart = async (
+  quiet: boolean = false
+): Promise<ChildProcess> => {
   if (!quiet) console.log('🔨 Starting Anvil...');
-  
+
   try {
     // Use make command to start anvil in the playground/local-node directory
     const anvilProcess = spawn('make', ['start-anvil'], {
@@ -42,17 +67,20 @@ export const anvilStart = async (quiet: boolean = false): Promise<ChildProcess> 
     return new Promise((resolve, reject) => {
       let output = '';
       let isStarted = false;
-      
+
       anvilProcess.stdout?.on('data', (data) => {
         output += data.toString();
-        
+
         // Only show logs until Anvil is started
         if (!isStarted && !quiet) {
           console.log('Anvil output:', data.toString());
         }
-        
+
         // Check if Anvil is ready (look for listening message)
-        if (output.includes('Listening on') || output.includes('127.0.0.1:8545')) {
+        if (
+          output.includes('Listening on') ||
+          output.includes('127.0.0.1:8545')
+        ) {
           if (!quiet) console.log('✅ Anvil started successfully');
           isStarted = true;
           resolve(anvilProcess);
@@ -92,31 +120,42 @@ export const anvilStart = async (quiet: boolean = false): Promise<ChildProcess> 
  * Start the local RRelayer server using the CLI command
  * @returns Promise that resolves when the server is started
  */
-export const startLocalNode = async (quiet: boolean = false): Promise<ChildProcess> => {
+export const startLocalNode = async (
+  quiet: boolean = false
+): Promise<ChildProcess> => {
   if (!quiet) console.log('🚀 Starting local RRelayer server...');
-  
+
   try {
     // Run the CLI command to start the local server
-    const serverProcess = spawn('cargo', ['run', '--', 'start', '--path', '../../playground/local-node'], {
-      stdio: 'pipe',
-      detached: true,
-      cwd: '../../crates/cli', // Navigate to cli directory
-      env: {
-        ...process.env,
-        RUST_BACKTRACE: '1',
-      },
-    });
+    const serverProcess = spawn(
+      'cargo',
+      ['run', '--', 'start', '--path', '../../playground/local-node'],
+      {
+        stdio: 'pipe',
+        detached: true,
+        cwd: '../../crates/cli', // Navigate to cli directory
+        env: {
+          ...process.env,
+          RUST_BACKTRACE: '1',
+        },
+      }
+    );
 
     return new Promise((resolve, reject) => {
       let output = '';
-      
+
       serverProcess.stdout?.on('data', (data) => {
         output += data.toString();
         if (!quiet) console.log('Server output:', data.toString());
-        
+
         // Check if server is ready (look for server start message)
-        if (output.includes('Server running') || output.includes('listening') || output.includes('8000')) {
-          if (!quiet) console.log('✅ Local RRelayer server started successfully');
+        if (
+          output.includes('Server running') ||
+          output.includes('listening') ||
+          output.includes('8000')
+        ) {
+          if (!quiet)
+            console.log('✅ Local RRelayer server started successfully');
           resolve(serverProcess);
         }
       });
@@ -124,10 +163,15 @@ export const startLocalNode = async (quiet: boolean = false): Promise<ChildProce
       serverProcess.stderr?.on('data', (data) => {
         const errorMsg = data.toString();
         if (!quiet) console.error('Server error:', errorMsg);
-        
+
         // Some server messages might come through stderr but aren't errors
-        if (errorMsg.includes('Server running') || errorMsg.includes('listening') || errorMsg.includes('8000')) {
-          if (!quiet) console.log('✅ Local RRelayer server started successfully');
+        if (
+          errorMsg.includes('Server running') ||
+          errorMsg.includes('listening') ||
+          errorMsg.includes('8000')
+        ) {
+          if (!quiet)
+            console.log('✅ Local RRelayer server started successfully');
           resolve(serverProcess);
         }
       });
@@ -160,7 +204,9 @@ export const startLocalNode = async (quiet: boolean = false): Promise<ChildProce
  */
 export const isServerRunning = async (): Promise<boolean> => {
   try {
-    const { stdout } = await execAsync('curl -s http://localhost:8000/health || echo "failed"');
+    const { stdout } = await execAsync(
+      'curl -s http://localhost:8000/health || echo "failed"'
+    );
     return !stdout.includes('failed') && !stdout.includes('Connection refused');
   } catch {
     return false;
@@ -172,17 +218,24 @@ export const isServerRunning = async (): Promise<boolean> => {
  * @param maxAttempts - Maximum number of attempts to check (default: 60)
  * @param delayMs - Delay between checks in milliseconds (default: 1000)
  */
-export const waitForServer = async (maxAttempts: number = 60, delayMs: number = 1000, quiet: boolean = false): Promise<void> => {
+export const waitForServer = async (
+  maxAttempts: number = 60,
+  delayMs: number = 1000,
+  quiet: boolean = false
+): Promise<void> => {
   for (let i = 0; i < maxAttempts; i++) {
     if (await isServerRunning()) {
       if (!quiet) console.log('✅ RRelayer server is ready');
       return;
     }
-    
-    if (!quiet) console.log(`⏳ Waiting for RRelayer server... (${i + 1}/${maxAttempts})`);
-    await new Promise(resolve => setTimeout(resolve, delayMs));
+
+    if (!quiet)
+      console.log(
+        `⏳ Waiting for RRelayer server... (${i + 1}/${maxAttempts})`
+      );
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
   }
-  
+
   throw new Error('RRelayer server failed to start within the expected time');
 };
 
@@ -190,9 +243,12 @@ export const waitForServer = async (maxAttempts: number = 60, delayMs: number = 
  * Stop server process
  * @param serverProcess - The server process to stop
  */
-export const stopServer = (serverProcess: ChildProcess, quiet: boolean = false): void => {
+export const stopServer = (
+  serverProcess: ChildProcess,
+  quiet: boolean = false
+): void => {
   if (!quiet) console.log('🛑 Stopping RRelayer server...');
-  
+
   if (serverProcess) {
     serverProcess.kill('SIGTERM');
     if (!quiet) console.log('✅ RRelayer server stopped');
@@ -216,8 +272,9 @@ export const sendTxWithGas = async (
   data: string = '0x',
   quiet: boolean = false
 ): Promise<string> => {
-  if (!quiet) console.log(`💸 Sending transaction to ${to} with value ${value} wei`);
-  
+  if (!quiet)
+    console.log(`💸 Sending transaction to ${to} with value ${value} wei`);
+
   try {
     // Build the cast send command - different syntax for transfers vs contract calls
     let command;
@@ -228,15 +285,19 @@ export const sendTxWithGas = async (
       // Contract call - include data
       command = `FOUNDRY_DISABLE_NIGHTLY_WARNING=1 cast send ${to} "${data}" --value ${value} --gas-price ${gasPrice} --gas-limit ${gasLimit} --rpc-url http://127.0.0.1:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80`;
     }
-    
+
     const { stdout, stderr } = await execAsync(command);
-    
+
     // Only treat stderr as error if it contains actual error messages, not warnings
-    if (stderr && !stderr.includes('Warning:') && !stderr.includes('This is a nightly build')) {
+    if (
+      stderr &&
+      !stderr.includes('Warning:') &&
+      !stderr.includes('This is a nightly build')
+    ) {
       if (!quiet) console.error('Transaction error:', stderr);
       throw new Error(stderr);
     }
-    
+
     const txHash = stdout.trim();
     if (!quiet) console.log(`✅ Transaction sent: ${txHash}`);
     return txHash;
@@ -267,18 +328,21 @@ export const createRelayerAndFund = async (
   try {
     // Generate relayer name if not provided
     const relayerName = name || `funded-relayer-${Date.now()}`;
-    
+
     if (!quiet) console.log(`🔧 Creating relayer: ${relayerName}`);
-    
+
     // Create the relayer
     const relayer = await client.relayer.create(chainId, relayerName);
-    if (!quiet) console.log(`✅ Created relayer ${relayer.id} at address ${relayer.address}`);
-    
+    if (!quiet)
+      console.log(
+        `✅ Created relayer ${relayer.id} at address ${relayer.address}`
+      );
+
     // Fund the relayer using Anvil
     if (!quiet) console.log(`💰 Funding relayer with ${fundingAmount} ETH...`);
-    
+
     const fundingAmountWei = (parseFloat(fundingAmount) * 1e18).toString();
-    
+
     const fundingTxHash = await sendTxWithGas(
       relayer.address,
       fundingAmountWei,
@@ -287,12 +351,13 @@ export const createRelayerAndFund = async (
       '0x',
       quiet
     );
-    
-    if (!quiet) console.log(`✅ Relayer funded with transaction: ${fundingTxHash}`);
-    
+
+    if (!quiet)
+      console.log(`✅ Relayer funded with transaction: ${fundingTxHash}`);
+
     // Wait a bit for the transaction to be mined
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
     return {
       relayer,
       fundingTxHash,
@@ -307,9 +372,12 @@ export const createRelayerAndFund = async (
  * Stop Anvil process
  * @param anvilProcess - The Anvil process to stop
  */
-export const anvilStop = (anvilProcess: ChildProcess, quiet: boolean = false): void => {
+export const anvilStop = (
+  anvilProcess: ChildProcess,
+  quiet: boolean = false
+): void => {
   if (!quiet) console.log('🛑 Stopping Anvil...');
-  
+
   if (anvilProcess) {
     anvilProcess.kill('SIGTERM');
     if (!quiet) console.log('✅ Anvil stopped');
@@ -320,19 +388,26 @@ export const anvilStop = (anvilProcess: ChildProcess, quiet: boolean = false): v
  * Get the default Anvil accounts with their private keys
  * @returns Array of account objects with address and privateKey
  */
-export const getAnvilAccounts = (): [{address: Address, privateKey: string}, {address: Address, privateKey: string}, {address: Address, privateKey: string}] => {
+export const getAnvilAccounts = (): [
+  { address: Address; privateKey: string },
+  { address: Address; privateKey: string },
+  { address: Address; privateKey: string },
+] => {
   return [
     {
       address: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',
-      privateKey: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
+      privateKey:
+        '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
     },
     {
       address: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',
-      privateKey: '0x59c6995e998f97ff67aac7c2c20ba75d75cd8d1c6f75d7b2e08f4b2f31b7c527',
+      privateKey:
+        '0x59c6995e998f97ff67aac7c2c20ba75d75cd8d1c6f75d7b2e08f4b2f31b7c527',
     },
     {
       address: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC',
-      privateKey: '0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a',
+      privateKey:
+        '0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a',
     },
     // Add more accounts as needed
   ];
@@ -344,7 +419,9 @@ export const getAnvilAccounts = (): [{address: Address, privateKey: string}, {ad
  */
 export const isAnvilRunning = async (): Promise<boolean> => {
   try {
-    const { stdout } = await execAsync('curl -s -X POST -H "Content-Type: application/json" --data \'{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}\' http://127.0.0.1:8545');
+    const { stdout } = await execAsync(
+      'curl -s -X POST -H "Content-Type: application/json" --data \'{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}\' http://127.0.0.1:8545'
+    );
     return stdout.includes('result');
   } catch {
     return false;
@@ -356,17 +433,22 @@ export const isAnvilRunning = async (): Promise<boolean> => {
  * @param maxAttempts - Maximum number of attempts to check (default: 30)
  * @param delayMs - Delay between checks in milliseconds (default: 1000)
  */
-export const waitForAnvil = async (maxAttempts: number = 30, delayMs: number = 1000, quiet: boolean = false): Promise<void> => {
+export const waitForAnvil = async (
+  maxAttempts: number = 30,
+  delayMs: number = 1000,
+  quiet: boolean = false
+): Promise<void> => {
   for (let i = 0; i < maxAttempts; i++) {
     if (await isAnvilRunning()) {
       if (!quiet) console.log('✅ Anvil is ready');
       return;
     }
-    
-    if (!quiet) console.log(`⏳ Waiting for Anvil... (${i + 1}/${maxAttempts})`);
-    await new Promise(resolve => setTimeout(resolve, delayMs));
+
+    if (!quiet)
+      console.log(`⏳ Waiting for Anvil... (${i + 1}/${maxAttempts})`);
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
   }
-  
+
   throw new Error('Anvil failed to start within the expected time');
 };
 
@@ -388,27 +470,27 @@ export interface BeginResult {
 
 /**
  * 🚀 One-call setup for RRelayer testing
- * 
+ *
  * Sets up everything you need:
- * - Starts Anvil (if not running)  
+ * - Starts Anvil (if not running)
  * - Starts RRelayer server (if not running)
  * - Creates and funds a relayer with 5 ETH
  * - Returns ready-to-use AdminRelayerClient
- * 
+ *
  * @param fundingAmount - ETH to fund the relayer with (default: "5")
  * @param relayerName - Optional name for the relayer
  * @returns BeginResult with relayer client and end function
- * 
+ *
  * @example
  * ```typescript
  * import { begin } from './src/___PLAYGROUND___/helpers';
- * 
+ *
  * const { relayer, end } = await begin();
- * 
+ *
  * // Use the relayer
  * const address = await relayer.address();
  * const balance = await relayer.getBalanceOf();
- * 
+ *
  * // End when done
  * await end();
  * ```
@@ -442,7 +524,7 @@ export const begin = async (
 
     // Step 3: Create client and funded relayer
     const client = createBasicAuthClient();
-    
+
     const { relayer: relayerInfo } = await createRelayerAndFund(
       client,
       config.chainId,
@@ -457,7 +539,10 @@ export const begin = async (
     // Step 5: Get accounts
     const accounts = getAnvilAccounts();
 
-    if (!quiet) console.log(`✅ Ready! Relayer ${relayerInfo.id} at ${relayerInfo.address}\n`);
+    if (!quiet)
+      console.log(
+        `✅ Ready! Relayer ${relayerInfo.id} at ${relayerInfo.address}\n`
+      );
 
     // End function
     const end = async () => {
@@ -470,7 +555,7 @@ export const begin = async (
       if (serverProcess) {
         stopServer(serverProcess, quiet);
       }
-      
+
       if (anvilProcess) {
         anvilStop(anvilProcess, quiet);
       }
@@ -483,7 +568,6 @@ export const begin = async (
       accounts,
       end,
     };
-
   } catch (error) {
     // Cleanup on error
     if (serverProcess) stopServer(serverProcess, quiet);

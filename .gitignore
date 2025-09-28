@@ -34,3 +34,4 @@ crates/e2e-tests/gcp-service-account.json
 crates/e2e-tests/__TEST_RESULTS__
 crates/e2e-tests/rrelayer.yaml
 documentation/rrelayer/docs/dist/**
+documentation/rrelayer/vocs.config.tsx.time*

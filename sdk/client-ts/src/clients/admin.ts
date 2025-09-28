@@ -6,6 +6,7 @@ import {
   updateRelayerMaxGasPrice,
   removeRelayerMaxGasPrice,
   getTransactionsPendingCount,
+  TransactionSpeed,
 } from '../api';
 import { RelayerClient } from './relayer';
 import { TransactionCountType } from './types';
@@ -18,6 +19,7 @@ export interface AdminRelayerClientConfig {
     username: string;
     password: string;
   };
+  speed?: TransactionSpeed;
 }
 
 export class AdminRelayerClient extends RelayerClient {
@@ -27,6 +29,7 @@ export class AdminRelayerClient extends RelayerClient {
       providerUrl: config.providerUrl,
       relayerId: config.relayerId,
       auth: config.auth,
+      speed: config.speed,
     });
   }
 

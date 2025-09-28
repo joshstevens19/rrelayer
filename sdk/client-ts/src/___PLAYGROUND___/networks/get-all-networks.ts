@@ -1,12 +1,12 @@
-import {begin} from "../helpers";
+import { begin } from '../helpers';
 
 export const getAllNetworks = async () => {
-    let context = await begin();
+  let context = await begin();
 
-    let networks = await context.client.network.getAll();
-    console.log("networks", networks);
+  let networks = await context.client.network.getAll();
+  console.log('networks', networks);
 
-    await context.end()
+  await context.end();
 };
 
-getAllNetworks().then(_ => () => console.log("network done"));
+getAllNetworks().then((_) => () => console.log('network done'));

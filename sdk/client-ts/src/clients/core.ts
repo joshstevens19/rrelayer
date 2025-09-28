@@ -13,7 +13,9 @@ import {
   TransactionStatusResult,
   getTransactionStatus,
   getGasPrices,
-  GasEstimatorResult, getRelayerAllowlistAddress,
+  GasEstimatorResult,
+  getRelayerAllowlistAddress,
+  TransactionSpeed,
 } from '../api';
 import { RelayerClient } from './relayer';
 import {
@@ -23,7 +25,7 @@ import {
   PagingResult,
 } from '../api/types';
 import { AdminRelayerClient } from './admin';
-import {http} from "viem";
+import { http } from 'viem';
 
 export interface CreateClientConfig {
   serverUrl: string;
@@ -37,6 +39,7 @@ export interface CreateRelayerClientConfig {
   serverUrl: string;
   relayerId: string;
   apiKey: string;
+  speed?: TransactionSpeed;
 }
 
 export class Client {
@@ -102,7 +105,7 @@ export class Client {
        */
       get: async (chainId: number): Promise<Network | null> => {
         let networks = await getAllNetworks(apiBaseConfig);
-        return networks.find(network => network.chainId === chainId) || null;
+        return networks.find((network) => network.chainId === chainId) || null;
       },
       /**
        * get all networks
@@ -149,13 +152,13 @@ export class Client {
        * @returns An address of allowlist addresses
        */
       get: (
-          relayerId: string,
-          pagingContext: PagingContext = defaultPagingContext
+        relayerId: string,
+        pagingContext: PagingContext = defaultPagingContext
       ): Promise<PagingResult<string>> => {
         return getRelayerAllowlistAddress(
-            relayerId,
-            pagingContext,
-            this._apiBaseConfig
+          relayerId,
+          pagingContext,
+          this._apiBaseConfig
         );
       },
     };
@@ -164,10 +167,12 @@ export class Client {
   /**
    * Create admin relayer client
    * @param relayerId The relayer id
+   * @param speed How fast you want the transactions to be mined at - optional defaults to fast
    * @returns AdminRelayerClient The admin relayer client
    */
   public async getRelayerClient(
-    relayerId: string
+    relayerId: string,
+    speed?: TransactionSpeed
   ): Promise<AdminRelayerClient> {
     const relayer = await this.relayer.get(relayerId);
     if (!relayer) {
@@ -179,6 +184,7 @@ export class Client {
       providerUrl: 'TODO',
       relayerId,
       auth: this._config.auth,
+      speed,
     });
   }
 
@@ -205,9 +211,9 @@ export const createClient = (config: CreateClientConfig): Client => {
   return new Client(config);
 };
 
-export const createRelayerClient = async (
+export const createRelayerClient = (
   config: CreateRelayerClientConfig
-): Promise<RelayerClient> => {
+): RelayerClient => {
   return new RelayerClient({
     serverUrl: config.serverUrl,
     providerUrl: 'TODO',

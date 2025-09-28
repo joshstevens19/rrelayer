@@ -1,7 +1,10 @@
 mod automatic_top_up_task;
+mod balance_monitor;
 mod webhook_manager_task;
 
-use crate::background_tasks::webhook_manager_task::run_webhook_manager_task;
+use crate::background_tasks::{
+    balance_monitor::balance_monitor, webhook_manager_task::run_webhook_manager_task,
+};
 use crate::gas::{blob_gas_oracle, gas_oracle, BlobGasOracleCache, GasOracleCache};
 use crate::{
     background_tasks::automatic_top_up_task::run_automatic_top_up_task, provider::EvmProvider,
@@ -46,15 +49,20 @@ pub async fn run_background_tasks(
         safe_proxy_manager,
     );
 
+    let balance_monitor_task = balance_monitor(
+        providers.clone(),
+        postgres_client.clone(),
+        webhook_manager.clone(),
+    );
+
     if let Some(webhook_manager) = webhook_manager {
         run_webhook_manager_task(webhook_manager, providers.clone()).await;
     }
 
-    // Start background tasks, conditionally starting blob gas oracle
     if let Some(blob_task) = blob_gas_oracle_task {
-        tokio::join!(gas_oracle_task, blob_task, top_up_task);
+        tokio::join!(gas_oracle_task, blob_task, top_up_task, balance_monitor_task);
     } else {
-        tokio::join!(gas_oracle_task, top_up_task);
+        tokio::join!(gas_oracle_task, top_up_task, balance_monitor_task);
     }
 
     info!("Background tasks spawned up");

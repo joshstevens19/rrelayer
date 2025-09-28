@@ -1,0 +1,244 @@
+# Getting started
+
+[Ethers](https://docs.ethers.org) is a simple and easy-to-use library for interacting with any EVM blockchain.
+If you are use to `ethers` then this will look very familiar to you.
+
+To integrate the relayer within your application, it is just a few code changes; once done,
+you can start using the relayer to send transactions, write to contracts, sign messages and typed data.
+
+We will explore both `ethersv5` and `ethersv6` and some interfaces have changed between the two versions.
+
+## Installation
+
+Install both `ethers` and `rrelayer-ts`
+
+:::code-group
+
+```bash [npm]
+npm i rrelayer ethers
+```
+
+```bash [pnpm]
+pnpm i rrelayer ethers
+```
+
+```bash [bun]
+bun i rrelayer ethers
+```
+
+:::
+
+## Creating Ethers Provider
+
+rrelayer has two ways to create clients based on the authentication direction.
+
+1. Using the basic authentication which uses the username and password in your [api config](/config/api-config)
+2. Using API keys that have restricted permissions to only use the relayer - docs [here](config/networks/api-keys)
+
+### Ethers v5
+
+:::code-group
+
+```ts [Basic Auth - config.ts]
+import { createClient, TransactionSpeed } from 'rrelayer';
+import { BrowserProvider } from 'ethers';
+
+let client = createClient({
+    serverUrl: 'http://localhost:8000',
+    auth: {
+      username: 'your_username',
+      password: 'your_password',
+    },
+});
+
+const relayer = await client.getRelayerClient(
+     // The relayer id you want to connect to
+    '94afb207-bb47-4392-9229-ba87e4d783cb',
+     // This is optional it defaults to fast
+    TransactionSpeed.FAST
+);
+
+export provider = new BrowserProvider(relayer.ethereumProvider());
+export const signer = await provider.getSigner();
+```
+
+```ts [API Key - config.ts]
+import { createRelayerClient, TransactionSpeed } from 'rrelayer';
+import { ethers } from 'ethers';
+
+let relayer = createRelayerClient({
+   serverUrl: 'http://localhost:8000',
+   relayerId: '94afb207-bb47-4392-9229-ba87e4d783cb',
+   apiKey: 'YOUR_API_KEY',
+   // This is optional it defaults to fast
+   speed: TransactionSpeed.FAST
+ }
+);
+
+export const provider = new ethers.providers.Web3Provider(
+  relayer.ethereumProvider()
+);
+export const signer = await provider.getSigner();
+```
+
+:::
+
+### Ethers v6
+
+:::code-group
+
+```ts [Basic Auth - config.ts]
+import { createClient, TransactionSpeed } from 'rrelayer';
+import { BrowserProvider } from 'ethers';
+
+let client = createClient({
+    serverUrl: 'http://localhost:8000',
+    auth: {
+      username: 'your_username',
+      password: 'your_password',
+    },
+});
+
+const relayer = await client.getRelayerClient(
+     // The relayer id you want to connect to
+    '94afb207-bb47-4392-9229-ba87e4d783cb',
+     // This is optional it defaults to fast
+    TransactionSpeed.FAST
+);
+
+export provider = new BrowserProvider(relayer.ethereumProvider());
+export const signer = await provider.getSigner();
+```
+
+```ts [API Key - config.ts]
+import { createRelayerClient, TransactionSpeed } from 'rrelayer';
+import { ethers } from 'ethers';
+
+let relayer = createRelayerClient({
+   serverUrl: 'http://localhost:8000',
+   relayerId: '94afb207-bb47-4392-9229-ba87e4d783cb',
+   apiKey: 'YOUR_API_KEY',
+   // This is optional it defaults to fast
+   speed: TransactionSpeed.FAST
+ }
+);
+
+export const provider = new ethers.providers.Web3Provider(
+  relayer.ethereumProvider()
+);
+export const signer = await provider.getSigner();
+```
+
+:::
+
+Will now use ethers v6 example for the rest of the documentation but it is very similar if not the same.
+
+## Sign text
+
+You can sign text with the relayer
+
+:::info
+Remember the config examples are [above](/integration/typescript/ethers#creating-ethers-provider)
+:::
+
+```ts [example]
+import { signer } from './config';
+
+const message = await signer.signMessage('sign me!');
+```
+
+## Sign typed data
+
+You can sign typed data with the relayer
+
+:::info
+Remember the config examples are [above](/integration/typescript/ethers#creating-ethers-provider)
+:::
+
+```ts [example]
+import { signer } from './config';
+
+const signature = await signer._signTypedData({
+  {
+    name: 'Ether Mail',
+    version: '1',
+    chainId: 1,
+    verifyingContract: '0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC',
+  },
+  {
+    Person: [
+      { name: 'name', type: 'string' },
+      { name: 'wallet', type: 'address' },
+    ],
+    Mail: [
+      { name: 'from', type: 'Person' },
+      { name: 'to', type: 'Person' },
+      { name: 'contents', type: 'string' },
+    ],
+  },
+  {
+    from: {
+      name: 'Cow',
+      wallet: '0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826',
+    },
+    to: {
+      name: 'Bob',
+      wallet: '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB',
+    },
+    contents: 'Hello, Bob!',
+  },
+});
+```
+
+## Send transaction
+
+Send a transaction with the relayer
+
+:::info
+Remember the config examples are [above](/integration/typescript/ethers#creating-ethers-provider)
+:::
+
+```ts [example]
+import { signer } from './config';
+
+const hash = await signer.sendTransaction({
+  account,
+  to: '0x70997970c51812dc3a010c7d01b50e0d17dc79c8',
+  value: 1000000000000000000n,
+});
+```
+
+## Write contract
+
+Write a contract with the relayer
+
+:::code-group
+
+```ts [example]
+import { signer } from './config';
+import { wagmiAbi } from './abi';
+
+const contract = new Contract(
+  '0xFBA3912Ca04dd458c843e2EE08967fC04f3579c2',
+  abi,
+  signer
+);
+
+const result = await contract.mint();
+```
+
+```ts [abi]
+export const wagmiAbi = [
+  ...
+  {
+    inputs: [],
+    name: "mint",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  ...
+] as const;
+```
+
+:::

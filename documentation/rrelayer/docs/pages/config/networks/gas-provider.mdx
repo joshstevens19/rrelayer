@@ -1,8 +1,41 @@
-# Gas Provider
+# Gas Provider - Optional
 
-Every transaction has a gas price which you are willing to pay, and this is computed by how active the
-chain is at a given time. A few gas price providers exist, but all require signup; we do recommend
-that you use a provider over the fallback as it will be more aligned to the prices.
+Every transaction has to set a gas price which the transaction is willing to pay, and this is computed by how active the
+chain is at a given time like a market. A few gas price providers exist, but all require signup; we do recommend
+that you use a provider over the fallback when possible as it will be more aligned to the prices but fallback will work
+out the box.
+
+## Fallback
+
+The fallback gas provider uses simple RPC calls to the blockchain node to estimate gas prices. It works out of the box
+without requiring any API keys or external services, making it perfect for development and testing.
+
+The fallback provider queries the network's current base fee and priority fee to generate gas estimates across
+different speed tiers. While it may not be as optimized as dedicated gas price services, it provides reliable estimates for most use cases.
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: "${RRELAYER_AUTH_USERNAME}"
+  authentication_password: "${RRELAYER_AUTH_PASSWORD}"
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+networks:
+- name: "sepolia_ethereum"
+  chain_id: 11155111
+  provider_urls:
+  - "https://sepolia.gateway.tenderly.co"
+  block_explorer_url: "https://sepolia.etherscan.io"
+  gas_provider: "FALLBACK" // [!code focus]
+# No additional configuration needed for fallback // [!code focus]
+```
+
+## Block Native
+
+TODO
 
 ## Infura
 
@@ -61,6 +94,10 @@ gas_providers: // [!code focus]
   tenderly: // [!code focus]
     api_key: "${TENDERLY_API_KEY}" // [!code focus]
 ```
+
+## Etherscan
+
+// TODO
 
 ## Custom
 
@@ -134,7 +171,3 @@ gas_providers: // [!code focus]
 - **`endpoint`**: The base URL of your gas estimation API. The relayer will append the chain ID to this URL (e.g., `https://api.example.com/gas-estimates/1` for Ethereum mainnet)
 - **`supported_chains`**: Array of chain IDs that your custom gas provider supports
 - **`auth_header`** *(optional)*: Authorization header value to include in requests to your API
-
-## Fallback
-
-.... come back to this!!!

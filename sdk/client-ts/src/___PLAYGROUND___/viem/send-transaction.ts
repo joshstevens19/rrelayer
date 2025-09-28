@@ -1,36 +1,42 @@
-import { begin, getAnvilAccounts } from "../helpers";
-import {createPublicClient, createWalletClient, custom, parseEther} from "viem";
+import { begin, getAnvilAccounts } from '../helpers';
+import {
+  createPublicClient,
+  createWalletClient,
+  custom,
+  parseEther,
+} from 'viem';
 
 export const sendTransaction = async () => {
-    const context = await begin();
-    const accounts = getAnvilAccounts();
+  const context = await begin();
+  const accounts = getAnvilAccounts();
 
-    console.log("Sending transaction...");
+  console.log('Sending transaction...');
 
-    let chain = await context.relayer.getViemChain();
+  let chain = await context.relayer.getViemChain();
 
-    const walletClient = createWalletClient({
-        account: await context.relayer.address(),
-        chain,
-        transport: custom(context.relayer.ethereumProvider()),
-    });
-    const publicClient = createPublicClient({
-        chain,
-        transport: await context.client.getViemHttp(chain.id)
-    });
+  const walletClient = createWalletClient({
+    account: await context.relayer.address(),
+    chain,
+    transport: custom(context.relayer.ethereumProvider()),
+  });
 
-    const hash = await walletClient.sendTransaction({
-        to: accounts[1].address,
-        value: parseEther('0.001')
-    });
+  const publicClient = createPublicClient({
+    chain,
+    transport: await context.client.getViemHttp(chain.id),
+  });
 
-    const receipt = await publicClient.waitForTransactionReceipt({
-        hash
-    });
+  const hash = await walletClient.sendTransaction({
+    to: accounts[1].address,
+    value: parseEther('0.001'),
+  });
 
-    console.log("Transaction receipt:", receipt);
+  const receipt = await publicClient.waitForTransactionReceipt({
+    hash,
+  });
 
-    await context.end();
+  console.log('Transaction receipt:', receipt);
+
+  await context.end();
 };
 
-sendTransaction().then(() => console.log("send-transaction done"));
+sendTransaction().then(() => console.log('send-transaction done'));

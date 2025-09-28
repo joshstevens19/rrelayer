@@ -1,0 +1,213 @@
+# Getting started
+
+[Viem](https://viem.sh/docs/getting-started) is a simple and easy-to-use library for interacting with any EVM blockchain.
+If you are use to `viem` then this will look very familiar to you.
+
+To integrate the relayer within your application, it is just a few code changes; once done,
+you can start using the relayer to send transactions, write to contracts, sign messages and typed data.
+
+## Installation
+
+Install both `viem` and `rrelayer-ts`
+
+:::code-group
+
+```bash [npm]
+npm i rrelayer-ts viem
+```
+
+```bash [pnpm]
+pnpm i rrelayer-ts viem
+```
+
+```bash [bun]
+bun i rrelayer-ts viem
+```
+
+:::
+
+## Wallet Client And Public Client
+
+rrelayer has two ways to create clients based on the authentication direction.
+
+1. Using the basic authentication which uses the username and password in your [api config](/config/api-config)
+2. Using API keys that have restricted permissions to only use the relayer - docs [here](config/networks/api-keys)
+
+:::code-group
+
+```ts [Basic Auth - config.ts]
+import { createClient, TransactionSpeed } from 'rrelayer';
+import { createWalletClient, createPublicClient, custom } from 'viem';
+
+let client = createClient({
+    serverUrl: 'http://localhost:8000',
+    auth: {
+      username: 'your_username',
+      password: 'your_password',
+    },
+});
+
+const relayer = await client.getRelayerClient(
+     // The relayer id you want to connect to
+    '94afb207-bb47-4392-9229-ba87e4d783cb',
+     // This is optional it defaults to fast
+    TransactionSpeed.FAST
+);
+
+let chain = await relayer.getViemChain();
+
+export const walletClient = createWalletClient({
+    account: await relayer.address(),
+    chain,
+    transport: custom(relayer.ethereumProvider()),
+});
+
+export const publicClient = createPublicClient({
+    chain,
+    transport: await client.getViemHttp(chain.id)
+});
+```
+
+```ts [API Key - config.ts]
+import { createRelayerClient, TransactionSpeed } from 'rrelayer';
+import { createWalletClient, createPublicClient, custom, http } from 'viem';
+
+let relayer = createRelayerClient({
+   serverUrl: 'http://localhost:8000',
+   relayerId: '94afb207-bb47-4392-9229-ba87e4d783cb',
+   apiKey: 'YOUR_API_KEY',
+   // This is optional it defaults to fast
+   speed: TransactionSpeed.FAST
+ }
+);
+
+let chain = await relayer.getViemChain();
+
+export const walletClient = createWalletClient({
+    account: await relayer.address(),
+    chain,
+    transport: custom(relayer.ethereumProvider()),
+});
+
+export const publicClient = createPublicClient({
+    chain,
+    transport: http('NODE_URL')
+});
+```
+
+:::
+
+## Sign text
+
+You can sign text with the relayer
+
+:::info
+Remember the config examples are [above](/integration/typescript/viem#wallet-client-and-public-client)
+:::
+
+```ts [example]
+import { walletClient } from './config';
+
+const message = await walletClient.signMessage({
+  message: 'sign me!',
+});
+```
+
+## Sign typed data
+
+You can sign typed data with the relayer
+
+:::info
+Remember the config examples are [above](/integration/typescript/viem#wallet-client-and-public-client)
+:::
+
+```ts [example]
+import { walletClient } from './config';
+
+const signature = await walletClient.signTypedData({
+  domain: {
+    name: 'Ether Mail',
+    version: '1',
+    chainId: 1,
+    verifyingContract: '0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC',
+  },
+  types: {
+    Person: [
+      { name: 'name', type: 'string' },
+      { name: 'wallet', type: 'address' },
+    ],
+    Mail: [
+      { name: 'from', type: 'Person' },
+      { name: 'to', type: 'Person' },
+      { name: 'contents', type: 'string' },
+    ],
+  },
+  primaryType: 'Mail',
+  message: {
+    from: {
+      name: 'Cow',
+      wallet: '0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826',
+    },
+    to: {
+      name: 'Bob',
+      wallet: '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB',
+    },
+    contents: 'Hello, Bob!',
+  },
+});
+```
+
+## Send transaction
+
+Send a transaction with the relayer
+
+:::info
+Remember the config examples are [above](/integration/typescript/viem#wallet-client-and-public-client)
+:::
+
+```ts [example]
+import { walletClient } from './config';
+
+const hash = await walletClient.sendTransaction({
+  to: '0x70997970c51812dc3a010c7d01b50e0d17dc79c8',
+  value: 1000000000000000000n,
+});
+```
+
+## Write contract
+
+Write a contract with the relayer
+
+:::info
+Remember the config examples are [above](/integration/typescript/viem#wallet-client-and-public-client)
+:::
+
+:::code-group
+
+```ts [example]
+import { publicClient, walletClient } from './config';
+import { wagmiAbi } from './abi';
+
+const { request } = await publicClient.simulateContract({
+  address: '0xFBA3912Ca04dd458c843e2EE08967fC04f3579c2',
+  abi: wagmiAbi,
+  functionName: 'mint',
+});
+await walletClient.writeContract(request);
+```
+
+```ts [abi]
+export const wagmiAbi = [
+  ...
+  {
+    inputs: [],
+    name: "mint",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  ...
+] as const;
+```
+
+:::
