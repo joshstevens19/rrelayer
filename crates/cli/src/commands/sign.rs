@@ -1,7 +1,7 @@
 use clap::Subcommand;
 use rrelayer_core::common_types::PagingContext;
 use rrelayer_core::relayer::RelayerId;
-use rrelayer_sdk::{AdminRelayerClient, Client};
+use rrelayer::{AdminRelayerClient, Client};
 
 use crate::commands::error::SigningError;
 

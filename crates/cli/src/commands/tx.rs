@@ -16,7 +16,7 @@ use rrelayer_core::{
         Transaction, TransactionData, TransactionId, TransactionSpeed, TransactionValue,
     },
 };
-use rrelayer_sdk::{AdminRelayerClient, Client, TransactionCountType};
+use rrelayer::{AdminRelayerClient, Client, TransactionCountType};
 use std::io::{self, Write};
 
 sol! {

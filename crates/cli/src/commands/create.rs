@@ -1,4 +1,4 @@
-use rrelayer_sdk::Client;
+use rrelayer::Client;
 
 use crate::commands::{error::RelayerManagementError, network::get_chain_id_for_network};
 use crate::project_location::ProjectLocation;

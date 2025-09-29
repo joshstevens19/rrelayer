@@ -1,5 +1,5 @@
 use rrelayer_core::relayer::RelayerId;
-use rrelayer_sdk::Client;
+use rrelayer::Client;
 
 use crate::commands::error::RelayerManagementError;
 use crate::commands::network::get_chain_id_for_network;

@@ -24,7 +24,7 @@ pub enum NetworkError {
     ConnectionFailed(String),
 
     #[error("SDK API error: {0}")]
-    SdkApi(#[from] rrelayer_sdk::ApiSdkError),
+    SdkApi(#[from] rrelayer::ApiSdkError),
 
     #[error("JSON serialization error: {0}")]
     Json(#[from] serde_json::Error),
@@ -70,7 +70,7 @@ pub enum TransactionError {
     CommandFailed(String),
 
     #[error("SDK API error: {0}")]
-    SdkApi(#[from] rrelayer_sdk::ApiSdkError),
+    SdkApi(#[from] rrelayer::ApiSdkError),
 
     #[error("Integer parse error: {0}")]
     ParseInt(#[from] std::num::ParseIntError),
@@ -100,7 +100,7 @@ pub enum BalanceError {
     Wallet(#[from] rrelayer_core::WalletError),
 
     #[error("SDK API error: {0}")]
-    SdkApi(#[from] rrelayer_sdk::ApiSdkError),
+    SdkApi(#[from] rrelayer::ApiSdkError),
 }
 
 impl From<crate::error::CliError> for BalanceError {
@@ -124,7 +124,7 @@ pub enum SigningError {
     Terminal(#[from] dialoguer::Error),
 
     #[error("SDK API error: {0}")]
-    SdkApi(#[from] rrelayer_sdk::ApiSdkError),
+    SdkApi(#[from] rrelayer::ApiSdkError),
 
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
@@ -139,36 +139,36 @@ impl From<crate::error::CliError> for SigningError {
 #[derive(Error, Debug)]
 pub enum ApiKeyError {
     #[error("SDK API error: {0}")]
-    SdkApi(#[from] rrelayer_sdk::ApiSdkError),
+    SdkApi(#[from] rrelayer::ApiSdkError),
 }
 
 impl From<crate::error::CliError> for ApiKeyError {
     fn from(err: crate::error::CliError) -> Self {
-        Self::SdkApi(rrelayer_sdk::ApiSdkError::ConfigError(err.to_string()))
+        Self::SdkApi(rrelayer::ApiSdkError::ConfigError(err.to_string()))
     }
 }
 
 #[derive(Error, Debug)]
 pub enum UserError {
     #[error("SDK API error: {0}")]
-    SdkApi(#[from] rrelayer_sdk::ApiSdkError),
+    SdkApi(#[from] rrelayer::ApiSdkError),
 }
 
 impl From<crate::error::CliError> for UserError {
     fn from(err: crate::error::CliError) -> Self {
-        Self::SdkApi(rrelayer_sdk::ApiSdkError::ConfigError(err.to_string()))
+        Self::SdkApi(rrelayer::ApiSdkError::ConfigError(err.to_string()))
     }
 }
 
 #[derive(Error, Debug)]
 pub enum AllowlistError {
     #[error("SDK API error: {0}")]
-    SdkApi(#[from] rrelayer_sdk::ApiSdkError),
+    SdkApi(#[from] rrelayer::ApiSdkError),
 }
 
 impl From<crate::error::CliError> for AllowlistError {
     fn from(err: crate::error::CliError) -> Self {
-        Self::SdkApi(rrelayer_sdk::ApiSdkError::ConfigError(err.to_string()))
+        Self::SdkApi(rrelayer::ApiSdkError::ConfigError(err.to_string()))
     }
 }
 
@@ -220,8 +220,8 @@ impl From<crate::error::CliError> for ConfigError {
     }
 }
 
-impl From<rrelayer_sdk::ApiSdkError> for ConfigError {
-    fn from(err: rrelayer_sdk::ApiSdkError) -> Self {
+impl From<rrelayer::ApiSdkError> for ConfigError {
+    fn from(err: rrelayer::ApiSdkError) -> Self {
         Self::Invalid(err.to_string())
     }
 }
@@ -265,7 +265,7 @@ pub enum RelayerManagementError {
     CreationFailed(String),
 
     #[error("SDK API error: {0}")]
-    SdkApi(#[from] rrelayer_sdk::ApiSdkError),
+    SdkApi(#[from] rrelayer::ApiSdkError),
 
     #[error("Project configuration error: {0}")]
     ProjectConfig(String),

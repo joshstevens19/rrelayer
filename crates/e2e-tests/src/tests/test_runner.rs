@@ -12,7 +12,7 @@ use anyhow::{anyhow, Context};
 use rrelayer_core::common_types::EvmAddress;
 use rrelayer_core::relayer::CreateRelayerResult;
 use rrelayer_core::transaction::types::{Transaction, TransactionId, TransactionStatus};
-use rrelayer_sdk::AdminRelayerClient;
+use rrelayer::AdminRelayerClient;
 use std::time::{Duration, Instant};
 use tokio::time::timeout;
 use tracing::{error, info};

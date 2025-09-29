@@ -33,7 +33,7 @@ assert_matches = "1.5"
 
 # Core rrelayer dependencies
 rrelayer_core = { path = "../core" }
-rrelayer_sdk = { path = "../sdk" }
+rrelayer = { path = "../sdk" }
 
 # Process management for Anvil
 # tokio-process = "0.2"  # Not needed, using tokio::process

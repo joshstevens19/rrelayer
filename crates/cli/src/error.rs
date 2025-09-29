@@ -63,7 +63,7 @@ pub enum CliError {
     Json(#[from] serde_json::Error),
 
     #[error("SDK API error: {0}")]
-    SdkApi(#[from] rrelayer_sdk::ApiSdkError),
+    SdkApi(#[from] rrelayer::ApiSdkError),
 
     #[error("YAML serialization error: {0}")]
     Yaml(#[from] serde_yaml::Error),

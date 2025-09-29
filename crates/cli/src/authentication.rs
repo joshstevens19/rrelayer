@@ -1,6 +1,6 @@
 use crate::error::CliError;
 use crate::print_error_message;
-use rrelayer_sdk::Client;
+use rrelayer::Client;
 
 pub async fn check_api_running(client: &Client) -> Result<(), CliError> {
     match client.health().await {

@@ -10,7 +10,7 @@ use rrelayer_core::{
     transaction::api::{RelayTransactionRequest, SendTransactionResult},
     transaction::types::{TransactionData, TransactionId, TransactionValue},
 };
-use rrelayer_sdk::{Client, CreateClientAuth, CreateClientConfig};
+use rrelayer::{Client, CreateClientAuth, CreateClientConfig};
 use tracing::info;
 
 #[derive(Clone)]

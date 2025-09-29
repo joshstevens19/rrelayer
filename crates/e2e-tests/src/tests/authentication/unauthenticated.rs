@@ -1,7 +1,7 @@
 use crate::client::E2ETestConfig;
 use crate::tests::test_runner::TestRunner;
 use rrelayer_core::common_types::PagingContext;
-use rrelayer_sdk::{Client, CreateClientAuth, CreateClientConfig};
+use rrelayer::{Client, CreateClientAuth, CreateClientConfig};
 use tracing::info;
 
 impl TestRunner {

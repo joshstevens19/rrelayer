@@ -1,7 +1,7 @@
 use crate::commands::error::ConfigError;
 use clap::Subcommand;
 use rrelayer_core::relayer::RelayerId;
-use rrelayer_sdk::{AdminRelayerClient, Client};
+use rrelayer::{AdminRelayerClient, Client};
 
 #[derive(Subcommand)]
 pub enum GasCommand {

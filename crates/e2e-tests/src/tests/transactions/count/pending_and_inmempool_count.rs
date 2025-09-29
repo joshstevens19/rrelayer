@@ -1,7 +1,7 @@
 use crate::tests::test_runner::TestRunner;
 use anyhow::{anyhow, Context};
 use rrelayer_core::transaction::types::TransactionData;
-use rrelayer_sdk::TransactionCountType;
+use rrelayer::TransactionCountType;
 use std::time::Duration;
 use tracing::info;
 

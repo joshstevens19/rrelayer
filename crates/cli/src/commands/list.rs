@@ -1,5 +1,5 @@
 use rrelayer_core::common_types::PagingContext;
-use rrelayer_sdk::Client;
+use rrelayer::Client;
 
 use crate::project_location::ProjectLocation;
 use crate::{

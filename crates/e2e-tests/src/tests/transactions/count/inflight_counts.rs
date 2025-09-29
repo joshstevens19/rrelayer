@@ -3,7 +3,7 @@ use alloy::primitives::U256;
 use anyhow::{anyhow, Context};
 use rrelayer_core::transaction::api::{RelayTransactionRequest, TransactionSpeed};
 use rrelayer_core::transaction::types::{TransactionData, TransactionValue};
-use rrelayer_sdk::TransactionCountType;
+use rrelayer::TransactionCountType;
 use tracing::info;
 
 impl TestRunner {

@@ -19,7 +19,7 @@ mod console;
 mod credentials;
 use crate::commands::error::ProjectLocationError;
 pub use console::{print_error_message, print_success_message};
-use rrelayer_sdk::{Client, CreateClientAuth, CreateClientConfig};
+use rrelayer::{Client, CreateClientAuth, CreateClientConfig};
 
 mod error;
 mod project_location;
