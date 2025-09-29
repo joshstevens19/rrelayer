@@ -92,6 +92,12 @@ impl From<TransactionData> for Bytes {
     }
 }
 
+impl From<Vec<u8>> for TransactionData {
+    fn from(data: Vec<u8>) -> Self {
+        Self(Bytes::from(data))
+    }
+}
+
 impl<'a> FromSql<'a> for TransactionData {
     fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
         if <Self as FromSql>::accepts(ty) {

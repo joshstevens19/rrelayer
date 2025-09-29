@@ -425,10 +425,10 @@ impl<'a> AdminRelayerClientTransactionApi<'a> {
     pub async fn get_count(&self, transaction_count_type: TransactionCountType) -> ApiResult<u32> {
         match transaction_count_type {
             TransactionCountType::Pending => {
-                self.relayer_api.get_pending_count(self.relayer_id).await
+                self.transaction_api.get_pending_count(self.relayer_id).await
             }
             TransactionCountType::Inmempool => {
-                self.relayer_api.get_inmempool_count(self.relayer_id).await
+                self.transaction_api.get_inmempool_count(self.relayer_id).await
             }
         }
     }
@@ -575,19 +575,15 @@ pub struct RelayerClientTransactionApi<'a> {
 }
 
 impl<'a> RelayerClientTransactionApi<'a> {
-    pub async fn get(&self, transaction_id: &str) -> ApiResult<Option<Transaction>> {
-        let tx_id = TransactionId::from_str(transaction_id)
-            .map_err(|e| ApiSdkError::ConfigError(e.to_string()))?;
-        self.transaction_api.get(&tx_id).await
+    pub async fn get(&self, transaction_id: &TransactionId) -> ApiResult<Option<Transaction>> {
+        self.transaction_api.get(&transaction_id).await
     }
 
     pub async fn get_status(
         &self,
-        transaction_id: &str,
+        transaction_id: &TransactionId,
     ) -> ApiResult<Option<RelayTransactionStatusResult>> {
-        let tx_id = TransactionId::from_str(transaction_id)
-            .map_err(|e| ApiSdkError::ConfigError(e.to_string()))?;
-        self.transaction_api.get_status(&tx_id).await
+        self.transaction_api.get_status(&transaction_id).await
     }
 
     pub async fn get_all(
@@ -599,23 +595,19 @@ impl<'a> RelayerClientTransactionApi<'a> {
 
     pub async fn replace(
         &self,
-        transaction_id: &str,
+        transaction_id: &TransactionId,
         replacement_transaction: &RelayTransactionRequest,
         rate_limit_key: Option<String>,
     ) -> ApiResult<rrelayer_core::transaction::queue_system::ReplaceTransactionResult> {
-        let tx_id = TransactionId::from_str(transaction_id)
-            .map_err(|e| ApiSdkError::ConfigError(e.to_string()))?;
-        self.transaction_api.replace(&tx_id, replacement_transaction, rate_limit_key).await
+        self.transaction_api.replace(transaction_id, replacement_transaction, rate_limit_key).await
     }
 
     pub async fn cancel(
         &self,
-        transaction_id: &str,
+        transaction_id: &TransactionId,
         rate_limit_key: Option<String>,
     ) -> ApiResult<CancelTransactionResponse> {
-        let tx_id = TransactionId::from_str(transaction_id)
-            .map_err(|e| ApiSdkError::ConfigError(e.to_string()))?;
-        self.transaction_api.cancel(&tx_id, rate_limit_key).await
+        self.transaction_api.cancel(transaction_id, rate_limit_key).await
     }
 
     pub async fn send(
@@ -665,6 +657,17 @@ impl<'a> RelayerClientTransactionApi<'a> {
                 }
             } else {
                 return Err(ApiSdkError::ConfigError("Transaction not found".to_string()));
+            }
+        }
+    }
+
+    pub async fn get_count(&self, transaction_count_type: TransactionCountType) -> ApiResult<u32> {
+        match transaction_count_type {
+            TransactionCountType::Pending => {
+                self.transaction_api.get_pending_count(self.relayer_id).await
+            }
+            TransactionCountType::Inmempool => {
+                self.transaction_api.get_inmempool_count(self.relayer_id).await
             }
         }
     }

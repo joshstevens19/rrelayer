@@ -1,0 +1,1125 @@
+# Transactions
+
+Transaction-related SDK call.
+
+## Send Transaction
+
+:::info
+If you're already using alloy you can use the framework [alloy](<(/integration/sdk/framework-guides/rust/alloy)>) guides to integrate rrelayer.
+:::
+
+:::info
+Basic auth can send transactions with all relayers, and API keys can only send transactions with the relayer
+they have permission to use.
+:::
+
+### Transaction Request
+
+Just so you understand the properties you can pass in to send a transaction
+
+```rs
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub enum TransactionSpeed {
+    SLOW,
+    MEDIUM,
+    FAST,
+    SUPER,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RelayTransactionRequest {
+    pub to: EvmAddress,
+    #[serde(default)]
+    pub value: TransactionValue,
+    #[serde(default)]
+    pub data: TransactionData,
+    pub speed: Option<TransactionSpeed>,
+    /// This allows an app to pass their own custom external id in perfect for webhooks
+    pub external_id: Option<String>,
+    #[serde(default)]
+    pub blobs: Option<Vec<String>>, // will overflow the stack if you use the Blob type directly
+}
+```
+
+### Transaction Response
+
+```rs
+SendTransactionResult
+```
+
+Just so you understand the properties, the properties you get back when you send
+
+```rs
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SendTransactionResult {
+    pub id: TransactionId,
+    pub hash: TransactionHash,
+}
+```
+
+### Sending Native Transaction
+
+You can send native funds using the below:
+
+#### Basic Auth
+
+```rs
+use anyhow::Result;
+use rrelayer::{
+    AdminRelayerClient, CreateClientAuth, CreateClientConfig, EvmAddress, RelayTransactionRequest,
+    RelayerId, SendTransactionResult, TransactionData, TransactionSpeed, TransactionValue,
+    create_client,
+};
+use std::str::FromStr;
+
+async fn get_relayer_client() -> Result<AdminRelayerClient> {
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username: "your_username".to_string(),
+            password: "your_password".to_string(),
+        },
+    });
+
+    let relayer_client: AdminRelayerClient = client
+        .get_relayer_client(
+            &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+            Some(TransactionSpeed::FAST),
+        )
+        .await?;
+
+    Ok(relayer_client)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let request = RelayTransactionRequest {
+        to: EvmAddress::from_str("0x5FCD072a0BD58B6fa413031582E450FE724dba6D")?,
+        value: TransactionValue::from_str("1000000000000000000")
+            .map_err(|e| anyhow::anyhow!("Invalid value: {}", e))?, // 1 ETH in wei
+        data: TransactionData::empty(),
+        speed: Some(TransactionSpeed::FAST),
+        external_id: None,
+        blobs: None,
+    };
+
+    // Using a framework like alloy is recommended here. Look under framework guides > rust > alloy for it.
+    let result: SendTransactionResult = relayer_client.transaction().send(&request, None).await?;
+    println!("{:?}", result);
+
+    let relay_transaction_result =
+        relayer_client.transaction().wait_for_transaction_receipt_by_id(&result.id).await?;
+    println!("{:?}", relay_transaction_result);
+
+    Ok(())
+}
+```
+
+#### API Key Auth
+
+```rs
+use anyhow::Result;
+use rrelayer::{
+    CreateRelayerClientConfig, EvmAddress, RelayTransactionRequest, RelayerClient, RelayerId,
+    SendTransactionResult, TransactionData, TransactionSpeed, TransactionValue,
+    create_relayer_client,
+};
+use std::str::FromStr;
+
+async fn get_relayer_client() -> Result<RelayerClient> {
+    let relayer: RelayerClient = create_relayer_client(CreateRelayerClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        relayer_id: RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+        api_key: "YOUR_API_KEY".to_string(),
+        speed: Some(TransactionSpeed::FAST),
+    });
+
+    Ok(relayer)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let request = RelayTransactionRequest {
+        to: EvmAddress::from_str("0x5FCD072a0BD58B6fa413031582E450FE724dba6D")?,
+        value: TransactionValue::from_str("1000000000000000000")
+            .map_err(|e| anyhow::anyhow!("Invalid value: {}", e))?, // 1 ETH in wei
+        data: TransactionData::empty(),
+        speed: Some(TransactionSpeed::FAST),
+        external_id: None,
+        blobs: None,
+    };
+
+    // Using a framework like alloy is recommended here. Look under framework guides > rust > alloy for it.
+    let result: SendTransactionResult = relayer_client.transaction().send(&request, None).await?;
+    println!("{:?}", result);
+
+    let relay_transaction_result =
+        relayer_client.transaction().wait_for_transaction_receipt_by_id(&result.id).await?;
+    println!("{:?}", relay_transaction_result);
+
+    Ok(())
+}
+```
+
+### Sending Contract Transaction
+
+You can send contract transactions using the below:
+
+#### Basic Auth
+
+```rs
+use alloy::sol;
+use alloy::sol_types::SolCall;
+use anyhow::Result;
+use rrelayer::{
+    AdminRelayerClient, CreateClientAuth, CreateClientConfig, EvmAddress, RelayTransactionRequest,
+    RelayerId, SendTransactionResult, TransactionData, TransactionSpeed, TransactionValue,
+    create_client,
+};
+use std::str::FromStr;
+
+async fn get_relayer_client() -> Result<AdminRelayerClient> {
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username: "your_username".to_string(),
+            password: "your_password".to_string(),
+        },
+    });
+
+    let relayer_client: AdminRelayerClient = client
+        .get_relayer_client(
+            &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+            Some(TransactionSpeed::FAST),
+        )
+        .await?;
+
+    Ok(relayer_client)
+}
+
+sol! {
+    interface IERC20 {
+        function transfer(address to, uint256 amount) external returns (bool);
+    }
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let transfer_call = IERC20::transferCall {
+        to: EvmAddress::from_str("0x742d35Cc82C8c6c0dA18Affe2b08BF36C4b0E5Dc")?.into_address(),
+        amount: TransactionValue::from_str("1000000000000000000")
+            .map_err(|e| anyhow::anyhow!("Invalid value: {}", e))?
+            .into_inner(),
+    };
+
+    let encoded_data = transfer_call.abi_encode();
+
+    let request = RelayTransactionRequest {
+        to: EvmAddress::from_str("0x5FCD072a0BD58B6fa413031582E450FE724dba6D")?,
+        value: TransactionValue::zero(),
+        data: TransactionData::from(encoded_data),
+        speed: Some(TransactionSpeed::FAST),
+        external_id: None,
+        blobs: None,
+    };
+
+    let result: SendTransactionResult = relayer_client.transaction().send(&request, None).await?;
+    println!("{:?}", result);
+
+    let relay_transaction_result =
+        relayer_client.transaction().wait_for_transaction_receipt_by_id(&result.id).await?;
+    println!("{:?}", relay_transaction_result);
+
+    Ok(())
+}
+
+```
+
+#### API Key Auth
+
+```rs
+use alloy::sol;
+use alloy::sol_types::SolCall;
+use anyhow::Result;
+use rrelayer::{
+    CreateRelayerClientConfig, EvmAddress, RelayTransactionRequest, RelayerClient, RelayerId,
+    SendTransactionResult, TransactionData, TransactionSpeed, TransactionValue,
+    create_relayer_client,
+};
+use std::str::FromStr;
+
+async fn get_relayer_client() -> Result<RelayerClient> {
+    let relayer: RelayerClient = create_relayer_client(CreateRelayerClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        relayer_id: RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+        api_key: "YOUR_API_KEY".to_string(),
+        speed: Some(TransactionSpeed::FAST),
+    });
+
+    Ok(relayer)
+}
+
+sol! {
+    interface IERC20 {
+        function transfer(address to, uint256 amount) external returns (bool);
+    }
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let transfer_call = IERC20::transferCall {
+        to: EvmAddress::from_str("0x742d35Cc82C8c6c0dA18Affe2b08BF36C4b0E5Dc")?.into_address(),
+        amount: TransactionValue::from_str("1000000000000000000")
+            .map_err(|e| anyhow::anyhow!("Invalid value: {}", e))?
+            .into_inner(),
+    };
+
+    let encoded_data = transfer_call.abi_encode();
+
+    let request = RelayTransactionRequest {
+        to: EvmAddress::from_str("0x5FCD072a0BD58B6fa413031582E450FE724dba6D")?,
+        value: TransactionValue::zero(),
+        data: TransactionData::from(encoded_data),
+        speed: Some(TransactionSpeed::FAST),
+        external_id: None,
+        blobs: None,
+    };
+
+    let result: SendTransactionResult = relayer_client.transaction().send(&request, None).await?;
+    println!("{:?}", result);
+
+    let relay_transaction_result =
+        relayer_client.transaction().wait_for_transaction_receipt_by_id(&result.id).await?;
+    println!("{:?}", relay_transaction_result);
+
+    Ok(())
+}
+```
+
+### Blob Transaction
+
+:::warn
+To send blob transactions you need to make sure [enable_sending_blobs](/config/networks/config#enable_sending_blobs---optional)
+is enabled and your on a chain which supports blobs.
+:::
+
+#### Basic Auth
+
+```rs
+use anyhow::Result;
+use rrelayer::{
+    AdminRelayerClient, CreateClientAuth, CreateClientConfig, EvmAddress, RelayTransactionRequest,
+    RelayerId, SendTransactionResult, TransactionData, TransactionSpeed, TransactionValue,
+    create_client,
+};
+use std::str::FromStr;
+
+async fn get_relayer_client() -> Result<AdminRelayerClient> {
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username: "your_username".to_string(),
+            password: "your_password".to_string(),
+        },
+    });
+
+    let relayer_client: AdminRelayerClient = client
+        .get_relayer_client(
+            &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+            Some(TransactionSpeed::FAST),
+        )
+        .await?;
+
+    Ok(relayer_client)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let blob_data = vec![1u8; 131072]; // 128KB filled blob
+    let hex_blob = format!("0x{}", alloy::hex::encode(&blob_data));
+
+    let request = RelayTransactionRequest {
+        to: EvmAddress::from_str("0x5FCD072a0BD58B6fa413031582E450FE724dba6D")?,
+        value: TransactionValue::zero(),
+        data: TransactionData::empty(),
+        speed: Some(TransactionSpeed::FAST),
+        external_id: None,
+        blobs: Some(vec![hex_blob]),
+    };
+
+    let result: SendTransactionResult = relayer_client.transaction().send(&request, None).await?;
+    println!("{:?}", result);
+
+    let relay_transaction_result =
+        relayer_client.transaction().wait_for_transaction_receipt_by_id(&result.id).await?;
+    println!("{:?}", relay_transaction_result);
+
+    Ok(())
+}
+```
+
+#### API Key Auth
+
+```rs
+use anyhow::Result;
+use rrelayer::{
+    CreateRelayerClientConfig, EvmAddress, RelayTransactionRequest, RelayerClient, RelayerId,
+    SendTransactionResult, TransactionData, TransactionSpeed, TransactionValue,
+    create_relayer_client,
+};
+use std::str::FromStr;
+
+async fn get_relayer_client() -> Result<RelayerClient> {
+    let relayer: RelayerClient = create_relayer_client(CreateRelayerClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        relayer_id: RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+        api_key: "YOUR_API_KEY".to_string(),
+        speed: Some(TransactionSpeed::FAST),
+    });
+
+    Ok(relayer)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let blob_data = vec![1u8; 131072]; // 128KB filled blob
+    let hex_blob = format!("0x{}", alloy::hex::encode(&blob_data));
+
+    let request = RelayTransactionRequest {
+        to: EvmAddress::from_str("0x5FCD072a0BD58B6fa413031582E450FE724dba6D")?,
+        value: TransactionValue::zero(),
+        data: TransactionData::empty(),
+        speed: Some(TransactionSpeed::FAST),
+        external_id: None,
+        blobs: Some(vec![hex_blob]),
+    };
+
+    let result: SendTransactionResult = relayer_client.transaction().send(&request, None).await?;
+    println!("{:?}", result);
+
+    let relay_transaction_result =
+        relayer_client.transaction().wait_for_transaction_receipt_by_id(&result.id).await?;
+    println!("{:?}", relay_transaction_result);
+
+    Ok(())
+}
+```
+
+## Get Transaction
+
+:::info
+Basic auth can get transactions for all relayers, and API keys can only get transactions with the relayer they have permission to use.
+:::
+
+Get the transaction sent information by transaction id.
+
+### Response
+
+```rs
+Option<Transaction>
+```
+
+Just so you understand, the properties returned on a transaction
+
+```rs
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize)]
+pub enum TransactionStatus {
+    PENDING,
+    INMEMPOOL,
+    MINED,
+    CONFIRMED,
+    FAILED,
+    EXPIRED,
+    CANCELLED,
+    DROPPED,
+    REPLACED,
+}
+
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub enum TransactionSpeed {
+    SLOW,
+    MEDIUM,
+    FAST,
+    SUPER,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct GasPriceResult {
+    #[serde(rename = "maxPriorityFee")]
+    pub max_priority_fee: MaxPriorityFee,
+
+    #[serde(rename = "maxFee")]
+    pub max_fee: MaxFee,
+
+    #[serde(rename = "minWaitTimeEstimate")]
+    pub min_wait_time_estimate: Option<i64>,
+
+    #[serde(rename = "maxWaitTimeEstimate")]
+    pub max_wait_time_estimate: Option<i64>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct BlobGasPriceResult {
+    pub blob_gas_price: u128,
+    pub total_fee_for_blob: u128,
+}
+
+#[derive(Clone, Deserialize, Serialize, Debug)]
+pub struct Transaction {
+    pub id: TransactionId,
+
+    #[serde(rename = "relayerId")]
+    pub relayer_id: RelayerId,
+
+    pub to: EvmAddress,
+
+    pub from: EvmAddress,
+
+    pub value: TransactionValue,
+
+    pub data: TransactionData,
+
+    pub nonce: TransactionNonce,
+
+    pub chain_id: ChainId,
+
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub gas_limit: Option<GasLimit>,
+
+    pub status: TransactionStatus,
+
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub blobs: Option<Vec<TransactionBlob>>,
+
+    #[serde(rename = "txHash", skip_serializing_if = "Option::is_none", default)]
+    pub known_transaction_hash: Option<TransactionHash>,
+
+    #[serde(rename = "queuedAt")]
+    pub queued_at: DateTime<Utc>,
+
+    #[serde(rename = "expiresAt")]
+    pub expires_at: DateTime<Utc>,
+
+    #[serde(rename = "sentAt", skip_serializing_if = "Option::is_none", default)]
+    pub sent_at: Option<DateTime<Utc>>,
+
+    #[serde(rename = "confirmedAt", skip_serializing_if = "Option::is_none", default)]
+    pub confirmed_at: Option<DateTime<Utc>>,
+
+    #[serde(rename = "sentWithGas", skip_serializing_if = "Option::is_none", default)]
+    pub sent_with_gas: Option<GasPriceResult>,
+
+    #[serde(rename = "sentWithBlobGas", skip_serializing_if = "Option::is_none", default)]
+    pub sent_with_blob_gas: Option<BlobGasPriceResult>,
+
+    #[serde(rename = "minedAt", skip_serializing_if = "Option::is_none", default)]
+    pub mined_at: Option<DateTime<Utc>>,
+
+    #[serde(rename = "minedAtBlockNumber", skip_serializing_if = "Option::is_none", default)]
+    pub mined_at_block_number: Option<BlockNumber>,
+
+    pub speed: TransactionSpeed,
+
+    #[serde(rename = "maxPriorityFee", skip_serializing_if = "Option::is_none", default)]
+    pub sent_with_max_priority_fee_per_gas: Option<MaxPriorityFee>,
+
+    #[serde(rename = "maxFee", skip_serializing_if = "Option::is_none", default)]
+    pub sent_with_max_fee_per_gas: Option<MaxFee>,
+
+    pub is_noop: bool,
+
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub external_id: Option<String>,
+
+    #[serde(rename = "cancelledByTransactionId", skip_serializing_if = "Option::is_none", default)]
+    pub cancelled_by_transaction_id: Option<TransactionId>,
+}
+```
+
+### Basic Auth
+
+```rs
+use anyhow::Result;
+use rrelayer::{
+    AdminRelayerClient, CreateClientAuth, CreateClientConfig, RelayerId, Transaction,
+    TransactionId, TransactionSpeed, create_client,
+};
+use std::str::FromStr;
+
+async fn get_relayer_client() -> Result<AdminRelayerClient> {
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username: "your_username".to_string(),
+            password: "your_password".to_string(),
+        },
+    });
+
+    let relayer_client: AdminRelayerClient = client
+        .get_relayer_client(
+            &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+            Some(TransactionSpeed::FAST),
+        )
+        .await?;
+
+    Ok(relayer_client)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let transaction: Option<Transaction> = relayer_client
+        .transaction()
+        .get(
+            &TransactionId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")
+                .map_err(|e| anyhow::anyhow!("Invalid tx id: {}", e))?,
+        )
+        .await?;
+    println!("{:?}", transaction);
+
+    Ok(())
+}
+```
+
+### API Key Auth
+
+```rs
+use anyhow::Result;
+use rrelayer::{
+    CreateRelayerClientConfig, RelayerClient, RelayerId, Transaction, TransactionId,
+    TransactionSpeed, create_relayer_client,
+};
+use std::str::FromStr;
+
+async fn get_relayer_client() -> Result<RelayerClient> {
+    let relayer: RelayerClient = create_relayer_client(CreateRelayerClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        relayer_id: RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+        api_key: "YOUR_API_KEY".to_string(),
+        speed: Some(TransactionSpeed::FAST),
+    });
+
+    Ok(relayer)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let transaction: Option<Transaction> = relayer_client
+        .transaction()
+        .get(
+            &TransactionId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")
+                .map_err(|e| anyhow::anyhow!("Invalid tx id: {}", e))?,
+        )
+        .await?;
+    println!("{:?}", transaction);
+
+    Ok(())
+}
+```
+
+## Transaction Status
+
+:::info
+Basic auth can get transaction statuses for all relayers, and API keys can only get transactions statuses with the relayer they have permission to use.
+:::
+
+Get the transaction status by transaction id.
+
+### Response
+
+```ts
+Option<RelayTransactionStatusResult>;
+```
+
+Just so you understand, the properties returned on a transaction status response
+
+```rs
+import { AnyTransactionReceipt } from 'rrelayer';
+
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize)]
+pub enum TransactionStatus {
+    PENDING,
+    INMEMPOOL,
+    MINED,
+    CONFIRMED,
+    FAILED,
+    EXPIRED,
+    CANCELLED,
+    DROPPED,
+    REPLACED,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RelayTransactionStatusResult {
+    pub hash: Option<TransactionHash>,
+    pub status: TransactionStatus,
+    pub receipt: Option<AnyTransactionReceipt>,
+}
+```
+
+### Basic Auth
+
+```rs
+use anyhow::Result;
+use rrelayer::{
+    create_client, AdminRelayerClient, CreateClientAuth, CreateClientConfig,
+    RelayTransactionStatusResult, RelayerId, TransactionId, TransactionSpeed,
+};
+use std::str::FromStr;
+
+async fn get_relayer_client() -> Result<AdminRelayerClient> {
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username: "your_username".to_string(),
+            password: "your_password".to_string(),
+        },
+    });
+
+    let relayer_client: AdminRelayerClient = client
+        .get_relayer_client(
+            &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+            Some(TransactionSpeed::FAST),
+        )
+        .await?;
+
+    Ok(relayer_client)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let result: Option<RelayTransactionStatusResult> = relayer_client
+        .transaction()
+        .get_status(
+            &TransactionId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")
+                .map_err(|e| anyhow::anyhow!("Invalid tx id: {}", e))?,
+        )
+        .await?;
+    println!("{:?}", result);
+
+    Ok(())
+}
+```
+
+### API Key Auth
+
+```rs
+use anyhow::Result;
+use rrelayer::{
+    CreateRelayerClientConfig, RelayerClient, RelayerId, Transaction, TransactionId,
+    TransactionSpeed, create_relayer_client,
+};
+use std::str::FromStr;
+
+async fn get_relayer_client() -> Result<RelayerClient> {
+    let relayer: RelayerClient = create_relayer_client(CreateRelayerClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        relayer_id: RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+        api_key: "YOUR_API_KEY".to_string(),
+        speed: Some(TransactionSpeed::FAST),
+    });
+
+    Ok(relayer)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let transaction: Option<Transaction> = relayer_client
+        .transaction()
+        .get(
+            &TransactionId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")
+                .map_err(|e| anyhow::anyhow!("Invalid tx id: {}", e))?,
+        )
+        .await?;
+    println!("{:?}", transaction);
+
+    Ok(())
+}
+```
+
+## Replace Transaction
+
+:::info
+Basic auth can replace transactions for all relayers, and API keys can only replace transactions with the relayer they have permission to use.
+:::
+
+Replace an existing transaction. Note replace may not win, for example, if the transaction is already in the mempool, it could
+be mined before it is replaced.
+
+### Response
+
+```rs
+ReplaceTransactionResult
+```
+
+Just so you understand the properties, the properties you get back when you send
+
+```rs
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ReplaceTransactionResult {
+    pub success: bool,
+    pub replace_transaction_id: Option<TransactionId>,
+    pub replace_transaction_hash: Option<TransactionHash>,
+}
+```
+
+### Basic Auth
+
+```rs
+use anyhow::Result;
+use rrelayer::{
+    create_client, AdminRelayerClient, CreateClientAuth, CreateClientConfig, EvmAddress,
+    RelayTransactionRequest, RelayerId, ReplaceTransactionResult, TransactionData,
+    TransactionId, TransactionSpeed, TransactionValue,
+};
+use std::str::FromStr;
+
+async fn get_relayer_client() -> Result<AdminRelayerClient> {
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username: "your_username".to_string(),
+            password: "your_password".to_string(),
+        },
+    });
+
+    let relayer_client: AdminRelayerClient = client
+        .get_relayer_client(
+            &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+            Some(TransactionSpeed::FAST),
+        )
+        .await?;
+
+    Ok(relayer_client)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let request = RelayTransactionRequest {
+        to: EvmAddress::from_str("0x5FCD072a0BD58B6fa413031582E450FE724dba6D")?,
+        value: TransactionValue::from_str("1000000000000000000")
+            .map_err(|e| anyhow::anyhow!("Invalid value: {}", e))?, // 1 ETH in wei
+        data: TransactionData::empty(),
+        speed: Some(TransactionSpeed::FAST),
+        external_id: None,
+        blobs: None,
+    };
+
+    let result: ReplaceTransactionResult = relayer_client
+        .transaction()
+        .replace(
+            &TransactionId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")
+                .map_err(|e| anyhow::anyhow!("Invalid tx id: {}", e))?,
+            &request,
+            None,
+        )
+        .await?;
+    println!("{:?}", result);
+
+    if result.success
+        && let Some(tx_id) = result.replace_transaction_id
+    {
+        let relay_transaction_result =
+            relayer_client.transaction().wait_for_transaction_receipt_by_id(&tx_id).await?;
+        println!("{:?}", relay_transaction_result);
+
+        Ok(())
+    } else {
+        Err(anyhow::anyhow!("Could not replace transaction"))
+    }
+}
+```
+
+### API Key Auth
+
+```rs
+use anyhow::Result;
+use rrelayer::{
+    CreateRelayerClientConfig, EvmAddress, RelayTransactionRequest, RelayerClient, RelayerId,
+    ReplaceTransactionResult, TransactionData, TransactionId, TransactionSpeed, TransactionValue,
+    create_relayer_client,
+};
+use std::str::FromStr;
+
+async fn get_relayer_client() -> Result<RelayerClient> {
+    let relayer: RelayerClient = create_relayer_client(CreateRelayerClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        relayer_id: RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+        api_key: "YOUR_API_KEY".to_string(),
+        speed: Some(TransactionSpeed::FAST),
+    });
+
+    Ok(relayer)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let request = RelayTransactionRequest {
+        to: EvmAddress::from_str("0x5FCD072a0BD58B6fa413031582E450FE724dba6D")?,
+        value: TransactionValue::from_str("1000000000000000000")
+            .map_err(|e| anyhow::anyhow!("Invalid value: {}", e))?, // 1 ETH in wei
+        data: TransactionData::empty(),
+        speed: Some(TransactionSpeed::FAST),
+        external_id: None,
+        blobs: None,
+    };
+
+    let result: ReplaceTransactionResult = relayer_client
+        .transaction()
+        .replace(
+            &TransactionId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")
+                .map_err(|e| anyhow::anyhow!("Invalid tx id: {}", e))?,
+            &request,
+            None,
+        )
+        .await?;
+    println!("{:?}", result);
+
+    if result.success
+        && let Some(tx_id) = result.replace_transaction_id
+    {
+        let relay_transaction_result =
+            relayer_client.transaction().wait_for_transaction_receipt_by_id(&tx_id).await?;
+        println!("{:?}", relay_transaction_result);
+
+        Ok(())
+    } else {
+        Err(anyhow::anyhow!("Could not replace transaction"))
+    }
+}
+```
+
+## Cancel Transaction
+
+:::info
+Basic auth can cancel transactions for all relayers, and API keys can only cancel transactions with the relayer they have permission to use.
+:::
+
+Cancel an existing transaction. Note cancel may not win, for example, if the transaction is already in the mempool, it could
+be mined before it is cancelled.
+
+### Response
+
+```rs
+CancelTransactionResponse
+```
+
+Just so you understand the properties, the properties you get back when you send
+
+```rs
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CancelTransactionResponse {
+    pub success: bool,
+    pub cancel_transaction_id: Option<TransactionId>,
+}
+```
+
+### Basic Auth
+
+```rs
+use anyhow::Result;
+use rrelayer::{
+    AdminRelayerClient, CancelTransactionResponse, CreateClientAuth, CreateClientConfig, RelayerId,
+    TransactionId, TransactionSpeed, create_client,
+};
+use std::str::FromStr;
+
+async fn get_relayer_client() -> Result<AdminRelayerClient> {
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username: "your_username".to_string(),
+            password: "your_password".to_string(),
+        },
+    });
+
+    let relayer_client: AdminRelayerClient = client
+        .get_relayer_client(
+            &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+            Some(TransactionSpeed::FAST),
+        )
+        .await?;
+
+    Ok(relayer_client)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let result: CancelTransactionResponse = relayer_client
+        .transaction()
+        .cancel(
+            &TransactionId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")
+                .map_err(|e| anyhow::anyhow!("Invalid tx id: {}", e))?,
+            None,
+        )
+        .await?;
+    println!("{:?}", result);
+
+    if result.success
+        && let Some(tx_id) = result.cancel_transaction_id
+    {
+        let relay_transaction_result =
+            relayer_client.transaction().wait_for_transaction_receipt_by_id(&tx_id).await?;
+        println!("{:?}", relay_transaction_result);
+
+        Ok(())
+    } else {
+        Err(anyhow::anyhow!("Could not cancel transaction"))
+    }
+}
+```
+
+### API Key Auth
+
+```rs
+use anyhow::Result;
+use rrelayer::{
+    CancelTransactionResponse, CreateRelayerClientConfig, RelayerClient, RelayerId, TransactionId,
+    TransactionSpeed, create_relayer_client,
+};
+use std::str::FromStr;
+
+async fn get_relayer_client() -> Result<RelayerClient> {
+    let relayer: RelayerClient = create_relayer_client(CreateRelayerClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        relayer_id: RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+        api_key: "YOUR_API_KEY".to_string(),
+        speed: Some(TransactionSpeed::FAST),
+    });
+
+    Ok(relayer)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let result: CancelTransactionResponse = relayer_client
+        .transaction()
+        .cancel(
+            &TransactionId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")
+                .map_err(|e| anyhow::anyhow!("Invalid tx id: {}", e))?,
+            None,
+        )
+        .await?;
+    println!("{:?}", result);
+
+    if result.success
+        && let Some(tx_id) = result.cancel_transaction_id
+    {
+        let relay_transaction_result =
+            relayer_client.transaction().wait_for_transaction_receipt_by_id(&tx_id).await?;
+        println!("{:?}", relay_transaction_result);
+
+        Ok(())
+    } else {
+        Err(anyhow::anyhow!("Could not cancel transaction"))
+    }
+}
+```
+
+## Transactions Queue Counts
+
+:::info
+Basic auth can fetch transactions counts for all relayers, and API keys can only fetch transactions counts with the relayer they have permission to use.
+:::
+
+Get the transaction queue count for the relayer.
+
+### Response
+
+```rs
+u32
+```
+
+### Basic Auth
+
+```rs
+use anyhow::Result;
+use rrelayer::{
+    AdminRelayerClient, CreateClientAuth, CreateClientConfig, RelayerId, TransactionCountType,
+    TransactionSpeed, create_client,
+};
+use std::str::FromStr;
+
+async fn get_relayer_client() -> Result<AdminRelayerClient> {
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username: "your_username".to_string(),
+            password: "your_password".to_string(),
+        },
+    });
+
+    let relayer_client: AdminRelayerClient = client
+        .get_relayer_client(
+            &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+            Some(TransactionSpeed::FAST),
+        )
+        .await?;
+
+    Ok(relayer_client)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let pending_count: u32 =
+        relayer_client.transaction().get_count(TransactionCountType::Pending).await?;
+    println!("{:?}", pending_count);
+
+    let inmempool_count: u32 =
+        relayer_client.transaction().get_count(TransactionCountType::Pending).await?;
+    println!("{:?}", inmempool_count);
+
+    Ok(())
+}
+```
+
+### API Key Auth
+
+```rs
+use anyhow::Result;
+use rrelayer::{
+    create_relayer_client,
+    CreateRelayerClientConfig, RelayerClient, RelayerId, TransactionCountType,
+    TransactionSpeed,
+};
+use std::str::FromStr;
+
+async fn get_relayer_client() -> Result<RelayerClient> {
+    let relayer: RelayerClient = create_relayer_client(CreateRelayerClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        relayer_id: RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+        api_key: "YOUR_API_KEY".to_string(),
+        speed: Some(TransactionSpeed::FAST),
+    });
+
+    Ok(relayer)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let pending_count: u32 =
+        relayer_client.transaction().get_count(TransactionCountType::Pending).await?;
+    println!("{:?}", pending_count);
+
+    let inmempool_count: u32 =
+        relayer_client.transaction().get_count(TransactionCountType::Pending).await?;
+    println!("{:?}", inmempool_count);
+
+    Ok(())
+}
+```

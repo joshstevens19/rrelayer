@@ -448,14 +448,32 @@ export default defineConfig({
                 {
                   text: 'Rust',
                   collapsed: true,
-                  link: '/integration/transactions/networks/rust',
+                  link: '/integration/sdk/transactions/rust',
                   items: [
-                    { text: 'Send Transaction', link: '' },
-                    { text: 'Get Transaction', link: '' },
-                    { text: 'Transaction Status', link: '' },
-                    { text: 'Replace Transaction', link: '' },
-                    { text: 'Cancel Transaction', link: '' },
-                    { text: 'Transaction Counts', link: '' },
+                    {
+                      text: 'Send Transaction',
+                      link: '/integration/sdk/transactions/rust#send-transaction',
+                    },
+                    {
+                      text: 'Get Transaction',
+                      link: '/integration/sdk/transactions/rust#get-transaction',
+                    },
+                    {
+                      text: 'Transaction Status',
+                      link: '/integration/sdk/transactions/rust#transaction-status',
+                    },
+                    {
+                      text: 'Replace Transaction',
+                      link: '/integration/sdk/transactions/rust#replace-transaction',
+                    },
+                    {
+                      text: 'Cancel Transaction',
+                      link: '/integration/sdk/transactions/rust#cancel-transaction',
+                    },
+                    {
+                      text: 'Transaction Counts',
+                      link: '/integration/sdk/transactions/rust#transactions-counts',
+                    },
                   ],
                 },
               ],

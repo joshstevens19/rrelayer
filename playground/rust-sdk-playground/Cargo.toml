@@ -8,3 +8,4 @@ rrelayer = { path = "../../crates/sdk" }
 anyhow = "1.0.99"
 tokio = "1.47.1"
 serde_json = "1.0.142"
+alloy = { workspace = true, features = ["full", "signer-mnemonic", "eips", "eip712"] }

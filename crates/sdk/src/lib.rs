@@ -16,11 +16,13 @@ pub use rrelayer_core::{
     network::Network,
     relayer::{CreateRelayerResult, GetRelayerResult, Relayer, RelayerId},
     transaction::{
-        api::RelayTransactionRequest,
-        types::{TransactionId, TransactionSpeed, TransactionValue},
+        api::{RelayTransactionRequest, SendTransactionResult, RelayTransactionStatusResult, CancelTransactionResponse},
+        queue_system::ReplaceTransactionResult,
+        types::{TransactionId, TransactionValue, TransactionData, TransactionSpeed, Transaction},
     },
     signing::{SignTextResult, SignedTextHistory, SignTypedDataResult, SignedTypedDataHistory}
 };
 
 pub use alloy::primitives::PrimitiveSignature;
 pub use alloy::dyn_abi::TypedData;
+pub use alloy::network::AnyTransactionReceipt;

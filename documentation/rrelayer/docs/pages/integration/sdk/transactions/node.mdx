@@ -92,7 +92,7 @@ const txRequest: TransactionToSend = {
 let response = await relayerClient.transaction.send(txRequest);
 
 // returns a TransactionReceipt - import { TransactionReceipt } from 'rrelayer';
-let receipt = await relayerClient.transaction.waitForTransactionReceiptById(
+let relayTransactionResult = await relayerClient.transaction.waitForTransactionReceiptById(
     response.id
 );
 ```
@@ -127,7 +127,7 @@ const txRequest: TransactionToSend = {
 let response = await relayerClient.transaction.send(txRequest);
 
 // returns a TransactionReceipt - import { TransactionReceipt } from 'rrelayer';
-let receipt = await relayerClient.transaction.waitForTransactionReceiptById(
+let relayTransactionResult = await relayerClient.transaction.waitForTransactionReceiptById(
     response.id
 );
 ```
@@ -173,7 +173,7 @@ const txRequest: TransactionToSend = {
 let response = await relayerClient.transaction.send(txRequest);
 
 // returns a TransactionReceipt - import { TransactionReceipt } from 'rrelayer';
-let receipt = await relayerClient.transaction.waitForTransactionReceiptById(
+let relayTransactionResult = await relayerClient.transaction.waitForTransactionReceiptById(
     response.id
 );
 ```
@@ -208,7 +208,7 @@ const txRequest: TransactionToSend = {
 let response = await relayerClient.transaction.send(txRequest);
 
 // returns a TransactionReceipt - import { TransactionReceipt } from 'rrelayer';
-let receipt = await relayerClient.transaction.waitForTransactionReceiptById(
+let relayTransactionResult = await relayerClient.transaction.waitForTransactionReceiptById(
     response.id
 );
 ```
@@ -259,7 +259,7 @@ const txRequest = {
 let response = await relayerClient.transaction.send(txRequest);
 
 // returns a TransactionReceipt - import { TransactionReceipt } from 'rrelayer';
-let receipt = await relayerClient.transaction.waitForTransactionReceiptById(
+let relayTransactionResult = await relayerClient.transaction.waitForTransactionReceiptById(
     response.id
 );
 ```
@@ -296,7 +296,7 @@ const txRequest = {
 let response = await relayerClient.transaction.send(txRequest);
 
 // returns a TransactionReceipt - import { TransactionReceipt } from 'rrelayer';
-let receipt = await relayerClient.transaction.waitForTransactionReceiptById(
+let relayTransactionResult = await relayerClient.transaction.waitForTransactionReceiptById(
     response.id
 );
 ```
