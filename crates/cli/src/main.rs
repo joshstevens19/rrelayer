@@ -1,5 +1,12 @@
 use std::{env, path::PathBuf, str::FromStr};
 
+#[cfg(feature = "jemalloc")]
+use jemallocator::Jemalloc;
+
+#[cfg(feature = "jemalloc")]
+#[global_allocator]
+static GLOBAL: Jemalloc = Jemalloc;
+
 use clap::Parser;
 use rrelayer_core::{load_env_from_project_path, setup_info_logger};
 

@@ -600,6 +600,12 @@ jobs:
         run: |
           set -eo pipefail
           target="${{ matrix.target }}"
+          
+          if [[ "$target" != *msvc* && "$target" != "aarch64-unknown-linux-gnu" ]]; then
+            flags+=(--features jemalloc)
+          else
+            flags+=(--features reth)
+          fi
 
           if [[ "$target" == *windows* ]]; then
             export PATH="$PATH:/c/vcpkg"
