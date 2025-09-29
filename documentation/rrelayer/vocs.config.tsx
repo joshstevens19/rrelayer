@@ -14,7 +14,7 @@ export default defineConfig({
       <meta property="og:url" content="https://rrelayer.xyz" />
       <meta
         property="og:description"
-        content="Build scalable, efficient, and secure blockchain indexing solutions for modern decentralized applications."
+        content="A lighting-fast multi chain indexing solution written in Rust"
       />
     </>
   ),
