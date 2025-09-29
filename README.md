@@ -4,7 +4,6 @@
 
 30th September plan:
 - Do internal documentation throughout the .MD files
-- Get install script working locally
 
 31st September plan:
 - Reread documentation 
