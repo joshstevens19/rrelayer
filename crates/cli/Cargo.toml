@@ -16,7 +16,7 @@ colored = "2.0"
 tokio = "1.35.1"
 serde = { version = "1.0.204", features = ["derive"] }
 serde_json = "1.0.120"
-serde_yaml = "0.9.34+deprecated"
+serde_yaml = "0.9.34"
 thiserror = "1.0"
 prettytable = "0.10.0"
 chrono = "0.4.41"
