@@ -1,41 +1,3 @@
-//! Alloy integration for rrelayer SDK
-//!
-//! This module provides seamless integration between Alloy and the rrelayer service.
-//!
-//! # Usage
-//!
-//! ```rust,no_run
-//! use alloy::signers::Signer;
-//! use rrelayer::{RelayerClient, RelayerClientConfig, RelayerClientAuth, RelayerId};
-//! use rrelayer::alloy_integration::{RelayerSigner, with_relayer};
-//! use alloy::primitives::Address;
-//! use std::{sync::Arc, str::FromStr};
-//!
-//! # async fn example() -> anyhow::Result<()> {
-//! // Create RelayerClient
-//! let relayer_id = RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?;
-//! let config = RelayerClientConfig {
-//!     server_url: "http://localhost:8000".to_string(),
-//!     relayer_id: relayer_id.clone(),
-//!     auth: RelayerClientAuth::ApiKey { api_key: "your-key".to_string() },
-//!     speed: None,
-//! };
-//! let relayer_client = Arc::new(RelayerClient::new(config));
-//!
-//! // Create RelayerSigner from RelayerClient
-//! let address = Address::from_str("0x742d35cc6634c0532925a3b8d67e8000c942b1b5")?;
-//! let signer = RelayerSigner::from_relayer_client(relayer_client, address, Some(1));
-//!
-//! // Use exactly like any other Alloy signer
-//! let signature = signer.sign_message(b"hello world").await?;
-//!
-//! // Wrap provider for transaction hijacking
-//! let http_provider = (); // In practice: real HTTP provider
-//! let provider = with_relayer(http_provider, signer);
-//! # Ok(())
-//! # }
-//! ```
-
 use alloy::{
     dyn_abi::TypedData,
     network::TransactionBuilder,
@@ -252,28 +214,6 @@ impl Signer for RelayerSigner {
 ///
 /// This allows you to use standard Alloy provider patterns while transparently routing
 /// all transaction sending through your relayer infrastructure.
-///
-/// # Examples
-///
-/// ```rust,no_run
-/// use alloy::primitives::Address;
-/// use alloy::providers::{ProviderBuilder, Provider};
-/// use rrelayer::{RelayerProvider, with_relayer, RelayerSigner};
-/// use std::str::FromStr;
-///
-/// # async fn example() -> anyhow::Result<()> {
-/// # let relayer_signer: RelayerSigner = todo!(); // Created elsewhere
-/// // Wrap any provider with relayer functionality
-/// let rpc_url = "https://eth.llamarpc.com".parse()?;
-/// let http_provider = ProviderBuilder::new().on_http(rpc_url);
-/// let provider = with_relayer(http_provider, relayer_signer);
-///
-/// // Send transactions via relayer
-/// let to_address = Address::from_str("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045")?;
-/// let tx_id = provider.send_transaction_via_relayer(to_address, 1000000).await?;
-/// # Ok(())
-/// # }
-/// ```
 #[derive(Debug, Clone)]
 pub struct RelayerProvider<P> {
     inner: P,
@@ -408,36 +348,6 @@ impl<P> RelayerProvider<P> {
 }
 
 /// Convenience function to wrap any provider with relayer functionality.
-///
-/// # Arguments
-///
-/// * `provider` - The provider to wrap (can be HTTP, WS, etc.)
-/// * `relayer_signer` - The RelayerSigner to use for operations
-///
-/// # Returns
-///
-/// A RelayerProvider that transparently routes operations through the relayer
-///
-/// # Examples
-///
-/// ```rust,no_run
-/// use alloy::providers::{ProviderBuilder, Provider};
-/// use alloy::primitives::Address;
-/// use rrelayer::{with_relayer, RelayerSigner};
-/// use std::str::FromStr;
-///
-/// # async fn example() -> anyhow::Result<()> {
-/// # let relayer_signer: RelayerSigner = todo!(); // Created elsewhere
-/// let rpc_url = "https://eth.llamarpc.com".parse()?;
-/// let http_provider = ProviderBuilder::new().on_http(rpc_url);
-/// let relayer_provider = with_relayer(http_provider, relayer_signer);
-///
-/// // Now all transactions will be hijacked to use the relayer
-/// let to = Address::from_str("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045")?;
-/// let tx_id = relayer_provider.send_transaction_via_relayer(to, 1000000).await?;
-/// # Ok(())
-/// # }
-/// ```
 pub fn with_relayer<P>(provider: P, relayer_signer: RelayerSigner) -> RelayerProvider<P> {
     RelayerProvider::new(provider, relayer_signer)
 }
