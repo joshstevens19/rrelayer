@@ -7,6 +7,7 @@ use alloy::sol;
 use alloy::sol_types::SolCall;
 use chrono::{DateTime, Utc};
 use clap::Subcommand;
+use rrelayer::{AdminRelayerClient, Client, TransactionCountType};
 use rrelayer_core::common_types::PagingContext;
 use rrelayer_core::transaction::api::RelayTransactionRequest;
 use rrelayer_core::{
@@ -16,7 +17,6 @@ use rrelayer_core::{
         Transaction, TransactionData, TransactionId, TransactionSpeed, TransactionValue,
     },
 };
-use rrelayer::{AdminRelayerClient, Client, TransactionCountType};
 use std::io::{self, Write};
 
 sol! {

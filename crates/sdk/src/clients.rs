@@ -11,7 +11,7 @@ use rrelayer_core::signing::{SignedTextHistory, SignedTypedDataHistory};
 use rrelayer_core::transaction::api::{
     CancelTransactionResponse, RelayTransactionRequest, SendTransactionResult,
 };
-use rrelayer_core::transaction::types::TransactionStatus;
+use rrelayer_core::transaction::types::{TransactionSpeed, TransactionStatus};
 use rrelayer_core::{
     common_types::{EvmAddress, PagingContext, PagingResult},
     gas::GasEstimatorResult,
@@ -38,16 +38,8 @@ pub struct CreateClientAuth {
 pub struct CreateRelayerClientConfig {
     pub server_url: String,
     pub relayer_id: RelayerId,
-    pub provider_url: String,
     pub api_key: String,
     pub speed: Option<TransactionSpeed>,
-}
-
-#[derive(Debug, Clone)]
-pub enum TransactionSpeed {
-    Fast,
-    Standard,
-    Slow,
 }
 
 #[derive(Clone)]
@@ -244,7 +236,6 @@ impl AdminRelayerClient {
     pub fn new(config: AdminRelayerClientConfig) -> Self {
         let relayer_client_config = RelayerClientConfig {
             server_url: config.server_url.clone(),
-            provider_url: config.provider_url,
             relayer_id: config.relayer_id.clone(),
             auth: match &config.auth {
                 AdminRelayerClientAuth::BasicAuth { username, password } => {
@@ -448,7 +439,6 @@ pub enum TransactionCountType {
 #[derive(Debug, Clone)]
 pub struct RelayerClientConfig {
     pub server_url: String,
-    pub provider_url: String,
     pub relayer_id: RelayerId,
     pub auth: RelayerClientAuth,
     pub speed: Option<TransactionSpeed>,
@@ -683,7 +673,6 @@ pub fn create_client(config: CreateClientConfig) -> Client {
 pub fn create_relayer_client(config: CreateRelayerClientConfig) -> RelayerClient {
     RelayerClient::new(RelayerClientConfig {
         server_url: config.server_url,
-        provider_url: config.provider_url,
         relayer_id: config.relayer_id,
         auth: RelayerClientAuth::ApiKey { api_key: config.api_key },
         speed: config.speed,

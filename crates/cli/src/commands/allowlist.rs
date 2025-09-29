@@ -1,6 +1,6 @@
 use clap::Subcommand;
-use rrelayer_core::{common_types::PagingContext, relayer::RelayerId};
 use rrelayer::{AdminRelayerClient, Client};
+use rrelayer_core::{common_types::PagingContext, relayer::RelayerId};
 
 use crate::{commands::error::AllowlistError, console::print_table};
 

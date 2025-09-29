@@ -5,6 +5,7 @@ members = [
     "crates/core",
     "crates/sdk",
     "crates/e2e-tests",
+    "playground/rust-sdk-playground",
 ]
 
 [workspace.dependencies]

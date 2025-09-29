@@ -1,0 +1,9 @@
+[package]
+name = "rust-sdk-playground"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+rrelayer = { path = "../../crates/sdk" }
+anyhow = "1.0.99"
+tokio = "1.47.1"

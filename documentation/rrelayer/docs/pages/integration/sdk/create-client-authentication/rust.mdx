@@ -1,0 +1,95 @@
+# Create Client And Authentication
+
+rrelayer has two ways to create clients based on the authentication direction, which is basic auth and API keys;
+we will explore both below.
+
+## Basic Auth
+
+Using the basic authentication which uses the username and password in your [api config](/config/api-config)
+
+```rs [Basic Auth - config.rs]
+use std::str::FromStr;
+use rrelayer::{CreateClientAuth, CreateClientConfig, RelayerId, TransactionSpeed, create_client, AdminRelayerClient};
+
+// Client also exposes some admin methods in which API keys cannot do
+let client = create_client(CreateClientConfig {
+    server_url: "http://localhost:8000".to_string(),
+    auth: CreateClientAuth {
+        username: "your_username".to_string(),
+        password: "your_password".to_string(),
+    },
+});
+
+let relayer: AdminRelayerClient = client.get_relayer_client(
+    &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+    Some(TransactionSpeed::FAST),
+).await?;
+```
+
+## API Key Auth
+
+Using API keys that have restricted permissions to only use the relayer - docs [here](config/networks/api-keys)
+
+```rs [API Key - config.rs]
+use std::str::FromStr;
+use rrelayer::{
+    CreateRelayerClientConfig, RelayerClient, RelayerId, TransactionSpeed,
+    create_relayer_client,
+};
+
+let relayer: RelayerClient = create_relayer_client(CreateRelayerClientConfig {
+    server_url: "http://localhost:8000".to_string(),
+    relayer_id: RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+    api_key: "YOUR_API_KEY".to_string(),
+    speed: Some(TransactionSpeed::FAST),
+});
+```
+
+## Rate Limiting
+
+As rrelayer is integrated on the backend, we allow you to rate limit by passing it into the methods which
+can be rate limited which are sending transaction, replace transaction, cancel transaction, sign a message and sign typed data.
+You can config this [here](/config/rate-limits)
+
+:::info
+rrelayer types have parses from `alloy` typings please reference [this](/integration/sdk/framework-guides/rust/alloy) doc for more information.
+:::
+
+```rs [config.rs]
+use anyhow::Result;
+use rrelayer::{create_relayer_client, CreateRelayerClientConfig, EvmAddress, RelayTransactionRequest, RelayerClient, RelayerId, TransactionSpeed, TransactionValue};
+use std::str::FromStr;
+
+async fn get_relayer() -> Result<RelayerClient> {
+    let relayer: RelayerClient = create_relayer_client(CreateRelayerClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        relayer_id: RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+        api_key: "YOUR_API_KEY".to_string(),
+        speed: Some(TransactionSpeed::FAST),
+    });
+
+    Ok(relayer)
+}
+
+async fn rate_limit_example() -> Result<()> {
+    let relayer = get_relayer().await?;
+
+    let tx_request = RelayTransactionRequest {
+        to: EvmAddress::from_str("0xa4635F69E5A64CD48da3FbC999aCed87B00756F6")?,
+        value: TransactionValue::from_str("1000000000000000000")
+            .map_err(|e| anyhow::anyhow!("Invalid value: {}", e))?, // 1 ETH in wei
+        data: Default::default(),
+        speed: None,
+        external_id: None,
+        blobs: None,
+    };
+
+    // Passing in the user doing the transaction as an example, this rate limit key will be limited based on what is configured
+    relayer
+        .transaction()
+        .send(&tx_request, Some("user__0x5FCD072a0BD58B6fa413031582E450FE724dba6D".to_string()))
+        .await?;
+
+    Ok(())
+}
+```

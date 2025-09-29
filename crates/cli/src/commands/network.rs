@@ -2,8 +2,8 @@ use alloy::providers::Provider;
 use clap::{Args, Subcommand};
 use dialoguer::{Confirm, Input};
 use prettytable::{Cell, Row, Table, format};
-use rrelayer_core::{NetworkSetupConfig, create_retry_client, gas::GasPriceResult, get_chain_id};
 use rrelayer::Client;
+use rrelayer_core::{NetworkSetupConfig, create_retry_client, gas::GasPriceResult, get_chain_id};
 
 use crate::project_location::ProjectLocation;
 use crate::{commands::error::NetworkError, console::print_table};

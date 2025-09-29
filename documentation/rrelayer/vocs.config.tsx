@@ -208,7 +208,7 @@ export default defineConfig({
                   items: [
                     {
                       text: 'Alloy',
-                      link: '',
+                      link: '/integration/sdk/framework-guides/rust/alloy',
                     },
                   ],
                 },
@@ -426,7 +426,7 @@ export default defineConfig({
                 {
                   text: 'Node',
                   collapsed: true,
-                  link: '/integration/sign/networks/node',
+                  link: '/integration/sdk/sign/node',
                   items: [
                     {
                       text: 'Sign Text Message',

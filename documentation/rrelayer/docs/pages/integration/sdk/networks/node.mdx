@@ -28,16 +28,8 @@ export interface Network {
 
 ### Example
 
-:::code-group
-
-```ts [get-network.ts]
-import { client } from './config';
-
-// returns Network | null - import { Network } from 'rrelayer';
-let network = await client.network.get(11155111);
-```
-
-```ts [config.ts]
+```ts
+// config.ts
 import { createClient } from 'rrelayer';
 
 export const client = createClient({
@@ -47,9 +39,15 @@ export const client = createClient({
     password: 'your_password',
   },
 });
-```
 
-:::
+...
+
+// get-network.ts
+import { client } from './config';
+
+// returns Network | null - import { Network } from 'rrelayer';
+let network = await client.network.get(11155111);
+```
 
 ## Get Networks
 
@@ -77,16 +75,8 @@ export interface Network {
 
 ### Example
 
-:::code-group
-
-```ts [get-networks.ts]
-import { client } from './config';
-
-// returns Network[] - import { Network } from 'rrelayer';
-let networks = await client.network.getAll();
-```
-
-```ts [config.ts]
+```ts
+// config.ts
 import { createClient } from 'rrelayer';
 
 export const client = createClient({
@@ -96,9 +86,15 @@ export const client = createClient({
     password: 'your_password',
   },
 });
-```
 
-:::
+...
+
+// get-networks.ts
+import { client } from './config';
+
+// returns Network[] - import { Network } from 'rrelayer';
+let networks = await client.network.getAll();
+```
 
 ## Gas Prices
 
@@ -134,16 +130,8 @@ export interface GasEstimatorResult {
 
 ### Example
 
-:::code-group
-
-```ts [get-networks.ts]
-import { client } from './config';
-
-// returns GasEstimatorResult - import { GasEstimatorResult } from 'rrelayer';
-let gasPrices = await client.network.getGasPrices(11155111);
-```
-
-```ts [config.ts]
+```ts
+// config.ts
 import { createClient } from 'rrelayer';
 
 export const client = createClient({
@@ -153,6 +141,12 @@ export const client = createClient({
     password: 'your_password',
   },
 });
-```
 
-:::
+...
+
+// get-gas-prices.ts
+import { client } from './config';
+
+// returns GasEstimatorResult - import { GasEstimatorResult } from 'rrelayer';
+let gasPrices = await client.network.getGasPrices(11155111);
+```

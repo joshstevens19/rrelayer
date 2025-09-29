@@ -1,5 +1,6 @@
 use super::test_config::E2ETestConfig;
 use anyhow::{anyhow, Context, Result};
+use rrelayer::{Client, CreateClientAuth, CreateClientConfig};
 use rrelayer_core::relayer::CreateRelayerResult;
 use rrelayer_core::transaction::types::Transaction;
 use rrelayer_core::{
@@ -10,7 +11,6 @@ use rrelayer_core::{
     transaction::api::{RelayTransactionRequest, SendTransactionResult},
     transaction::types::{TransactionData, TransactionId, TransactionValue},
 };
-use rrelayer::{Client, CreateClientAuth, CreateClientConfig};
 use tracing::info;
 
 #[derive(Clone)]

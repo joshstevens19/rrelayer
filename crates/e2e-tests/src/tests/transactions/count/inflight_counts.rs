@@ -1,9 +1,9 @@
 use crate::tests::test_runner::TestRunner;
 use alloy::primitives::U256;
 use anyhow::{anyhow, Context};
+use rrelayer::TransactionCountType;
 use rrelayer_core::transaction::api::{RelayTransactionRequest, TransactionSpeed};
 use rrelayer_core::transaction::types::{TransactionData, TransactionValue};
-use rrelayer::TransactionCountType;
 use tracing::info;
 
 impl TestRunner {

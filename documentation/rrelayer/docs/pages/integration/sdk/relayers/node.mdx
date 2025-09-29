@@ -27,9 +27,21 @@ export interface CreateRelayerResult {
 
 ### Example
 
-:::code-group
+```ts
+// config.ts
+import { createClient } from 'rrelayer';
 
-```ts [create-relayer.ts]
+export const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: 'your_username',
+    password: 'your_password',
+  },
+});
+
+///
+
+// create-relayer.ts
 import { client, TransactionSpeed } from './config';
 
 // returns a CreateRelayerResult - import { CreateRelayerResult } from 'rrelayer';
@@ -44,20 +56,6 @@ const relayerClient = await client.getRelayerClient(
   TransactionSpeed.FAST
 );
 ```
-
-```ts [config.ts]
-import { createClient } from 'rrelayer';
-
-export const client = createClient({
-  serverUrl: 'http://localhost:8000',
-  auth: {
-    username: 'your_username',
-    password: 'your_password',
-  },
-});
-```
-
-:::
 
 ## Get Relayers
 
@@ -105,6 +103,20 @@ export interface Relayer {
 :::code-group
 
 ```ts [get-all-relayers.ts]
+// config.ts
+import { createClient } from 'rrelayer';
+
+export const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: 'your_username',
+    password: 'your_password',
+  },
+});
+
+...
+
+// get-all-relayers.ts
 import { client } from './config';
 
 // returns a PagingResult<Relayer> - import { PagingResult, Relayer } from 'rrelayer';
@@ -115,6 +127,20 @@ let relayers = await client.relayer.getAll({
 ```
 
 ```ts [get-network-relayers.ts]
+// config.ts
+import { createClient } from 'rrelayer';
+
+export const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: 'your_username',
+    password: 'your_password',
+  },
+});
+
+...
+
+// get-network-relayers.ts
 import { client } from './config';
 
 // returns a PagingResult<Relayer> - import { PagingResult, Relayer } from 'rrelayer';
@@ -125,18 +151,6 @@ let relayers = await client.relayer.getAll(
   },
   11155111
 );
-```
-
-```ts [config.ts]
-import { createClient } from 'rrelayer';
-
-export const client = createClient({
-  serverUrl: 'http://localhost:8000',
-  auth: {
-    username: 'your_username',
-    password: 'your_password',
-  },
-});
 ```
 
 :::
@@ -266,9 +280,21 @@ export interface CreateRelayerResult {
 
 ### Example
 
-:::code-group
+```ts
+// config.ts
+import { createClient } from 'rrelayer';
 
-```ts [clone-relayer.ts]
+export const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: 'your_username',
+    password: 'your_password',
+  },
+});
+
+...
+
+/// clone-relayer.ts
 import { client, TransactionSpeed } from './config';
 
 // returns a CreateRelayerResult - import { CreateRelayerResult } from 'rrelayer';
@@ -287,20 +313,6 @@ const relayerClient = await client.getRelayerClient(
   TransactionSpeed.FAST
 );
 ```
-
-```ts [config.ts]
-import { createClient } from 'rrelayer';
-
-export const client = createClient({
-  serverUrl: 'http://localhost:8000',
-  auth: {
-    username: 'your_username',
-    password: 'your_password',
-  },
-});
-```
-
-:::
 
 ## Pause/Unpause Relayer
 
@@ -321,18 +333,7 @@ Promise<Void>;
 :::code-group
 
 ```ts [pause-relayer.ts]
-import { relayerClient } from './config';
-
-await relayerClient.pause();
-```
-
-```ts [unpause-relayer.ts]
-import { relayerClient } from './config';
-
-await relayerClient.unpause();
-```
-
-```ts [config.ts]
+// config.ts
 import { createClient, TransactionSpeed } from 'rrelayer';
 
 const client = createClient({
@@ -349,6 +350,40 @@ export const relayerClient = await client.getRelayerClient(
   // This is optional it defaults to fast
   TransactionSpeed.FAST
 );
+
+...
+
+// pause-relayer.ts
+import { relayerClient } from './config';
+
+await relayerClient.pause();
+```
+
+```ts [unpause-relayer.ts]
+// config.ts
+import { createClient, TransactionSpeed } from 'rrelayer';
+
+const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: 'your_username',
+    password: 'your_password',
+  },
+});
+
+export const relayerClient = await client.getRelayerClient(
+  // The relayer id you want to connect to
+  '94afb207-bb47-4392-9229-ba87e4d783cb',
+  // This is optional it defaults to fast
+  TransactionSpeed.FAST
+);
+
+...
+
+// unpause-relayer.ts
+import { relayerClient } from './config';
+
+await relayerClient.unpause();
 ```
 
 :::
@@ -372,18 +407,7 @@ Promise<Void>;
 :::code-group
 
 ```ts [disable-eip-1559-status.ts]
-import { relayerClient } from './config';
-
-await relayerClient.updateEIP1559Status(false);
-```
-
-```ts [enable-eip-1559-status.ts]
-import { relayerClient } from './config';
-
-await relayerClient.updateEIP1559Status(true);
-```
-
-```ts [config.ts]
+// config.ts
 import { createClient, TransactionSpeed } from 'rrelayer';
 
 const client = createClient({
@@ -400,6 +424,40 @@ export const relayerClient = await client.getRelayerClient(
   // This is optional it defaults to fast
   TransactionSpeed.FAST
 );
+
+...
+
+/// disable-eip-1559-status.ts
+import { relayerClient } from './config';
+
+await relayerClient.updateEIP1559Status(false);
+```
+
+```ts [enable-eip-1559-status.ts]
+// config.ts
+import { createClient, TransactionSpeed } from 'rrelayer';
+
+const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: 'your_username',
+    password: 'your_password',
+  },
+});
+
+export const relayerClient = await client.getRelayerClient(
+  // The relayer id you want to connect to
+  '94afb207-bb47-4392-9229-ba87e4d783cb',
+  // This is optional it defaults to fast
+  TransactionSpeed.FAST
+);
+
+...
+
+/// enable-eip-1559-status.ts
+import { relayerClient } from './config';
+
+await relayerClient.updateEIP1559Status(true);
 ```
 
 :::
@@ -421,16 +479,8 @@ Promise<Void>;
 
 ### Example
 
-:::code-group
-
-```ts [update-max-gas-price.ts]
-import { relayerClient } from './config';
-
-// 2 gwei
-await relayerClient.updateMaxGasPrice('2000000000');
-```
-
-```ts [config.ts]
+```ts
+// config.ts
 import { createClient, TransactionSpeed } from 'rrelayer';
 
 const client = createClient({
@@ -447,9 +497,15 @@ export const relayerClient = await client.getRelayerClient(
   // This is optional it defaults to fast
   TransactionSpeed.FAST
 );
-```
 
-:::
+...
+
+// update-max-gas-price.ts
+import { relayerClient } from './config';
+
+// 2 gwei
+await relayerClient.updateMaxGasPrice('2000000000');
+```
 
 ## Remove Max Gas Price
 
@@ -467,15 +523,8 @@ Promise<Void>;
 
 ### Example
 
-:::code-group
-
-```ts [remove-max-gas-price.ts]
-import { relayerClient } from './config';
-
-await relayerClient.removeMaxGasPrice();
-```
-
-```ts [config.ts]
+```ts
+// config.ts
 import { createClient, TransactionSpeed } from 'rrelayer';
 
 const client = createClient({
@@ -492,9 +541,14 @@ export const relayerClient = await client.getRelayerClient(
   // This is optional it defaults to fast
   TransactionSpeed.FAST
 );
-```
 
-:::
+...
+
+// remove-max-gas-price.ts
+import { relayerClient } from './config';
+
+await relayerClient.removeMaxGasPrice();
+```
 
 ## Delete Relayer
 
@@ -513,15 +567,8 @@ Promise<Void>;
 
 ### Example
 
-:::code-group
-
-```ts [delete-relayer.ts]
-import { client } from './config';
-
-await client.relayer.delete('94afb207-bb47-4392-9229-ba87e4d783cb');
-```
-
-```ts [config.ts]
+```ts
+// config.ts
 import { createClient } from 'rrelayer';
 
 export const client = createClient({
@@ -531,9 +578,14 @@ export const client = createClient({
     password: 'your_password',
   },
 });
-```
 
-:::
+...
+
+// delete-relayer.ts
+import { client } from './config';
+
+await client.relayer.delete('94afb207-bb47-4392-9229-ba87e4d783cb');
+```
 
 ## Get Allowlist
 

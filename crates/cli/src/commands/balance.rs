@@ -1,6 +1,6 @@
 use alloy::{primitives::U256, providers::Provider, sol};
-use rrelayer_core::{common_types::EvmAddress, create_retry_client, relayer::RelayerId};
 use rrelayer::Client;
+use rrelayer_core::{common_types::EvmAddress, create_retry_client, relayer::RelayerId};
 
 use crate::commands::error::BalanceError;
 
