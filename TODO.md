@@ -9,7 +9,6 @@
     - loading up ALL supported gas providers so it works
     - Testing handling custom gas with http call
 - Look into authentication to login and then use it outside rrelayer.yaml
-- Publish packages - TS + Rust
 - Release—20:00 UK time
 
 # AFTER

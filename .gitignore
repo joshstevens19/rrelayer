@@ -20,6 +20,11 @@ Cargo.lock
 # MSVC Windows builds of rustc generate these, which store debugging information
 *.pdb
 
+*.tmp
+Cargo.toml.tmp
+
+.claude
+
 # App ignores
 crates/cli/.env
 documentation/node_modules

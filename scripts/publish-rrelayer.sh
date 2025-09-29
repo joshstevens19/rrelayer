@@ -5,7 +5,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
-cd "$SCRIPT_DIR"
+cd "$SCRIPT_DIR/.."
 
 echo "🚀 Publishing rrelayer to crates.io..."
 echo
@@ -25,14 +25,14 @@ CORE_VERSION=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\
 echo "Version: $CORE_VERSION"
 
 cargo check || exit 1
-cargo publish --dry-run || exit 1
+cargo publish --dry-run --allow-dirty || exit 1
 
 echo
 read -p "Publish rrelayer_core v$CORE_VERSION? (y/N): " -n 1 -r
 echo
 
 if [[ $REPLY =~ ^[Yy]$ ]]; then
-    cargo publish || exit 1
+    cargo publish --allow-dirty || exit 1
     echo "✅ Published rrelayer_core v$CORE_VERSION"
     echo "⏳ Waiting 30s for crates.io..."
     sleep 30
@@ -58,7 +58,7 @@ cargo check || {
     exit 1
 }
 
-cargo publish --dry-run || {
+cargo publish --dry-run --allow-dirty || {
     echo "❌ Dry run failed"
     mv Cargo.toml.bak Cargo.toml
     exit 1
@@ -69,7 +69,7 @@ read -p "Publish rrelayer v$SDK_VERSION? (y/N): " -n 1 -r
 echo
 
 if [[ $REPLY =~ ^[Yy]$ ]]; then
-    cargo publish || {
+    cargo publish --allow-dirty || {
         echo "❌ Publish failed"
         mv Cargo.toml.bak Cargo.toml
         exit 1

@@ -16,6 +16,7 @@ import {
   GasEstimatorResult,
   getRelayerAllowlistAddress,
   TransactionSpeed, cloneRelayer,
+  getNetwork,
 } from '../api';
 import { RelayerClient } from './relayer';
 import {
@@ -119,9 +120,7 @@ export class Client {
        * @returns Network array
        */
       get: async (chainId: number): Promise<Network | null> => {
-        // TODO: use get network endpoint
-        let networks = await getAllNetworks(apiBaseConfig);
-        return networks.find((network) => network.chainId === chainId) || null;
+        return getNetwork(chainId, apiBaseConfig);
       },
       /**
        * get all networks

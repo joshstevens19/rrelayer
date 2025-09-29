@@ -47,10 +47,6 @@ pub enum TxCommand {
         #[arg(long, short = 'r')]
         relayer_id: RelayerId,
 
-        /// Filter by status (pending, sent, failed, success)
-        #[arg(long)]
-        status: Option<TxStatus>,
-
         /// Number of results to return (default: 10)
         #[arg(long, default_value = "10")]
         limit: u32,
@@ -149,9 +145,9 @@ pub async fn handle_tx(command: &TxCommand, client: &Client) -> Result<(), Trans
             handle_withdraw(to, amount, token, *decimals, relayer_client).await
         }
         TxCommand::Status { tx_id } => handle_status(tx_id, client).await,
-        TxCommand::List { relayer_id, status, limit, offset } => {
+        TxCommand::List { relayer_id, limit, offset } => {
             let relayer_client = client.get_relayer_client(relayer_id, None).await?;
-            handle_list(status, *limit, *offset, relayer_client).await
+            handle_list(*limit, *offset, relayer_client).await
         }
         TxCommand::Queue { relayer_id } => {
             let relayer_client = client.get_relayer_client(relayer_id, None).await?;
@@ -267,8 +263,6 @@ async fn handle_status(tx_id: &TransactionId, client: &Client) -> Result<(), Tra
 }
 
 async fn handle_list(
-    // TODO: handle status filtering
-    _status: &Option<TxStatus>,
     limit: u32,
     offset: u32,
     client: AdminRelayerClient,
