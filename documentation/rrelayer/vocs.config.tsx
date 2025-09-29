@@ -216,7 +216,7 @@ export default defineConfig({
             },
             {
               text: 'Create Client / Authentication',
-              collapsed: false,
+              collapsed: true,
               items: [
                 {
                   text: 'Node',
@@ -266,7 +266,7 @@ export default defineConfig({
             },
             {
               text: 'Relayers',
-              collapsed: false,
+              collapsed: true,
               items: [
                 {
                   text: 'Node',
@@ -332,7 +332,7 @@ export default defineConfig({
             },
             {
               text: 'Networks',
-              collapsed: false,
+              collapsed: true,
               items: [
                 {
                   text: 'Node',
@@ -365,7 +365,7 @@ export default defineConfig({
             },
             {
               text: 'Transactions',
-              collapsed: false,
+              collapsed: true,
               items: [
                 {
                   text: 'Node',
@@ -413,7 +413,7 @@ export default defineConfig({
             },
             {
               text: 'Sign',
-              collapsed: false,
+              collapsed: true,
               items: [
                 {
                   text: 'Node',
