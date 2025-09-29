@@ -1,12 +1,12 @@
 use anyhow::Result;
 use rrelayer_core::{start, StartError};
+use std::path::Path;
 use std::{
     path::PathBuf,
     process::{Child, Command, Stdio},
     thread,
     time::Duration,
 };
-use std::path::Path;
 use tokio::time::sleep;
 use tracing::{error, info, warn};
 

@@ -1,5 +1,3 @@
-use std::{net::SocketAddr, sync::Arc, time::Instant};
-use std::path::Path;
 use crate::app_state::RelayersInternalOnly;
 use crate::authentication::{create_basic_auth_routes, inject_basic_auth_status};
 use crate::background_tasks::run_background_tasks;
@@ -39,6 +37,8 @@ use axum::{
     Json, Router,
 };
 use dotenv::dotenv;
+use std::path::Path;
+use std::{net::SocketAddr, sync::Arc, time::Instant};
 use thiserror::Error;
 use tokio::sync::Mutex;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};

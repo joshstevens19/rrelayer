@@ -33,7 +33,9 @@ impl TestRunner {
             )
             .await;
 
-        if tx_result.is_ok() { successful_transactions += 1 }
+        if tx_result.is_ok() {
+            successful_transactions += 1
+        }
 
         let relayer = self.create_and_fund_relayer("rate-limit-relayer").await?;
         info!("relayer2: {:?}", relayer);
@@ -49,7 +51,9 @@ impl TestRunner {
             )
             .await;
 
-        if tx_result.is_ok() { successful_transactions += 1 }
+        if tx_result.is_ok() {
+            successful_transactions += 1
+        }
 
         let relayer = self.create_and_fund_relayer("rate-limit-relayer").await?;
         info!("relayer3: {:?}", relayer);
@@ -65,7 +69,9 @@ impl TestRunner {
             )
             .await;
 
-        if tx_result.is_ok() { successful_transactions += 1 }
+        if tx_result.is_ok() {
+            successful_transactions += 1
+        }
 
         let relayer = self.create_and_fund_relayer("rate-limit-relayer").await?;
         info!("relayer4: {:?}", relayer);
@@ -81,7 +87,9 @@ impl TestRunner {
             )
             .await;
 
-        if tx_result.is_ok() { successful_transactions += 1 }
+        if tx_result.is_ok() {
+            successful_transactions += 1
+        }
 
         let relayer = self.create_and_fund_relayer("rate-limit-relayer").await?;
         info!("relayer5: {:?}", relayer);
@@ -97,7 +105,9 @@ impl TestRunner {
             )
             .await;
 
-        if tx_result.is_ok() { successful_transactions += 1 }
+        if tx_result.is_ok() {
+            successful_transactions += 1
+        }
 
         let relayer = self.create_and_fund_relayer("rate-limit-relayer").await?;
         info!("relayer6: {:?}", relayer);
@@ -113,7 +123,9 @@ impl TestRunner {
             )
             .await;
 
-        if tx_result.is_ok() { successful_transactions += 1 }
+        if tx_result.is_ok() {
+            successful_transactions += 1
+        }
 
         if successful_transactions != 3 {
             return Err(anyhow!(

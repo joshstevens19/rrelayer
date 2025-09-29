@@ -397,8 +397,7 @@ impl WebhookManager {
         message: String,
         signature: alloy::primitives::Signature,
     ) {
-        let payload =
-            WebhookSigningPayload::text_signed(*relayer_id, chain_id, message, signature);
+        let payload = WebhookSigningPayload::text_signed(*relayer_id, chain_id, message, signature);
         self.queue_signing_webhook(relayer_id, chain_id, payload).await;
     }
 

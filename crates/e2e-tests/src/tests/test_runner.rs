@@ -199,15 +199,12 @@ impl TestRunner {
                     None
                 }
             };
-            
+
             if let Some((relayer, relayer_id)) = relayer_clone {
                 self.fund_relayer(&relayer.address, alloy::primitives::utils::parse_ether("10")?)
                     .await?;
-                let relayer_client = self
-                    .relayer_client
-                    .client
-                    .get_relayer_client(&relayer_id, None)
-                    .await?;
+                let relayer_client =
+                    self.relayer_client.client.get_relayer_client(&relayer_id, None).await?;
                 return Ok(relayer_client);
             }
         }
@@ -259,13 +256,9 @@ impl TestRunner {
                 None
             }
         };
-        
+
         if let Some(id) = relayer_id {
-            let relayer_client = self
-                .relayer_client
-                .client
-                .get_relayer_client(&id, None)
-                .await?;
+            let relayer_client = self.relayer_client.client.get_relayer_client(&id, None).await?;
             Ok(relayer_client)
         } else {
             Err(anyhow!("Failed to create relayer at target index {}", target_index))

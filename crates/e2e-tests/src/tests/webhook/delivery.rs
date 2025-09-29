@@ -478,8 +478,7 @@ impl TestRunner {
             if signing_webhook.payload.get("timestamp").is_none() {
                 return Err(anyhow!("Signing webhook payload missing timestamp"));
             }
-            if signing_webhook.payload.get("payload").and_then(|p| p.get("api_version")).is_none()
-            {
+            if signing_webhook.payload.get("payload").and_then(|p| p.get("api_version")).is_none() {
                 return Err(anyhow!(
                     "Signing webhook payload missing api_version in nested payload"
                 ));

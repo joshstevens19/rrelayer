@@ -65,42 +65,54 @@ impl TestRunner {
 
         let sign_result = relayer.sign().typed_data(&typed_data, relay_key.clone()).await;
 
-        if sign_result.is_ok() { successful_signing += 1 }
+        if sign_result.is_ok() {
+            successful_signing += 1
+        }
 
         let relayer = self.create_and_fund_relayer("rate-limit-relayer").await?;
         info!("relayer2: {:?}", relayer);
 
         let sign_result = relayer.sign().typed_data(&typed_data, relay_key.clone()).await;
 
-        if sign_result.is_ok(){ successful_signing += 1 }
+        if sign_result.is_ok() {
+            successful_signing += 1
+        }
 
         let relayer = self.create_and_fund_relayer("rate-limit-relayer").await?;
         info!("relayer3: {:?}", relayer);
 
         let sign_result = relayer.sign().typed_data(&typed_data, relay_key.clone()).await;
 
-        if sign_result.is_ok() { successful_signing += 1 }
+        if sign_result.is_ok() {
+            successful_signing += 1
+        }
 
         let relayer = self.create_and_fund_relayer("rate-limit-relayer").await?;
         info!("relayer4: {:?}", relayer);
 
         let sign_result = relayer.sign().typed_data(&typed_data, relay_key.clone()).await;
 
-        if sign_result.is_ok() { successful_signing += 1 }
+        if sign_result.is_ok() {
+            successful_signing += 1
+        }
 
         let relayer = self.create_and_fund_relayer("rate-limit-relayer").await?;
         info!("relayer5: {:?}", relayer);
 
         let sign_result = relayer.sign().typed_data(&typed_data, relay_key.clone()).await;
 
-        if sign_result.is_ok() { successful_signing += 1 }
+        if sign_result.is_ok() {
+            successful_signing += 1
+        }
 
         let relayer = self.create_and_fund_relayer("rate-limit-relayer").await?;
         info!("relayer6: {:?}", relayer);
 
         let sign_result = relayer.sign().typed_data(&typed_data, relay_key.clone()).await;
 
-        if sign_result.is_ok() { successful_signing += 1 }
+        if sign_result.is_ok() {
+            successful_signing += 1
+        }
 
         if successful_signing != 3 {
             return Err(anyhow!(

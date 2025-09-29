@@ -2,8 +2,8 @@ use alloy::primitives::FixedBytes;
 use alloy_eips::eip4844::{Blob, BYTES_PER_BLOB};
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
-use std::{convert::TryFrom, str::FromStr};
 use std::fmt::Display;
+use std::{convert::TryFrom, str::FromStr};
 use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

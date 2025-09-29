@@ -646,10 +646,7 @@ impl TransactionsQueues {
                 );
                 Ok(CancelTransactionResult::failed())
             } else {
-                info!(
-                    "cancel_transaction: transaction {} not found in any queue",
-                    transaction.id
-                );
+                info!("cancel_transaction: transaction {} not found in any queue", transaction.id);
                 Ok(CancelTransactionResult::failed())
             }
         } else {

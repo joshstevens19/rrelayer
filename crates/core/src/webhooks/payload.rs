@@ -112,8 +112,7 @@ impl From<&Transaction> for WebhookTransactionData {
             nonce: transaction.nonce,
             mined_at: transaction.mined_at,
             mined_at_block_number: transaction.mined_at_block_number,
-            sent_with_max_priority_fee_per_gas: transaction
-                .sent_with_max_priority_fee_per_gas,
+            sent_with_max_priority_fee_per_gas: transaction.sent_with_max_priority_fee_per_gas,
             sent_with_max_fee_per_gas: transaction.sent_with_max_fee_per_gas,
             is_noop: transaction.is_noop,
         }

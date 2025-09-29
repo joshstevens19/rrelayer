@@ -385,10 +385,8 @@ impl<P> RelayerProvider<P> {
         };
 
         // Extract value (default to 0 if not specified)
-        let value = tx_request
-            .value
-            .map(TransactionValue::new)
-            .unwrap_or_else(TransactionValue::zero);
+        let value =
+            tx_request.value.map(TransactionValue::new).unwrap_or_else(TransactionValue::zero);
 
         // Extract transaction data - simplified for now
         let data = match tx_request.input.input() {

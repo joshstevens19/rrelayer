@@ -34,7 +34,9 @@ impl TestRunner {
                 )
                 .await;
 
-            if tx_result.is_ok() { successful_transactions += 1 }
+            if tx_result.is_ok() {
+                successful_transactions += 1
+            }
         }
         if successful_transactions != 1 {
             return Err(anyhow!("Sending transactions rate limiting not enforced"));

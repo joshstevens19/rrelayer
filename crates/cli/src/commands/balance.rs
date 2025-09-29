@@ -46,14 +46,10 @@ pub async fn handle_balance(
                         BalanceError::QueryFailed(format!("Failed to get token balance: {}", e))
                     })?;
 
-                let decimals =
-                    token_contract.decimals().call().await.unwrap_or(18u8);
+                let decimals = token_contract.decimals().call().await.unwrap_or(18u8);
 
-                let token_symbol = token_contract
-                    .symbol()
-                    .call()
-                    .await
-                    .unwrap_or_else(|_| "TOKEN".to_string());
+                let token_symbol =
+                    token_contract.symbol().call().await.unwrap_or_else(|_| "TOKEN".to_string());
 
                 let divisor = U256::from(10).pow(U256::from(decimals));
                 let token_value = if balance.is_zero() {

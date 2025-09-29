@@ -83,16 +83,19 @@ pub fn list_profiles() -> Result<Vec<String>, CredentialError> {
     let storage_dir = get_storage_dir()?;
 
     if storage_dir.exists()
-        && let Ok(entries) = fs::read_dir(storage_dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.is_file() && path.extension() == Some(std::ffi::OsStr::new("json"))
-                    && let Some(stem) = path.file_stem()
-                        && let Some(profile_name) = stem.to_str() {
-                            profiles.push(profile_name.to_string());
-                        }
+        && let Ok(entries) = fs::read_dir(storage_dir)
+    {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file()
+                && path.extension() == Some(std::ffi::OsStr::new("json"))
+                && let Some(stem) = path.file_stem()
+                && let Some(profile_name) = stem.to_str()
+            {
+                profiles.push(profile_name.to_string());
             }
         }
+    }
 
     profiles.sort();
     Ok(profiles)

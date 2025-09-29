@@ -303,8 +303,8 @@ impl WalletManagerTrait for TurnkeyWalletManager {
         {
             let accounts = self.accounts.lock().await;
             if let Some(account) = accounts.get(&wallet_index) {
-                return EvmAddress::from_str(&account.address).map_err(|e| {
-                    WalletError::ApiError { message: format!("Invalid address format: {}", e) }
+                return EvmAddress::from_str(&account.address).map_err(|e| WalletError::ApiError {
+                    message: format!("Invalid address format: {}", e),
                 });
             }
         }

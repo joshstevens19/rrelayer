@@ -252,11 +252,12 @@ impl AppState {
         if let Some(network_permissions) = network_permission {
             for network_permission in network_permissions {
                 if network_permission.relayers.contains(relayer)
-                    && network_permission.disable_personal_sign.unwrap_or_default() {
-                        return Err(unauthorized(Some(
-                            "Relayer have disabled personal signing".to_string(),
-                        )));
-                    }
+                    && network_permission.disable_personal_sign.unwrap_or_default()
+                {
+                    return Err(unauthorized(Some(
+                        "Relayer have disabled personal signing".to_string(),
+                    )));
+                }
             }
         }
 

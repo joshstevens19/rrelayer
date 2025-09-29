@@ -25,7 +25,9 @@ impl TestRunner {
         for _ in 0..5 {
             let sign_result = relayer.sign().text("Hello, RRelayer!", relay_key.clone()).await;
 
-            if sign_result.is_ok() { successful_signing += 1 }
+            if sign_result.is_ok() {
+                successful_signing += 1
+            }
         }
 
         if successful_signing != 1 {
@@ -78,7 +80,9 @@ impl TestRunner {
         for _ in 0..5 {
             let sign_result = relayer.sign().typed_data(&typed_data, relay_key.clone()).await;
 
-            if sign_result.is_ok() { successful_typed_signing += 1 }
+            if sign_result.is_ok() {
+                successful_typed_signing += 1
+            }
         }
 
         if successful_typed_signing != 0 {
