@@ -4,12 +4,783 @@ Transaction-related SDK call.
 
 ## Send Transaction
 
+:::info
+If your already using viem or ethers you can use the framework guides to integrate rrelayer.
+[viem](/integration/sdk/framework-guides/typescript/viem) and [ethers](/integration/sdk/framework-guides/typescript/ethers).
+:::
+
+:::info
+Basic auth can send transactions with all relayers, and API keys can only send transactions with the relayer
+they have permission to use.
+:::
+
+### Transaction Request
+
+Just so you understand the properties you can pass in to send a transaction
+
+```ts
+export enum TransactionSpeed {
+  SLOW = 'SLOW',
+  MEDIUM = 'MEDIUM',
+  FAST = 'FAST',
+  SUPER = 'SUPER',
+}
+
+export interface TransactionToSend {
+  to: string;
+  value?: string | null;
+  data?: string | null;
+  speed?: TransactionSpeed | null; // defaults to TransactionSpeed.Fast
+  blobs?: `0x${string}`[];
+  external_id?: string; // Is sent in the webhook and usage for your own custom ids
+}
+```
+
+### Transaction Response
+
+```ts
+Promise<TransactionSent>;
+```
+
+Just so you understand the properties, the properties you get back when you send
+
+```ts
+export interface TransactionSent {
+  id: string;
+  hash: `0x${string}`;
+}
+```
+
+### Sending Native Transaction
+
+You can send native funds using the below:
+
+#### Basic Auth
+
+```ts
+// config.ts
+import { createClient, TransactionSpeed } from 'rrelayer';
+
+const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: 'your_username',
+    password: 'your_password',
+  },
+});
+
+export const relayerClient = await client.getRelayerClient(
+  // The relayer id you want to connect to
+  '94afb207-bb47-4392-9229-ba87e4d783cb',
+  // This is optional it defaults to fast
+  TransactionSpeed.FAST
+);
+
+...
+
+// send-eth-transaction.ts
+import { relayerClient } from './config';
+import { TransactionToSend } from 'rrelayer';
+
+// Using a framework like viem and ethers is recommended here. Look under framework guides > TypeScript for them.
+const txRequest: TransactionToSend = {
+    to: '0x5FCD072a0BD58B6fa413031582E450FE724dba6D',
+    value: '1000000000000000000'
+};
+
+// returns TransactionSent - import { TransactionSent } from 'rrelayer';
+let response = await relayerClient.transaction.send(txRequest);
+
+// returns a TransactionReceipt - import { TransactionReceipt } from 'rrelayer';
+let receipt = await relayerClient.transaction.waitForTransactionReceiptById(
+    response.id
+);
+```
+
+#### API Key Auth
+
+```ts
+// config.ts
+import { createRelayerClient, TransactionSpeed } from 'rrelayer';
+
+export let relayerClient = createRelayerClient({
+  serverUrl: 'http://localhost:8000',
+  relayerId: '94afb207-bb47-4392-9229-ba87e4d783cb',
+  apiKey: 'YOUR_API_KEY',
+  // This is optional it defaults to fast
+  speed: TransactionSpeed.FAST,
+});
+
+...
+
+// send-eth-transaction.ts
+import { relayerClient } from './config';
+import { TransactionToSend } from 'rrelayer';
+
+// Using a framework like viem and ethers is recommended here. Look under framework guides > TypeScript for them.
+const txRequest: TransactionToSend = {
+    to: '0x5FCD072a0BD58B6fa413031582E450FE724dba6D',
+    value: '1000000000000000000'
+};
+
+// returns TransactionSent - import { TransactionSent } from 'rrelayer';
+let response = await relayerClient.transaction.send(txRequest);
+
+// returns a TransactionReceipt - import { TransactionReceipt } from 'rrelayer';
+let receipt = await relayerClient.transaction.waitForTransactionReceiptById(
+    response.id
+);
+```
+
+### Sending Contract Transaction
+
+You can send contract transactions using the below:
+
+#### Basic Auth
+
+```ts
+// config.ts
+import { createClient, TransactionSpeed } from 'rrelayer';
+
+const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: 'your_username',
+    password: 'your_password',
+  },
+});
+
+export const relayerClient = await client.getRelayerClient(
+  // The relayer id you want to connect to
+  '94afb207-bb47-4392-9229-ba87e4d783cb',
+  // This is optional it defaults to fast
+  TransactionSpeed.FAST
+);
+
+...
+
+// send-contract-transaction.ts
+import { relayerClient } from './config';
+import { TransactionToSend } from 'rrelayer';
+
+// Using a framework like viem and ethers is recommended here. Look under framework guides > TypeScript for them.
+const txRequest: TransactionToSend = {
+    to: '0xFBA3912Ca04dd458c843e2EE08967fC04f3579c2',
+    data: '0x0111111' // the encoding of the contract call
+};
+
+// returns TransactionSent - import { TransactionSent } from 'rrelayer';
+let response = await relayerClient.transaction.send(txRequest);
+
+// returns a TransactionReceipt - import { TransactionReceipt } from 'rrelayer';
+let receipt = await relayerClient.transaction.waitForTransactionReceiptById(
+    response.id
+);
+```
+
+#### API Key Auth
+
+```ts
+// config.ts
+import { createRelayerClient, TransactionSpeed } from 'rrelayer';
+
+export let relayerClient = createRelayerClient({
+  serverUrl: 'http://localhost:8000',
+  relayerId: '94afb207-bb47-4392-9229-ba87e4d783cb',
+  apiKey: 'YOUR_API_KEY',
+  // This is optional it defaults to fast
+  speed: TransactionSpeed.FAST,
+});
+
+...
+
+// send-contract-transaction.ts
+import { relayerClient } from './config';
+import { TransactionToSend } from 'rrelayer';
+
+// Using a framework like viem and ethers is recommended here. Look under framework guides > TypeScript for them.
+const txRequest: TransactionToSend = {
+    to: '0xFBA3912Ca04dd458c843e2EE08967fC04f3579c2', // the contract address
+    data: '0x0111111' // the encoding of the contract call
+};
+
+// returns TransactionSent - import { TransactionSent } from 'rrelayer';
+let response = await relayerClient.transaction.send(txRequest);
+
+// returns a TransactionReceipt - import { TransactionReceipt } from 'rrelayer';
+let receipt = await relayerClient.transaction.waitForTransactionReceiptById(
+    response.id
+);
+```
+
+### Blob Transaction
+
+:::warn
+To send blob transactions you need to make sure [enable_sending_blobs](/config/networks/config#enable_sending_blobs---optional)
+is enabled and your on a chain which supports blobs.
+:::
+
+#### Basic Auth
+
+```ts
+// config.ts
+import { createClient, TransactionSpeed } from 'rrelayer';
+
+const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: 'your_username',
+    password: 'your_password',
+  },
+});
+
+export const relayerClient = await client.getRelayerClient(
+  // The relayer id you want to connect to
+  '94afb207-bb47-4392-9229-ba87e4d783cb',
+  // This is optional it defaults to fast
+  TransactionSpeed.FAST
+);
+
+...
+
+// send-blob-transaction.ts
+import { relayerClient } from './config';
+import { createBlobFromString } from 'rrelayer';
+
+// just a simple example of creating a blob into bytes encoded as a hex string
+const blobData = createBlobFromString('hello world');
+
+const txRequest = {
+    to: '0x5FCD072a0BD58B6fa413031582E450FE724dba6D',
+    blob: [blobData]
+};
+
+// returns TransactionSent - import { TransactionSent } from 'rrelayer';
+let response = await relayerClient.transaction.send(txRequest);
+
+// returns a TransactionReceipt - import { TransactionReceipt } from 'rrelayer';
+let receipt = await relayerClient.transaction.waitForTransactionReceiptById(
+    response.id
+);
+```
+
+#### API Key Auth
+
+```ts
+// config.ts
+import { createRelayerClient, TransactionSpeed } from 'rrelayer';
+
+export let relayerClient = createRelayerClient({
+  serverUrl: 'http://localhost:8000',
+  relayerId: '94afb207-bb47-4392-9229-ba87e4d783cb',
+  apiKey: 'YOUR_API_KEY',
+  // This is optional it defaults to fast
+  speed: TransactionSpeed.FAST,
+});
+
+...
+
+// send-blob-transaction.ts
+import { relayerClient } from './config';
+import { createBlobFromString } from 'rrelayer';
+
+// just a simple example of creating a blob into bytes encoded as a hex string
+const blobData = createBlobFromString('hello world');
+
+const txRequest = {
+    to: '0x5FCD072a0BD58B6fa413031582E450FE724dba6D',
+    blob: [blobData]
+};
+
+// returns TransactionSent - import { TransactionSent } from 'rrelayer';
+let response = await relayerClient.transaction.send(txRequest);
+
+// returns a TransactionReceipt - import { TransactionReceipt } from 'rrelayer';
+let receipt = await relayerClient.transaction.waitForTransactionReceiptById(
+    response.id
+);
+```
+
 ## Get Transaction
+
+:::info
+Basic auth can get transactions for all relayers, and API keys can only get transactions with the relayer they have permission to use.
+:::
+
+Get the transaction sent information by transaction id.
+
+### Response
+
+```ts
+Promise<Transaction | null>;
+```
+
+Just so you understand, the properties returned on a transaction
+
+```ts
+export enum TransactionStatus {
+  PENDING = 'PENDING',
+  INMEMPOOL = 'INMEMPOOL',
+  MINED = 'MINED',
+  CONFIRMED = 'CONFIRMED',
+  FAILED = 'FAILED',
+  EXPIRED = 'EXPIRED',
+  CANCELLED = 'CANCELLED',
+  REPLACED = 'REPLACED',
+  DROPPED = 'DROPPED',
+}
+
+export enum TransactionSpeed {
+  SLOW = 'SLOW',
+  MEDIUM = 'MEDIUM',
+  FAST = 'FAST',
+  SUPER = 'SUPER',
+}
+
+export interface GasPriceResult {
+  maxPriorityFee: number;
+  maxFee: number;
+  minWaitTimeEstimate?: number;
+  maxWaitTimeEstimate?: number;
+}
+
+export interface BlobGasPriceResult {
+  blobGasPrice: string;
+  totalFeeForBlob: string;
+}
+
+export interface Transaction {
+  id: string;
+  relayerId: string;
+  to: `0x${string}`;
+  from: `0x${string}`;
+  value: string;
+  data: string;
+  nonce: string;
+  chainId: number;
+  gasLimit?: string | null;
+  status: TransactionStatus;
+  blobs?: any[] | null;
+  txHash?: `0x${string}` | null;
+  queuedAt: Date;
+  expiresAt: Date;
+  sentAt?: string | null;
+  confirmedAt?: string | null;
+  sentWithGas?: GasPriceResult | null;
+  sentWithBlobGas?: BlobGasPriceResult | null;
+  minedAt?: Date | null;
+  minedAtBlockNumber?: string | null;
+  speed: TransactionSpeed;
+  maxPriorityFee?: string | null;
+  maxFee?: string | null;
+  isNoop: boolean; // cancelled transaction
+  externalId?: string | null;
+  cancelledByTransactionId?: string | null;
+}
+```
+
+### Basic Auth
+
+```ts
+// config.ts
+import { createClient, TransactionSpeed } from 'rrelayer';
+
+const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: 'your_username',
+    password: 'your_password',
+  },
+});
+
+export const relayerClient = await client.getRelayerClient(
+  // The relayer id you want to connect to
+  '94afb207-bb47-4392-9229-ba87e4d783cb',
+  // This is optional it defaults to fast
+  TransactionSpeed.FAST
+);
+
+...
+
+// get-transaction.ts
+import { relayerClient } from './config';
+
+// returns a Transaction | null - import { TransactionStatusResult } from 'rrelayer';
+let response = await relayerClient.transaction.get('ebf8a8c1-9de5-4307-9810-8e842dad7bde');
+```
+
+### API Key Auth
+
+```ts
+// config.ts
+import { createRelayerClient, TransactionSpeed } from 'rrelayer';
+
+export let relayerClient = createRelayerClient({
+  serverUrl: 'http://localhost:8000',
+  relayerId: '94afb207-bb47-4392-9229-ba87e4d783cb',
+  apiKey: 'YOUR_API_KEY',
+  // This is optional it defaults to fast
+  speed: TransactionSpeed.FAST,
+});
+
+...
+
+
+// get-transaction.ts
+import { relayerClient } from './config';
+
+// returns a Transaction | null - import { TransactionStatusResult } from 'rrelayer';
+let response = await relayerClient.transaction.get('ebf8a8c1-9de5-4307-9810-8e842dad7bde');
+```
 
 ## Transaction Status
 
+:::info
+Basic auth can get transaction statuses for all relayers, and API keys can only get transactions statuses with the relayer they have permission to use.
+:::
+
+Get the transaction status by transaction id.
+
+### Response
+
+```ts
+Promise<TransactionStatusResult | null>;
+```
+
+Just so you understand, the properties returned on a transaction status response
+
+```ts
+import { TransactionReceipt } from 'rrelayer';
+
+export enum TransactionStatus {
+  PENDING = 'PENDING',
+  INMEMPOOL = 'INMEMPOOL',
+  MINED = 'MINED',
+  CONFIRMED = 'CONFIRMED',
+  FAILED = 'FAILED',
+  EXPIRED = 'EXPIRED',
+  CANCELLED = 'CANCELLED',
+  REPLACED = 'REPLACED',
+  DROPPED = 'DROPPED',
+}
+
+export interface TransactionStatusResult {
+  hash?: `0x${string}`;
+  status: TransactionStatus;
+  receipt?: TransactionReceipt;
+}
+```
+
+### Basic Auth
+
+```ts
+// config.ts
+import { createClient, TransactionSpeed } from 'rrelayer';
+
+const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: 'your_username',
+    password: 'your_password',
+  },
+});
+
+export const relayerClient = await client.getRelayerClient(
+  // The relayer id you want to connect to
+  '94afb207-bb47-4392-9229-ba87e4d783cb',
+  // This is optional it defaults to fast
+  TransactionSpeed.FAST
+);
+
+...
+
+// get-transaction-status.ts
+import { relayerClient } from './config';
+
+// returns a TransactionStatusResult | null - import { TransactionStatusResult } from 'rrelayer';
+let response = await relayerClient.transaction.getStatus('ebf8a8c1-9de5-4307-9810-8e842dad7bde');
+```
+
+### API Key Auth
+
+```ts
+// config.ts
+import { createRelayerClient, TransactionSpeed } from 'rrelayer';
+
+export let relayerClient = createRelayerClient({
+  serverUrl: 'http://localhost:8000',
+  relayerId: '94afb207-bb47-4392-9229-ba87e4d783cb',
+  apiKey: 'YOUR_API_KEY',
+  // This is optional it defaults to fast
+  speed: TransactionSpeed.FAST,
+});
+
+...
+
+// get-transaction-status.ts
+import { relayerClient } from './config';
+
+// returns a TransactionStatusResult | null - import { TransactionStatusResult } from 'rrelayer';
+let response = await relayerClient.transaction.getStatus('ebf8a8c1-9de5-4307-9810-8e842dad7bde');
+```
+
 ## Replace Transaction
+
+:::info
+Basic auth can replace transactions for all relayers, and API keys can only replace transactions with the relayer they have permission to use.
+:::
+
+Replace an existing transaction. Note replace may not win, for example, if the transaction is already in the mempool, it could
+be mined before it is replaced.
+
+### Response
+
+```ts
+Promise<TransactionSent>;
+```
+
+Just so you understand the properties, the properties you get back when you send
+
+```ts
+export interface TransactionSent {
+  id: string;
+  hash: `0x${string}`;
+}
+```
+
+### Basic Auth
+
+```ts
+// config.ts
+import { createClient, TransactionSpeed } from 'rrelayer';
+
+const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: 'your_username',
+    password: 'your_password',
+  },
+});
+
+export const relayerClient = await client.getRelayerClient(
+  // The relayer id you want to connect to
+  '94afb207-bb47-4392-9229-ba87e4d783cb',
+  // This is optional it defaults to fast
+  TransactionSpeed.FAST
+);
+
+...
+
+// replace-transaction.ts
+import { relayerClient } from './config';
+import { TransactionToSend } from 'rrelayer';
+
+// Using a framework like viem and ethers is recommended here. Look under framework guides > TypeScript for them.
+const txRequest: TransactionToSend = {
+    to: '0x5FCD072a0BD58B6fa413031582E450FE724dba6D',
+    value: '1000000000000000000'
+};
+
+// returns TransactionSent - import { TransactionSent } from 'rrelayer';
+let response = await relayerClient.transaction.replace('ebf8a8c1-9de5-4307-9810-8e842dad7bde', txRequest);
+
+// returns a TransactionReceipt - import { TransactionReceipt } from 'rrelayer';
+let receipt = await relayerClient.transaction.waitForTransactionReceiptById(
+    response.id
+);
+```
+
+### API Key Auth
+
+```ts
+// config.ts
+import { createRelayerClient, TransactionSpeed } from 'rrelayer';
+
+export let relayerClient = createRelayerClient({
+  serverUrl: 'http://localhost:8000',
+  relayerId: '94afb207-bb47-4392-9229-ba87e4d783cb',
+  apiKey: 'YOUR_API_KEY',
+  // This is optional it defaults to fast
+  speed: TransactionSpeed.FAST,
+});
+
+...
+
+// replace-transaction.ts
+import { relayerClient } from './config';
+import { TransactionToSend } from 'rrelayer';
+
+// Using a framework like viem and ethers is recommended here. Look under framework guides > TypeScript for them.
+const txRequest: TransactionToSend = {
+    to: '0x5FCD072a0BD58B6fa413031582E450FE724dba6D',
+    value: '1000000000000000000'
+};
+
+// returns TransactionSent - import { TransactionSent } from 'rrelayer';
+let response = await relayerClient.transaction.replace('ebf8a8c1-9de5-4307-9810-8e842dad7bde', txRequest);
+
+// returns a TransactionReceipt - import { TransactionReceipt } from 'rrelayer';
+let receipt = await relayerClient.transaction.waitForTransactionReceiptById(
+    response.id
+);
+```
 
 ## Cancel Transaction
 
-## Transactions Counts
+:::info
+Basic auth can cancel transactions for all relayers, and API keys can only cancel transactions with the relayer they have permission to use.
+:::
+
+Cancel an existing transaction. Note cancel may not win, for example, if the transaction is already in the mempool, it could
+be mined before it is cancelled.
+
+### Response
+
+```ts
+Promise<TransactionSent>;
+```
+
+Just so you understand the properties, the properties you get back when you send
+
+```ts
+export interface TransactionSent {
+  id: string;
+  hash: `0x${string}`;
+}
+```
+
+### Basic Auth
+
+```ts
+// config.ts
+import { createClient, TransactionSpeed } from 'rrelayer';
+
+const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: 'your_username',
+    password: 'your_password',
+  },
+});
+
+export const relayerClient = await client.getRelayerClient(
+  // The relayer id you want to connect to
+  '94afb207-bb47-4392-9229-ba87e4d783cb',
+  // This is optional it defaults to fast
+  TransactionSpeed.FAST
+);
+
+...
+
+// cancel-transaction.ts
+import { relayerClient } from './config';
+
+// returns TransactionSent - import { TransactionSent } from 'rrelayer';
+let response = await relayerClient.transaction.cancel('ebf8a8c1-9de5-4307-9810-8e842dad7bde');
+
+// returns a TransactionReceipt - import { TransactionReceipt } from 'rrelayer';
+let receipt = await relayerClient.transaction.waitForTransactionReceiptById(
+    response.id
+);
+```
+
+### API Key Auth
+
+```ts
+// config.ts
+import { createRelayerClient, TransactionSpeed } from 'rrelayer';
+
+export let relayerClient = createRelayerClient({
+  serverUrl: 'http://localhost:8000',
+  relayerId: '94afb207-bb47-4392-9229-ba87e4d783cb',
+  apiKey: 'YOUR_API_KEY',
+  // This is optional it defaults to fast
+  speed: TransactionSpeed.FAST,
+});
+
+...
+
+// cancel-transaction.ts
+import { relayerClient } from './config';
+
+// returns TransactionSent - import { TransactionSent } from 'rrelayer';
+let response = await relayerClient.transaction.cancel('ebf8a8c1-9de5-4307-9810-8e842dad7bde');
+
+// returns a TransactionReceipt - import { TransactionReceipt } from 'rrelayer';
+let receipt = await relayerClient.transaction.waitForTransactionReceiptById(
+    response.id
+);
+```
+
+## Transactions Queue Counts
+
+:::info
+Basic auth can fetch transactions counts for all relayers, and API keys can only fetch transactions counts with the relayer they have permission to use.
+:::
+
+Get the transaction queue count for the relayer.
+
+### Response
+
+```ts
+Promise<number>;
+```
+
+### Basic Auth
+
+```ts
+// config.ts
+import { createClient, TransactionSpeed } from 'rrelayer';
+
+const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: 'your_username',
+    password: 'your_password',
+  },
+});
+
+export const relayerClient = await client.getRelayerClient(
+  // The relayer id you want to connect to
+  '94afb207-bb47-4392-9229-ba87e4d783cb',
+  // This is optional it defaults to fast
+  TransactionSpeed.FAST
+);
+
+...
+
+// transaction-queue-count.ts
+import { relayerClient } from './config';
+import { TransactionCountType } from 'rrelayer';
+
+// returns a number
+let pending_queue_count = await relayerClient.transaction.getCount(TransactionCountType.PENDING);
+// returns a number
+let inmempool_queue_count = await relayerClient.transaction.getCount(TransactionCountType.INMEMPOOL);
+```
+
+### API Key Auth
+
+```ts
+// config.ts
+import { createRelayerClient, TransactionSpeed } from 'rrelayer';
+
+export let relayerClient = createRelayerClient({
+  serverUrl: 'http://localhost:8000',
+  relayerId: '94afb207-bb47-4392-9229-ba87e4d783cb',
+  apiKey: 'YOUR_API_KEY',
+  // This is optional it defaults to fast
+  speed: TransactionSpeed.FAST,
+});
+
+...
+
+// transaction-queue-count.ts
+import { relayerClient } from './config';
+import { TransactionCountType } from 'rrelayer';
+
+// returns a number
+let pending_queue_count = await relayerClient.transaction.getCount(TransactionCountType.PENDING);
+// returns a number
+let inmempool_queue_count = await relayerClient.transaction.getCount(TransactionCountType.INMEMPOOL);
+```

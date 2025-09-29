@@ -1,10 +1,10 @@
-import { Hash, TransactionReceipt } from 'viem';
+import { TransactionReceipt } from 'viem';
 import { getApi } from '../axios-wrapper';
 import { ApiBaseConfig } from '../types';
 import { TransactionStatus } from './types';
 
 export interface TransactionStatusResult {
-  hash?: Hash;
+  hash?: `0x${string}`;
   status: TransactionStatus;
   receipt?: TransactionReceipt;
 }

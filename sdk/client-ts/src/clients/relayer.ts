@@ -118,7 +118,7 @@ export class RelayerClient {
        */
       get: (
         pagingContext: PagingContext = defaultPagingContext
-      ): Promise<PagingResult<string>> => {
+      ): Promise<PagingResult<`0x${string}`>> => {
         return getRelayerAllowlistAddress(
           this.id,
           pagingContext,

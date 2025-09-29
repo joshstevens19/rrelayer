@@ -5,9 +5,9 @@ export const getRelayerAllowlistAddress = async (
   relayerId: string,
   pagingContext: PagingContext,
   baseConfig: ApiBaseConfig
-): Promise<PagingResult<string>> => {
+): Promise<PagingResult<`0x${string}`>> => {
   try {
-    const response = await getApi<PagingResult<string>>(
+    const response = await getApi<PagingResult<`0x${string}`>>(
       baseConfig,
       `relayers/${relayerId}/allowlists`,
       { ...pagingContext }

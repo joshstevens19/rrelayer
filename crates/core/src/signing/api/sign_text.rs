@@ -15,6 +15,7 @@ use axum::{
 use google_secretmanager1::client::serde_with::serde_derive::Serialize;
 use serde::Deserialize;
 use std::sync::Arc;
+use crate::common_types::EvmAddress;
 
 #[derive(Debug, Deserialize)]
 pub struct SignTextDto {
@@ -26,6 +27,7 @@ pub struct SignTextResult {
     #[serde(rename = "messageSigned")]
     pub message_signed: String,
     pub signature: PrimitiveSignature,
+    pub signed_by: EvmAddress
 }
 
 /// Signs a plain text message using the relayer's private key.
@@ -98,7 +100,7 @@ pub async fn sign_text(
         });
     }
 
-    let result = SignTextResult { message_signed: sign.text, signature };
+    let result = SignTextResult { message_signed: sign.text, signature, signed_by: relayer_provider_context.relayer.address };
 
     if let Some(reservation) = rate_limit_reservation {
         reservation.commit();

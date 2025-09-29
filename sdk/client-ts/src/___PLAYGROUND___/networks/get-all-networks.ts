@@ -9,4 +9,4 @@ export const getAllNetworks = async () => {
   await context.end();
 };
 
-getAllNetworks().then((_) => () => console.log('network done'));
+getAllNetworks().then((_) => () => console.log('get-all-networks done'));

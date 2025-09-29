@@ -1,4 +1,3 @@
-import { Address, Hash } from 'viem';
 import { GasPriceResult, BlobGasPriceResult } from '../network';
 
 export enum TransactionStatus {
@@ -23,8 +22,8 @@ export enum TransactionSpeed {
 export interface Transaction {
   id: string;
   relayerId: string;
-  to: Address;
-  from: Address;
+  to: `0x${string}`;
+  from: `0x${string}`;
   value: string;
   data: string;
   nonce: string;
@@ -32,7 +31,7 @@ export interface Transaction {
   gasLimit?: string | null;
   status: TransactionStatus;
   blobs?: any[] | null;
-  txHash?: Hash | null;
+  txHash?: `0x${string}` | null;
   queuedAt: Date;
   expiresAt: Date;
   sentAt?: string | null;
@@ -60,5 +59,5 @@ export interface TransactionToSend {
 
 export interface TransactionSent {
   id: string;
-  hash: Hash | null;
+  hash: `0x${string}`;
 }

@@ -4,8 +4,33 @@ Sign-related SDK call.
 
 ## Sign Text Message
 
+:::info
+If your already using viem or ethers you can use the framework guides to integrate rrelayer.
+[viem](/integration/sdk/framework-guides/typescript/viem) and [ethers](/integration/sdk/framework-guides/typescript/ethers).
+:::
+
+:::info
 Basic auth can sign text with all relayers, and API keys can only sign text with the relayer
 they have permission to use.
+:::
+
+Sign text message with the relayer.
+
+### Response
+
+```ts
+Promise<SignTextResult>;
+```
+
+Just so you understand the properties returned
+
+```ts
+export interface SignTextResult {
+  messageSigned: string;
+  signature: string;
+  signedBy: `0x${string}`;
+}
+```
 
 ### Basic Auth
 
@@ -33,7 +58,9 @@ export const relayerClient = await client.getRelayerClient(
 // sign-text.ts
 import { relayerClient } from './config';
 
-let signature = await relayerClient.sign.text('sign this message');
+// Using a framework like viem and ethers is recommended here. Look under framework guides > TypeScript for them.
+// returns a SignTextResult - import { SignTextResult } from 'rrelayer';
+let result = await relayerClient.sign.text('sign this message');
 ```
 
 ### API Key Auth
@@ -55,17 +82,54 @@ export let relayerClient = createRelayerClient({
 // sign-text.ts
 import { relayerClient } from './config';
 
-let signature = await relayerClient.sign.text('sign this message');
+// Using a framework like viem and ethers is recommended here. Look under framework guides > TypeScript for them.
+// returns a SignTextResult - import { SignTextResult } from 'rrelayer';
+let result = await relayerClient.sign.text('sign this message');
 ```
 
 ## Signed Text History
 
+:::info
 Basic auth can read all relayers signed text history, and API keys can only read the signed text history
 with the relayer they have permission to use.
+:::
+
+Get the full history of what the relayer has signed via messages.
+
+### Response
+
+```ts
+Promise<PagingResult<SignedTextHistory>>;
+```
+
+Just so you understand the properties returned
+
+```ts
+export interface PagingContext {
+  limit: number;
+  offset: number;
+}
+
+export interface PagingResult<T> {
+  items: T[];
+  next?: PagingContext;
+  previous?: PagingContext;
+}
+
+export interface SignedTextHistory {
+  relayerId: string;
+  message: string;
+  signature: string;
+  chain_id: number;
+  signed_at: Date;
+}
+
+type SignedTextHistoryResponse = PagingResult<SignedTextHistory>;
+```
 
 ### Basic Auth
 
-```ts []
+```ts
 // config.ts
 import { createClient, TransactionSpeed } from 'rrelayer';
 
@@ -89,6 +153,7 @@ export const relayerClient = await client.getRelayerClient(
 // signed-text-history.ts
 import { relayerClient } from './config';
 
+// returns -> PagingResult<SignedTextHistory>
 let signedTextHistory = await relayerClient.sign.textHistory({
   limit: 100,
   offset: 0,
@@ -97,7 +162,7 @@ let signedTextHistory = await relayerClient.sign.textHistory({
 
 ### API Key Auth
 
-```ts [signed-text-history.ts]
+```ts
 // config.ts
 import { createRelayerClient, TransactionSpeed } from 'rrelayer';
 
@@ -114,6 +179,7 @@ export let relayerClient = createRelayerClient({
 // signed-text-history.ts
 import { relayerClient } from './config';
 
+// returns -> PagingResult<SignedTextHistory>
 let signedTextHistory = await relayerClient.sign.textHistory({
   limit: 100,
   offset: 0,
@@ -122,8 +188,26 @@ let signedTextHistory = await relayerClient.sign.textHistory({
 
 ## Sign Typed Data
 
+:::info
 Basic auth can sign typed data with all relayers, and API keys can only sign typed data with the relayer
 they have permission to use.
+:::
+
+Sign typed data with the relayer.
+
+### Response
+
+```ts
+Promise<SignTypedDataResult>;
+```
+
+Just so you understand the properties returned
+
+```ts
+export interface SignTypedDataResult {
+  signature: string;
+}
+```
 
 ### Basic Auth
 
@@ -178,7 +262,9 @@ const typedData = {
   message: value,
 };
 
-let signature = await relayerClient.sign.typedData(typedData);
+// Using a framework like viem and ethers is recommended here. Look under framework guides > TypeScript for them.
+// returns a SignTypedDataResult - import { SignTypedDataResult } from 'rrelayer';
+let result = await relayerClient.sign.typedData(typedData);
 ```
 
 ### API Key Auth
@@ -227,13 +313,52 @@ const typedData = {
   message: value,
 };
 
-let signature = await relayerClient.sign.typedData(typedData);
+// Using a framework like viem and ethers is recommended here. Look under framework guides > TypeScript for them.
+// returns a SignTypedDataResult - import { SignTypedDataResult } from 'rrelayer';
+let result = await relayerClient.sign.typedData(typedData);
 ```
 
 ## Signed Typed Data History
 
+:::info
 Basic auth can read all relayers signed typed data history, and API keys can only read the signed typed data history
 with the relayer they have permission to use.
+:::
+
+Get the full history of what the relayer has signed via typed data.
+
+### Response
+
+```ts
+Promise<PagingResult<SignedTypedDataHistory>>;
+```
+
+Just so you understand the properties returned
+
+```ts
+export interface PagingContext {
+  limit: number;
+  offset: number;
+}
+
+export interface PagingResult<T> {
+  items: T[];
+  next?: PagingContext;
+  previous?: PagingContext;
+}
+
+export interface SignedTypedDataHistory {
+  relayerId: string;
+  domainData: unknown;
+  messageData: unknown;
+  primaryType: string;
+  signature: string;
+  chainId: number;
+  signedAt: Date;
+}
+
+type SignedTypedDataHistoryResponse = PagingResult<SignedTypedDataHistory>;
+```
 
 ### Basic Auth
 
@@ -261,6 +386,7 @@ export const relayerClient = await client.getRelayerClient(
 // signed-typed-data-history.ts
 import { relayerClient } from './config';
 
+// returns -> PagingResult<SignedTypedDataHistory>
 let signedTypedDataHistory = await relayerClient.sign.typedDataHistory({
   limit: 100,
   offset: 0,
@@ -286,6 +412,7 @@ export let relayerClient = createRelayerClient({
 // signed-typed-data-history.ts
 import { relayerClient } from './config';
 
+// returns -> PagingResult<SignedTypedDataHistory>
 let signedTypedDataHistory = await relayerClient.sign.typedDataHistory({
   limit: 100,
   offset: 0,

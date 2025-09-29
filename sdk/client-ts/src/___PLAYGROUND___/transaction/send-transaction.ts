@@ -8,7 +8,6 @@ export const sendTransaction = async () => {
   const txRequest = {
     to: accounts[1].address,
     value: '1000000000000000000',
-    data: '0x',
   };
 
   const response = await context.relayer.transaction.send(txRequest);

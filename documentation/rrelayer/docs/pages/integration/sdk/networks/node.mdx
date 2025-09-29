@@ -10,11 +10,30 @@ Only basic auth authentication can get a network
 
 Get the network details.
 
+### Response
+
+```ts
+Promise<Network | null>;
+```
+
+Just so you understand the properties returned
+
+```ts
+export interface Network {
+  name: string;
+  chainId: number;
+  providerUrls: string[];
+}
+```
+
+### Example
+
 :::code-group
 
 ```ts [get-network.ts]
 import { client } from './config';
 
+// returns Network | null - import { Network } from 'rrelayer';
 let network = await client.network.get(11155111);
 ```
 
@@ -40,11 +59,30 @@ Only basic auth authentication can get all networks
 
 Get all networks details.
 
+### Response
+
+```ts
+Promise<Networks[]>;
+```
+
+Just so you understand the properties returned
+
+```ts
+export interface Network {
+  name: string;
+  chainId: number;
+  providerUrls: string[];
+}
+```
+
+### Example
+
 :::code-group
 
 ```ts [get-networks.ts]
 import { client } from './config';
 
+// returns Network[] - import { Network } from 'rrelayer';
 let networks = await client.network.getAll();
 ```
 
@@ -68,13 +106,40 @@ export const client = createClient({
 Only basic auth authentication can get the networks gas prices
 :::
 
-Get the gas prices for the network
+Get the gas prices for the network.
+
+### Response
+
+```ts
+Promise<GasEstimatorResult>;
+```
+
+Just so you understand the properties returned
+
+```ts
+export interface GasPriceResult {
+  maxPriorityFee: number;
+  maxFee: number;
+  minWaitTimeEstimate?: number;
+  maxWaitTimeEstimate?: number;
+}
+
+export interface GasEstimatorResult {
+  slow: GasPriceResult;
+  medium: GasPriceResult;
+  fast: GasPriceResult;
+  superFast: GasPriceResult;
+}
+```
+
+### Example
 
 :::code-group
 
 ```ts [get-networks.ts]
 import { client } from './config';
 
+// returns GasEstimatorResult - import { GasEstimatorResult } from 'rrelayer';
 let gasPrices = await client.network.getGasPrices(11155111);
 ```
 
