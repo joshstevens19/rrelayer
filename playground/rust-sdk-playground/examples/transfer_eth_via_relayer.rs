@@ -3,16 +3,13 @@
 use alloy::{
     network::TransactionBuilder,
     primitives::{Address, U256},
-    providers::{Provider, ProviderBuilder},
     rpc::types::TransactionRequest,
-    signers::Signer,
 };
 use eyre::Result;
-use rrelayer::{RelayerClient, RelayerClientAuth, RelayerClientConfig, RelayerId};
+use rrelayer::{
+    RelayerClient, RelayerClientAuth, RelayerClientConfig, RelayerId, RelayerSigner, with_relayer,
+};
 use std::{str::FromStr, sync::Arc};
-
-// Import our relayer integration
-use rust_sdk_playground::alloy::{RelayerSigner, with_relayer};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -44,8 +41,8 @@ async fn main() -> Result<()> {
     println!("   Bob: {}", bob);
 
     // Build transaction EXACTLY like the original Alloy example
-    let tx =
-        TransactionRequest::default().with_from(alice).with_to(bob).with_value(U256::from(100)); // 100 wei
+    let _ =
+        TransactionRequest::default().with_from(*alice).with_to(bob).with_value(U256::from(100)); // 100 wei
 
     println!("\n💸 Sending 100 wei from Alice to Bob...");
     println!("   Using: hijacked_provider.send_transaction(tx)");
@@ -92,10 +89,9 @@ fn create_relayer_signer() -> Result<RelayerSigner> {
     };
     let relayer_client = Arc::new(RelayerClient::new(config));
 
-    Ok(RelayerSigner::new(
-        relayer_id,
+    Ok(RelayerSigner::from_relayer_client(
         relayer_client,
         Address::from_str("0x742d35cc6634c0532925a3b8d67e8000c942b1b5")?,
-        Some(1), // Mainnet
+        Some(1),
     ))
 }

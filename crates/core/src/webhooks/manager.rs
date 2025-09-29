@@ -26,7 +26,11 @@ pub struct WebhookManager {
     pub sender: WebhookSender,
     webhook_configs: Vec<WebhookConfig>,
     network_names: Arc<RwLock<HashMap<ChainId, String>>>,
+    // TODO: REVIEW
+    #[allow(dead_code)]
     cleanup_interval: Interval,
+    // TODO: REVIEW
+    #[allow(dead_code)]
     retry_interval: Interval,
 }
 
@@ -306,6 +310,8 @@ impl WebhookManager {
         }
     }
 
+    // TODO: REVIEW
+    #[allow(dead_code)]
     async fn cleanup_deliveries(&self) {
         let mut pending = self.pending_deliveries.write().await;
         let initial_count = pending.len();

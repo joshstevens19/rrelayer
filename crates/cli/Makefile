@@ -44,7 +44,6 @@ config_pause:
 	cargo run -- config --path $(CURDIR)/../../playground/example pause --relayer-id 7ed18611-1739-4a5f-99e3-e70356029984
 config_unpause:
 	cargo run -- config --path $(CURDIR)/../../playground/example unpause --relayer-id 7ed18611-1739-4a5f-99e3-e70356029984
-# TODO: How to set back to EIP-1559
 config_gas_latest:
 	cargo run -- config --path $(CURDIR)/../../playground/example gas --relayer-id 7ed18611-1739-4a5f-99e3-e70356029984 latest
 config_gas_legacy:

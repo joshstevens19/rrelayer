@@ -115,6 +115,7 @@ impl WebhookTestServer {
         self.received_webhooks.lock().unwrap().clear();
     }
 
+    #[allow(dead_code)]
     pub fn count_webhooks_by_event(&self, event_type: &str) -> usize {
         self.received_webhooks
             .lock()
@@ -124,6 +125,7 @@ impl WebhookTestServer {
             .count()
     }
 
+    #[allow(dead_code)]
     pub async fn wait_for_webhook(
         &self,
         transaction_id: &str,
@@ -144,6 +146,7 @@ impl WebhookTestServer {
         None
     }
 
+    #[allow(dead_code)]
     fn verify_signature(&self, payload: &serde_json::Value, signature: &str) -> bool {
         use hmac::{Hmac, Mac};
         use sha2::Sha256;

@@ -49,9 +49,3 @@ hmac = "0.12"
 sha2 = "0.10"
 p256 = { version = "0.13", features = ["ecdsa"] }
 tower = "0.5.2"
-
-[profile.maxperf]
-inherits = "release"
-lto = "fat"
-codegen-units = 1
-incremental = false

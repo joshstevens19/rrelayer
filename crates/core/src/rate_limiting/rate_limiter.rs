@@ -1,6 +1,6 @@
 use super::{
     detection::RateLimitDetector,
-    types::{RateLimitDetectContext, RateLimitError, RateLimitOperation, RateLimitResult},
+    types::{RateLimitError, RateLimitOperation, RateLimitResult},
 };
 use crate::app_state::AppState;
 use crate::relayer::get_relayer;
@@ -165,7 +165,6 @@ impl RateLimiter {
             rate_limiter: self,
             user_key: user_key.clone(),
             operation,
-            context,
             relayer_address: *relayer_address,
             reserved: true,
         })
@@ -499,7 +498,6 @@ pub struct RateLimitReservation<'a> {
     rate_limiter: &'a RateLimiter,
     user_key: String,
     operation: RateLimitOperation,
-    context: RateLimitDetectContext,
     relayer_address: EvmAddress,
     reserved: bool,
 }

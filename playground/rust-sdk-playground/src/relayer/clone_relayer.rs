@@ -30,6 +30,7 @@ async fn example() -> Result<()> {
         .await?;
     println!("{:?}", result);
 
+    #[allow(unused_variables)]
     let relayer_client =
         client.get_relayer_client(&result.id, Some(TransactionSpeed::FAST)).await?;
 

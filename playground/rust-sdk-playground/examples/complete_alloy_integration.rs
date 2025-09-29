@@ -55,7 +55,7 @@ async fn example_1_sign_message(signer: &RelayerSigner) -> Result<()> {
                 Ok(recovered_addr) => {
                     println!("   Recovered address: {}", recovered_addr);
                     println!("   Signer address: {}", signer.address());
-                    if recovered_addr == signer.address() {
+                    if recovered_addr == *signer.address() {
                         println!("   ✅ Signature verification: PASSED");
                     } else {
                         println!("   ❌ Signature verification: FAILED");
@@ -94,7 +94,7 @@ async fn example_2_sign_typed_data(signer: &RelayerSigner) -> Result<()> {
     println!("📋 Example 2: Alloy EIP-712 Typed Data Signing");
 
     // Create EIP-712 domain (standard Alloy pattern)
-    let domain = Eip712Domain {
+    let _ = Eip712Domain {
         name: Some("AlloyRelayerExample".into()),
         version: Some("1".into()),
         chain_id: signer.chain_id().map(|id| U256::from(id)),
@@ -165,9 +165,8 @@ async fn example_3_send_transaction(relayer_signer: &RelayerSigner) -> Result<()
     let to = Address::from_str("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045")?;
     let value = U256::from(1000000000000000000u64); // 1 ETH
 
-    // Method 1: Using TransactionRequest (standard Alloy)
     let tx_request = TransactionRequest::default()
-        .with_from(from)
+        .with_from(*from)
         .with_to(to)
         .with_value(value)
         .with_gas_limit(21000)

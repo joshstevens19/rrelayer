@@ -22,6 +22,7 @@ async fn example() -> Result<()> {
     let result: CreateRelayerResult = client.relayer().create(11155111, "fancy_relayer").await?;
     println!("{:?}", result);
 
+    #[allow(unused_variables)]
     let relayer_client =
         client.get_relayer_client(&result.id, Some(TransactionSpeed::FAST)).await?;
 

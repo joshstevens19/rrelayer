@@ -356,17 +356,23 @@ mod tests {
         let config = SafeProxyConfig {
             address: safe_address,
             relayers: vec![relayer1, relayer2],
-            chain_id: ChainId(1),
+            chain_id: ChainId::new(1),
         };
 
         let manager = SafeProxyManager::new(vec![config]);
 
-        assert_eq!(manager.get_safe_proxy_for_relayer(&relayer1, ChainId(1)), Some(safe_address));
-        assert_eq!(manager.get_safe_proxy_for_relayer(&relayer2, ChainId(1)), Some(safe_address));
+        assert_eq!(
+            manager.get_safe_proxy_for_relayer(&relayer1, ChainId::new(1)),
+            Some(safe_address)
+        );
+        assert_eq!(
+            manager.get_safe_proxy_for_relayer(&relayer2, ChainId::new(1)),
+            Some(safe_address)
+        );
         assert_eq!(
             manager.get_safe_proxy_for_relayer(
                 &EvmAddress::new(address!("56988BA8250E009DCC5DF543D78E2277E2AA900B")),
-                ChainId(1)
+                ChainId::new(1)
             ),
             None
         );

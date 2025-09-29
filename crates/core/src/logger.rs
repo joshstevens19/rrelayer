@@ -93,10 +93,12 @@ pub fn setup_info_logger() {
     setup_logger(LevelFilter::INFO);
 }
 
+#[allow(dead_code)]
 pub fn mark_shutdown_started() {
     SHUTDOWN_IN_PROGRESS.store(true, Ordering::Relaxed);
 }
 
+#[allow(dead_code)]
 pub struct LoggerGuard;
 
 impl Drop for LoggerGuard {

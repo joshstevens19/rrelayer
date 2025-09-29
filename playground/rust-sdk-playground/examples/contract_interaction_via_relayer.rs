@@ -3,7 +3,6 @@
 
 use alloy::{
     primitives::{Address, U256},
-    providers::{Provider, ProviderBuilder},
     sol,
 };
 use eyre::Result;
@@ -11,9 +10,6 @@ use rrelayer::{
     RelayerClient, RelayerClientAuth, RelayerClientConfig, RelayerId, RelayerSigner, with_relayer,
 };
 use std::{str::FromStr, sync::Arc};
-
-// Import our relayer integration
-use rust_sdk_playground::alloy::{RelayerSigner, with_relayer};
 
 // Simplified ERC20 contract interface for demo
 sol! {
@@ -34,7 +30,7 @@ async fn main() -> Result<()> {
 
     // 2. Create provider and wrap with relayer hijacking
     let mock_provider = MockProvider::new();
-    let hijacked_provider = with_relayer(mock_provider, relayer_signer.clone());
+    let _ = with_relayer(mock_provider, relayer_signer.clone());
 
     println!("🔧 Provider wrapped with relayer hijacking");
 
@@ -128,10 +124,9 @@ fn create_relayer_signer() -> Result<RelayerSigner> {
     };
     let relayer_client = Arc::new(RelayerClient::new(config));
 
-    Ok(RelayerSigner::new(
-        relayer_id,
+    Ok(RelayerSigner::from_relayer_client(
         relayer_client,
         Address::from_str("0x742d35cc6634c0532925a3b8d67e8000c942b1b5")?,
-        Some(1), // Mainnet
+        Some(1),
     ))
 }

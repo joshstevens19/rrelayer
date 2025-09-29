@@ -44,6 +44,7 @@ pub struct CreateRelayerClientConfig {
 #[derive(Clone)]
 pub struct Client {
     config: CreateClientConfig,
+    #[allow(dead_code)]
     api_base_config: ApiBaseConfig,
     authentication_api: AuthenticationApi,
     network_api: NetworkApi,
@@ -332,6 +333,7 @@ impl AdminRelayerClient {
 #[derive(Debug, Clone)]
 pub struct AdminRelayerClientTransactionApi<'a> {
     transaction_api: &'a TransactionApi,
+    #[allow(dead_code)]
     relayer_api: &'a RelayerApi,
     relayer_id: &'a RelayerId,
 }
@@ -458,6 +460,7 @@ pub enum RelayerClientAuth {
 pub struct RelayerClient {
     id: RelayerId,
     speed: Option<TransactionSpeed>,
+    #[allow(dead_code)]
     api_base_config: ApiBaseConfig,
     relayer_api: RelayerApi,
     sign_api: SignApi,

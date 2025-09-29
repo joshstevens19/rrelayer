@@ -405,7 +405,7 @@ impl TransactionsQueue {
         let item = transactions.front().cloned();
 
         if let Some(comp_tx) = item {
-            if let Some(winning_transaction) = comp_tx.get_transaction_by_id(id) {
+            if let Some(_) = comp_tx.get_transaction_by_id(id) {
                 let transaction_status: TransactionStatus;
 
                 if receipt.status() {

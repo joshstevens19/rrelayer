@@ -270,34 +270,32 @@ impl TestRunner {
             blobs: None,
         };
 
-        let send_result = relayer
+        let _ = relayer
             .transaction()
             .send(&tx_request, None)
             .await
             .context("Failed to send transaction")?;
 
-        let transaction_id = &send_result.id;
-
-        let replacement_request = RelayTransactionRequest {
-            to: self.config.anvil_accounts[1],
-            value: alloy::primitives::utils::parse_ether("0.2")?.into(),
-            data: TransactionData::empty(),
-            speed: Some(TransactionSpeed::FAST),
-            external_id: Some("test-replacement".to_string()),
-            blobs: None,
-        };
-
         // TODO: uncomment when fix nonce issue on webhooks
-        // let replace_result = self
-        //     .relayer_client
-        //     .sdk
-        //     .transaction
-        //     .replace_transaction(transaction_id, &replacement_request)
+        // let transaction_id = &send_result.id;
+        //
+        // let replacement_request = RelayTransactionRequest {
+        //     to: self.config.anvil_accounts[1],
+        //     value: alloy::primitives::utils::parse_ether("0.2")?.into(),
+        //     data: TransactionData::empty(),
+        //     speed: Some(TransactionSpeed::FAST),
+        //     external_id: Some("test-replacement".to_string()),
+        //     blobs: None,
+        // };
+
+        // let replace_result = relayer
+        //     .transaction()
+        //     .replace(transaction_id, &replacement_request, None)
         //     .await
         //     .context("Failed to replace transaction")?;
-        // info!("[SUCCESS] Transaction replacement result: {}", replace_result);
+        // info!("[SUCCESS] Transaction replacement result: {:?}", replace_result);
         //
-        // if !replace_result {
+        // if !replace_result.success {
         //     return Err(anyhow::anyhow!("Replace transaction failed"));
         // }
 
@@ -320,8 +318,7 @@ impl TestRunner {
             "transaction_mined",
             "transaction_confirmed",
             "transaction_cancelled",
-            // TODO: uncomment when fix nonce issue on webhooks
-            // "transaction_replaced"
+            //  "transaction_replaced",
         ];
 
         for event in &webhook_events {

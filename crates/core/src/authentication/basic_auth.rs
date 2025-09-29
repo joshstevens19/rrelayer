@@ -80,6 +80,7 @@ impl BasicAuthCredentials {
 
 /// Authenticated marker - just indicates that basic auth passed
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct Authenticated;
 
 /// Basic auth extractor that validates server-wide credentials

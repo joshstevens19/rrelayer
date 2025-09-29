@@ -38,7 +38,7 @@ async fn main() -> Result<()> {
                     println!("   Signer address: {}", signer.address());
                     println!("   Recovered address: {}", recovered);
 
-                    if recovered == signer.address() {
+                    if recovered == *signer.address() {
                         println!("✅ Signature verification successful!");
                     } else {
                         println!("❌ Signature verification failed!");

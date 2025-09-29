@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum TestResult {
     Passed,
     Failed(String),

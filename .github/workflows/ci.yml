@@ -161,7 +161,12 @@ jobs:
         run: |
           set -eo pipefail
           target="${{ matrix.target }}"
-          
+          flags=()
+
+          if [[ "$target" != *msvc* && "$target" != "aarch64-unknown-linux-gnu" ]]; then
+            flags+=(--features jemalloc)
+          fi
+
           [[ "$target" == *windows* ]] && exe=".exe"
 
           if [[ "$target" == *windows* ]]; then
@@ -171,9 +176,9 @@ jobs:
           fi
 
           if [[ "${{ env.BUILD_TYPE }}" == "release" ]]; then
-            RUST_BACKTRACE=1 CMAKE_TOOLCHAIN_FILE="$CMAKE_TOOLCHAIN_FILE" cargo build --release --target "$target" -vv
+            RUST_BACKTRACE=1 CMAKE_TOOLCHAIN_FILE="$CMAKE_TOOLCHAIN_FILE" cargo build --release --target "$target" "${flags[@]}" -vv
           else
-            RUST_BACKTRACE=1 CMAKE_TOOLCHAIN_FILE="$CMAKE_TOOLCHAIN_FILE" cargo build --target "$target" -vv
+            RUST_BACKTRACE=1 CMAKE_TOOLCHAIN_FILE="$CMAKE_TOOLCHAIN_FILE" cargo build --target "$target" "${flags[@]}" -vv
           fi
 
       - name: Smoke Test
@@ -603,8 +608,6 @@ jobs:
           
           if [[ "$target" != *msvc* && "$target" != "aarch64-unknown-linux-gnu" ]]; then
             flags+=(--features jemalloc)
-          else
-            flags+=(--features reth)
           fi
 
           if [[ "$target" == *windows* ]]; then

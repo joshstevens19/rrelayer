@@ -11,7 +11,7 @@
 //! use alloy::primitives::Address;
 //! use std::{sync::Arc, str::FromStr};
 //!
-//! # async fn example() -> eyre::Result<()> {
+//! # async fn example() -> anyhow::Result<()> {
 //! // Create RelayerClient
 //! let relayer_id = RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?;
 //! let config = RelayerClientConfig {
@@ -80,7 +80,7 @@ pub enum RelayerSignerError {
 /// use rrelayer::{RelayerSigner, RelayerClient, RelayerClientConfig, RelayerClientAuth, RelayerId};
 /// use std::{sync::Arc, str::FromStr};
 ///
-/// # async fn example() -> eyre::Result<()> {
+/// # async fn example() -> anyhow::Result<()> {
 /// // Create RelayerClient
 /// let relayer_id = RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?;
 /// let config = RelayerClientConfig {
@@ -192,6 +192,11 @@ impl RelayerSigner {
     pub fn client(&self) -> &RelayerClientType {
         &self.client_type
     }
+
+    /// Get address of relayer
+    pub fn address(&self) -> &Address {
+        &self.address
+    }
 }
 
 #[async_trait]
@@ -256,7 +261,7 @@ impl Signer for RelayerSigner {
 /// use rrelayer::{RelayerProvider, with_relayer, RelayerSigner};
 /// use std::str::FromStr;
 ///
-/// # async fn example() -> eyre::Result<()> {
+/// # async fn example() -> anyhow::Result<()> {
 /// # let relayer_signer: RelayerSigner = todo!(); // Created elsewhere
 /// // Wrap any provider with relayer functionality
 /// let rpc_url = "https://eth.llamarpc.com".parse()?;
@@ -365,7 +370,7 @@ impl<P> RelayerProvider<P> {
         // Extract to address - for now require it to be specified
         let to = match &tx_request.to {
             Some(to_addr) => {
-                // Try to extract address from the TxKind
+                #[allow(irrefutable_let_patterns)]
                 if let Ok(addr_str) = format!("{:?}", to_addr)
                     .strip_prefix("0x")
                     .unwrap_or(&format!("{:?}", to_addr))
@@ -424,7 +429,7 @@ impl<P> RelayerProvider<P> {
 /// use rrelayer::{with_relayer, RelayerSigner};
 /// use std::str::FromStr;
 ///
-/// # async fn example() -> eyre::Result<()> {
+/// # async fn example() -> anyhow::Result<()> {
 /// # let relayer_signer: RelayerSigner = todo!(); // Created elsewhere
 /// let rpc_url = "https://eth.llamarpc.com".parse()?;
 /// let http_provider = ProviderBuilder::new().on_http(rpc_url);
@@ -444,7 +449,6 @@ pub fn with_relayer<P>(provider: P, relayer_signer: RelayerSigner) -> RelayerPro
 mod tests {
     use super::*;
     use alloy::primitives::address;
-    use std::str::FromStr;
 
     #[test]
     fn test_relayer_signer_creation() {

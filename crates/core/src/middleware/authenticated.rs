@@ -17,6 +17,7 @@ use tracing::error;
 /// }
 /// ```
 #[derive(Clone)]
+#[allow(dead_code)]
 pub struct Authenticated;
 
 #[async_trait]

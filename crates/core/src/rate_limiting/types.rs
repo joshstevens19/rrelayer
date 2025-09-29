@@ -23,18 +23,9 @@ pub enum RateLimitDetectMethod {
     Fallback,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum TransactionType {
-    Direct,
-    Gasless,
-    Automated,
-}
-
 #[derive(Debug, Clone)]
 pub struct RateLimitDetectContext {
     pub key: String,
-    pub detection_method: RateLimitDetectMethod,
-    pub transaction_type: TransactionType,
 }
 
 #[derive(Debug, Error)]
@@ -58,5 +49,6 @@ pub struct RateLimitResult {
     pub current_usage: u64,
     pub limit: u64,
     pub window_seconds: u32,
+    #[allow(dead_code)]
     pub reset_time: std::time::SystemTime,
 }
