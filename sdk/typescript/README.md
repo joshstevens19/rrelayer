@@ -77,4 +77,4 @@ export let relayer = createRelayerClient({
 });
 ```
 
-You can read about all the functionality [here](https://rrelayer.xyz/integration/sdk/installation/rust)
+You can read about all the functionality [here](https://rrelayer.xyz/integration/sdk/installation/node)

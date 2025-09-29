@@ -3,8 +3,19 @@ name = "rrelayer_core"
 version = "0.1.0"
 resolver = "2"
 edition = "2021"
-
-include = ["src/**", "Cargo.toml"]
+authors = ["joshstevens19@hotmail.co.uk"]
+license = "MIT"
+description = "Core types and functionality for rrelayer - a powerful blockchain transaction relay service"
+homepage = "https://rrelayer.xyz"
+repository = "https://github.com/joshstevens19/rrelayer"
+documentation = "https://docs.rs/rrelayer_core"
+keywords = ["blockchain", "ethereum", "evm", "transaction", "relay"]
+categories = ["api-bindings", "web-programming", "cryptography::cryptocurrencies"]
+include = [
+    "src/**/*",
+    "Cargo.toml",
+    "../../LICENSE"
+]
 
 [dependencies]
 tokio-postgres = { version = "0.7", features = ["with-uuid-1", "with-chrono-0_4", "with-serde_json-1"] }

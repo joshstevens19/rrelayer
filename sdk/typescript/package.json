@@ -1,19 +1,13 @@
 {
   "name": "rrelayer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "The rrelayer sdk",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
+    "prepublishOnly": "npm run build",
     "format": "prettier --write \"src/**/*.{ts,js,json}\"",
     "format:check": "prettier --check \"src/**/*.{ts,js,json}\"",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "test:e2e": "jest --testMatch='**/__tests__/**/*.test.ts'",
-    "test:relayer": "jest --testMatch='**/__tests__/relayer-client.test.ts'",
-    "test:admin": "jest --testMatch='**/__tests__/admin-client.test.ts'",
-    "test:client": "jest --testMatch='**/__tests__/client.test.ts'",
     "playground::network::get-all": "ts-node src/___PLAYGROUND___/networks/get-all-networks.ts",
     "playground::relayer::create": "ts-node src/___PLAYGROUND___/relayer/create-relayer.ts",
     "playground::relayer::get-all": "ts-node src/___PLAYGROUND___/relayer/get-all-relayers.ts",
@@ -48,11 +42,32 @@
     "viem": "^2.37.3"
   },
   "devDependencies": {
-    "@types/jest": "^30.0.0",
-    "jest": "^30.1.3",
     "prettier": "^3.6.2",
-    "ts-jest": "^29.4.4",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.2"
+  },
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "blockchain",
+    "ethereum",
+    "evm",
+    "transaction",
+    "relay",
+    "wallet",
+    "web3",
+    "crypto",
+    "defi"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/joshstevens19/rrelayer.git",
+    "directory": "sdk/typescript"
+  },
+  "homepage": "https://rrelayer.xyz",
+  "bugs": {
+    "url": "https://github.com/joshstevens19/rrelayer/issues"
   }
 }

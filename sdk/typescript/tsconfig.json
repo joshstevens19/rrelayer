@@ -22,7 +22,8 @@
   },
   "exclude": [
     "node_modules",
-    "___PLAYGROUND__",
+    "src/___PLAYGROUND___/**/*",
+    "src/__tests__/**/*",
     "dist",
     "src/jest",
     "**/*.spec.ts",

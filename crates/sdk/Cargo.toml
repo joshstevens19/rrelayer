@@ -2,6 +2,21 @@
 name = "rrelayer"
 version = "0.1.0"
 edition = "2024"
+authors = ["joshstevens19@hotmail.co.uk"]
+license = "MIT"
+description = "The official Rust SDK for interacting with rrelayer services - a powerful blockchain transaction relay service"
+homepage = "https://rrelayer.xyz"
+repository = "https://github.com/joshstevens19/rrelayer"
+documentation = "https://docs.rs/rrelayer"
+readme = "README.md"
+keywords = ["blockchain", "ethereum", "evm", "transaction", "relay"]
+categories = ["api-bindings", "web-programming", "cryptography::cryptocurrencies"]
+include = [
+    "src/**/*",
+    "Cargo.toml",
+    "README.md",
+    "../../LICENSE"
+]
 
 [dependencies]
 reqwest = { version = "0.12.15", features = ["json", "native-tls", "cookies"] }
@@ -14,7 +29,7 @@ alloy = { workspace = true, features = ["full", "signer-mnemonic", "eips", "eip7
 alloy-rlp = { workspace = true }
 alloy-eips = { workspace = true }
 base64 = "0.22.0"
-rrelayer_core = { path = "../core" }
+rrelayer_core = { path = "../core", version = "0.1.0" }
 tokio = { version = "1", features = ["time"] }
 async-trait = "0.1"
 hex = "0.4"
