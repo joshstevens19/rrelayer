@@ -7,14 +7,14 @@ use crate::postgres::ToSql;
 use alloy::primitives::{FixedBytes, U256};
 use alloy::{
     hex,
-    primitives::{Bytes, PrimitiveSignature, B256},
+    primitives::{Bytes, Signature as AlloySig, B256},
 };
 use bytes::BytesMut;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use tokio_postgres::types::{to_sql_checked, FromSql, IsNull, Type};
 
 #[derive(Clone, Debug, PartialEq, Copy)]
-pub struct Signature(PrimitiveSignature);
+pub struct Signature(AlloySig);
 
 impl Display for Signature {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -46,7 +46,7 @@ impl Signature {
         Ok(EvmAddress::from(self.0.recover_address_from_prehash(prehash)?))
     }
 
-    pub fn inner(&self) -> &PrimitiveSignature {
+    pub fn inner(&self) -> &AlloySig {
         &self.0
     }
 
@@ -86,14 +86,14 @@ impl<'de> Deserialize<'de> for Signature {
         D: Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        let sig = PrimitiveSignature::from_str(&s)
+        let sig = AlloySig::from_str(&s)
             .map_err(|e| serde::de::Error::custom(format!("Invalid signature: {e}")))?;
         Ok(Signature(sig))
     }
 }
 
-impl From<PrimitiveSignature> for Signature {
-    fn from(sig: PrimitiveSignature) -> Self {
+impl From<AlloySig> for Signature {
+    fn from(sig: AlloySig) -> Self {
         Signature(sig)
     }
 }
@@ -102,7 +102,7 @@ impl FromStr for Signature {
     type Err = alloy::primitives::SignatureError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        PrimitiveSignature::from_str(s).map(Signature)
+        AlloySig::from_str(s).map(Signature)
     }
 }
 
@@ -113,8 +113,7 @@ impl<'a> FromSql<'a> for Signature {
             return Err("Invalid byte length for Ethereum signature".into());
         }
 
-        let sig = PrimitiveSignature::try_from(raw)
-            .map_err(|e| format!("Failed to parse signature: {e}"))?;
+        let sig = AlloySig::try_from(raw).map_err(|e| format!("Failed to parse signature: {e}"))?;
 
         Ok(Signature(sig))
     }

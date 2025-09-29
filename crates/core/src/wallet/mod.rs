@@ -2,7 +2,7 @@ use crate::common_types::EvmAddress;
 use crate::network::ChainId;
 use alloy::consensus::TypedTransaction;
 use alloy::dyn_abi::TypedData;
-use alloy::primitives::PrimitiveSignature;
+use alloy::primitives::Signature;
 use async_trait::async_trait;
 use thiserror::Error;
 
@@ -118,19 +118,15 @@ pub trait WalletManagerTrait: Send + Sync {
         wallet_index: u32,
         transaction: &TypedTransaction,
         chain_id: &ChainId,
-    ) -> Result<PrimitiveSignature, WalletError>;
+    ) -> Result<Signature, WalletError>;
 
-    async fn sign_text(
-        &self,
-        wallet_index: u32,
-        text: &str,
-    ) -> Result<PrimitiveSignature, WalletError>;
+    async fn sign_text(&self, wallet_index: u32, text: &str) -> Result<Signature, WalletError>;
 
     async fn sign_typed_data(
         &self,
         wallet_index: u32,
         typed_data: &TypedData,
-    ) -> Result<PrimitiveSignature, WalletError>;
+    ) -> Result<Signature, WalletError>;
 
     /// Returns whether this wallet manager supports EIP-4844 blob transactions
     fn supports_blobs(&self) -> bool;

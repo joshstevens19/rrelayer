@@ -1,4 +1,3 @@
-use alloy::providers::Provider;
 use clap::{Args, Subcommand};
 use dialoguer::{Confirm, Input};
 use prettytable::{Cell, Row, Table, format};

@@ -389,7 +389,7 @@ impl WebhookManager {
         relayer_id: &RelayerId,
         chain_id: ChainId,
         message: String,
-        signature: alloy::primitives::PrimitiveSignature,
+        signature: alloy::primitives::Signature,
     ) {
         let payload =
             WebhookSigningPayload::text_signed(relayer_id.clone(), chain_id, message, signature);
@@ -403,7 +403,7 @@ impl WebhookManager {
         domain_data: serde_json::Value,
         message_data: serde_json::Value,
         primary_type: String,
-        signature: alloy::primitives::PrimitiveSignature,
+        signature: alloy::primitives::Signature,
     ) {
         let payload = WebhookSigningPayload::typed_data_signed(
             relayer_id.clone(),

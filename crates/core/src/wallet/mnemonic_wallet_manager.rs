@@ -4,7 +4,7 @@ use crate::wallet::{WalletError, WalletManagerTrait};
 use alloy::consensus::TypedTransaction;
 use alloy::dyn_abi::TypedData;
 use alloy::network::TxSigner;
-use alloy::primitives::PrimitiveSignature;
+use alloy::primitives::Signature;
 use alloy::signers::{
     local::{
         coins_bip39::{English, Mnemonic},
@@ -81,7 +81,7 @@ impl WalletManagerTrait for MnemonicWalletManager {
         wallet_index: u32,
         transaction: &TypedTransaction,
         chain_id: &ChainId,
-    ) -> Result<PrimitiveSignature, WalletError> {
+    ) -> Result<Signature, WalletError> {
         let wallet = self.get_wallet(wallet_index, chain_id).await?;
 
         let signature = match transaction {
@@ -110,11 +110,7 @@ impl WalletManagerTrait for MnemonicWalletManager {
         Ok(signature)
     }
 
-    async fn sign_text(
-        &self,
-        wallet_index: u32,
-        text: &str,
-    ) -> Result<PrimitiveSignature, WalletError> {
+    async fn sign_text(&self, wallet_index: u32, text: &str) -> Result<Signature, WalletError> {
         let wallet = self.get_wallet(wallet_index, &ChainId::default()).await?;
         let signature = wallet.sign_message(text.as_bytes()).await?;
         Ok(signature)
@@ -124,7 +120,7 @@ impl WalletManagerTrait for MnemonicWalletManager {
         &self,
         wallet_index: u32,
         typed_data: &TypedData,
-    ) -> Result<PrimitiveSignature, WalletError> {
+    ) -> Result<Signature, WalletError> {
         let wallet = self.get_wallet(wallet_index, &ChainId::default()).await?;
         let signature = wallet.sign_dynamic_typed_data(typed_data).await?;
         Ok(signature)

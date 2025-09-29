@@ -3,7 +3,6 @@ use crate::shared::{bad_request, HttpError};
 use crate::transaction::types::TransactionBlob;
 use crate::{create_retry_client, rrelayer_error};
 use alloy::primitives::U256;
-use alloy::providers::Provider;
 use alloy_eips::eip4844::Blob;
 use std::time::Duration;
 use tokio::time::sleep;

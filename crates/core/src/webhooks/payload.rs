@@ -8,7 +8,7 @@ use crate::{
         TransactionNonce, TransactionStatus, TransactionValue,
     },
 };
-use alloy::{network::AnyTransactionReceipt, primitives::PrimitiveSignature};
+use alloy::{network::AnyTransactionReceipt, primitives::Signature};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -142,7 +142,7 @@ pub struct WebhookSigningData {
     #[serde(rename = "chainId")]
     pub chain_id: ChainId,
     /// The signature produced
-    pub signature: PrimitiveSignature,
+    pub signature: Signature,
     /// When the signing occurred
     #[serde(rename = "signedAt")]
     pub signed_at: DateTime<Utc>,
@@ -165,7 +165,7 @@ impl WebhookSigningPayload {
         relayer_id: RelayerId,
         chain_id: ChainId,
         message: String,
-        signature: PrimitiveSignature,
+        signature: Signature,
     ) -> Self {
         Self {
             event_type: WebhookEventType::TextSigned,
@@ -190,7 +190,7 @@ impl WebhookSigningPayload {
         domain_data: serde_json::Value,
         message_data: serde_json::Value,
         primary_type: String,
-        signature: PrimitiveSignature,
+        signature: Signature,
     ) -> Self {
         Self {
             event_type: WebhookEventType::TypedDataSigned,

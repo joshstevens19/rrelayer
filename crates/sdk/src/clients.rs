@@ -20,7 +20,6 @@ use rrelayer_core::{
     transaction::api::RelayTransactionStatusResult,
     transaction::types::{Transaction, TransactionId},
 };
-use std::str::FromStr;
 
 #[derive(Debug, Clone)]
 pub struct CreateClientConfig {

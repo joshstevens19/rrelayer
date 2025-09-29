@@ -1,5 +1,4 @@
 use alloy::primitives::{keccak256, Address, Bytes, U256};
-use alloy::providers::Provider;
 use alloy::rpc::types::serde_helpers::WithOtherFields;
 use alloy::sol;
 use alloy::sol_types::{SolCall, SolStruct};
@@ -262,9 +261,9 @@ impl SafeProxyManager {
             ..Default::default()
         });
 
-        match provider.rpc_client().call(&call_tx).await {
-            Ok(result) => match ISafeContract::nonceCall::abi_decode_returns(&result, false) {
-                Ok(nonce) => Ok(nonce._0),
+        match provider.rpc_client().call(call_tx).await {
+            Ok(result) => match ISafeContract::nonceCall::abi_decode_returns(&result) {
+                Ok(nonce) => Ok(nonce),
                 Err(e) => Err(SafeProxyError::SafeContractError(format!(
                     "Failed to decode Safe nonce response: {}",
                     e

@@ -7,7 +7,7 @@ use crate::{
     rate_limiting::RateLimitOperation,
     relayer::{get_relayer_provider_context_by_relayer_id, RelayerId},
 };
-use alloy::primitives::PrimitiveSignature;
+use alloy::primitives::Signature;
 use axum::http::HeaderMap;
 use axum::{
     extract::{Path, State},
@@ -26,7 +26,7 @@ pub struct SignTextDto {
 pub struct SignTextResult {
     #[serde(rename = "messageSigned")]
     pub message_signed: String,
-    pub signature: PrimitiveSignature,
+    pub signature: Signature,
     pub signed_by: EvmAddress,
 }
 

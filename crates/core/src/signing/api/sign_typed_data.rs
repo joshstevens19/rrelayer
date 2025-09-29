@@ -10,7 +10,7 @@ use crate::{
     relayer::{get_relayer_provider_context_by_relayer_id, RelayerId},
 };
 use alloy::dyn_abi::TypedData;
-use alloy::primitives::PrimitiveSignature;
+use alloy::primitives::Signature;
 use axum::http::HeaderMap;
 use axum::{
     extract::{Path, State},
@@ -22,7 +22,7 @@ use std::sync::Arc;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SignTypedDataResult {
-    pub signature: PrimitiveSignature,
+    pub signature: Signature,
 }
 
 pub async fn sign_typed_data(

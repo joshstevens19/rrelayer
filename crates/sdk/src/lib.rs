@@ -15,7 +15,7 @@ pub use alloy_integration::{RelayerClientType, RelayerProvider, RelayerSigner, w
 
 pub use alloy::dyn_abi::TypedData;
 pub use alloy::network::AnyTransactionReceipt;
-pub use alloy::primitives::PrimitiveSignature;
+pub use alloy::primitives::Signature;
 
 pub use rrelayer_core::{
     common_types::{EvmAddress, PagingContext, PagingResult},

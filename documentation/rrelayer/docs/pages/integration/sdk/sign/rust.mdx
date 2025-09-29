@@ -28,7 +28,7 @@ Just so you understand the properties returned
 pub struct SignTextResult {
     #[serde(rename = "messageSigned")]
     pub message_signed: String,
-    pub signature: PrimitiveSignature,
+    pub signature: Signature,
     pub signed_by: EvmAddress,
 }
 ```
@@ -237,7 +237,7 @@ Just so you understand the properties returned
 ```rs
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SignTypedDataResult {
-    pub signature: PrimitiveSignature,
+    pub signature: Signature,
 }
 ```
 

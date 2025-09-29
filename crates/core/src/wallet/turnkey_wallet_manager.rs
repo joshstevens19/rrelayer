@@ -4,13 +4,13 @@ use crate::wallet::{WalletError, WalletManagerTrait};
 use crate::yaml::TurnkeySigningProviderConfig;
 use alloy::consensus::{TxEnvelope, TypedTransaction};
 use alloy::dyn_abi::TypedData;
-use alloy::primitives::{keccak256, PrimitiveSignature};
+use alloy::primitives::{keccak256, Signature};
 use alloy_rlp::Decodable;
 use async_trait::async_trait;
 use base64::{engine::general_purpose, Engine as _};
 use hex;
 use p256::{
-    ecdsa::{signature::Signer, Signature, SigningKey},
+    ecdsa::{signature::Signer, Signature as EcdsaSignature, SigningKey},
     SecretKey,
 };
 use serde::{Deserialize, Serialize};
@@ -205,7 +205,7 @@ impl TurnkeyWalletManager {
 
         let signing_key = SigningKey::from(&secret_key);
 
-        let signature: Signature = signing_key.sign(body.as_bytes());
+        let signature: EcdsaSignature = signing_key.sign(body.as_bytes());
         let signature_bytes = signature.to_der();
         let signature_hex = hex::encode(&signature_bytes);
 
@@ -426,7 +426,7 @@ impl WalletManagerTrait for TurnkeyWalletManager {
         wallet_index: u32,
         transaction: &TypedTransaction,
         chain_id: &ChainId,
-    ) -> Result<PrimitiveSignature, WalletError> {
+    ) -> Result<Signature, WalletError> {
         info!(
             "Turnkey sign_transaction called - wallet_index: {}, chain_id: {}",
             wallet_index, chain_id
@@ -649,11 +649,7 @@ impl WalletManagerTrait for TurnkeyWalletManager {
         Ok(signature)
     }
 
-    async fn sign_text(
-        &self,
-        wallet_index: u32,
-        text: &str,
-    ) -> Result<PrimitiveSignature, WalletError> {
+    async fn sign_text(&self, wallet_index: u32, text: &str) -> Result<Signature, WalletError> {
         info!("Turnkey sign_text called - wallet_index: {}, text: '{}'", wallet_index, text);
 
         let accounts = self.accounts.lock().await;
@@ -771,7 +767,7 @@ impl WalletManagerTrait for TurnkeyWalletManager {
             WalletError::ApiError { message: "s value is not 32 bytes".to_string() }
         })?;
 
-        let signature = PrimitiveSignature::new(
+        let signature = Signature::new(
             alloy::primitives::U256::from_be_bytes(r_bytes_32),
             alloy::primitives::U256::from_be_bytes(s_bytes_32),
             v_value != 0,
@@ -785,7 +781,7 @@ impl WalletManagerTrait for TurnkeyWalletManager {
         &self,
         wallet_index: u32,
         typed_data: &TypedData,
-    ) -> Result<PrimitiveSignature, WalletError> {
+    ) -> Result<Signature, WalletError> {
         let accounts = self.accounts.lock().await;
         let _ = accounts
             .get(&wallet_index)
@@ -888,7 +884,7 @@ impl WalletManagerTrait for TurnkeyWalletManager {
             WalletError::ApiError { message: "s value is not 32 bytes".to_string() }
         })?;
 
-        let signature = PrimitiveSignature::new(
+        let signature = Signature::new(
             alloy::primitives::U256::from_be_bytes(r_bytes_32),
             alloy::primitives::U256::from_be_bytes(s_bytes_32),
             v_value != 0,

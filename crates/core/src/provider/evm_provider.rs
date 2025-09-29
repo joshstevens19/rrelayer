@@ -1,5 +1,5 @@
 use crate::gas::BLOB_GAS_PER_BLOB;
-use crate::provider::layer_extensions::{RpcLoggingLayer, RpcLoggingService};
+use crate::provider::layer_extensions::RpcLoggingLayer;
 use crate::wallet::{
     AwsKmsWalletManager, MnemonicWalletManager, PrivyWalletManager, TurnkeyWalletManager,
     WalletError, WalletManagerTrait,
@@ -23,16 +23,15 @@ use alloy::{
     consensus::TypedTransaction,
     dyn_abi::eip712::TypedData,
     eips::{BlockId, BlockNumberOrTag},
-    network::primitives::BlockTransactionsKind,
     network::Ethereum,
     network::TransactionBuilderError,
-    primitives::PrimitiveSignature,
-    providers::{Provider, ProviderBuilder, RootProvider},
+    primitives::Signature,
+    providers::{Provider, ProviderBuilder},
     rpc::types::TransactionRequest,
     signers::local::LocalSignerError,
     transports::{
         http::{reqwest::Error as ReqwestError, Client, Http},
-        layers::{RetryBackoffLayer, RetryBackoffService},
+        layers::RetryBackoffLayer,
         RpcError, TransportErrorKind,
     },
 };
@@ -44,8 +43,7 @@ use std::time::Duration;
 use thiserror::Error;
 use tracing::info;
 
-pub type RelayerProvider =
-    RootProvider<RetryBackoffService<RpcLoggingService<Http<Client>>>, AnyNetwork>;
+pub type RelayerProvider = Box<dyn Provider<AnyNetwork> + Send + Sync>;
 
 #[derive(Clone)]
 pub struct EvmProvider {
@@ -72,16 +70,10 @@ async fn calculate_block_time_difference(
     }
 
     let latest = provider
-        .get_block(
-            BlockId::Number(BlockNumberOrTag::Number(latest_block_number - 12)),
-            BlockTransactionsKind::Hashes,
-        )
+        .get_block(BlockId::Number(BlockNumberOrTag::Number(latest_block_number - 12)))
         .await?;
     let earliest = provider
-        .get_block(
-            BlockId::Number(BlockNumberOrTag::Number(latest_block_number - 13)),
-            BlockTransactionsKind::Hashes,
-        )
+        .get_block(BlockId::Number(BlockNumberOrTag::Number(latest_block_number - 13)))
         .await?;
 
     let latest = latest.ok_or(RpcError::Transport(TransportErrorKind::Custom(
@@ -125,9 +117,10 @@ pub async fn create_retry_client(rpc_url: &str) -> Result<Arc<RelayerProvider>, 
     let retry_layer = RetryBackoffLayer::new(5000, 1000, 660);
     let rpc_client =
         RpcClient::builder().layer(retry_layer).layer(logging_layer).transport(http, false);
-    let provider = ProviderBuilder::new().network::<AnyNetwork>().on_client(rpc_client.clone());
+    let provider =
+        ProviderBuilder::new().network::<AnyNetwork>().connect_client(rpc_client.clone());
 
-    Ok(Arc::new(provider))
+    Ok(Arc::new(Box::new(provider)))
 }
 
 #[derive(Error, Debug)]
@@ -321,7 +314,7 @@ impl EvmProvider {
         &self,
         wallet_index: &u32,
         transaction: &TypedTransaction,
-    ) -> Result<PrimitiveSignature, WalletError> {
+    ) -> Result<Signature, WalletError> {
         self.wallet_manager.sign_transaction(*wallet_index, transaction, &self.chain_id).await
     }
 
@@ -329,7 +322,7 @@ impl EvmProvider {
         &self,
         wallet_index: &u32,
         text: &String,
-    ) -> Result<PrimitiveSignature, WalletError> {
+    ) -> Result<Signature, WalletError> {
         self.wallet_manager.sign_text(*wallet_index, text).await
     }
 
@@ -337,7 +330,7 @@ impl EvmProvider {
         &self,
         wallet_index: &u32,
         typed_data: &TypedData,
-    ) -> Result<PrimitiveSignature, WalletError> {
+    ) -> Result<Signature, WalletError> {
         self.wallet_manager.sign_typed_data(*wallet_index, typed_data).await
     }
 
@@ -352,7 +345,7 @@ impl EvmProvider {
 
         let request_with_other = WithOtherFields::new(request);
 
-        let result = self.rpc_client().estimate_gas(&request_with_other).await?;
+        let result = self.rpc_client().estimate_gas(request_with_other).await?;
 
         Ok(GasLimit::new(result as u128))
     }

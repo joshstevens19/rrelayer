@@ -3,7 +3,6 @@
 ## TODO List
 
 30th September plan:
-- Finish documentation
 - Do internal documentation throughout the .MD files
 - Get install script working locally
 
@@ -16,7 +15,7 @@
 - Look into authentication to login and then use it outside rrelayer.yaml
 - Publish packages - TS + Rust
 - Release—20:00 UK time
-
+2
 # AFTER
 
 - Create CI to run E2E tests on push

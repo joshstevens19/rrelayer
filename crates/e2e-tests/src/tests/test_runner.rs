@@ -139,10 +139,7 @@ impl TestRunner {
         let signer: PrivateKeySigner = private_key.parse()?;
         let wallet = EthereumWallet::from(signer);
 
-        let provider = ProviderBuilder::new()
-            .with_recommended_fillers()
-            .wallet(wallet)
-            .on_http(anvil_url.parse()?);
+        let provider = ProviderBuilder::new().wallet(wallet).connect(&anvil_url).await?;
 
         let tx_request =
             TransactionRequest::default().to(relayer_address.into_address()).value(funding_amount);

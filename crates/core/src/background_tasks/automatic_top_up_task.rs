@@ -16,7 +16,6 @@ use crate::{
     SetupConfig,
 };
 use alloy::primitives::U256;
-use alloy::providers::Provider;
 use alloy::rpc::types::serde_helpers::WithOtherFields;
 use alloy::sol;
 use alloy::sol_types::SolCall;
@@ -929,14 +928,14 @@ impl AutomaticTopUpTask {
             ..Default::default()
         });
 
-        match provider.rpc_client().call(&call_tx).await {
+        match provider.rpc_client().call(call_tx).await {
             Ok(result) => {
                 if result.is_empty() {
                     return Ok(U256::ZERO);
                 }
 
-                match IERC20::balanceOfCall::abi_decode_returns(&result, false) {
-                    Ok(balance) => Ok(balance._0),
+                match IERC20::balanceOfCall::abi_decode_returns(&result) {
+                    Ok(balance) => Ok(balance),
                     Err(e) => {
                         warn!(
                             "Failed to decode balanceOf response for token {} and address {}: {}. \

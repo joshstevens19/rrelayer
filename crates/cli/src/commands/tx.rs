@@ -452,12 +452,10 @@ async fn handle_fund(
     let wallet = EthereumWallet::from(signer);
 
     let rpc_url = network.provider_urls.first().expect("Providers not found").to_string();
-    let provider = ProviderBuilder::new()
-        .with_recommended_fillers()
-        .wallet(wallet)
-        .on_builtin(&rpc_url)
-        .await
-        .map_err(|e| TransactionError::CommandFailed(format!("Failed to connect to RPC: {}", e)))?;
+    let provider =
+        ProviderBuilder::new().wallet(wallet).connect(&rpc_url).await.map_err(|e| {
+            TransactionError::CommandFailed(format!("Failed to connect to RPC: {}", e))
+        })?;
 
     println!("Connected to RPC at {}", rpc_url);
 

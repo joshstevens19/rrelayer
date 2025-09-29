@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use alloy::{eips::BlockNumberOrTag, primitives::utils::parse_units, providers::Provider};
+use alloy::{eips::BlockNumberOrTag, primitives::utils::parse_units};
 use async_trait::async_trait;
 
 use super::base::{BaseGasFeeEstimator, GasEstimatorError, GasEstimatorResult, GasPriceResult};
@@ -34,10 +34,7 @@ impl FallbackGasFeeEstimator {
             Some(base_fee) if base_fee != 0 => base_fee,
             _ => self
                 .provider
-                .get_block_by_number(
-                    BlockNumberOrTag::Latest,
-                    alloy::rpc::types::BlockTransactionsKind::Hashes,
-                )
+                .get_block_by_number(BlockNumberOrTag::Latest)
                 .await
                 .map_err(|e| GasEstimatorError::CustomError(e.to_string()))?
                 .ok_or_else(|| {
@@ -90,7 +87,7 @@ impl BaseGasFeeEstimator for FallbackGasFeeEstimator {
             Err(_) => {
                 let suggested = self
                     .provider
-                    .estimate_eip1559_fees(None)
+                    .estimate_eip1559_fees()
                     .await
                     .map_err(|e| GasEstimatorError::CustomError(e.to_string()))?;
 

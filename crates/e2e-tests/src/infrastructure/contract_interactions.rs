@@ -1,11 +1,10 @@
 use alloy::sol_types::SolCall;
 use alloy::{
-    network::EthereumWallet,
+    network::{AnyNetwork, EthereumWallet},
     primitives::{Address, U256},
-    providers::{Provider, ProviderBuilder, RootProvider},
+    providers::{DynProvider, Provider, ProviderBuilder},
     signers::local::PrivateKeySigner,
     sol,
-    transports::http::{Client, Http},
 };
 use anyhow::{Context, Result};
 use rand;
@@ -42,16 +41,24 @@ sol! {
 }
 
 pub struct ContractInteractor {
-    provider: RootProvider<Http<Client>>,
+    provider: DynProvider<AnyNetwork>,
     contract_address: Option<EvmAddress>,
     token_address: Option<EvmAddress>,
 }
 
 impl ContractInteractor {
     pub async fn new(rpc_url: &str) -> Result<Self> {
-        let provider = ProviderBuilder::new().on_http(rpc_url.parse().context("Invalid RPC URL")?);
+        let provider = ProviderBuilder::new()
+            .network::<AnyNetwork>()
+            .connect(rpc_url)
+            .await
+            .context("Failed to connect to RPC")?;
 
-        Ok(Self { provider, contract_address: None, token_address: None })
+        Ok(Self {
+            provider: DynProvider::new(provider),
+            contract_address: None,
+            token_address: None,
+        })
     }
 
     pub async fn deploy_test_contract(&mut self, deployer_private_key: &str) -> Result<Address> {
@@ -59,11 +66,12 @@ impl ContractInteractor {
             deployer_private_key.parse().context("Invalid private key")?;
         let wallet = EthereumWallet::from(signer);
 
-        let provider_url_str = self.provider.client().transport().url();
+        let provider_url_str = "http://localhost:8545";
         let deploy_provider = ProviderBuilder::new()
-            .with_recommended_fillers()
             .wallet(wallet)
-            .on_http(provider_url_str.parse().context("Failed to parse provider URL")?);
+            .connect(&provider_url_str)
+            .await
+            .context("Failed to connect to provider")?;
 
         info!("Deploying test contract...");
 
@@ -129,7 +137,7 @@ impl ContractInteractor {
     pub async fn deploy_test_token(&mut self, deployer_private_key: &str) -> Result<Address> {
         info!("Deploying ERC-20 test token using Forge...");
 
-        let rpc_url = self.provider.client().transport().url().to_string();
+        let rpc_url = "http://localhost:8545".to_string(); // Use default URL
 
         let contracts_dir = std::path::Path::new("contracts");
         if !contracts_dir.exists() {
@@ -199,7 +207,7 @@ impl ContractInteractor {
         let total_supply =
             token_contract.totalSupply().call().await.context("Failed to verify token contract")?;
 
-        info!("[SUCCESS] Test ERC-20 token verified - Total supply: {}", total_supply._0);
+        info!("[SUCCESS] Test ERC-20 token verified - Total supply: {}", total_supply);
 
         let fund_addresses = vec![
             // raw, aws secret manager and gcp secret manager
@@ -255,7 +263,7 @@ impl ContractInteractor {
     pub async fn deploy_safe_contracts(&mut self, deployer_private_key: &str) -> Result<Address> {
         info!("Deploying Safe contracts using Forge...");
 
-        let rpc_url = self.provider.client().transport().url().to_string();
+        let rpc_url = "http://localhost:8545".to_string(); // Use default URL
 
         let contracts_dir = std::path::Path::new("contracts");
         if !contracts_dir.exists() {
@@ -420,11 +428,12 @@ impl ContractInteractor {
         let signer: PrivateKeySigner = from_private_key.parse().context("Invalid private key")?;
         let wallet = EthereumWallet::from(signer);
 
-        let provider_url_str = self.provider.client().transport().url();
+        let provider_url_str = "http://localhost:8545"; // Use default URL
         let transfer_provider = ProviderBuilder::new()
-            .with_recommended_fillers()
             .wallet(wallet)
-            .on_http(provider_url_str.parse().context("Failed to parse provider URL")?);
+            .connect(&provider_url_str)
+            .await
+            .context("Failed to connect to provider")?;
 
         let token_contract = TestToken::new(token_address.into(), &transfer_provider);
         let transfer_call = token_contract.transfer(*to_address, amount);
@@ -445,7 +454,7 @@ impl ContractInteractor {
             .await
             .context("Failed to get token balance")?;
 
-        Ok(balance._0)
+        Ok(balance)
     }
 
     pub fn encode_simple_call(&self, value: u32) -> Result<String> {

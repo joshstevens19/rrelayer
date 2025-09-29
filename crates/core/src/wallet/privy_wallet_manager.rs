@@ -3,7 +3,7 @@ use crate::network::ChainId;
 use crate::wallet::{WalletError, WalletManagerTrait};
 use alloy::consensus::{TxEnvelope, TypedTransaction};
 use alloy::dyn_abi::TypedData;
-use alloy::primitives::PrimitiveSignature;
+use alloy::primitives::Signature;
 use alloy_rlp::Decodable;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -148,7 +148,7 @@ impl WalletManagerTrait for PrivyWalletManager {
         wallet_index: u32,
         transaction: &TypedTransaction,
         _chain_id: &ChainId,
-    ) -> Result<PrimitiveSignature, WalletError> {
+    ) -> Result<Signature, WalletError> {
         let wallets = self.wallets.lock().await;
         let wallet = wallets
             .get(&wallet_index)
@@ -268,11 +268,7 @@ impl WalletManagerTrait for PrivyWalletManager {
         Ok(signature)
     }
 
-    async fn sign_text(
-        &self,
-        wallet_index: u32,
-        text: &str,
-    ) -> Result<PrimitiveSignature, WalletError> {
+    async fn sign_text(&self, wallet_index: u32, text: &str) -> Result<Signature, WalletError> {
         let wallets = self.wallets.lock().await;
         let wallet = wallets
             .get(&wallet_index)
@@ -313,7 +309,7 @@ impl WalletManagerTrait for PrivyWalletManager {
             message: "No signature in response data".to_string(),
         })?;
 
-        let signature = PrimitiveSignature::from_str(signature_hex)?;
+        let signature = Signature::from_str(signature_hex)?;
         Ok(signature)
     }
 
@@ -321,7 +317,7 @@ impl WalletManagerTrait for PrivyWalletManager {
         &self,
         wallet_index: u32,
         typed_data: &TypedData,
-    ) -> Result<PrimitiveSignature, WalletError> {
+    ) -> Result<Signature, WalletError> {
         let wallets = self.wallets.lock().await;
         let wallet = wallets
             .get(&wallet_index)
@@ -368,7 +364,7 @@ impl WalletManagerTrait for PrivyWalletManager {
             message: "No signature in response data".to_string(),
         })?;
 
-        let signature = PrimitiveSignature::from_str(signature_hex)?;
+        let signature = Signature::from_str(signature_hex)?;
         Ok(signature)
     }
 

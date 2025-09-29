@@ -39,7 +39,7 @@
 use alloy::{
     dyn_abi::TypedData,
     network::TransactionBuilder,
-    primitives::{Address, B256, ChainId, PrimitiveSignature, U256},
+    primitives::{Address, B256, ChainId, Signature, U256},
     rpc::types::TransactionRequest,
     signers::Signer,
 };
@@ -214,7 +214,7 @@ impl Signer for RelayerSigner {
     /// Sign a hash using the relayer service.
     ///
     /// This routes the signing request through `relayer.sign().text()`.
-    async fn sign_hash(&self, hash: &B256) -> alloy::signers::Result<PrimitiveSignature> {
+    async fn sign_hash(&self, hash: &B256) -> alloy::signers::Result<Signature> {
         let hash_hex = format!("0x{}", hex::encode(hash));
 
         let sign_result = match &self.client_type {
@@ -232,7 +232,7 @@ impl Signer for RelayerSigner {
     async fn sign_dynamic_typed_data(
         &self,
         payload: &TypedData,
-    ) -> alloy::signers::Result<PrimitiveSignature> {
+    ) -> alloy::signers::Result<Signature> {
         let sign_result = match &self.client_type {
             RelayerClientType::Relayer(client) => client.sign().typed_data(payload, None).await,
             RelayerClientType::Admin(client) => client.sign().typed_data(payload, None).await,
