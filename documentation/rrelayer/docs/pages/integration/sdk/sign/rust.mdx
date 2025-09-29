@@ -1,0 +1,515 @@
+# Sign
+
+Sign-related SDK call.
+
+## Sign Text Message
+
+:::info
+If you're already using alloy can use the framework [alloy]((/integration/sdk/framework-guides/rust/alloy)) guides to integrate rrelayer.
+:::
+
+:::info
+Basic auth can sign text with all relayers, and API keys can only sign text with the relayer
+they have permission to use.
+:::
+
+Sign text message with the relayer.
+
+### Response
+
+```rs
+SignTextResult
+```
+
+Just so you understand the properties returned
+
+```rs
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SignTextResult {
+    #[serde(rename = "messageSigned")]
+    pub message_signed: String,
+    pub signature: PrimitiveSignature,
+    pub signed_by: EvmAddress,
+}
+```
+
+### Basic Auth
+
+```rs
+use anyhow::Result;
+use rrelayer::{
+    create_client, AdminRelayerClient, CreateClientAuth, CreateClientConfig, RelayerId,
+    SignTextResult, TransactionSpeed,
+};
+use std::str::FromStr;
+
+async fn get_relayer_client() -> Result<AdminRelayerClient> {
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username: "your_username".to_string(),
+            password: "your_password".to_string(),
+        },
+    });
+
+    let relayer_client: AdminRelayerClient = client
+        .get_relayer_client(
+            &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+            Some(TransactionSpeed::FAST),
+        )
+        .await?;
+
+    Ok(relayer_client)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let result: SignTextResult = relayer_client.sign().text("sign this message", None).await?;
+    println!("{:?}", result);
+
+    Ok(())
+}
+```
+
+### API Key Auth
+
+```rs
+use anyhow::Result;
+use rrelayer::{
+    CreateRelayerClientConfig, RelayerClient, RelayerId, SignTextResult, TransactionSpeed,
+    create_relayer_client,
+};
+use std::str::FromStr;
+
+async fn get_relayer_client() -> Result<RelayerClient> {
+    let relayer: RelayerClient = create_relayer_client(CreateRelayerClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        relayer_id: RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+        api_key: "YOUR_API_KEY".to_string(),
+        speed: Some(TransactionSpeed::FAST),
+    });
+
+    Ok(relayer)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let result: SignTextResult = relayer_client.sign().text("sign this message", None).await?;
+    println!("{:?}", result);
+
+    Ok(())
+}
+
+```
+
+## Signed Text History
+
+:::info
+Basic auth can read all relayers signed text history, and API keys can only read the signed text history
+with the relayer they have permission to use.
+:::
+
+Get the full history of what the relayer has signed via messages.
+
+### Response
+
+```rs
+PagingResult<SignedTextHistory>
+```
+
+Just so you understand the properties returned
+
+```rs
+#[derive(Debug, Deserialize, Serialize)]
+pub struct PagingContext {
+    pub limit: u32,
+    pub offset: u32,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct PagingResult<TResult: Serialize> {
+    pub items: Vec<TResult>,
+    pub next: Option<PagingContext>,
+    pub previous: Option<PagingContext>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SignedTextHistory {
+    pub relayer_id: RelayerId,
+    pub message: String,
+    pub signature: Signature,
+    pub chain_id: ChainId,
+    pub signed_at: DateTime<Utc>,
+}
+```
+
+### Basic Auth
+
+```rs
+use anyhow::Result;
+use rrelayer::{
+    AdminRelayerClient, CreateClientAuth, CreateClientConfig, PagingContext, PagingResult,
+    RelayerId, SignedTextHistory, TransactionSpeed, create_client,
+};
+use std::str::FromStr;
+
+async fn get_relayer_client() -> Result<AdminRelayerClient> {
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username: "your_username".to_string(),
+            password: "your_password".to_string(),
+        },
+    });
+
+    let relayer_client: AdminRelayerClient = client
+        .get_relayer_client(
+            &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+            Some(TransactionSpeed::FAST),
+        )
+        .await?;
+
+    Ok(relayer_client)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let result: PagingResult<SignedTextHistory> =
+        relayer_client.sign().text_history(&PagingContext { limit: 100, offset: 0 }).await?;
+    println!("{:?}", result);
+
+    Ok(())
+}
+
+```
+
+### API Key Auth
+
+```rs
+use anyhow::Result;
+use rrelayer::{
+    create_relayer_client, CreateRelayerClientConfig, PagingContext, PagingResult, RelayerClient
+    , RelayerId, SignedTextHistory, TransactionSpeed,
+};
+use std::str::FromStr;
+
+async fn get_relayer_client() -> Result<RelayerClient> {
+    let relayer: RelayerClient = create_relayer_client(CreateRelayerClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        relayer_id: RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+        api_key: "YOUR_API_KEY".to_string(),
+        speed: Some(TransactionSpeed::FAST),
+    });
+
+    Ok(relayer)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let result: PagingResult<SignedTextHistory> =
+        relayer_client.sign().text_history(&PagingContext { limit: 100, offset: 0 }).await?;
+    println!("{:?}", result);
+
+    Ok(())
+}
+```
+
+## Sign Typed Data
+
+:::info
+If you're already using alloy can use the framework [alloy]((/integration/sdk/framework-guides/rust/alloy)) guides to integrate rrelayer.
+:::
+
+Sign typed data with the relayer.
+
+### Response
+
+```rs
+SignTypedDataResult
+```
+
+Just so you understand the properties returned
+
+```rs
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SignTypedDataResult {
+    pub signature: PrimitiveSignature,
+}
+```
+
+### Basic Auth
+
+```rs
+use anyhow::{Context, Result};
+use rrelayer::{
+    AdminRelayerClient, CreateClientAuth, CreateClientConfig, RelayerId, SignTextResult,
+    SignTypedDataResult, TransactionSpeed, TypedData, create_client,
+};
+use std::str::FromStr;
+
+async fn get_relayer_client() -> Result<AdminRelayerClient> {
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username: "your_username".to_string(),
+            password: "your_password".to_string(),
+        },
+    });
+
+    let relayer_client: AdminRelayerClient = client
+        .get_relayer_client(
+            &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+            Some(TransactionSpeed::FAST),
+        )
+        .await?;
+
+    Ok(relayer_client)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let chain_id = relayer_client.get_info().await?.chain_id;
+
+    let typed_data_json = serde_json::json!({
+        "types": {
+            "EIP712Domain": [
+                {"name": "name", "type": "string"},
+                {"name": "version", "type": "string"},
+                {"name": "chainId", "type": "uint256"},
+                {"name": "verifyingContract", "type": "address"}
+            ],
+            "Mail": [
+                {"name": "from", "type": "Person"},
+                {"name": "to", "type": "Person"},
+                {"name": "contents", "type": "string"}
+            ],
+            "Person": [
+                {"name": "name", "type": "string"},
+                {"name": "wallet", "type": "address"}
+            ]
+        },
+        "primaryType": "Mail",
+        "domain": {
+            "name": "RRelayer Test",
+            "version": "1",
+            "chainId": chain_id,
+            "verifyingContract": "0x0000000000000000000000000000000000000000"
+        },
+        "message": {
+            "from": {
+                "name": "Alice",
+                "wallet": "0x1234567890123456789012345678901234567890"
+            },
+            "to": {
+                "name": "Bob",
+                "wallet": "0x0987654321098765432109876543210987654321"
+            },
+            "contents": "Hello from E2E test!"
+        }
+    });
+
+    let typed_data: TypedData =
+        serde_json::from_value(typed_data_json).context("Failed to create typed data")?;
+
+    let result: SignTypedDataResult = relayer_client.sign().typed_data(&typed_data, None).await?;
+    println!("{:?}", result);
+
+    Ok(())
+}
+```
+
+### API Key Auth
+
+```rs
+use anyhow::{Context, Result};
+use rrelayer::{
+    CreateRelayerClientConfig, RelayerClient, RelayerId, SignTypedDataResult, TransactionSpeed,
+    TypedData, create_relayer_client,
+};
+use std::str::FromStr;
+
+async fn get_relayer_client() -> Result<RelayerClient> {
+    let relayer: RelayerClient = create_relayer_client(CreateRelayerClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        relayer_id: RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+        api_key: "YOUR_API_KEY".to_string(),
+        speed: Some(TransactionSpeed::FAST),
+    });
+
+    Ok(relayer)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let chain_id = relayer_client.get_info().await?.chain_id;
+
+    let typed_data_json = serde_json::json!({
+        "types": {
+            "EIP712Domain": [
+                {"name": "name", "type": "string"},
+                {"name": "version", "type": "string"},
+                {"name": "chainId", "type": "uint256"},
+                {"name": "verifyingContract", "type": "address"}
+            ],
+            "Mail": [
+                {"name": "from", "type": "Person"},
+                {"name": "to", "type": "Person"},
+                {"name": "contents", "type": "string"}
+            ],
+            "Person": [
+                {"name": "name", "type": "string"},
+                {"name": "wallet", "type": "address"}
+            ]
+        },
+        "primaryType": "Mail",
+        "domain": {
+            "name": "RRelayer Test",
+            "version": "1",
+            "chainId": chain_id,
+            "verifyingContract": "0x0000000000000000000000000000000000000000"
+        },
+        "message": {
+            "from": {
+                "name": "Alice",
+                "wallet": "0x1234567890123456789012345678901234567890"
+            },
+            "to": {
+                "name": "Bob",
+                "wallet": "0x0987654321098765432109876543210987654321"
+            },
+            "contents": "Hello from E2E test!"
+        }
+    });
+
+    let typed_data: TypedData =
+        serde_json::from_value(typed_data_json).context("Failed to create typed data")?;
+
+    let result: SignTypedDataResult = relayer_client.sign().typed_data(&typed_data, None).await?;
+    println!("{:?}", result);
+
+    Ok(())
+}
+```
+
+## Signed Typed Data History
+
+:::info
+Basic auth can read all relayers signed typed data history, and API keys can only read the signed typed data history
+with the relayer they have permission to use.
+:::
+
+Get the full history of what the relayer has signed via typed data.
+
+### Response
+
+```rs
+PagingResult<SignedTypedDataHistory>
+```
+
+Just so you understand the properties returned
+
+```rs
+#[derive(Debug, Deserialize, Serialize)]
+pub struct PagingContext {
+    pub limit: u32,
+    pub offset: u32,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct PagingResult<TResult: Serialize> {
+    pub items: Vec<TResult>,
+    pub next: Option<PagingContext>,
+    pub previous: Option<PagingContext>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SignedTypedDataHistory {
+    pub relayer_id: RelayerId,
+    pub domain_data: serde_json::Value,
+    pub message_data: serde_json::Value,
+    pub primary_type: String,
+    pub signature: Signature,
+    pub chain_id: ChainId,
+    pub signed_at: DateTime<Utc>,
+}
+```
+
+### Basic Auth
+
+```rs
+use anyhow::Result;
+use rrelayer::{
+    AdminRelayerClient, CreateClientAuth, CreateClientConfig, PagingContext, PagingResult,
+    RelayerId, SignedTypedDataHistory, TransactionSpeed, create_client,
+};
+use std::str::FromStr;
+
+async fn get_relayer_client() -> Result<AdminRelayerClient> {
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username: "your_username".to_string(),
+            password: "your_password".to_string(),
+        },
+    });
+
+    let relayer_client: AdminRelayerClient = client
+        .get_relayer_client(
+            &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+            Some(TransactionSpeed::FAST),
+        )
+        .await?;
+
+    Ok(relayer_client)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let result: PagingResult<SignedTypedDataHistory> =
+        relayer_client.sign().typed_data_history(&PagingContext { limit: 100, offset: 0 }).await?;
+    println!("{:?}", result);
+
+    Ok(())
+}
+
+```
+
+### API Key Auth
+
+```rs
+use anyhow::Result;
+use rrelayer::{
+    CreateRelayerClientConfig, PagingContext, PagingResult, RelayerClient, RelayerId,
+    SignedTypedDataHistory, TransactionSpeed, create_relayer_client,
+};
+use std::str::FromStr;
+
+async fn get_relayer_client() -> Result<RelayerClient> {
+    let relayer: RelayerClient = create_relayer_client(CreateRelayerClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        relayer_id: RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+        api_key: "YOUR_API_KEY".to_string(),
+        speed: Some(TransactionSpeed::FAST),
+    });
+
+    Ok(relayer)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let result: PagingResult<SignedTypedDataHistory> =
+        relayer_client.sign().typed_data_history(&PagingContext { limit: 100, offset: 0 }).await?;
+    println!("{:?}", result);
+
+    Ok(())
+}
+
+```

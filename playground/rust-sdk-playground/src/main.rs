@@ -3,6 +3,7 @@ mod config;
 mod networks;
 mod rate_limit;
 mod relayer;
+mod signing;
 
 use anyhow::Result;
 

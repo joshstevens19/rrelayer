@@ -19,4 +19,8 @@ pub use rrelayer_core::{
         api::RelayTransactionRequest,
         types::{TransactionId, TransactionSpeed, TransactionValue},
     },
+    signing::{SignTextResult, SignedTextHistory, SignTypedDataResult, SignedTypedDataHistory}
 };
+
+pub use alloy::primitives::PrimitiveSignature;
+pub use alloy::dyn_abi::TypedData;

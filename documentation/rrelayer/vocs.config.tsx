@@ -490,7 +490,7 @@ export default defineConfig({
                 {
                   text: 'Rust',
                   collapsed: true,
-                  link: '/integration/sign/sign/rust',
+                  link: '/integration/sdk/sign/rust',
                   items: [
                     {
                       text: 'Sign Text Message',
