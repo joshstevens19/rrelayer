@@ -1,0 +1,821 @@
+# Relayers
+
+Relayer-related SDK call.
+
+## Create Relayer
+
+:::info
+Only basic auth authentication can create relayers
+:::
+
+Create a new relayer for a network.
+
+### Response
+
+```rs
+CreateRelayerResult
+```
+
+Just so you understand the properties returned
+
+```rs
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CreateRelayerResult {
+    pub id: RelayerId,
+    pub address: EvmAddress,
+}
+```
+
+### Example
+
+```rs
+use anyhow::Result;
+use rrelayer::{
+    Client, CreateClientAuth, CreateClientConfig, CreateRelayerResult, TransactionSpeed,
+    create_client,
+};
+
+async fn get_client() -> Result<Client> {
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username: "your_username".to_string(),
+            password: "your_password".to_string(),
+        },
+    });
+
+    Ok(client)
+}
+
+async fn example() -> Result<()> {
+    let client = get_client().await?;
+
+    let result: CreateRelayerResult =
+        client.relayer().create(11155111, "fancy_relayer").await?;
+    println!("{:?}", result);
+
+    let relayer_client =
+        client.get_relayer_client(&result.id, Some(TransactionSpeed::FAST)).await?;
+
+    Ok(())
+}
+
+```
+
+## Get Relayers
+
+:::info
+Only basic auth authentication can get all relayers
+:::
+
+Get all the relayers across all networks or a single network.
+
+### Response
+
+```rs
+PagingResult<Relayer>;
+```
+
+Just so you understand the properties returned
+
+```rs
+#[derive(Debug, Deserialize, Serialize)]
+pub struct PagingContext {
+    pub limit: u32,
+    pub offset: u32,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct PagingResult<TResult: Serialize> {
+    pub items: Vec<TResult>,
+    pub next: Option<PagingContext>,
+    pub previous: Option<PagingContext>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct Relayer {
+    /// The unique identifier for the relayer
+    pub id: RelayerId,
+
+    /// The name of the relayer
+    pub name: String,
+
+    /// The chain id the relayer is operating on
+    #[serde(rename = "chainId")]
+    pub chain_id: ChainId,
+
+    /// The relayer address
+    pub address: EvmAddress,
+
+    /// The relayer wallet index
+    pub wallet_index: u32,
+
+    /// The max gas price
+    #[serde(rename = "maxGasPrice", skip_serializing_if = "Option::is_none", default)]
+    pub max_gas_price: Option<GasPrice>,
+
+    /// If the relayer is paused
+    pub paused: bool,
+
+    /// If 1559 transactions are enabled
+    #[serde(rename = "eip1559Enabled")]
+    pub eip_1559_enabled: bool,
+
+    /// The relayer creation time
+    #[serde(rename = "createdAt")]
+    pub created_at: DateTime<Utc>,
+}
+```
+
+### Example
+
+:::code-group
+
+```rs [get-all-relayers.rs]
+use anyhow::Result;
+use rrelayer::{create_client, Client, CreateClientAuth, CreateClientConfig, PagingContext, PagingResult, Relayer};
+
+async fn get_client() -> Result<Client> {
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username: "your_username".to_string(),
+            password: "your_password".to_string(),
+        },
+    });
+
+    Ok(client)
+}
+
+async fn example() -> Result<()> {
+    let client = get_client().await?;
+
+    let result: PagingResult<Relayer> = client.relayer().get_all(&PagingContext {
+        limit: 100,
+        offset: 0,
+    }, None).await?;
+    println!("{:?}", result);
+
+    Ok(())
+}
+```
+
+```rs [get-network-relayers.rs]
+use anyhow::Result;
+use rrelayer::{create_client, Client, CreateClientAuth, CreateClientConfig, PagingContext, PagingResult, Relayer};
+
+async fn get_client() -> Result<Client> {
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username: "your_username".to_string(),
+            password: "your_password".to_string(),
+        },
+    });
+
+    Ok(client)
+}
+
+async fn example() -> Result<()> {
+    let client = get_client().await?;
+
+    let result: PagingResult<Relayer> = client.relayer().get_all(&PagingContext {
+        limit: 100,
+        offset: 0,
+    }, Some(11155111)).await?;
+    println!("{:?}", result);
+
+    Ok(())
+}
+```
+
+:::
+
+## Get Relayer
+
+Basic auth can get all relayers information, and API keys can only get the relayer information
+they have permission to use.
+
+### Basic Auth
+
+#### Response
+
+```rs
+Option<GetRelayerResult>
+```
+
+Just so you understand the properties returned
+
+```rs
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct Relayer {
+    /// The unique identifier for the relayer
+    pub id: RelayerId,
+
+    /// The name of the relayer
+    pub name: String,
+
+    /// The chain id the relayer is operating on
+    #[serde(rename = "chainId")]
+    pub chain_id: ChainId,
+
+    /// The relayer address
+    pub address: EvmAddress,
+
+    /// The relayer wallet index
+    pub wallet_index: u32,
+
+    /// The max gas price
+    #[serde(rename = "maxGasPrice", skip_serializing_if = "Option::is_none", default)]
+    pub max_gas_price: Option<GasPrice>,
+
+    /// If the relayer is paused
+    pub paused: bool,
+
+    /// If 1559 transactions are enabled
+    #[serde(rename = "eip1559Enabled")]
+    pub eip_1559_enabled: bool,
+
+    /// The relayer creation time
+    #[serde(rename = "createdAt")]
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GetRelayerResult {
+    pub relayer: Relayer,
+    #[serde(rename = "providerUrls")]
+    pub provider_urls: Vec<String>,
+}
+```
+
+```rs
+use anyhow::Result;
+use rrelayer::{
+    AdminRelayerClient, CreateClientAuth, CreateClientConfig, Relayer, RelayerId, TransactionSpeed,
+    create_client,
+};
+use std::str::FromStr;
+
+async fn get_relayer_client() -> Result<AdminRelayerClient> {
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username: "your_username".to_string(),
+            password: "your_password".to_string(),
+        },
+    });
+
+    let relayer_client: AdminRelayerClient = client
+        .get_relayer_client(
+            &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+            Some(TransactionSpeed::FAST),
+        )
+        .await?;
+
+    Ok(relayer_client)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let result: Relayer = relayer_client.get_info().await?;
+    println!("{:?}", result);
+
+    Ok(())
+}
+```
+
+### API Key Auth
+
+#### Response
+
+```rs
+Option<Relayer>;
+```
+
+Just so you understand the properties returned
+
+```rs
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct Relayer {
+    /// The unique identifier for the relayer
+    pub id: RelayerId,
+
+    /// The name of the relayer
+    pub name: String,
+
+    /// The chain id the relayer is operating on
+    #[serde(rename = "chainId")]
+    pub chain_id: ChainId,
+
+    /// The relayer address
+    pub address: EvmAddress,
+
+    /// The relayer wallet index
+    pub wallet_index: u32,
+
+    /// The max gas price
+    #[serde(rename = "maxGasPrice", skip_serializing_if = "Option::is_none", default)]
+    pub max_gas_price: Option<GasPrice>,
+
+    /// If the relayer is paused
+    pub paused: bool,
+
+    /// If 1559 transactions are enabled
+    #[serde(rename = "eip1559Enabled")]
+    pub eip_1559_enabled: bool,
+
+    /// The relayer creation time
+    #[serde(rename = "createdAt")]
+    pub created_at: DateTime<Utc>,
+}
+```
+
+```rs
+use anyhow::Result;
+use rrelayer::{
+    create_relayer_client, CreateRelayerClientConfig, Relayer, RelayerClient,
+    RelayerId, TransactionSpeed,
+};
+use std::str::FromStr;
+
+async fn get_relayer_client() -> Result<RelayerClient> {
+    let relayer: RelayerClient = create_relayer_client(CreateRelayerClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        relayer_id: RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+        api_key: "YOUR_API_KEY".to_string(),
+        speed: Some(TransactionSpeed::FAST),
+    });
+
+    Ok(relayer)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let result: Relayer = relayer_client.get_info().await?;
+    println!("{:?}", result);
+
+    Ok(())
+}
+```
+
+## Clone Relayer
+
+:::info
+Only basic auth authentication can clone relayers
+:::
+
+Clone a relayer to a network.
+
+### Response
+
+```rs
+CreateRelayerResult
+```
+
+Just so you understand the properties returned
+
+```rs
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CreateRelayerResult {
+    pub id: RelayerId,
+    pub address: EvmAddress,
+}
+```
+
+### Example
+
+```rs
+use std::str::FromStr;
+use anyhow::Result;
+use rrelayer::{
+    Client, CreateClientAuth, CreateClientConfig, CreateRelayerResult, RelayerId, TransactionSpeed,
+    create_client,
+};
+
+async fn get_client() -> Result<Client> {
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username: "your_username".to_string(),
+            password: "your_password".to_string(),
+        },
+    });
+
+    Ok(client)
+}
+
+async fn example() -> Result<()> {
+    let client = get_client().await?;
+
+    let result: CreateRelayerResult = client
+        .relayer()
+        .clone_relayer(
+            &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+            11155111,
+            "cloned-relayer",
+        )
+        .await?;
+    println!("{:?}", result);
+
+    let relayer_client =
+        client.get_relayer_client(&result.id, Some(TransactionSpeed::FAST)).await?;
+
+    Ok(())
+}
+
+```
+
+## Pause/Unpause Relayer
+
+:::info
+Only basic auth authentication can pause/unpause relayers
+:::
+
+You can pause and unpause a relayers anytime. When you pause, rrelayer will not accept anymore transactions on it.
+
+:::code-group
+
+```rs [pause-relayer.rs]
+use anyhow::Result;
+use rrelayer::{
+    AdminRelayerClient, CreateClientAuth, CreateClientConfig, RelayerId, TransactionSpeed,
+    create_client,
+};
+use std::str::FromStr;
+
+async fn get_admin_relayer() -> Result<AdminRelayerClient> {
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username: "your_username".to_string(),
+            password: "your_password".to_string(),
+        },
+    });
+
+    let relayer: AdminRelayerClient = client
+        .get_relayer_client(
+            &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+            Some(TransactionSpeed::FAST),
+        )
+        .await?;
+
+    Ok(relayer)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_admin_relayer().await?;
+
+    relayer_client.pause().await?;
+
+    Ok(())
+}
+```
+
+```rs [unpause-relayer.rs]
+use anyhow::Result;
+use rrelayer::{
+    AdminRelayerClient, CreateClientAuth, CreateClientConfig, RelayerId, TransactionSpeed,
+    create_client,
+};
+use std::str::FromStr;
+
+async fn get_admin_relayer() -> Result<AdminRelayerClient> {
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username: "your_username".to_string(),
+            password: "your_password".to_string(),
+        },
+    });
+
+    let relayer: AdminRelayerClient = client
+        .get_relayer_client(
+            &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+            Some(TransactionSpeed::FAST),
+        )
+        .await?;
+
+    Ok(relayer)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_admin_relayer().await?;
+
+    relayer_client.unpause().await?;
+
+    Ok(())
+}
+```
+
+:::
+
+## Update EIP-1559 Status
+
+:::info
+Only basic auth authentication can update EIP-1559 status
+:::
+
+By default, EIP-1559 transactions are enabled, but you can turn on legacy and toggle this anytime.
+
+:::code-group
+
+```rs [disable-eip-1559-status.rs]
+use anyhow::Result;
+use rrelayer::{
+    AdminRelayerClient, CreateClientAuth, CreateClientConfig, RelayerId, TransactionSpeed,
+    create_client,
+};
+use std::str::FromStr;
+
+async fn get_admin_relayer() -> Result<AdminRelayerClient> {
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username: "your_username".to_string(),
+            password: "your_password".to_string(),
+        },
+    });
+
+    let relayer: AdminRelayerClient = client
+        .get_relayer_client(
+            &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+            Some(TransactionSpeed::FAST),
+        )
+        .await?;
+
+    Ok(relayer)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_admin_relayer().await?;
+
+    relayer_client.update_eip1559_status(false).await?;
+
+    Ok(())
+}
+```
+
+```rs [enable-eip-1559-status.rs]
+use anyhow::Result;
+use rrelayer::{
+    AdminRelayerClient, CreateClientAuth, CreateClientConfig, RelayerId, TransactionSpeed,
+    create_client,
+};
+use std::str::FromStr;
+
+async fn get_admin_relayer() -> Result<AdminRelayerClient> {
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username: "your_username".to_string(),
+            password: "your_password".to_string(),
+        },
+    });
+
+    let relayer: AdminRelayerClient = client
+        .get_relayer_client(
+            &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+            Some(TransactionSpeed::FAST),
+        )
+        .await?;
+
+    Ok(relayer)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_admin_relayer().await?;
+
+    relayer_client.update_eip1559_status(true).await?;
+
+    Ok(())
+}
+
+```
+
+:::
+
+## Update Max Gas Price
+
+:::info
+Only basic auth authentication can update max gas price
+:::
+
+You can set the max amount the relayer will bump gas up to, this can protect you about network congression/expensive
+periods. You must pass in the wei amount.
+
+```rs
+use anyhow::Result;
+use rrelayer::{
+    AdminRelayerClient, CreateClientAuth, CreateClientConfig, RelayerId, TransactionSpeed,
+    create_client,
+};
+use std::str::FromStr;
+
+async fn get_admin_relayer() -> Result<AdminRelayerClient> {
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username: "your_username".to_string(),
+            password: "your_password".to_string(),
+        },
+    });
+
+    let relayer: AdminRelayerClient = client
+        .get_relayer_client(
+            &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+            Some(TransactionSpeed::FAST),
+        )
+        .await?;
+
+    Ok(relayer)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_admin_relayer().await?;
+
+    // 2 gwei
+    relayer_client.update_max_gas_price("2000000000").await?;
+
+    Ok(())
+}
+```
+
+## Remove Max Gas Price
+
+:::info
+Only basic auth authentication can remove max gas price
+:::
+
+You can remove the max gas price set.
+
+```rs
+use anyhow::Result;
+use rrelayer::{
+    AdminRelayerClient, CreateClientAuth, CreateClientConfig, RelayerId, TransactionSpeed,
+    create_client,
+};
+use std::str::FromStr;
+
+async fn get_admin_relayer() -> Result<AdminRelayerClient> {
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username: "your_username".to_string(),
+            password: "your_password".to_string(),
+        },
+    });
+
+    let relayer: AdminRelayerClient = client
+        .get_relayer_client(
+            &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+            Some(TransactionSpeed::FAST),
+        )
+        .await?;
+
+    Ok(relayer)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_admin_relayer().await?;
+
+    relayer_client.remove_max_gas_price().await?;
+
+    Ok(())
+}
+```
+
+## Delete Relayer
+
+:::info
+Only basic auth authentication can delete relayers
+:::
+
+Delete a new relayer for a network, it just does a soft delete the database records stay, alongside it will
+clear the current queue.
+
+```rs
+use anyhow::Result;
+use rrelayer::{Client, CreateClientAuth, CreateClientConfig, RelayerId, create_client};
+use std::str::FromStr;
+
+async fn get_client() -> Result<Client> {
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username: "your_username".to_string(),
+            password: "your_password".to_string(),
+        },
+    });
+
+    Ok(client)
+}
+
+async fn example() -> Result<()> {
+    let client = get_client().await?;
+
+    client.relayer().delete(&RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?).await?;
+
+    Ok(())
+}
+```
+
+## Get Allowlist
+
+Basic auth can get all relayers allowlists, and API keys can only get the relayer allowlist
+they have permission to use.
+
+### Response
+
+```rs
+PagingResult<EvmAddress>
+```
+
+Just so you understand the properties returned
+
+```ts
+export interface PagingContext {
+  limit: number;
+  offset: number;
+}
+
+export interface PagingResult<T> {
+  items: T[];
+  next?: PagingContext;
+  previous?: PagingContext;
+}
+```
+
+### Basic Auth
+
+```rs
+use anyhow::Result;
+use rrelayer::{
+    AdminRelayerClient, CreateClientAuth, CreateClientConfig, EvmAddress, PagingContext,
+    PagingResult, RelayerId, TransactionSpeed, create_client,
+};
+use std::str::FromStr;
+
+async fn get_relayer_client() -> Result<AdminRelayerClient> {
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username: "your_username".to_string(),
+            password: "your_password".to_string(),
+        },
+    });
+
+    let relayer_client: AdminRelayerClient = client
+        .get_relayer_client(
+            &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+            Some(TransactionSpeed::FAST),
+        )
+        .await?;
+
+    Ok(relayer_client)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let allowlist: PagingResult<EvmAddress> =
+        relayer_client.allowlist().get(&PagingContext { limit: 100, offset: 0 }).await?;
+    println!("{:?}", allowlist);
+
+    Ok(())
+}
+```
+
+### API Key Auth
+
+```rs
+use anyhow::Result;
+use rrelayer::{
+    CreateRelayerClientConfig, EvmAddress, PagingContext, PagingResult, RelayerClient, RelayerId,
+    TransactionSpeed, create_relayer_client,
+};
+use std::str::FromStr;
+
+async fn get_relayer_client() -> Result<RelayerClient> {
+    let relayer: RelayerClient = create_relayer_client(CreateRelayerClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        relayer_id: RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+        api_key: "YOUR_API_KEY".to_string(),
+        speed: Some(TransactionSpeed::FAST),
+    });
+
+    Ok(relayer)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let allowlist: PagingResult<EvmAddress> =
+        relayer_client.allowlist().get(&PagingContext { limit: 100, offset: 0 }).await?;
+    println!("{:?}", allowlist);
+
+    Ok(())
+}
+```

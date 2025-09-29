@@ -141,8 +141,12 @@ pub struct ClientRelayerApi<'a> {
 }
 
 impl<'a> ClientRelayerApi<'a> {
-    pub async fn create(&self, chain_id: &u64, name: &str) -> ApiResult<CreateRelayerResult> {
+    pub async fn create(&self, chain_id: u64, name: &str) -> ApiResult<CreateRelayerResult> {
         self.relayer_api.create(chain_id, name).await
+    }
+
+    pub async fn clone_relayer(&self,  id: &RelayerId, chain_id: u64, name: &str) -> ApiResult<CreateRelayerResult> {
+        self.relayer_api.clone(id, chain_id, name).await
     }
 
     pub async fn delete(&self, id: &RelayerId) -> ApiResult<()> {
@@ -167,8 +171,8 @@ pub struct ClientNetworkApi<'a> {
 }
 
 impl<'a> ClientNetworkApi<'a> {
-    pub async fn get(&self, chain_id: &u64) -> ApiResult<Option<Network>> {
-        let chain_id = ChainId::new(*chain_id);
+    pub async fn get(&self, chain_id: u64) -> ApiResult<Option<Network>> {
+        let chain_id = ChainId::new(chain_id);
         self.network_api.get(&chain_id).await
     }
 
@@ -176,7 +180,7 @@ impl<'a> ClientNetworkApi<'a> {
         self.network_api.get_all().await
     }
 
-    pub async fn get_gas_prices(&self, chain_id: &u64) -> ApiResult<Option<GasEstimatorResult>> {
+    pub async fn get_gas_prices(&self, chain_id: u64) -> ApiResult<Option<GasEstimatorResult>> {
         self.network_api.get_gas_prices(chain_id).await
     }
 }
@@ -318,7 +322,7 @@ impl AdminRelayerClient {
 
     pub async fn clone_relayer(
         &self,
-        chain_id: &u64,
+        chain_id: u64,
         name: &str,
     ) -> ApiResult<CreateRelayerResult> {
         self.relayer_api.clone(self.relayer_client.id(), chain_id, name).await

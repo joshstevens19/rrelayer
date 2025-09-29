@@ -322,14 +322,46 @@ export default defineConfig({
                   collapsed: true,
                   link: '/integration/sdk/relayers/rust',
                   items: [
-                    { text: 'Create Relayer', link: '' },
-                    { text: 'Get Relayers', link: '' },
-                    { text: 'Get Relayer', link: '' },
-                    { text: 'Clone Relayer', link: '' },
-                    { text: 'Pause/Unpause', link: '' },
-                    { text: 'Gas Settings', link: '' },
-                    { text: 'Delete Relayer', link: '' },
-                    { text: 'Get Allowlist', link: '' },
+                    {
+                      text: 'Create Relayer',
+                      link: '/integration/sdk/relayers/rust#create-relayer',
+                    },
+                    {
+                      text: 'Get Relayers',
+                      link: '/integration/sdk/relayers/rust#get-relayers',
+                    },
+                    {
+                      text: 'Get Relayer',
+                      link: '/integration/sdk/relayers/rust#get-relayer',
+                    },
+                    {
+                      text: 'Clone Relayer',
+                      link: '/integration/sdk/relayers/rust#clone-relayer',
+                    },
+                    {
+                      text: 'Pause/Unpause',
+                      link: '/integration/sdk/relayers/rust#pauseunpause-relayer',
+                    },
+                    {
+                      text: 'Update EIP-1559 Status',
+                      link: '/integration/sdk/relayers/rust#update-eip-1559-status',
+                    },
+                    {
+                      text: 'Update Max Gas Price',
+                      link: '/integration/sdk/relayers/rust#update-max-gas-price',
+                    },
+                    {
+                      text: 'Remove Max Gas Price',
+                      link: '/integration/sdk/relayers/rust#remove-max-gas-price',
+                    },
+                    {
+                      text: 'Delete Relayer',
+                      link: '/integration/sdk/relayers/rust#delete-relayer',
+                    },
+                    {
+                      text: 'Get Allowlist',
+                      link: '/integration/sdk/relayers/rust#get-allowlist',
+                    },
                   ],
                 },
               ],

@@ -33,7 +33,7 @@ impl NetworkApi {
     /// # Returns
     ///
     /// Returns a Result containing either the gas prices or an error
-    pub async fn get_gas_prices(&self, chain_id: &u64) -> ApiResult<Option<GasEstimatorResult>> {
+    pub async fn get_gas_prices(&self, chain_id: u64) -> ApiResult<Option<GasEstimatorResult>> {
         let endpoint = format!("networks/gas/price/{}", chain_id.to_string());
         self.client.get(&endpoint).await
     }

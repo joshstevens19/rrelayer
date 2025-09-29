@@ -1,5 +1,6 @@
 use anyhow::Result;
-use rrelayer::{Client, CreateClientAuth, CreateClientConfig, GasEstimatorResult, create_client};
+use rrelayer::{Client, CreateClientAuth, CreateClientConfig, RelayerId, create_client};
+use std::str::FromStr;
 
 async fn get_client() -> Result<Client> {
     let client = create_client(CreateClientConfig {
@@ -16,8 +17,7 @@ async fn get_client() -> Result<Client> {
 async fn example() -> Result<()> {
     let client = get_client().await?;
 
-    let result: Option<GasEstimatorResult> = client.network().get_gas_prices(11155111).await?;
-    println!("{:?}", result);
+    client.relayer().delete(&RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?).await?;
 
     Ok(())
 }

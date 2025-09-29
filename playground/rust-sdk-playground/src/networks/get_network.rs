@@ -16,7 +16,7 @@ async fn get_client() -> Result<Client> {
 async fn example() -> Result<()> {
     let client = get_client().await?;
 
-    let network: Option<Network> = client.network().get(&11155111).await?;
+    let network: Option<Network> = client.network().get(11155111).await?;
     println!("{:?}", network);
 
     Ok(())

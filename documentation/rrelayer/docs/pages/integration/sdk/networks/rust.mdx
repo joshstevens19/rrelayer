@@ -50,7 +50,7 @@ async fn get_client() -> Result<Client> {
 async fn example() -> Result<()> {
     let client = get_client().await?;
 
-    let network: Option<Network> = client.network().get(&11155111).await?;
+    let network: Option<Network> = client.network().get(11155111).await?;
     println!("{:?}", network);
 
     Ok(())
@@ -179,7 +179,7 @@ async fn get_client() -> Result<Client> {
 async fn example() -> Result<()> {
     let client = get_client().await?;
 
-    let result: Option<GasEstimatorResult> = client.network().get_gas_prices(&11155111).await?;
+    let result: Option<GasEstimatorResult> = client.network().get_gas_prices(11155111).await?;
     println!("{:?}", result);
 
     Ok(())

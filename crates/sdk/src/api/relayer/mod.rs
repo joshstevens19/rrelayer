@@ -52,7 +52,7 @@ impl RelayerApi {
         self.client.get_or_none(&format!("relayers/{}", id)).await
     }
 
-    pub async fn create(&self, chain_id: &u64, name: &str) -> ApiResult<CreateRelayerResult> {
+    pub async fn create(&self, chain_id: u64, name: &str) -> ApiResult<CreateRelayerResult> {
         self.client
             .post(
                 &format!("relayers/{}/new", chain_id.to_string()),
@@ -64,7 +64,7 @@ impl RelayerApi {
     pub async fn clone(
         &self,
         id: &RelayerId,
-        chain_id: &u64,
+        chain_id: u64,
         name: &str,
     ) -> ApiResult<CreateRelayerResult> {
         self.client
