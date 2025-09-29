@@ -11,6 +11,7 @@ All transaction endpoints require authentication. See [Authentication](/integrat
 Send a new transaction through a relayer.
 
 ### Endpoint
+
 ```
 POST /api/transactions/relayers/{relayer_id}/send
 ```
@@ -30,14 +31,14 @@ POST /api/transactions/relayers/{relayer_id}/send
 
 #### Parameters
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `to` | `string` | Yes | Recipient address |
-| `value` | `string` | No | Transaction value in wei (default: "0") |
-| `data` | `string` | No | Transaction data/input (default: "0x") |
-| `speed` | `string` | No | Transaction speed: `"SLOW"`, `"MEDIUM"`, `"FAST"`, `"SUPER_FAST"` |
-| `external_id` | `string` | No | Custom external ID for tracking |
-| `blobs` | `string[]` | No | Blob data for EIP-4844 transactions |
+| Field         | Type       | Required | Description                                                       |
+| ------------- | ---------- | -------- | ----------------------------------------------------------------- |
+| `to`          | `string`   | Yes      | Recipient address                                                 |
+| `value`       | `string`   | No       | Transaction value in wei (default: "0")                           |
+| `data`        | `string`   | No       | Transaction data/input (default: "0x")                            |
+| `speed`       | `string`   | No       | Transaction speed: `"SLOW"`, `"MEDIUM"`, `"FAST"`, `"SUPER_FAST"` |
+| `external_id` | `string`   | No       | Custom external ID for tracking                                   |
+| `blobs`       | `string[]` | No       | Blob data for EIP-4844 transactions                               |
 
 ### Response
 
@@ -67,6 +68,7 @@ curl -X POST https://your-rrelayer.com/api/transactions/relayers/0x742d35.../sen
 Get transaction details by ID.
 
 ### Endpoint
+
 ```
 GET /api/transactions/{transaction_id}
 ```
@@ -122,6 +124,7 @@ curl https://your-rrelayer.com/api/transactions/tx_abc123def456 \
 Get the current status and receipt information for a transaction.
 
 ### Endpoint
+
 ```
 GET /api/transactions/status/{transaction_id}
 ```
@@ -145,17 +148,17 @@ GET /api/transactions/status/{transaction_id}
 
 ### Transaction Statuses
 
-| Status | Description |
-|--------|-------------|
-| `PENDING` | Transaction is queued and waiting to be sent |
-| `INMEMPOOL` | Transaction has been sent to the blockchain mempool |
-| `MINED` | Transaction has been included in a block |
-| `CONFIRMED` | Transaction has reached required confirmations |
-| `FAILED` | Transaction failed on-chain |
-| `EXPIRED` | Transaction expired before being mined |
-| `CANCELLED` | Transaction was cancelled by a cancel operation |
-| `REPLACED` | Transaction was replaced by a replace operation |
-| `DROPPED` | Transaction was dropped from mempool (e.g., failed cancel/replace) |
+| Status      | Description                                                        |
+| ----------- | ------------------------------------------------------------------ |
+| `PENDING`   | Transaction is queued and waiting to be sent                       |
+| `INMEMPOOL` | Transaction has been sent to the blockchain mempool                |
+| `MINED`     | Transaction has been included in a block                           |
+| `CONFIRMED` | Transaction has reached required confirmations                     |
+| `FAILED`    | Transaction failed on-chain                                        |
+| `EXPIRED`   | Transaction expired before being mined                             |
+| `CANCELLED` | Transaction was cancelled by a cancel operation                    |
+| `REPLACED`  | Transaction was replaced by a replace operation                    |
+| `DROPPED`   | Transaction was dropped from mempool (e.g., failed cancel/replace) |
 
 ### Example
 
@@ -169,6 +172,7 @@ curl https://your-rrelayer.com/api/transactions/status/tx_abc123def456 \
 Replace a pending or in-mempool transaction with new transaction parameters.
 
 ### Endpoint
+
 ```
 PUT /api/transactions/replace/{transaction_id}
 ```
@@ -202,9 +206,9 @@ PUT /api/transactions/replace/{transaction_id}
 
 ### Fields
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | `string` | ID of the replacement transaction created |
+| Field  | Type     | Description                                                          |
+| ------ | -------- | -------------------------------------------------------------------- |
+| `id`   | `string` | ID of the replacement transaction created                            |
 | `hash` | `string` | Transaction hash of the replacement transaction (for INMEMPOOL only) |
 
 **Note**: For PENDING transactions that are replaced immediately, the response contains the same transaction ID with updated parameters, and `hash` will be `null` until sent.
@@ -227,6 +231,7 @@ curl -X PUT https://your-rrelayer.com/api/transactions/replace/tx_abc123def456 \
 Cancel a pending or in-mempool transaction.
 
 ### Endpoint
+
 ```
 PUT /api/transactions/cancel/{transaction_id}
 ```
@@ -249,9 +254,9 @@ PUT /api/transactions/cancel/{transaction_id}
 
 ### Fields
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | `string` | ID of the cancel transaction created |
+| Field  | Type     | Description                                                     |
+| ------ | -------- | --------------------------------------------------------------- |
+| `id`   | `string` | ID of the cancel transaction created                            |
 | `hash` | `string` | Transaction hash of the cancel transaction (for INMEMPOOL only) |
 
 **Note**: For PENDING transactions that are cancelled immediately, `hash` will be `null`.
@@ -268,17 +273,18 @@ curl -X PUT https://your-rrelayer.com/api/transactions/cancel/tx_abc123def456 \
 Get all transactions for a specific relayer.
 
 ### Endpoint
+
 ```
 GET /api/transactions/relayers/{relayer_id}
 ```
 
 ### Query Parameters
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `limit` | `number` | Maximum number of transactions to return |
-| `offset` | `number` | Number of transactions to skip |
-| `status` | `string` | Filter by transaction status |
+| Parameter | Type     | Description                              |
+| --------- | -------- | ---------------------------------------- |
+| `limit`   | `number` | Maximum number of transactions to return |
+| `offset`  | `number` | Number of transactions to skip           |
+| `status`  | `string` | Filter by transaction status             |
 
 ### Response
 
@@ -311,11 +317,13 @@ curl "https://your-rrelayer.com/api/transactions/relayers/0x742d35...?limit=10&o
 Get pending and in-mempool transaction counts for a relayer.
 
 ### Pending Count
+
 ```
 GET /api/transactions/relayers/{relayer_id}/pending/count
 ```
 
 ### In-Mempool Count
+
 ```
 GET /api/transactions/relayers/{relayer_id}/inmempool/count
 ```
@@ -339,14 +347,14 @@ curl https://your-rrelayer.com/api/transactions/relayers/0x742d35.../pending/cou
 
 ### Common Error Codes
 
-| Status | Code | Description |
-|--------|------|-------------|
-| 400 | `INVALID_REQUEST` | Invalid request parameters |
-| 401 | `UNAUTHORIZED` | Authentication required |
-| 403 | `FORBIDDEN` | Insufficient permissions |
-| 404 | `NOT_FOUND` | Transaction or relayer not found |
-| 429 | `RATE_LIMIT_EXCEEDED` | Rate limit exceeded |
-| 500 | `INTERNAL_ERROR` | Server error |
+| Status | Code                  | Description                      |
+| ------ | --------------------- | -------------------------------- |
+| 400    | `INVALID_REQUEST`     | Invalid request parameters       |
+| 401    | `UNAUTHORIZED`        | Authentication required          |
+| 403    | `FORBIDDEN`           | Insufficient permissions         |
+| 404    | `NOT_FOUND`           | Transaction or relayer not found |
+| 429    | `RATE_LIMIT_EXCEEDED` | Rate limit exceeded              |
+| 500    | `INTERNAL_ERROR`      | Server error                     |
 
 ### Error Response Format
 
@@ -366,10 +374,12 @@ When cancelling or replacing transactions that are already in the blockchain mem
 The blockchain will only mine one transaction per nonce. The resolution depends on which transaction gets mined first:
 
 #### Cancel Operations
+
 - **Cancel wins**: Original transaction becomes `CANCELLED` with `is_noop: true` and `cancelled_by_transaction_id` set
 - **Original wins**: Original transaction becomes `MINED`, cancel transaction becomes `DROPPED`
 
-#### Replace Operations  
+#### Replace Operations
+
 - **Replacement wins**: Original transaction becomes `REPLACED`, replacement transaction becomes `MINED`
 - **Original wins**: Original transaction becomes `MINED`, replacement transaction becomes `DROPPED`
 
@@ -389,7 +399,7 @@ POST /api/transactions/relayers/{relayer_id}/send
 # Response: {"id": "tx_original", "hash": "0x..."}
 
 # 2. Cancel the transaction (while INMEMPOOL)
-PUT /api/transactions/cancel/tx_original  
+PUT /api/transactions/cancel/tx_original
 # Response: {"id": "tx_cancel", "hash": "0x..."}
 
 # 3. Monitor the original transaction status

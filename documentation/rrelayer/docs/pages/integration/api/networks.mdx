@@ -11,6 +11,7 @@ All network endpoints require authentication. See [Authentication](/integration/
 Get a list of all supported blockchain networks.
 
 ### Endpoint
+
 ```
 GET /api/networks
 ```
@@ -40,9 +41,7 @@ GET /api/networks
       "chain_id": 11155111,
       "name": "sepolia_ethereum",
       "display_name": "Sepolia Testnet",
-      "rpc_urls": [
-        "https://sepolia.gateway.tenderly.co"
-      ],
+      "rpc_urls": ["https://sepolia.gateway.tenderly.co"],
       "block_explorer_url": "https://sepolia.etherscan.io",
       "native_currency": {
         "name": "Sepolia Ether",
@@ -57,11 +56,11 @@ GET /api/networks
 
 ### Network Status
 
-| Status | Description |
-|--------|-------------|
-| `ACTIVE` | Network is active and available |
-| `INACTIVE` | Network is temporarily disabled |
-| `MAINTENANCE` | Network is under maintenance |
+| Status        | Description                     |
+| ------------- | ------------------------------- |
+| `ACTIVE`      | Network is active and available |
+| `INACTIVE`    | Network is temporarily disabled |
+| `MAINTENANCE` | Network is under maintenance    |
 
 ### Example
 
@@ -75,6 +74,7 @@ curl https://your-rrelayer.com/api/networks \
 Get current gas price estimates for a specific network.
 
 ### Endpoint
+
 ```
 GET /api/networks/gas/price/{chain_id}
 ```
@@ -118,10 +118,10 @@ GET /api/networks/gas/price/{chain_id}
 
 ### Gas Price Fields
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `max_priority_fee` | `string` | Priority fee in Gwei |
-| `max_fee` | `string` | Maximum fee in Gwei |
+| Field                    | Type     | Description                  |
+| ------------------------ | -------- | ---------------------------- |
+| `max_priority_fee`       | `string` | Priority fee in Gwei         |
+| `max_fee`                | `string` | Maximum fee in Gwei          |
 | `min_wait_time_estimate` | `number` | Minimum wait time in seconds |
 | `max_wait_time_estimate` | `number` | Maximum wait time in seconds |
 
@@ -136,13 +136,13 @@ curl https://your-rrelayer.com/api/networks/gas/price/11155111 \
 
 ### Common Error Codes
 
-| Status | Code | Description |
-|--------|------|-------------|
-| 400 | `INVALID_REQUEST` | Invalid request parameters |
-| 401 | `UNAUTHORIZED` | Authentication required |
-| 404 | `NOT_FOUND` | Network not found |
-| 500 | `INTERNAL_ERROR` | Server error |
-| 503 | `SERVICE_UNAVAILABLE` | Gas provider unavailable |
+| Status | Code                  | Description                |
+| ------ | --------------------- | -------------------------- |
+| 400    | `INVALID_REQUEST`     | Invalid request parameters |
+| 401    | `UNAUTHORIZED`        | Authentication required    |
+| 404    | `NOT_FOUND`           | Network not found          |
+| 500    | `INTERNAL_ERROR`      | Server error               |
+| 503    | `SERVICE_UNAVAILABLE` | Gas provider unavailable   |
 
 ### Error Response Format
 
@@ -159,11 +159,11 @@ rrelayer supports multiple gas price providers:
 
 ### Supported Providers
 
-| Provider | Description |
-|----------|-------------|
-| `TENDERLY` | Tenderly Gas Station |
-| `INFURA` | Infura Gas API |
-| `CUSTOM` | Custom gas provider |
+| Provider   | Description             |
+| ---------- | ----------------------- |
+| `TENDERLY` | Tenderly Gas Station    |
+| `INFURA`   | Infura Gas API          |
+| `CUSTOM`   | Custom gas provider     |
 | `FALLBACK` | Fallback gas estimation |
 
 ### Provider Selection
@@ -210,7 +210,7 @@ if (urgent) {
 const transaction = {
   to: '0x...',
   value: '1000000000000000000',
-  speed: speed
+  speed: speed,
 };
 ```
 

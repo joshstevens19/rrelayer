@@ -24,6 +24,10 @@ pub fn unauthorized(message: Option<String>) -> HttpError {
     (StatusCode::UNAUTHORIZED, message.unwrap_or("Unauthorized".to_string()))
 }
 
+pub fn forbidden(message: String) -> HttpError {
+    (StatusCode::FORBIDDEN, message.unwrap_or("Forbidden".to_string()))
+}
+
 impl From<PostgresError> for HttpError {
     fn from(error: PostgresError) -> HttpError {
         error!("Postgres error occurred - {:?}", error);

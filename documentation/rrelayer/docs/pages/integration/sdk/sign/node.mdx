@@ -1,0 +1,293 @@
+# Sign
+
+Sign-related SDK call.
+
+## Sign Text Message
+
+Basic auth can sign text with all relayers, and API keys can only sign text with the relayer
+they have permission to use.
+
+### Basic Auth
+
+```ts
+// config.ts
+import { createClient } from 'rrelayer';
+
+const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: 'your_username',
+    password: 'your_password',
+  },
+});
+
+export const relayerClient = await client.getRelayerClient(
+  // The relayer id you want to connect to
+  '94afb207-bb47-4392-9229-ba87e4d783cb',
+  // This is optional it defaults to fast
+  TransactionSpeed.FAST
+);
+
+...
+
+// sign-text.ts
+import { relayerClient } from './config';
+
+let signature = await relayerClient.sign.text('sign this message');
+```
+
+### API Key Auth
+
+```ts
+// config.ts
+import { createRelayerClient, TransactionSpeed } from 'rrelayer';
+
+export let relayerClient = createRelayerClient({
+  serverUrl: 'http://localhost:8000',
+  relayerId: '94afb207-bb47-4392-9229-ba87e4d783cb',
+  apiKey: 'YOUR_API_KEY',
+  // This is optional it defaults to fast
+  speed: TransactionSpeed.FAST,
+});
+
+...
+
+// sign-text.ts
+import { relayerClient } from './config';
+
+let signature = await relayerClient.sign.text('sign this message');
+```
+
+## Signed Text History
+
+Basic auth can read all relayers signed text history, and API keys can only read the signed text history
+with the relayer they have permission to use.
+
+### Basic Auth
+
+```ts []
+// config.ts
+import { createClient, TransactionSpeed } from 'rrelayer';
+
+const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: 'your_username',
+    password: 'your_password',
+  },
+});
+
+export const relayerClient = await client.getRelayerClient(
+  // The relayer id you want to connect to
+  '94afb207-bb47-4392-9229-ba87e4d783cb',
+  // This is optional it defaults to fast
+  TransactionSpeed.FAST
+);
+
+...
+
+// signed-text-history.ts
+import { relayerClient } from './config';
+
+let signedTextHistory = await relayerClient.sign.textHistory({
+  limit: 100,
+  offset: 0,
+});
+```
+
+### API Key Auth
+
+```ts [signed-text-history.ts]
+// config.ts
+import { createRelayerClient, TransactionSpeed } from 'rrelayer';
+
+export let relayerClient = createRelayerClient({
+  serverUrl: 'http://localhost:8000',
+  relayerId: '94afb207-bb47-4392-9229-ba87e4d783cb',
+  apiKey: 'YOUR_API_KEY',
+  // This is optional it defaults to fast
+  speed: TransactionSpeed.FAST,
+});
+
+...
+
+// signed-text-history.ts
+import { relayerClient } from './config';
+
+let signedTextHistory = await relayerClient.sign.textHistory({
+  limit: 100,
+  offset: 0,
+});
+```
+
+## Sign Typed Data
+
+Basic auth can sign typed data with all relayers, and API keys can only sign typed data with the relayer
+they have permission to use.
+
+### Basic Auth
+
+```ts
+// config.ts
+import { createClient, TransactionSpeed } from 'rrelayer';
+
+const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: 'your_username',
+    password: 'your_password',
+  },
+});
+
+export const relayerClient = await client.getRelayerClient(
+  // The relayer id you want to connect to
+  '94afb207-bb47-4392-9229-ba87e4d783cb',
+  // This is optional it defaults to fast
+  TransactionSpeed.FAST
+);
+
+...
+
+// sign-typed-data.ts
+import { relayerClient } from './config';
+
+const domain = {
+  name: 'Test App',
+  version: '1',
+  chainId: 31337,
+  verifyingContract:
+    '0x1234567890123456789012345678901234567890' as `0x${string}`,
+};
+
+const types = {
+  Person: [
+    { name: 'name', type: 'string' },
+    { name: 'wallet', type: 'address' },
+  ],
+};
+
+const value = {
+  name: 'Alice',
+  wallet: await relayerClient.address(),
+};
+
+const typedData = {
+  domain,
+  types,
+  primaryType: 'Person' as const,
+  message: value,
+};
+
+let signature = await relayerClient.sign.typedData(typedData);
+```
+
+### API Key Auth
+
+```ts
+// config.ts
+import { createRelayerClient, TransactionSpeed } from 'rrelayer';
+
+export let relayerClient = createRelayerClient({
+  serverUrl: 'http://localhost:8000',
+  relayerId: '94afb207-bb47-4392-9229-ba87e4d783cb',
+  apiKey: 'YOUR_API_KEY',
+  // This is optional it defaults to fast
+  speed: TransactionSpeed.FAST,
+});
+
+...
+
+// sign-typed-data.ts
+import { relayerClient } from './config';
+
+const domain = {
+  name: 'Test App',
+  version: '1',
+  chainId: 31337,
+  verifyingContract:
+    '0x1234567890123456789012345678901234567890' as `0x${string}`,
+};
+
+const types = {
+  Person: [
+    { name: 'name', type: 'string' },
+    { name: 'wallet', type: 'address' },
+  ],
+};
+
+const value = {
+  name: 'Alice',
+  wallet: await relayerClient.address(),
+};
+
+const typedData = {
+  domain,
+  types,
+  primaryType: 'Person' as const,
+  message: value,
+};
+
+let signature = await relayerClient.sign.typedData(typedData);
+```
+
+## Signed Typed Data History
+
+Basic auth can read all relayers signed typed data history, and API keys can only read the signed typed data history
+with the relayer they have permission to use.
+
+### Basic Auth
+
+```ts
+// config.ts
+import { createClient, TransactionSpeed } from 'rrelayer';
+
+const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: 'your_username',
+    password: 'your_password',
+  },
+});
+
+export const relayerClient = await client.getRelayerClient(
+  // The relayer id you want to connect to
+  '94afb207-bb47-4392-9229-ba87e4d783cb',
+  // This is optional it defaults to fast
+  TransactionSpeed.FAST
+);
+
+...
+
+// signed-typed-data-history.ts
+import { relayerClient } from './config';
+
+let signedTypedDataHistory = await relayerClient.sign.typedDataHistory({
+  limit: 100,
+  offset: 0,
+});
+```
+
+### API Key Auth
+
+```ts
+// config.ts
+import { createRelayerClient, TransactionSpeed } from 'rrelayer';
+
+export let relayerClient = createRelayerClient({
+  serverUrl: 'http://localhost:8000',
+  relayerId: '94afb207-bb47-4392-9229-ba87e4d783cb',
+  apiKey: 'YOUR_API_KEY',
+  // This is optional it defaults to fast
+  speed: TransactionSpeed.FAST,
+});
+
+...
+
+// signed-typed-data-history.ts
+import { relayerClient } from './config';
+
+let signedTypedDataHistory = await relayerClient.sign.typedDataHistory({
+  limit: 100,
+  offset: 0,
+});
+```

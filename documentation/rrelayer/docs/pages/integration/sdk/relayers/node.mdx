@@ -1,0 +1,434 @@
+# Relayers
+
+Relayer-related SDK call.
+
+## Create Relayer
+
+:::info
+Only basic auth authentication can create relayers
+:::
+
+Create a new relayer for a network.
+
+:::code-group
+
+```ts [create-relayer.ts]
+import { client, TransactionSpeed } from './config';
+
+let created_result = await client.relayer.create(11155111, 'fancy-relayer');
+// created_result.id = relayer id
+// created_result.address = relayer address
+
+// You can then create the relayer client doing this
+const relayerClient = await client.getRelayerClient(
+  created_result.id,
+  // This is optional it defaults to fast
+  TransactionSpeed.FAST
+);
+```
+
+```ts [config.ts]
+import { createClient } from 'rrelayer';
+
+export const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: 'your_username',
+    password: 'your_password',
+  },
+});
+```
+
+:::
+
+## Get Relayers
+
+:::info
+Only basic auth authentication can get all relayers
+:::
+
+Get all the relayers across all networks or a single network.
+
+:::code-group
+
+```ts [get-all-relayers.ts]
+import { client } from './config';
+
+let relayers = await client.relayer.getAll({
+  limit: 100,
+  offset: 0,
+});
+```
+
+```ts [get-network-relayers.ts]
+import { client } from './config';
+
+let relayers = await client.relayer.getAll(
+  {
+    limit: 100,
+    offset: 0,
+  },
+  11155111
+);
+```
+
+```ts [config.ts]
+import { createClient } from 'rrelayer';
+
+export const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: 'your_username',
+    password: 'your_password',
+  },
+});
+```
+
+:::
+
+## Get Relayer
+
+Basic auth can get all relayers information, and API keys can only get the relayer information
+they have permission to use.
+
+### Basic Auth
+
+```ts
+// config.ts
+import { createClient } from 'rrelayer';
+
+export const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: 'your_username',
+    password: 'your_password',
+  },
+});
+
+...
+
+// get-relayer.ts
+import { client } from './config';
+
+let relayer = await client.relayer.get('94afb207-bb47-4392-9229-ba87e4d783cb');
+```
+
+### API Key Auth
+
+```ts
+// config.ts
+import { createRelayerClient, TransactionSpeed } from 'rrelayer';
+
+export let relayerClient = createRelayerClient({
+  serverUrl: 'http://localhost:8000',
+  relayerId: '94afb207-bb47-4392-9229-ba87e4d783cb',
+  apiKey: 'YOUR_API_KEY',
+  // This is optional it defaults to fast
+  speed: TransactionSpeed.FAST,
+});
+
+...
+
+// get-relayer.ts
+import { relayerClient } from './config';
+
+let info = await relayerClient.getInfo();
+```
+
+## Clone Relayer
+
+:::info
+Only basic auth authentication can clone relayers
+:::
+
+Clone a relayer to a network.
+
+:::code-group
+
+```ts [clone-relayer.ts]
+import { client, TransactionSpeed } from './config';
+
+let cloned_result = await client.relayer.clone(
+  '94afb207-bb47-4392-9229-ba87e4d783cb',
+  1,
+  'cloned-relayer'
+);
+// cloned_result.id = the new cloned relayer id
+// cloned_result.address = the new cloned relayer address
+
+// You can then create the relayer client doing this
+const relayerClient = await client.getRelayerClient(
+  cloned_result.id,
+  // This is optional it defaults to fast
+  TransactionSpeed.FAST
+);
+```
+
+```ts [config.ts]
+import { createClient } from 'rrelayer';
+
+export const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: 'your_username',
+    password: 'your_password',
+  },
+});
+```
+
+:::
+
+## Pause/Unpause Relayer
+
+:::info
+Only basic auth authentication can pause/unpause relayers
+:::
+
+You can pause and unpause a relayers anytime. When you pause, rrelayer will not accept anymore transactions on it.
+
+:::code-group
+
+```ts [pause-relayer.ts]
+import { relayerClient } from './config';
+
+await relayerClient.pause();
+```
+
+```ts [unpause-relayer.ts]
+import { relayerClient } from './config';
+
+await relayerClient.unpause();
+```
+
+```ts [config.ts]
+import { createClient, TransactionSpeed } from 'rrelayer';
+
+const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: 'your_username',
+    password: 'your_password',
+  },
+});
+
+export const relayerClient = await client.getRelayerClient(
+  // The relayer id you want to connect to
+  '94afb207-bb47-4392-9229-ba87e4d783cb',
+  // This is optional it defaults to fast
+  TransactionSpeed.FAST
+);
+```
+
+:::
+
+## Update EIP-1559 Status
+
+:::info
+Only basic auth authentication can update EIP-1559 status
+:::
+
+By default, EIP-1559 transactions are enabled, but you can turn on legacy and toggle this anytime.
+
+:::code-group
+
+```ts [disable-eip-1559-status.ts]
+import { relayerClient } from './config';
+
+await relayerClient.updateEIP1559Status(false);
+```
+
+```ts [enable-eip-1559-status.ts]
+import { relayerClient } from './config';
+
+await relayerClient.updateEIP1559Status(true);
+```
+
+```ts [config.ts]
+import { createClient, TransactionSpeed } from 'rrelayer';
+
+const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: 'your_username',
+    password: 'your_password',
+  },
+});
+
+export const relayerClient = await client.getRelayerClient(
+  // The relayer id you want to connect to
+  '94afb207-bb47-4392-9229-ba87e4d783cb',
+  // This is optional it defaults to fast
+  TransactionSpeed.FAST
+);
+```
+
+:::
+
+## Update Max Gas Price
+
+:::info
+Only basic auth authentication can update max gas price
+:::
+
+You can set the max amount the relayer will bump gas up to, this can protect you about network congression/expensive
+periods. You must pass in the wei amount.
+
+:::code-group
+
+```ts [update-max-gas-price.ts]
+import { relayerClient } from './config';
+
+// 2 gwei
+await relayerClient.updateMaxGasPrice('2000000000');
+```
+
+```ts [config.ts]
+import { createClient, TransactionSpeed } from 'rrelayer';
+
+const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: 'your_username',
+    password: 'your_password',
+  },
+});
+
+export const relayerClient = await client.getRelayerClient(
+  // The relayer id you want to connect to
+  '94afb207-bb47-4392-9229-ba87e4d783cb',
+  // This is optional it defaults to fast
+  TransactionSpeed.FAST
+);
+```
+
+:::
+
+## Remove Max Gas Price
+
+:::info
+Only basic auth authentication can remove max gas price
+:::
+
+You can remove the max gas price set.
+
+:::code-group
+
+```ts [remove-max-gas-price.ts]
+import { relayerClient } from './config';
+
+await relayerClient.removeMaxGasPrice();
+```
+
+```ts [config.ts]
+import { createClient, TransactionSpeed } from 'rrelayer';
+
+const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: 'your_username',
+    password: 'your_password',
+  },
+});
+
+export const relayerClient = await client.getRelayerClient(
+  // The relayer id you want to connect to
+  '94afb207-bb47-4392-9229-ba87e4d783cb',
+  // This is optional it defaults to fast
+  TransactionSpeed.FAST
+);
+```
+
+:::
+
+## Delete Relayer
+
+:::info
+Only basic auth authentication can delete relayers
+:::
+
+Delete a new relayer for a network, it just does a soft delete the database records stay, alongside it will
+clear the current queue.
+
+:::code-group
+
+```ts [delete-relayer.ts]
+import { client } from './config';
+
+await client.relayer.delete('94afb207-bb47-4392-9229-ba87e4d783cb');
+```
+
+```ts [config.ts]
+import { createClient } from 'rrelayer';
+
+export const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: 'your_username',
+    password: 'your_password',
+  },
+});
+```
+
+:::
+
+## Get Allowlist
+
+Basic auth can get all relayers allowlists, and API keys can only get the relayer allowlist
+they have permission to use.
+
+### Basic Auth
+
+```ts
+// config.ts
+import { createClient, TransactionSpeed } from 'rrelayer';
+
+const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: 'your_username',
+    password: 'your_password',
+  },
+});
+
+export const relayerClient = await client.getRelayerClient(
+  // The relayer id you want to connect to
+  '94afb207-bb47-4392-9229-ba87e4d783cb',
+  // This is optional it defaults to fast
+  TransactionSpeed.FAST
+);
+
+...
+
+// get-allowlist.ts
+import { relayerClient } from './config';
+
+let relayer = await relayerClient.allowlist.get({
+  limit: 100,
+  offset: 0,
+});
+```
+
+### API Key Auth
+
+```ts
+// config.ts
+import { createRelayerClient, TransactionSpeed } from 'rrelayer';
+
+export let relayerClient = createRelayerClient({
+  serverUrl: 'http://localhost:8000',
+  relayerId: '94afb207-bb47-4392-9229-ba87e4d783cb',
+  apiKey: 'YOUR_API_KEY',
+  // This is optional it defaults to fast
+  speed: TransactionSpeed.FAST,
+});
+
+...
+
+// get-allowlist.ts
+import { relayerClient } from './config';
+
+let relayer = await relayerClient.allowlist.get({
+  limit: 100,
+  offset: 0,
+});
+```

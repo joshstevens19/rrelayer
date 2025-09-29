@@ -20,6 +20,7 @@ All allowlist endpoints require authentication. See [Authentication](/integratio
 Get the list of allowed recipient addresses for a specific relayer.
 
 ### Endpoint
+
 ```
 GET /api/relayers/{relayer_id}/allowlists
 ```
@@ -85,12 +86,12 @@ Configure different allowlists for different relayers:
 permissions:
   allowlist:
     relayers:
-      "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b":
-        - "0x1234567890abcdef1234567890abcdef12345678"
-        - "0x9876543210fedcba9876543210fedcba98765432"
-      "0x853e46dd7577c4c0df3f4e9f0b0e1f1f1c2d3e4f":
-        - "0xabcdef1234567890abcdef1234567890abcdef12"
-        - "0xfedcba0987654321fedcba0987654321fedcba09"
+      '0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b':
+        - '0x1234567890abcdef1234567890abcdef12345678'
+        - '0x9876543210fedcba9876543210fedcba98765432'
+      '0x853e46dd7577c4c0df3f4e9f0b0e1f1f1c2d3e4f':
+        - '0xabcdef1234567890abcdef1234567890abcdef12'
+        - '0xfedcba0987654321fedcba0987654321fedcba09'
 ```
 
 ### Wildcard Allowlist
@@ -100,7 +101,7 @@ Allow transactions to any address (disable allowlist):
 ```yaml
 permissions:
   allowlist:
-    addresses: ["*"]
+    addresses: ['*']
 ```
 
 ## Allowlist Behavior
@@ -138,9 +139,9 @@ Limit transactions to specific DeFi protocol contracts:
 permissions:
   allowlist:
     addresses:
-    - "0xa0b86a33e6441e776e21c0b7f0c8de3d5cde6b8e"  # Uniswap V3 Router
-    - "0x7a250d5630b4cf539739df2c5dacb4c659f2488d"  # Uniswap V2 Router
-    - "0x1111111254eeb25477b68fb85ed929f73a960582"  # 1inch Router
+      - '0xa0b86a33e6441e776e21c0b7f0c8de3d5cde6b8e' # Uniswap V3 Router
+      - '0x7a250d5630b4cf539739df2c5dacb4c659f2488d' # Uniswap V2 Router
+      - '0x1111111254eeb25477b68fb85ed929f73a960582' # 1inch Router
 ```
 
 ### Corporate Treasury
@@ -151,9 +152,9 @@ Restrict to approved corporate addresses:
 permissions:
   allowlist:
     addresses:
-    - "0x1234567890abcdef1234567890abcdef12345678"  # Treasury Wallet
-    - "0x9876543210fedcba9876543210fedcba98765432"  # Operations Wallet
-    - "0xabcdef1234567890abcdef1234567890abcdef12"  # Payroll Wallet
+      - '0x1234567890abcdef1234567890abcdef12345678' # Treasury Wallet
+      - '0x9876543210fedcba9876543210fedcba98765432' # Operations Wallet
+      - '0xabcdef1234567890abcdef1234567890abcdef12' # Payroll Wallet
 ```
 
 ### Multi-Chain Bridge
@@ -165,11 +166,11 @@ permissions:
   allowlist:
     relayers:
       # Ethereum mainnet relayer
-      "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b":
-        - "0xa0b86a33e6441e776e21c0b7f0c8de3d5cde6b8e"  # Ethereum Bridge
-      # Polygon relayer  
-      "0x853e46dd7577c4c0df3f4e9f0b0e1f1f1c2d3e4f":
-        - "0x8484ef722627bf18ca5ae6bcf031c23e6e922b30"  # Polygon Bridge
+      '0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b':
+        - '0xa0b86a33e6441e776e21c0b7f0c8de3d5cde6b8e' # Ethereum Bridge
+      # Polygon relayer
+      '0x853e46dd7577c4c0df3f4e9f0b0e1f1f1c2d3e4f':
+        - '0x8484ef722627bf18ca5ae6bcf031c23e6e922b30' # Polygon Bridge
 ```
 
 ## Security Considerations
@@ -190,7 +191,7 @@ permissions:
 
 ### Common Mistakes
 
-1. **Overly permissive** - Using "*" in production environments
+1. **Overly permissive** - Using "\*" in production environments
 2. **Stale addresses** - Not removing old or compromised addresses
 3. **Case sensitivity** - Addresses must match exactly (0x vs 0X)
 4. **Missing addresses** - Forgetting to allowlist required destinations
@@ -241,13 +242,13 @@ echo "0x1234567890abcdef1234567890abcdef12345678" | grep -E "^0x[a-fA-F0-9]{40}$
 
 ### Common Error Codes
 
-| Status | Code | Description |
-|--------|------|-------------|
-| 400 | `INVALID_REQUEST` | Invalid request parameters |
-| 401 | `UNAUTHORIZED` | Authentication required |
-| 403 | `FORBIDDEN` | Address not in allowlist |
-| 404 | `NOT_FOUND` | Relayer not found |
-| 500 | `INTERNAL_ERROR` | Server error |
+| Status | Code              | Description                |
+| ------ | ----------------- | -------------------------- |
+| 400    | `INVALID_REQUEST` | Invalid request parameters |
+| 401    | `UNAUTHORIZED`    | Authentication required    |
+| 403    | `FORBIDDEN`       | Address not in allowlist   |
+| 404    | `NOT_FOUND`       | Relayer not found          |
+| 500    | `INTERNAL_ERROR`  | Server error               |
 
 ### Error Response Format
 
@@ -273,7 +274,7 @@ echo "0x1234567890abcdef1234567890abcdef12345678" | grep -E "^0x[a-fA-F0-9]{40}$
 
 ### Optimization Tips
 
-1. **Use wildcards** sparingly - "*" disables security checks
+1. **Use wildcards** sparingly - "\*" disables security checks
 2. **Regular cleanup** - Remove unused addresses
 3. **Monitor performance** - Track transaction validation times
 4. **Consider alternatives** - For very large lists, consider contract-based checks

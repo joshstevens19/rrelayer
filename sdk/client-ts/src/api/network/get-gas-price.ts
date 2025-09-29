@@ -21,7 +21,7 @@ export interface GasEstimatorResult {
 }
 
 export const getGasPrices = async (
-  chainId: string | number,
+  chainId: number,
   baseConfig: ApiBaseConfig
 ): Promise<GasEstimatorResult | null> => {
   try {

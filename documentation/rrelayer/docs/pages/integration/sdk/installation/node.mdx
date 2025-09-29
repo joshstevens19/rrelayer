@@ -1,0 +1,28 @@
+# Node Installations
+
+Installing rrelayer is super quick and easy
+
+:::code-group
+
+```bash [npm]
+npm i rrelayer
+```
+
+```bash [pnpm]
+pnpm i rrelayer
+```
+
+```bash [bun]
+bun i rrelayer
+```
+
+:::
+
+Important to know that `rrelayer` should always be hit from your backend server due to authentication / API keys,
+if you expose it in the frontend, anyone can hit rrelayer and do actions.
+If you are using `next.js` you can use the server side API, which you can read more [here](https://nextjs.org/docs/pages/building-your-application/routing/api-routes).
+
+rrelayer has built-in framework integrations with [viem](/integration/sdk/framework-guides/typescript/viem) and [ethers](/integration/sdk/framework-guides/typescript/ethers);
+this allows you to integrate with those frameworks in a few lines of code, most the time that is what you will want to do.
+
+If you want to use all the features, you can use the direct SDK you can get started with that [here](/integration/sdk/create-client-authentication/node).

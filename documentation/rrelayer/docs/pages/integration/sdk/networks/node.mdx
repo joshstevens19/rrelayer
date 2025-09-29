@@ -1,0 +1,93 @@
+# Networks
+
+Network-related SDK calls.
+
+## Get Network
+
+:::info
+Only basic auth authentication can get a network
+:::
+
+Get the network details.
+
+:::code-group
+
+```ts [get-network.ts]
+import { client } from './config';
+
+let network = await client.network.get(11155111);
+```
+
+```ts [config.ts]
+import { createClient } from 'rrelayer';
+
+export const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: 'your_username',
+    password: 'your_password',
+  },
+});
+```
+
+:::
+
+## Get Networks
+
+:::info
+Only basic auth authentication can get all networks
+:::
+
+Get all networks details.
+
+:::code-group
+
+```ts [get-networks.ts]
+import { client } from './config';
+
+let networks = await client.network.getAll();
+```
+
+```ts [config.ts]
+import { createClient } from 'rrelayer';
+
+export const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: 'your_username',
+    password: 'your_password',
+  },
+});
+```
+
+:::
+
+## Gas Prices
+
+:::info
+Only basic auth authentication can get the networks gas prices
+:::
+
+Get the gas prices for the network
+
+:::code-group
+
+```ts [get-networks.ts]
+import { client } from './config';
+
+let gasPrices = await client.network.getGasPrices(11155111);
+```
+
+```ts [config.ts]
+import { createClient } from 'rrelayer';
+
+export const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: 'your_username',
+    password: 'your_password',
+  },
+});
+```
+
+:::

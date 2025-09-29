@@ -15,7 +15,7 @@ import {
   getGasPrices,
   GasEstimatorResult,
   getRelayerAllowlistAddress,
-  TransactionSpeed,
+  TransactionSpeed, cloneRelayer,
 } from '../api';
 import { RelayerClient } from './relayer';
 import {
@@ -56,16 +56,30 @@ export class Client {
   public get relayer() {
     return {
       /**
-       * Create a new relayer api key
+       * Create a new relayer
        * @param chainId The chain id to create the relayer on
        * @param name The name of the relayer
-       * @returns string
+       * @returns Promise<CreateRelayerResult>
        */
       create: async (
-        chainId: string | number,
+        chainId: number,
         name: string
       ): Promise<CreateRelayerResult> => {
         return createRelayer(chainId, name, this._apiBaseConfig);
+      },
+      /**
+       * Clone an existing relayer
+       * @param relayerId The relayer id you want to clone
+       * @param chainId The chain id to clone the relayer to
+       * @param name The name of the new relayer
+       * @returns Promise<CreateRelayerResult>
+       */
+      clone: async (
+          relayerId: string,
+          chainId: number,
+          name: string
+      ): Promise<CreateRelayerResult> => {
+        return cloneRelayer(relayerId, chainId, name, this._apiBaseConfig);
       },
       /**
        * Delete a relayer
@@ -116,8 +130,12 @@ export class Client {
       getAll: (): Promise<Network[]> => {
         return getAllNetworks(apiBaseConfig);
       },
+      /**
+       * Get gas prices for the network
+       * @param chainId The chain id
+       */
       getGasPrices(
-        chainId: string | number
+        chainId: number
       ): Promise<GasEstimatorResult | null> {
         return getGasPrices(chainId, apiBaseConfig);
       },

@@ -6,7 +6,7 @@ export interface StatusResponse {
   message: string;
 }
 
-export const test_auth = async (
+export const auth_status = async (
   baseConfig: ApiBaseConfig
 ): Promise<StatusResponse> => {
   try {

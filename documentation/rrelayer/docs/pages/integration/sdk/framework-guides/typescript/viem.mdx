@@ -40,31 +40,31 @@ import { createClient, TransactionSpeed } from 'rrelayer';
 import { createWalletClient, createPublicClient, custom } from 'viem';
 
 let client = createClient({
-    serverUrl: 'http://localhost:8000',
-    auth: {
-      username: 'your_username',
-      password: 'your_password',
-    },
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: 'your_username',
+    password: 'your_password',
+  },
 });
 
 const relayer = await client.getRelayerClient(
-     // The relayer id you want to connect to
-    '94afb207-bb47-4392-9229-ba87e4d783cb',
-     // This is optional it defaults to fast
-    TransactionSpeed.FAST
+  // The relayer id you want to connect to
+  '94afb207-bb47-4392-9229-ba87e4d783cb',
+  // This is optional it defaults to fast
+  TransactionSpeed.FAST
 );
 
 let chain = await relayer.getViemChain();
 
 export const walletClient = createWalletClient({
-    account: await relayer.address(),
-    chain,
-    transport: custom(relayer.ethereumProvider()),
+  account: await relayer.address(),
+  chain,
+  transport: custom(relayer.ethereumProvider()),
 });
 
 export const publicClient = createPublicClient({
-    chain,
-    transport: await client.getViemHttp(chain.id)
+  chain,
+  transport: await client.getViemHttp(chain.id),
 });
 ```
 
@@ -73,25 +73,24 @@ import { createRelayerClient, TransactionSpeed } from 'rrelayer';
 import { createWalletClient, createPublicClient, custom, http } from 'viem';
 
 let relayer = createRelayerClient({
-   serverUrl: 'http://localhost:8000',
-   relayerId: '94afb207-bb47-4392-9229-ba87e4d783cb',
-   apiKey: 'YOUR_API_KEY',
-   // This is optional it defaults to fast
-   speed: TransactionSpeed.FAST
- }
-);
+  serverUrl: 'http://localhost:8000',
+  relayerId: '94afb207-bb47-4392-9229-ba87e4d783cb',
+  apiKey: 'YOUR_API_KEY',
+  // This is optional it defaults to fast
+  speed: TransactionSpeed.FAST,
+});
 
 let chain = await relayer.getViemChain();
 
 export const walletClient = createWalletClient({
-    account: await relayer.address(),
-    chain,
-    transport: custom(relayer.ethereumProvider()),
+  account: await relayer.address(),
+  chain,
+  transport: custom(relayer.ethereumProvider()),
 });
 
 export const publicClient = createPublicClient({
-    chain,
-    transport: http('NODE_URL')
+  chain,
+  transport: http('NODE_URL'),
 });
 ```
 
@@ -102,7 +101,7 @@ export const publicClient = createPublicClient({
 You can sign text with the relayer
 
 :::info
-Remember the config examples are [above](/integration/typescript/viem#wallet-client-and-public-client)
+Remember the config examples are [above](/integration/sdk/framework-guides/typescript/viem#wallet-client-and-public-client)
 :::
 
 ```ts [example]
@@ -118,7 +117,7 @@ const message = await walletClient.signMessage({
 You can sign typed data with the relayer
 
 :::info
-Remember the config examples are [above](/integration/typescript/viem#wallet-client-and-public-client)
+Remember the config examples are [above](/integration/sdk/framework-guides/typescript/viem#wallet-client-and-public-client)
 :::
 
 ```ts [example]
@@ -162,7 +161,7 @@ const signature = await walletClient.signTypedData({
 Send a transaction with the relayer
 
 :::info
-Remember the config examples are [above](/integration/typescript/viem#wallet-client-and-public-client)
+Remember the config examples are [above](/integration/sdk/framework-guides/typescript/viem#wallet-client-and-public-client)
 :::
 
 ```ts [example]
@@ -179,7 +178,7 @@ const hash = await walletClient.sendTransaction({
 Write a contract with the relayer
 
 :::info
-Remember the config examples are [above](/integration/typescript/viem#wallet-client-and-public-client)
+Remember the config examples are [above](/integration/sdk/framework-guides/typescript/viem#wallet-client-and-public-client)
 :::
 
 :::code-group

@@ -16,7 +16,7 @@
     "react": "latest",
     "react-dom": "latest",
     "typescript": "latest",
-    "vocs": "1.0.0-alpha.52"
+    "vocs": "^1.0.13"
   },
   "devDependencies": {
     "prettier": "^3.6.2"

@@ -2,6 +2,7 @@ import { defineConfig } from 'vocs';
 
 export default defineConfig({
   title: '🦀 rrelayer 🦀',
+  search: {},
   head: (
     <>
       <meta property="og:type" content="website" />
@@ -56,6 +57,7 @@ export default defineConfig({
         { text: 'Api Config', link: '/config/api-config' },
         {
           text: 'Signing Providers',
+          collapsed: false,
           items: [
             { text: 'AWS KMS', link: '/config/signing-providers/aws-kms' },
             {
@@ -76,10 +78,12 @@ export default defineConfig({
         },
         {
           text: 'Networks',
+          collapsed: false,
           items: [
             { text: 'Config', link: '/config/networks/config' },
             {
               text: 'Automatic Top Up',
+              collapsed: false,
               link: '/config/networks/automatic-top-up',
               items: [
                 {
@@ -98,6 +102,7 @@ export default defineConfig({
             },
             {
               text: 'Permissions',
+              collapsed: false,
               link: '/config/networks/permissions',
               items: [
                 {
@@ -125,14 +130,33 @@ export default defineConfig({
             { text: 'API Keys', link: '/config/networks/api-keys' },
             {
               text: 'Gas Provider',
+              collapsed: false,
               link: '/config/networks/gas-provider',
               items: [
-                { text: 'Fallback', link: '/config/networks/gas-provider#fallback' },
-                { text: 'Block Native', link: '/config/networks/gas-provider#block-native' },
-                { text: 'Infura', link: '/config/networks/gas-provider#infura' },
-                { text: 'Tenderly', link: '/config/networks/gas-provider#tenderly' },
-                { text: 'Etherscan', link: '/config/networks/gas-provider#etherscan' },
-                { text: 'Custom', link: '/config/networks/gas-provider#custom' },
+                {
+                  text: 'Fallback',
+                  link: '/config/networks/gas-provider#fallback',
+                },
+                {
+                  text: 'Block Native',
+                  link: '/config/networks/gas-provider#block-native',
+                },
+                {
+                  text: 'Infura',
+                  link: '/config/networks/gas-provider#infura',
+                },
+                {
+                  text: 'Tenderly',
+                  link: '/config/networks/gas-provider#tenderly',
+                },
+                {
+                  text: 'Etherscan',
+                  link: '/config/networks/gas-provider#etherscan',
+                },
+                {
+                  text: 'Custom',
+                  link: '/config/networks/gas-provider#custom',
+                },
               ],
             },
           ],
@@ -145,53 +169,285 @@ export default defineConfig({
       text: 'Integration',
       items: [
         {
-          text: 'Typescript',
+          text: 'SDK',
           items: [
             {
-              text: 'Getting started',
-              link: '/integration/typescript/getting-started',
-            },
-            {
-              text: 'Viem',
-              link: '/integration/typescript/viem',
-            },
-            {
-              text: 'Ethers',
-              link: '/integration/typescript/ethers',
-            },
-            {
-              text: 'SDK',
-              link: '',
+              text: 'Installation',
+              collapsed: false,
               items: [
                 {
-                  text: 'Authentication',
-                  link: '',
+                  text: 'Node - TS/JS',
+                  link: '/integration/sdk/installation/node',
                 },
                 {
-                  text: 'Relayers',
-                  link: '',
-                },
-                {
-                  text: 'Networks',
-                  link: '',
-                },
-                {
-                  text: 'Transactions',
-                  link: '',
-                },
-                {
-                  text: 'Sign',
-                  link: '',
-                },
-                {
-                  text: 'Allowlist',
+                  text: 'Rust',
                   link: '',
                 },
               ],
             },
             {
-              text: 'Vercel',
-              link: '',
+              text: 'Framework Guides',
+              collapsed: false,
+              items: [
+                {
+                  text: 'Typescript',
+                  items: [
+                    {
+                      text: 'Viem',
+                      link: '/integration/sdk/framework-guides/typescript/viem',
+                    },
+                    {
+                      text: 'Ethers',
+                      link: '/integration/sdk/framework-guides/typescript/ethers',
+                    },
+                  ],
+                },
+                {
+                  text: 'Rust',
+                  link: '',
+                  items: [
+                    {
+                      text: 'Alloy',
+                      link: '',
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              text: 'Create Client / Authentication',
+              collapsed: false,
+              items: [
+                {
+                  text: 'Node',
+                  collapsed: true,
+                  items: [
+                    {
+                      text: 'Basic Auth',
+                      link: '/integration/sdk/create-client-authentication/node#basic-auth',
+                    },
+                    {
+                      text: 'API Keys',
+                      link: '/integration/sdk/create-client-authentication/node#api-key-auth',
+                    },
+                    {
+                      text: 'Auth Status Check',
+                      link: '/integration/sdk/create-client-authentication/node#auth-status-check',
+                    },
+                    {
+                      text: 'Rate Limiting',
+                      link: '/integration/sdk/create-client-authentication/node#rate-limiting',
+                    },
+                  ],
+                },
+                {
+                  text: 'Rust',
+                  collapsed: true,
+                  items: [
+                    {
+                      text: 'Basic Auth',
+                      link: '/integration/sdk/create-client-authentication/rust#basic-auth',
+                    },
+                    {
+                      text: 'API Keys',
+                      link: '/integration/sdk/create-client-authentication/rust#api-key-auth',
+                    },
+                    {
+                      text: 'Auth Status Check',
+                      link: '/integration/sdk/create-client-authentication/rust#auth-status-check',
+                    },
+                    {
+                      text: 'Rate Limiting',
+                      link: '/integration/sdk/create-client-authentication/rust#rate-limiting',
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              text: 'Relayers',
+              collapsed: false,
+              items: [
+                {
+                  text: 'Node',
+                  collapsed: true,
+                  items: [
+                    {
+                      text: 'Create Relayer',
+                      link: '/integration/sdk/relayers/node#create-relayer',
+                    },
+                    {
+                      text: 'Get Relayers',
+                      link: '/integration/sdk/relayers/node#get-relayers',
+                    },
+                    {
+                      text: 'Get Relayer',
+                      link: '/integration/sdk/relayers/node#get-relayer',
+                    },
+                    {
+                      text: 'Clone Relayer',
+                      link: '/integration/sdk/relayers/node#clone-relayer',
+                    },
+                    {
+                      text: 'Pause/Unpause',
+                      link: '/integration/sdk/relayers/node#pauseunpause-relayer',
+                    },
+                    {
+                      text: 'Update EIP-1559 Status',
+                      link: '/integration/sdk/relayers/node#update-eip-1559-status',
+                    },
+                    {
+                      text: 'Update Max Gas Price',
+                      link: '/integration/sdk/relayers/node#update-max-gas-price',
+                    },
+                    {
+                      text: 'Remove Max Gas Price',
+                      link: '/integration/sdk/relayers/node#remove-max-gas-price',
+                    },
+                    {
+                      text: 'Delete Relayer',
+                      link: '/integration/sdk/relayers/node#delete-relayer',
+                    },
+                    {
+                      text: 'Get Allowlist',
+                      link: '/integration/sdk/relayers/node#get-allowlist',
+                    },
+                  ],
+                },
+                {
+                  text: 'Rust',
+                  collapsed: true,
+                  items: [
+                    { text: 'Create Relayer', link: '' },
+                    { text: 'Get Relayers', link: '' },
+                    { text: 'Get Relayer', link: '' },
+                    { text: 'Clone Relayer', link: '' },
+                    { text: 'Pause/Unpause', link: '' },
+                    { text: 'Gas Settings', link: '' },
+                    { text: 'Delete Relayer', link: '' },
+                    { text: 'Get Allowlist', link: '' },
+                  ],
+                },
+              ],
+            },
+            {
+              text: 'Networks',
+              collapsed: false,
+              items: [
+                {
+                  text: 'Node',
+                  collapsed: true,
+                  items: [
+                    {
+                      text: 'Get Network',
+                      link: '/integration/sdk/networks/node#get-network',
+                    },
+                    {
+                      text: 'Get Networks',
+                      link: '/integration/sdk/networks/node#get-networks',
+                    },
+                    {
+                      text: 'Gas Prices',
+                      link: '/integration/sdk/networks/node#gas-prices',
+                    },
+                  ],
+                },
+                {
+                  text: 'Rust',
+                  collapsed: true,
+                  items: [
+                    { text: 'Get Network', link: '' },
+                    { text: 'Get Networks', link: '' },
+                    { text: 'Gas Prices', link: '' },
+                  ],
+                },
+              ],
+            },
+            {
+              text: 'Transactions',
+              collapsed: false,
+              items: [
+                {
+                  text: 'Node',
+                  collapsed: true,
+                  items: [
+                    {
+                      text: 'Send Transaction',
+                      link: '/integration/sdk/transactions/node#send-transaction',
+                    },
+                    {
+                      text: 'Get Transaction',
+                      link: '/integration/sdk/transactions/node#get-transaction',
+                    },
+                    {
+                      text: 'Transaction Status',
+                      link: '/integration/sdk/transactions/node#transaction-status',
+                    },
+                    {
+                      text: 'Replace Transaction',
+                      link: '/integration/sdk/transactions/node#replace-transaction',
+                    },
+                    {
+                      text: 'Cancel Transaction',
+                      link: '/integration/sdk/transactions/node#cancel-transaction',
+                    },
+                    {
+                      text: 'Transaction Counts',
+                      link: '/integration/sdk/transactions/node#transactions-counts',
+                    },
+                  ],
+                },
+                {
+                  text: 'Rust',
+                  collapsed: true,
+                  items: [
+                    { text: 'Send Transaction', link: '' },
+                    { text: 'Get Transaction', link: '' },
+                    { text: 'Transaction Status', link: '' },
+                    { text: 'Replace Transaction', link: '' },
+                    { text: 'Cancel Transaction', link: '' },
+                    { text: 'Transaction Counts', link: '' },
+                  ],
+                },
+              ],
+            },
+            {
+              text: 'Sign',
+              collapsed: false,
+              items: [
+                {
+                  text: 'Node',
+                  collapsed: true,
+                  items: [
+                    {
+                      text: 'Sign Text Message',
+                      link: '/integration/sdk/sign/node#sign-text-message',
+                    },
+                    {
+                      text: 'Signed Text History',
+                      link: '/integration/sdk/sign/node#signed-text-history',
+                    },
+                    {
+                      text: 'Sign Typed Data',
+                      link: '/integration/sdk/sign/node#sign-typed-data',
+                    },
+                    {
+                      text: 'Signed Typed Data History',
+                      link: '/integration/sdk/sign/node#signed-typed-data-history',
+                    },
+                  ],
+                },
+                {
+                  text: 'Rust',
+                  collapsed: true,
+                  items: [
+                    { text: 'Sign Text Message', link: '' },
+                    { text: 'Signed Text History', link: '' },
+                    { text: 'Sign Typed Data', link: '' },
+                    { text: 'Signed Typed Data History', link: '' },
+                  ],
+                },
+              ],
             },
           ],
         },
@@ -203,10 +459,22 @@ export default defineConfig({
               link: '/integration/api/authentication',
               collapsed: true,
               items: [
-                { text: 'Basic Auth', link: '/integration/api/authentication#basic-authentication' },
-                { text: 'API Keys', link: '/integration/api/authentication#api-key-authentication' },
-                { text: 'Status Check', link: '/integration/api/authentication#status-check' },
-                { text: 'Rate Limiting', link: '/integration/api/authentication#rate-limiting-headers' },
+                {
+                  text: 'Basic Auth',
+                  link: '/integration/api/authentication#basic-authentication',
+                },
+                {
+                  text: 'API Keys',
+                  link: '/integration/api/authentication#api-key-authentication',
+                },
+                {
+                  text: 'Auth Status Check',
+                  link: '/integration/api/authentication#status-check',
+                },
+                {
+                  text: 'Rate Limiting',
+                  link: '/integration/api/authentication#rate-limiting-headers',
+                },
               ],
             },
             {
@@ -214,13 +482,38 @@ export default defineConfig({
               link: '/integration/api/relayers',
               collapsed: true,
               items: [
-                { text: 'Create Relayer', link: '/integration/api/relayers#create-relayer' },
-                { text: 'Get Relayers', link: '/integration/api/relayers#get-relayers' },
-                { text: 'Get Relayer', link: '/integration/api/relayers#get-relayer' },
-                { text: 'Clone Relayer', link: '/integration/api/relayers#clone-relayer' },
-                { text: 'Pause/Unpause', link: '/integration/api/relayers#pause-relayer' },
-                { text: 'Gas Settings', link: '/integration/api/relayers#update-max-gas-price' },
-                { text: 'Delete Relayer', link: '/integration/api/relayers#delete-relayer' },
+                {
+                  text: 'Create Relayer',
+                  link: '/integration/api/relayers#create-relayer',
+                },
+                {
+                  text: 'Get Relayers',
+                  link: '/integration/api/relayers#get-relayers',
+                },
+                {
+                  text: 'Get Relayer',
+                  link: '/integration/api/relayers#get-relayer',
+                },
+                {
+                  text: 'Clone Relayer',
+                  link: '/integration/api/relayers#clone-relayer',
+                },
+                {
+                  text: 'Pause/Unpause',
+                  link: '/integration/api/relayers#pause-relayer',
+                },
+                {
+                  text: 'Gas Settings',
+                  link: '/integration/api/relayers#update-max-gas-price',
+                },
+                {
+                  text: 'Delete Relayer',
+                  link: '/integration/api/relayers#delete-relayer',
+                },
+                {
+                  text: 'Get Allowlist',
+                  link: '/integration/api/allowlist#get-allowlist-addresses',
+                },
               ],
             },
             {
@@ -228,9 +521,22 @@ export default defineConfig({
               link: '/integration/api/networks',
               collapsed: true,
               items: [
-                { text: 'Get Networks', link: '/integration/api/networks#get-networks' },
-                { text: 'Gas Prices', link: '/integration/api/networks#get-gas-price' },
-                { text: 'Gas Providers', link: '/integration/api/networks#gas-price-providers' },
+                {
+                  text: 'Get Network',
+                  link: '/integration/api/networks#get-networks',
+                },
+                {
+                  text: 'Get Networks',
+                  link: '/integration/api/networks#get-networks',
+                },
+                {
+                  text: 'Gas Prices',
+                  link: '/integration/api/networks#get-gas-price',
+                },
+                {
+                  text: 'Gas Providers',
+                  link: '/integration/api/networks#gas-price-providers',
+                },
               ],
             },
             {
@@ -238,12 +544,30 @@ export default defineConfig({
               link: '/integration/api/transactions',
               collapsed: true,
               items: [
-                { text: 'Send Transaction', link: '/integration/api/transactions#send-transaction' },
-                { text: 'Get Transaction', link: '/integration/api/transactions#get-transaction' },
-                { text: 'Transaction Status', link: '/integration/api/transactions#get-transaction-status' },
-                { text: 'Replace Transaction', link: '/integration/api/transactions#replace-transaction' },
-                { text: 'Cancel Transaction', link: '/integration/api/transactions#cancel-transaction' },
-                { text: 'Transaction Counts', link: '/integration/api/transactions#get-transaction-counts' },
+                {
+                  text: 'Send Transaction',
+                  link: '/integration/api/transactions#send-transaction',
+                },
+                {
+                  text: 'Get Transaction',
+                  link: '/integration/api/transactions#get-transaction',
+                },
+                {
+                  text: 'Transaction Status',
+                  link: '/integration/api/transactions#get-transaction-status',
+                },
+                {
+                  text: 'Replace Transaction',
+                  link: '/integration/api/transactions#replace-transaction',
+                },
+                {
+                  text: 'Cancel Transaction',
+                  link: '/integration/api/transactions#cancel-transaction',
+                },
+                {
+                  text: 'Transaction Counts',
+                  link: '/integration/api/transactions#get-transaction-counts',
+                },
               ],
             },
             {
@@ -251,22 +575,26 @@ export default defineConfig({
               link: '/integration/api/sign',
               collapsed: true,
               items: [
-                { text: 'Sign Text Message', link: '/integration/api/sign#sign-text-message' },
-                { text: 'Signed Text History', link: '/integration/api/sign#get-text-signing-history' },
-                { text: 'Sign Typed Data', link: '/integration/api/sign#sign-typed-data-eip-712' },
-                { text: 'Signed Typed Data History', link: '/integration/api/sign#get-typed-data-signing-history' },
-                { text: 'EIP-712 Types', link: '/integration/api/sign#eip-712-domain-types' },
-              ],
-            },
-            {
-              text: 'Allowlist',
-              link: '/integration/api/allowlist',
-              collapsed: true,
-              items: [
-                { text: 'Get Allowlist', link: '/integration/api/allowlist#get-allowlist-addresses' },
-                { text: 'Configuration', link: '/integration/api/allowlist#configuration' },
-                { text: 'Use Cases', link: '/integration/api/allowlist#use-cases' },
-                { text: 'Testing', link: '/integration/api/allowlist#testing-allowlists' },
+                {
+                  text: 'Sign Text Message',
+                  link: '/integration/api/sign#sign-text-message',
+                },
+                {
+                  text: 'Signed Text History',
+                  link: '/integration/api/sign#get-text-signing-history',
+                },
+                {
+                  text: 'Sign Typed Data',
+                  link: '/integration/api/sign#sign-typed-data-eip-712',
+                },
+                {
+                  text: 'Signed Typed Data History',
+                  link: '/integration/api/sign#get-typed-data-signing-history',
+                },
+                {
+                  text: 'EIP-712 Types',
+                  link: '/integration/api/sign#eip-712-domain-types',
+                },
               ],
             },
           ],
@@ -284,8 +612,14 @@ export default defineConfig({
     {
       text: 'Coming soon..',
       items: [
-        { text: 'Triggers - Send transactions based on events emitted', link: '' },
-        { text: 'Cron - Send transactions every n number of hours/days/weeks', link: '' },
+        {
+          text: 'Triggers - Send transactions based on events emitted',
+          link: '',
+        },
+        {
+          text: 'Cron - Send transactions every n number of hours/days/weeks',
+          link: '',
+        },
         { text: 'Safe multisig support', link: '' },
       ],
     },

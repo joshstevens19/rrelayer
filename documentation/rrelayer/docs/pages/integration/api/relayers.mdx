@@ -11,6 +11,7 @@ All relayer endpoints require authentication. See [Authentication](/integration/
 Create a new relayer for a specific blockchain network.
 
 ### Endpoint
+
 ```
 POST /api/relayers/{chain_id}/new
 ```
@@ -25,9 +26,9 @@ POST /api/relayers/{chain_id}/new
 
 #### Parameters
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | `string` | Yes | Human-readable name for the relayer |
+| Field  | Type     | Required | Description                         |
+| ------ | -------- | -------- | ----------------------------------- |
+| `name` | `string` | Yes      | Human-readable name for the relayer |
 
 ### Response
 
@@ -52,17 +53,18 @@ curl -X POST https://your-rrelayer.com/api/relayers/11155111/new \
 Get a list of all relayers.
 
 ### Endpoint
+
 ```
 GET /api/relayers
 ```
 
 ### Query Parameters
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `limit` | `number` | Maximum number of relayers to return |
-| `offset` | `number` | Number of relayers to skip |
-| `chain_id` | `number` | Filter by chain ID |
+| Parameter  | Type     | Description                          |
+| ---------- | -------- | ------------------------------------ |
+| `limit`    | `number` | Maximum number of relayers to return |
+| `offset`   | `number` | Number of relayers to skip           |
+| `chain_id` | `number` | Filter by chain ID                   |
 
 ### Response
 
@@ -94,6 +96,7 @@ curl "https://your-rrelayer.com/api/relayers?limit=10&chain_id=11155111" \
 Get details for a specific relayer.
 
 ### Endpoint
+
 ```
 GET /api/relayers/{relayer_id}
 ```
@@ -118,11 +121,11 @@ GET /api/relayers/{relayer_id}
 
 ### Relayer Status
 
-| Status | Description |
-|--------|-------------|
-| `ACTIVE` | Relayer is active and can send transactions |
-| `PAUSED` | Relayer is paused and will not send transactions |
-| `DELETED` | Relayer has been deleted |
+| Status    | Description                                      |
+| --------- | ------------------------------------------------ |
+| `ACTIVE`  | Relayer is active and can send transactions      |
+| `PAUSED`  | Relayer is paused and will not send transactions |
+| `DELETED` | Relayer has been deleted                         |
 
 ### Example
 
@@ -136,6 +139,7 @@ curl https://your-rrelayer.com/api/relayers/0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a
 Create a copy of an existing relayer with the same configuration.
 
 ### Endpoint
+
 ```
 POST /api/relayers/{relayer_id}/clone
 ```
@@ -171,6 +175,7 @@ curl -X POST https://your-rrelayer.com/api/relayers/0x742d35.../clone \
 Pause a relayer to stop it from sending new transactions.
 
 ### Endpoint
+
 ```
 PUT /api/relayers/{relayer_id}/pause
 ```
@@ -195,6 +200,7 @@ curl -X PUT https://your-rrelayer.com/api/relayers/0x742d35.../pause \
 Resume a paused relayer.
 
 ### Endpoint
+
 ```
 PUT /api/relayers/{relayer_id}/unpause
 ```
@@ -219,14 +225,15 @@ curl -X PUT https://your-rrelayer.com/api/relayers/0x742d35.../unpause \
 Set the maximum gas price a relayer will use for transactions.
 
 ### Endpoint
+
 ```
 PUT /api/relayers/{relayer_id}/gas/max/{gas_price_cap}
 ```
 
 ### Path Parameters
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
+| Parameter       | Type     | Description              |
+| --------------- | -------- | ------------------------ |
 | `gas_price_cap` | `string` | Maximum gas price in wei |
 
 ### Response
@@ -249,14 +256,15 @@ curl -X PUT https://your-rrelayer.com/api/relayers/0x742d35.../gas/max/500000000
 Enable or disable EIP-1559 transaction types for a relayer.
 
 ### Endpoint
+
 ```
 PUT /api/relayers/{relayer_id}/gas/eip1559/{enabled}
 ```
 
 ### Path Parameters
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
+| Parameter | Type      | Description                                   |
+| --------- | --------- | --------------------------------------------- |
 | `enabled` | `boolean` | `true` to enable EIP-1559, `false` to disable |
 
 ### Response
@@ -279,6 +287,7 @@ curl -X PUT https://your-rrelayer.com/api/relayers/0x742d35.../gas/eip1559/true 
 Get the list of allowed recipient addresses for a relayer.
 
 ### Endpoint
+
 ```
 GET /api/relayers/{relayer_id}/allowlists
 ```
@@ -306,6 +315,7 @@ curl https://your-rrelayer.com/api/relayers/0x742d35.../allowlists \
 Delete a relayer permanently.
 
 ### Endpoint
+
 ```
 DELETE /api/relayers/{relayer_id}
 ```
@@ -329,14 +339,14 @@ curl -X DELETE https://your-rrelayer.com/api/relayers/0x742d35cc6466c4b0de3e3e8c
 
 ### Common Error Codes
 
-| Status | Code | Description |
-|--------|------|-------------|
-| 400 | `INVALID_REQUEST` | Invalid request parameters |
-| 401 | `UNAUTHORIZED` | Authentication required |
-| 403 | `FORBIDDEN` | Insufficient permissions |
-| 404 | `NOT_FOUND` | Relayer not found |
-| 409 | `CONFLICT` | Relayer name already exists |
-| 500 | `INTERNAL_ERROR` | Server error |
+| Status | Code              | Description                 |
+| ------ | ----------------- | --------------------------- |
+| 400    | `INVALID_REQUEST` | Invalid request parameters  |
+| 401    | `UNAUTHORIZED`    | Authentication required     |
+| 403    | `FORBIDDEN`       | Insufficient permissions    |
+| 404    | `NOT_FOUND`       | Relayer not found           |
+| 409    | `CONFLICT`        | Relayer name already exists |
+| 500    | `INTERNAL_ERROR`  | Server error                |
 
 ### Error Response Format
 

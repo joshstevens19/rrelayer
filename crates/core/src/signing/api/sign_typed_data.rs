@@ -1,7 +1,7 @@
 use crate::app_state::NetworkValidateAction;
 use crate::common_types::EvmAddress;
 use crate::rate_limiting::RateLimiter;
-use crate::shared::{bad_request, not_found, unauthorized, HttpError};
+use crate::shared::{bad_request, forbidden, not_found, unauthorized, HttpError};
 use crate::signing::db::RecordSignedTypedDataRequest;
 use crate::transaction::types::TransactionValue;
 use crate::{
@@ -47,6 +47,10 @@ pub async fn sign_typed_data(
         &relayer_provider_context.relayer.address,
         &relayer_provider_context.relayer.chain_id,
     )?;
+
+    if relayer_provider_context.relayer.paused {
+        return Err(forbidden("Relayer is paused".to_string()));
+    }
 
     if let Some(chain_id) = typed_data.domain.chain_id {
         let chain_id: u64 = chain_id.to();

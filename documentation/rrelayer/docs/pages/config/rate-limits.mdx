@@ -67,12 +67,12 @@ rate_limits:
   user_limits:
     # Per-relayer limits (applied to each relayer address individually)
     per_relayer:
-      interval: "minute"
+      interval: 'minute'
       transactions: 5
       signing_operations: 10
     # Global limits (applied across all relayers for a user)
     global:
-      interval: "minute" 
+      interval: 'minute'
       transactions: 50
       signing_operations: 100
   # Whether to fall back to relayer address when no rate limit key is provided
@@ -92,24 +92,26 @@ Currently supported interval values:
 ### User Limits Configuration
 
 #### Per-Relayer Limits
+
 Limits applied to each relayer address individually:
 
 ```yaml
 user_limits:
   per_relayer:
-    interval: "minute"
-    transactions: 10        # Max 10 transactions per minute per relayer
-    signing_operations: 20  # Max 20 signing operations per minute per relayer
+    interval: 'minute'
+    transactions: 10 # Max 10 transactions per minute per relayer
+    signing_operations: 20 # Max 20 signing operations per minute per relayer
 ```
 
 #### Global Limits
+
 Limits applied across all relayers for a user:
 
 ```yaml
 user_limits:
   global:
-    interval: "minute"
-    transactions: 100       # Max 100 transactions per minute across all relayers
+    interval: 'minute'
+    transactions: 100 # Max 100 transactions per minute across all relayers
     signing_operations: 200 # Max 200 signing operations per minute across all relayers
 ```
 
@@ -138,56 +140,61 @@ When `fallback_to_relayer: true` and no custom key is provided, rrelayer uses th
 ## Rate Limit Examples
 
 ### Conservative Limits
+
 ```yaml
 rate_limits:
   user_limits:
     per_relayer:
-      interval: "minute"
+      interval: 'minute'
       transactions: 1
       signing_operations: 1
     global:
-      interval: "minute"
+      interval: 'minute'
       transactions: 3
       signing_operations: 3
   fallback_to_relayer: true
 ```
 
 ### Production Limits
+
 ```yaml
 rate_limits:
   user_limits:
     per_relayer:
-      interval: "minute"
+      interval: 'minute'
       transactions: 30
       signing_operations: 60
     global:
-      interval: "minute"
+      interval: 'minute'
       transactions: 500
       signing_operations: 1000
   fallback_to_relayer: true
 ```
 
 ### High-Volume API
+
 ```yaml
 rate_limits:
   user_limits:
     per_relayer:
-      interval: "second"
+      interval: 'second'
       transactions: 5
       signing_operations: 10
     global:
-      interval: "minute"
+      interval: 'minute'
       transactions: 200
       signing_operations: 400
-  fallback_to_relayer: false  # Require explicit rate limit keys
+  fallback_to_relayer: false # Require explicit rate limit keys
 ```
 
 ## Rate Limit Responses
 
 ### Successful Request
+
 When within rate limits, requests proceed normally.
 
 ### Rate Limit Exceeded
+
 When rate limits are exceeded, rrelayer returns:
 
 ```json
@@ -204,27 +211,30 @@ HTTP Status: `429 Too Many Requests`
 All rate limit configurations are optional:
 
 ### Minimal Configuration
+
 ```yaml
 # No rate limits configured - all requests allowed
 rate_limits: {}
 ```
 
 ### Per-Relayer Only
+
 ```yaml
 rate_limits:
   user_limits:
     per_relayer:
-      interval: "minute"
+      interval: 'minute'
       transactions: 10
       signing_operations: 20
 ```
 
 ### Global Only
+
 ```yaml
 rate_limits:
   user_limits:
     global:
-      interval: "minute"
+      interval: 'minute'
       transactions: 100
       signing_operations: 200
 ```
@@ -240,25 +250,27 @@ rate_limits:
 ### Recommended Starting Values
 
 **Development/Testing:**
+
 ```yaml
 rate_limits:
   user_limits:
     per_relayer:
-      interval: "minute"
+      interval: 'minute'
       transactions: 5
       signing_operations: 10
 ```
 
 **Production API:**
+
 ```yaml
 rate_limits:
   user_limits:
     per_relayer:
-      interval: "minute"
+      interval: 'minute'
       transactions: 30
       signing_operations: 60
     global:
-      interval: "minute"
+      interval: 'minute'
       transactions: 500
       signing_operations: 1000
 ```
@@ -280,16 +292,19 @@ rate_limits:
 ### Common Issues
 
 **Rate limits too restrictive:**
+
 - Increase transaction and signing operation limits
 - Note: All intervals are currently 1-minute windows
 - Ensure users are using appropriate rate limit keys
 
 **Rate limits not working:**
+
 - Verify `fallback_to_relayer` setting
 - Check if rate limit keys are properly set in headers
 - Confirm rate limit configuration syntax
 
 **Unexpected rate limit errors:**
+
 - Check if global limits are being hit across multiple relayers
 - Verify rate limit key consistency across requests
 - Review interval configuration (typos in interval names)

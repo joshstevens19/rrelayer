@@ -1,1 +1,1 @@
-export * from './test_auth';
+export * from './auth_status';

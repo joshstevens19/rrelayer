@@ -7,7 +7,7 @@ export interface CreateRelayerResult {
 }
 
 export const createRelayer = async (
-  chainId: string | number,
+  chainId: number,
   name: string,
   baseConfig: ApiBaseConfig
 ): Promise<CreateRelayerResult> => {

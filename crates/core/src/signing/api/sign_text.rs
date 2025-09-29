@@ -1,5 +1,5 @@
 use crate::rate_limiting::RateLimiter;
-use crate::shared::{not_found, HttpError};
+use crate::shared::{forbidden, not_found, HttpError};
 use crate::signing::db::RecordSignedTextRequest;
 use crate::{
     app_state::AppState,
@@ -51,6 +51,10 @@ pub async fn sign_text(
         &relayer_provider_context.relayer.address,
         &relayer_provider_context.relayer.chain_id,
     )?;
+
+    if relayer_provider_context.relayer.paused {
+        return Err(forbidden("Relayer is paused".to_string()));
+    }
 
     let rate_limit_reservation = RateLimiter::check_and_reserve_rate_limit(
         &state,

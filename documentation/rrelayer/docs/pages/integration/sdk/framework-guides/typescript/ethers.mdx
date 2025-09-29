@@ -67,13 +67,12 @@ import { createRelayerClient, TransactionSpeed } from 'rrelayer';
 import { ethers } from 'ethers';
 
 let relayer = createRelayerClient({
-   serverUrl: 'http://localhost:8000',
-   relayerId: '94afb207-bb47-4392-9229-ba87e4d783cb',
-   apiKey: 'YOUR_API_KEY',
-   // This is optional it defaults to fast
-   speed: TransactionSpeed.FAST
- }
-);
+  serverUrl: 'http://localhost:8000',
+  relayerId: '94afb207-bb47-4392-9229-ba87e4d783cb',
+  apiKey: 'YOUR_API_KEY',
+  // This is optional it defaults to fast
+  speed: TransactionSpeed.FAST,
+});
 
 export const provider = new ethers.providers.Web3Provider(
   relayer.ethereumProvider()
@@ -115,13 +114,12 @@ import { createRelayerClient, TransactionSpeed } from 'rrelayer';
 import { ethers } from 'ethers';
 
 let relayer = createRelayerClient({
-   serverUrl: 'http://localhost:8000',
-   relayerId: '94afb207-bb47-4392-9229-ba87e4d783cb',
-   apiKey: 'YOUR_API_KEY',
-   // This is optional it defaults to fast
-   speed: TransactionSpeed.FAST
- }
-);
+  serverUrl: 'http://localhost:8000',
+  relayerId: '94afb207-bb47-4392-9229-ba87e4d783cb',
+  apiKey: 'YOUR_API_KEY',
+  // This is optional it defaults to fast
+  speed: TransactionSpeed.FAST,
+});
 
 export const provider = new ethers.providers.Web3Provider(
   relayer.ethereumProvider()
@@ -138,7 +136,7 @@ Will now use ethers v6 example for the rest of the documentation but it is very 
 You can sign text with the relayer
 
 :::info
-Remember the config examples are [above](/integration/typescript/ethers#creating-ethers-provider)
+Remember the config examples are [above](/integration/sdk/framework-guides/typescript/ethers#creating-ethers-provider)
 :::
 
 ```ts [example]
@@ -152,7 +150,7 @@ const message = await signer.signMessage('sign me!');
 You can sign typed data with the relayer
 
 :::info
-Remember the config examples are [above](/integration/typescript/ethers#creating-ethers-provider)
+Remember the config examples are [above](/integration/sdk/framework-guides/typescript/ethers#creating-ethers-provider)
 :::
 
 ```ts [example]
@@ -195,7 +193,7 @@ const signature = await signer._signTypedData({
 Send a transaction with the relayer
 
 :::info
-Remember the config examples are [above](/integration/typescript/ethers#creating-ethers-provider)
+Remember the config examples are [above](/integration/sdk/framework-guides/typescript/ethers#creating-ethers-provider)
 :::
 
 ```ts [example]

@@ -6,7 +6,7 @@ use thiserror::Error;
 use super::{
     SendTransactionGasPriceError, TransactionQueueSendTransactionError, TransactionSentWithRelayer,
 };
-use crate::shared::{bad_request, internal_server_error, not_found, HttpError};
+use crate::shared::{bad_request, forbidden, internal_server_error, not_found, HttpError};
 use crate::transaction::types::TransactionConversionError;
 use crate::{
     postgres::PostgresError,
@@ -40,7 +40,7 @@ impl From<ReplaceTransactionError> for HttpError {
         }
 
         if matches!(value, ReplaceTransactionError::RelayerIsPaused(_)) {
-            return bad_request(value.to_string());
+            return forbidden(value.to_string());
         }
 
         internal_server_error(Some(value.to_string()))
@@ -83,7 +83,7 @@ pub enum AddTransactionError {
 impl From<AddTransactionError> for HttpError {
     fn from(value: AddTransactionError) -> Self {
         if matches!(value, AddTransactionError::RelayerIsPaused(_)) {
-            return bad_request(value.to_string());
+            return forbidden(value.to_string());
         }
 
         if matches!(value, AddTransactionError::RelayerNotFound(_)) {
@@ -116,7 +116,7 @@ pub enum CancelTransactionError {
 impl From<CancelTransactionError> for HttpError {
     fn from(value: CancelTransactionError) -> Self {
         if matches!(value, CancelTransactionError::RelayerIsPaused(_)) {
-            return bad_request(value.to_string());
+            return forbidden(value.to_string());
         }
 
         if matches!(value, CancelTransactionError::RelayerNotFound(_)) {

@@ -18,14 +18,13 @@ Basic authenticated requests must include proper authentication headers:
 Authorization: Basic <base64-encoded-credentials>
 ```
 
-
 Basic authentication is configured in your rrelayer.yaml:
 
 ```yaml
 api_config:
   port: 3000
-  authentication_username: "${RRELAYER_AUTH_USERNAME}"
-  authentication_password: "${RRELAYER_AUTH_PASSWORD}"
+  authentication_username: '${RRELAYER_AUTH_USERNAME}'
+  authentication_password: '${RRELAYER_AUTH_PASSWORD}'
 ```
 
 you can read more about that [here](/config/api-config)
@@ -61,12 +60,12 @@ networks: // [!code focus]
 
 you can read how to set APIs keys in [here](/config/networks/api-keys)
 
-
 ## Status Check
 
 Check if the API server is running and accessible.
 
 ### Endpoint
+
 ```
 GET /api/auth/status
 ```
@@ -82,19 +81,19 @@ GET /api/auth/status
 OR
 
 ```json
-  {
-    "authenticated_with": "APIKEY",
-    "api_key_access": [
-      {
-        "chain_id": 1,
-        "relayers": ["0x123...", "0x456..."]
-      },
-      {
-        "chain_id": 137,
-        "relayers": ["0x789..."]
-      }
-    ]
-  }
+{
+  "authenticated_with": "APIKEY",
+  "api_key_access": [
+    {
+      "chain_id": 1,
+      "relayers": ["0x123...", "0x456..."]
+    },
+    {
+      "chain_id": 137,
+      "relayers": ["0x789..."]
+    }
+  ]
+}
 ```
 
 ### Example
@@ -124,6 +123,7 @@ x-rrelayer-rate-limit-key: <rate-limit-key>
 ```
 
 Example:
+
 ```bash
 curl https://your-rrelayer.com/api/transactions/relayers/0x.../send \
   -H "x-rrelayer-rate-limit-key: user-12345" \
@@ -131,6 +131,8 @@ curl https://your-rrelayer.com/api/transactions/relayers/0x.../send \
   -H "Content-Type: application/json" \
   -d '{"to": "0x...", "value": "1000000000000000000"}'
 ```
+
+You can config this [here](/config/rate-limits).
 
 ## Development vs Production
 
@@ -140,8 +142,8 @@ For local development, you can use simple credentials:
 
 ```yaml
 api_config:
-  authentication_username: "admin"
-  authentication_password: "password"
+  authentication_username: 'admin'
+  authentication_password: 'password'
 ```
 
 ### Production Setup
@@ -150,11 +152,12 @@ For production, use strong, randomly generated credentials:
 
 ```yaml
 api_config:
-  authentication_username: "${RRELAYER_AUTH_USERNAME}"
-  authentication_password: "${RRELAYER_AUTH_PASSWORD}"
+  authentication_username: '${RRELAYER_AUTH_USERNAME}'
+  authentication_password: '${RRELAYER_AUTH_PASSWORD}'
 ```
 
 Set environment variables:
+
 ```bash
 export RRELAYER_AUTH_USERNAME="admin_$(openssl rand -hex 16)"
 export RRELAYER_AUTH_PASSWORD="$(openssl rand -base64 32)"

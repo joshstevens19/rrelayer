@@ -7,6 +7,7 @@ Webhooks allow you to receive real-time notifications about transaction events a
 rrelayer supports webhooks for the following events:
 
 ### Transaction Events
+
 - **`transaction_queued`** - Transaction was added to the queue
 - **`transaction_sent`** - Transaction was sent to the blockchain
 - **`transaction_mined`** - Transaction was mined (included in a block)
@@ -17,10 +18,12 @@ rrelayer supports webhooks for the following events:
 - **`transaction_replaced`** - Transaction was replaced
 
 ### Signing Events
+
 - **`text_signed`** - Text message was signed
 - **`typed_data_signed`** - Typed data (EIP-712) was signed
 
 ### Balance Alert Events
+
 - **`low_balance`** - Relayer balance fell below minimum threshold
 
 ## Configuration
@@ -339,7 +342,7 @@ function verifyWebhook(body, signature, secret) {
     .createHmac('sha256', secret)
     .update(body, 'utf8')
     .digest('hex');
-  
+
   return crypto.timingSafeEqual(
     Buffer.from(signature, 'hex'),
     Buffer.from(expectedSignature, 'hex')
@@ -367,7 +370,7 @@ function verifyWebhook(body, signature, secret) {
 
 1. **Initial attempt**: Immediate
 2. **First retry**: After 1 second
-3. **Second retry**: After 2 seconds  
+3. **Second retry**: After 2 seconds
 4. **Third retry**: After 4 seconds
 5. **Final failure**: After 3 failed attempts
 
@@ -379,10 +382,10 @@ To receive alerts when relayer balances fall below safe thresholds, enable the `
 
 ```yaml [rrelayer.yaml]
 webhooks:
-- endpoint: "https://monitoring.yourapp.com/webhooks/alerts"
-  shared_secret: "${MONITORING_WEBHOOK_SECRET}"
-  networks: "*"
-  alert_on_low_balances: true  # Enable balance alerts
+  - endpoint: 'https://monitoring.yourapp.com/webhooks/alerts'
+    shared_secret: '${MONITORING_WEBHOOK_SECRET}'
+    networks: '*'
+    alert_on_low_balances: true # Enable balance alerts
 ```
 
 ### Dedicated Alert Endpoint
@@ -391,18 +394,18 @@ For better monitoring, consider using a separate webhook endpoint specifically f
 
 ```yaml [rrelayer.yaml]
 webhooks:
-# Transaction notifications
-- endpoint: "https://api.yourapp.com/webhooks/transactions"
-  shared_secret: "${TRANSACTION_WEBHOOK_SECRET}"
-  networks: "*"
-  max_retries: 3
+  # Transaction notifications
+  - endpoint: 'https://api.yourapp.com/webhooks/transactions'
+    shared_secret: '${TRANSACTION_WEBHOOK_SECRET}'
+    networks: '*'
+    max_retries: 3
 
-# Balance and system alerts  
-- endpoint: "https://monitoring.yourapp.com/webhooks/alerts"
-  shared_secret: "${ALERT_WEBHOOK_SECRET}"
-  networks: "*"
-  max_retries: 5
-  alert_on_low_balances: true
+  # Balance and system alerts
+  - endpoint: 'https://monitoring.yourapp.com/webhooks/alerts'
+    shared_secret: '${ALERT_WEBHOOK_SECRET}'
+    networks: '*'
+    max_retries: 5
+    alert_on_low_balances: true
 ```
 
 ### Monitoring Integration
@@ -413,10 +416,15 @@ Low balance webhooks integrate well with monitoring systems:
 // Example webhook handler for balance alerts
 app.post('/webhooks/alerts', (req, res) => {
   const { event_type, balance_alert } = req.body;
-  
+
   if (event_type === 'low_balance') {
-    const { relayerId, chainId, currentBalanceFormatted, minimumBalanceFormatted } = balance_alert;
-    
+    const {
+      relayerId,
+      chainId,
+      currentBalanceFormatted,
+      minimumBalanceFormatted,
+    } = balance_alert;
+
     // Send alert to monitoring system
     monitoring.alert({
       level: 'warning',
@@ -424,16 +432,16 @@ app.post('/webhooks/alerts', (req, res) => {
       details: {
         current: `${currentBalanceFormatted} ETH`,
         minimum: `${minimumBalanceFormatted} ETH`,
-        chain: chainId
-      }
+        chain: chainId,
+      },
     });
-    
+
     // Optionally trigger automatic top-up process
     if (shouldAutoTopUp(chainId, currentBalanceFormatted)) {
       triggerTopUp(relayerId, chainId);
     }
   }
-  
+
   res.status(200).json({ received: true });
 });
 ```
@@ -473,6 +481,7 @@ rrelayer provides internal monitoring of webhook delivery:
 - Webhook statistics are available for monitoring
 
 Monitor your webhook endpoints for:
+
 - Response times
 - Error rates
 - Processing failures
