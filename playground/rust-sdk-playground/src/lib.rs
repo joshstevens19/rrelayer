@@ -1,5 +1,5 @@
-pub mod client;
-pub mod config;
+#![allow(dead_code)]
+
 pub mod networks;
 pub mod rate_limit;
 pub mod relayer;

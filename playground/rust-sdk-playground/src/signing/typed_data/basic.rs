@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use rrelayer::{
-    AdminRelayerClient, CreateClientAuth, CreateClientConfig, RelayerId, SignTextResult,
-    SignTypedDataResult, TransactionSpeed, TypedData, create_client,
+    AdminRelayerClient, CreateClientAuth, CreateClientConfig, RelayerId, SignTypedDataResult,
+    TransactionSpeed, TypedData, create_client,
 };
 use std::str::FromStr;
 
