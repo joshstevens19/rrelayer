@@ -6,7 +6,6 @@
 - Finish documentation
 - Do internal documentation throughout the .MD files
 - Get install script working locally
-- Get domain working
 - Get CI builds / releases working
 
 31st September plan:
