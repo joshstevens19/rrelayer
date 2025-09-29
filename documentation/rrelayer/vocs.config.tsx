@@ -221,6 +221,7 @@ export default defineConfig({
                 {
                   text: 'Node',
                   collapsed: true,
+                  link: '/integration/sdk/create-client-authentication/node',
                   items: [
                     {
                       text: 'Basic Auth',
@@ -243,6 +244,7 @@ export default defineConfig({
                 {
                   text: 'Rust',
                   collapsed: true,
+                  link: '/integration/sdk/create-client-authentication/rust',
                   items: [
                     {
                       text: 'Basic Auth',
@@ -271,6 +273,7 @@ export default defineConfig({
                 {
                   text: 'Node',
                   collapsed: true,
+                  link: '/integration/sdk/relayers/node',
                   items: [
                     {
                       text: 'Create Relayer',
@@ -317,6 +320,7 @@ export default defineConfig({
                 {
                   text: 'Rust',
                   collapsed: true,
+                  link: '/integration/sdk/relayers/rust',
                   items: [
                     { text: 'Create Relayer', link: '' },
                     { text: 'Get Relayers', link: '' },
@@ -337,6 +341,7 @@ export default defineConfig({
                 {
                   text: 'Node',
                   collapsed: true,
+                  link: '/integration/sdk/networks/node',
                   items: [
                     {
                       text: 'Get Network',
@@ -355,6 +360,7 @@ export default defineConfig({
                 {
                   text: 'Rust',
                   collapsed: true,
+                  link: '/integration/sdk/networks/rust',
                   items: [
                     { text: 'Get Network', link: '' },
                     { text: 'Get Networks', link: '' },
@@ -370,6 +376,7 @@ export default defineConfig({
                 {
                   text: 'Node',
                   collapsed: true,
+                  link: '/integration/transactions/networks/node',
                   items: [
                     {
                       text: 'Send Transaction',
@@ -400,6 +407,7 @@ export default defineConfig({
                 {
                   text: 'Rust',
                   collapsed: true,
+                  link: '/integration/transactions/networks/rust',
                   items: [
                     { text: 'Send Transaction', link: '' },
                     { text: 'Get Transaction', link: '' },
@@ -418,6 +426,7 @@ export default defineConfig({
                 {
                   text: 'Node',
                   collapsed: true,
+                  link: '/integration/sign/networks/node',
                   items: [
                     {
                       text: 'Sign Text Message',
@@ -440,6 +449,7 @@ export default defineConfig({
                 {
                   text: 'Rust',
                   collapsed: true,
+                  link: '/integration/sign/networks/rust',
                   items: [
                     { text: 'Sign Text Message', link: '' },
                     { text: 'Signed Text History', link: '' },
