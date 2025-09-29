@@ -392,7 +392,7 @@ impl<'de> Deserialize<'de> for AllOrOneOrManyAddresses {
         impl<'de> Visitor<'de> for AllOrOneOrManyVisitor {
             type Value = AllOrOneOrManyAddresses;
 
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str("a string '*', a single address, or an array of addresses")
             }
 
@@ -671,19 +671,6 @@ pub struct WebhookConfig {
     pub max_retries: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub alert_on_low_balances: Option<bool>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct WebhookConfigAdvanced {
-    pub endpoint: String,
-    pub shared_secret: String,
-    pub networks: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub timeout_seconds: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub retry_attempts: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub enabled: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

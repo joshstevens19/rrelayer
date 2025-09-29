@@ -41,28 +41,6 @@ pub struct TurnkeyAccount {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TurnkeyCreateAccountRequest {
-    #[serde(rename = "type")]
-    pub activity_type: String,
-    #[serde(rename = "organizationId")]
-    pub organization_id: String,
-    pub parameters: TurnkeyCreateAccountParameters,
-    #[serde(rename = "timestampMs")]
-    pub timestamp_ms: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TurnkeyCreateAccountParameters {
-    #[serde(rename = "walletId")]
-    pub wallet_id: String,
-    pub curve: String,
-    #[serde(rename = "pathFormat")]
-    pub path_format: String,
-    #[serde(rename = "pathIndex")]
-    pub path_index: u32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TurnkeyCreateAccountResponse {
     pub activity: TurnkeyActivity,
 }
@@ -123,46 +101,6 @@ pub struct TurnkeySignRawPayloadResult {
     pub r: String,
     pub s: String,
     pub v: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TurnkeySignTransactionRequest {
-    #[serde(rename = "type")]
-    pub activity_type: String,
-    #[serde(rename = "organizationId")]
-    pub organization_id: String,
-    pub parameters: TurnkeySignTransactionParameters,
-    #[serde(rename = "timestampMs")]
-    pub timestamp_ms: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TurnkeySignTransactionParameters {
-    #[serde(rename = "unsignedTransaction")]
-    pub unsigned_transaction: String,
-    #[serde(rename = "walletAccountId")]
-    pub wallet_account_id: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TurnkeySignRawPayloadRequest {
-    #[serde(rename = "type")]
-    pub activity_type: String,
-    #[serde(rename = "organizationId")]
-    pub organization_id: String,
-    pub parameters: TurnkeySignRawPayloadParameters,
-    #[serde(rename = "timestampMs")]
-    pub timestamp_ms: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TurnkeySignRawPayloadParameters {
-    pub payload: String,
-    pub encoding: String,
-    #[serde(rename = "hashFunction")]
-    pub hash_function: String,
-    #[serde(rename = "walletAccountId")]
-    pub wallet_account_id: String,
 }
 
 #[derive(Debug)]

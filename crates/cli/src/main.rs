@@ -1,7 +1,7 @@
 use std::{env, path::PathBuf, str::FromStr};
 
 #[cfg(feature = "jemalloc")]
-use jemallocator::Jemalloc;
+use tikv_jemallocator::Jemalloc;
 
 #[cfg(feature = "jemalloc")]
 #[global_allocator]

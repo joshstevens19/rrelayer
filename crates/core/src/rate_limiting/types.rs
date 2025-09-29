@@ -1,5 +1,4 @@
 use crate::postgres::PostgresError;
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -15,12 +14,6 @@ impl RateLimitOperation {
             RateLimitOperation::Signing => "signing",
         }
     }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum RateLimitDetectMethod {
-    Header,
-    Fallback,
 }
 
 #[derive(Debug, Clone)]

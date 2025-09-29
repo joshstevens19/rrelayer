@@ -19,8 +19,6 @@ pub use transaction_speed::TransactionSpeed;
 mod transaction_status;
 pub use transaction_status::TransactionStatus;
 
-mod relayer_transaction;
-
 mod transaction;
 pub use transaction::{Transaction, TransactionConversionError};
 
