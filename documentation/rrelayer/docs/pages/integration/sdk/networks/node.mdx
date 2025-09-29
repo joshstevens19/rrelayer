@@ -107,7 +107,7 @@ Get the gas prices for the network.
 ### Response
 
 ```ts
-Promise<GasEstimatorResult>;
+Promise<GasEstimatorResult | null>;
 ```
 
 Just so you understand the properties returned
@@ -147,6 +147,6 @@ export const client = createClient({
 // get-gas-prices.ts
 import { client } from './config';
 
-// returns GasEstimatorResult - import { GasEstimatorResult } from 'rrelayer';
+// returns GasEstimatorResult | null - import { GasEstimatorResult } from 'rrelayer';
 let gasPrices = await client.network.getGasPrices(11155111);
 ```

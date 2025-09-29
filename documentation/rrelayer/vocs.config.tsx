@@ -362,9 +362,18 @@ export default defineConfig({
                   collapsed: true,
                   link: '/integration/sdk/networks/rust',
                   items: [
-                    { text: 'Get Network', link: '' },
-                    { text: 'Get Networks', link: '' },
-                    { text: 'Gas Prices', link: '' },
+                    {
+                      text: 'Get Network',
+                      link: '/integration/sdk/networks/rust#get-network',
+                    },
+                    {
+                      text: 'Get Networks',
+                      link: '/integration/sdk/networks/rust#get-networks',
+                    },
+                    {
+                      text: 'Gas Prices',
+                      link: '/integration/sdk/networks/rust#gas-prices',
+                    },
                   ],
                 },
               ],
@@ -449,12 +458,24 @@ export default defineConfig({
                 {
                   text: 'Rust',
                   collapsed: true,
-                  link: '/integration/sign/networks/rust',
+                  link: '/integration/sign/sign/rust',
                   items: [
-                    { text: 'Sign Text Message', link: '' },
-                    { text: 'Signed Text History', link: '' },
-                    { text: 'Sign Typed Data', link: '' },
-                    { text: 'Signed Typed Data History', link: '' },
+                    {
+                      text: 'Sign Text Message',
+                      link: '/integration/sdk/sign/rust#sign-text-message',
+                    },
+                    {
+                      text: 'Signed Text History',
+                      link: '/integration/sdk/sign/rust#signed-text-history',
+                    },
+                    {
+                      text: 'Sign Typed Data',
+                      link: '/integration/sdk/sign/rust#sign-typed-data',
+                    },
+                    {
+                      text: 'Signed Typed Data History',
+                      link: '/integration/sdk/sign/rust#signed-typed-data-history',
+                    },
                   ],
                 },
               ],

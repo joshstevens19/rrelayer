@@ -1,0 +1,187 @@
+# Networks
+
+Network-related SDK calls.
+
+## Get Network
+
+:::info
+Only basic auth authentication can get a network
+:::
+
+Get the network details.
+
+### Response
+
+```rs
+Option<Network>
+```
+
+Just so you understand the properties returned
+
+```rs
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Network {
+    pub name: String,
+    #[serde(rename = "chainId")]
+    pub chain_id: ChainId,
+    #[serde(rename = "providerUrls")]
+    pub provider_urls: Vec<String>,
+}
+```
+
+### Example
+
+```rs
+use anyhow::Result;
+use rrelayer::{create_client, Client, CreateClientAuth, CreateClientConfig, Network};
+
+async fn get_client() -> Result<Client> {
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username: "your_username".to_string(),
+            password: "your_password".to_string(),
+        },
+    });
+
+    Ok(client)
+}
+
+async fn example() -> Result<()> {
+    let client = get_client().await?;
+
+    let network: Option<Network> = client.network().get(&11155111).await?;
+    println!("{:?}", network);
+
+    Ok(())
+}
+
+```
+
+## Get Networks
+
+:::info
+Only basic auth authentication can get all networks
+:::
+
+Get all networks details.
+
+### Response
+
+```rs
+Vec<Network>
+```
+
+Just so you understand the properties returned
+
+```rs
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Network {
+    pub name: String,
+    #[serde(rename = "chainId")]
+    pub chain_id: ChainId,
+    #[serde(rename = "providerUrls")]
+    pub provider_urls: Vec<String>,
+}
+```
+
+### Example
+
+```rs
+use anyhow::Result;
+use rrelayer::{create_client, Client, CreateClientAuth, CreateClientConfig, Network};
+
+async fn get_client() -> Result<Client> {
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username: "your_username".to_string(),
+            password: "your_password".to_string(),
+        },
+    });
+
+    Ok(client)
+}
+
+async fn example() -> Result<()> {
+    let client = get_client().await?;
+
+    let networks: Vec<Network> = client.network().get_all().await?;
+    println!("{:?}", networks);
+
+    Ok(())
+}
+```
+
+## Gas Prices
+
+:::info
+Only basic auth authentication can get the networks gas prices
+:::
+
+Get the gas prices for the network.
+
+### Response
+
+```rs
+Option<GasEstimatorResult>
+```
+
+Just so you understand the properties returned
+
+```rs
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct GasPriceResult {
+    #[serde(rename = "maxPriorityFee")]
+    pub max_priority_fee: MaxPriorityFee,
+
+    #[serde(rename = "maxFee")]
+    pub max_fee: MaxFee,
+
+    #[serde(rename = "minWaitTimeEstimate")]
+    pub min_wait_time_estimate: Option<i64>,
+
+    #[serde(rename = "maxWaitTimeEstimate")]
+    pub max_wait_time_estimate: Option<i64>,
+}
+
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct GasEstimatorResult {
+    pub slow: GasPriceResult,
+
+    pub medium: GasPriceResult,
+
+    pub fast: GasPriceResult,
+
+    pub super_fast: GasPriceResult,
+}
+```
+
+### Example
+
+```rs
+use anyhow::Result;
+use rrelayer::{Client, CreateClientAuth, CreateClientConfig, GasEstimatorResult, create_client};
+
+async fn get_client() -> Result<Client> {
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username: "your_username".to_string(),
+            password: "your_password".to_string(),
+        },
+    });
+
+    Ok(client)
+}
+
+async fn example() -> Result<()> {
+    let client = get_client().await?;
+
+    let result: Option<GasEstimatorResult> = client.network().get_gas_prices(&11155111).await?;
+    println!("{:?}", result);
+
+    Ok(())
+}
+```

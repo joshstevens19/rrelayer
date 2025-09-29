@@ -12,9 +12,11 @@ pub use api::{ApiSdkError, AuthenticationApi, NetworkApi, RelayerApi, SignApi, T
 
 pub use rrelayer_core::{
     common_types::EvmAddress,
+    gas::GasEstimatorResult,
     relayer::RelayerId,
     transaction::{
         api::RelayTransactionRequest,
         types::{TransactionId, TransactionSpeed, TransactionValue},
     },
+    network::Network
 };
