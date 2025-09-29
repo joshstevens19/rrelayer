@@ -181,7 +181,7 @@ export default defineConfig({
                 },
                 {
                   text: 'Rust',
-                  link: '',
+                  link: '/integration/sdk/installation/rust',
                 },
               ],
             },
@@ -376,7 +376,7 @@ export default defineConfig({
                 {
                   text: 'Node',
                   collapsed: true,
-                  link: '/integration/transactions/networks/node',
+                  link: '/integration/sdk/transactions/node',
                   items: [
                     {
                       text: 'Send Transaction',
