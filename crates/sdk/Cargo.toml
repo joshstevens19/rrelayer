@@ -16,4 +16,6 @@ alloy-eips = { workspace = true }
 base64 = "0.22.0"
 rrelayer_core = { path = "../core" }
 tokio = { version = "1", features = ["time"] }
+async-trait = "0.1"
+hex = "0.4"
 

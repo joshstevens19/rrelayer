@@ -30,7 +30,7 @@ impl TestRunner {
             return Err(anyhow!("Relayer should exist"));
         }
 
-        let cloned_relayer = relayer.clone_relayer(&31337, "cloned-test-relayer").await?;
+        let cloned_relayer = relayer.clone_relayer(31337, "cloned-test-relayer").await?;
 
         if cloned_relayer.id == *relayer.id() {
             return Err(anyhow!("Relayer should have been cloned and have its own ID"));

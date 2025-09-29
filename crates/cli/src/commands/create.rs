@@ -17,7 +17,7 @@ pub async fn handle_create(
 
     let chain_id = get_chain_id_for_network(&network, project_path).await?;
 
-    let result = client.relayer().create(&chain_id, name).await?;
+    let result = client.relayer().create(chain_id, name).await?;
 
     println!("\n[SUCCESS]  Relayer created successfully!");
     println!("┌─────────────────────────────────────────────────");

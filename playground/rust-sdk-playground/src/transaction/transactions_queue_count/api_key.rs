@@ -1,8 +1,7 @@
 use anyhow::Result;
 use rrelayer::{
+    CreateRelayerClientConfig, RelayerClient, RelayerId, TransactionCountType, TransactionSpeed,
     create_relayer_client,
-    CreateRelayerClientConfig, RelayerClient, RelayerId, TransactionCountType,
-    TransactionSpeed,
 };
 use std::str::FromStr;
 

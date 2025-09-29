@@ -22,7 +22,7 @@ pub async fn handle_clone(
 
     let chain_id = get_chain_id_for_network(&network, project_path).await?;
 
-    let result = client.clone_relayer(&chain_id, name).await?;
+    let result = client.clone_relayer(chain_id, name).await?;
 
     println!("\n✅  Relayer cloned successfully!");
     println!("┌─────────────────────────────────────────────────");

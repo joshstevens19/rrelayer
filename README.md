@@ -6,9 +6,10 @@
 - Finish documentation
 - Do internal documentation throughout the .MD files
 - Get install script working locally
-- Get CI builds / releases working
 
 31st September plan:
+- Reread documentation 
+- Get CI builds / releases working
 - Testing
     - loading up ALL supported gas providers so it works
     - Testing handling custom gas with http call

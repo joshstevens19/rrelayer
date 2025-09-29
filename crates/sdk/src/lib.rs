@@ -1,3 +1,4 @@
+pub mod alloy_integration;
 mod api;
 mod clients;
 
@@ -10,19 +11,24 @@ pub use clients::{
 pub use api::types::{ApiResult, AuthConfig};
 pub use api::{ApiSdkError, AuthenticationApi, NetworkApi, RelayerApi, SignApi, TransactionApi};
 
+pub use alloy_integration::{RelayerClientType, RelayerProvider, RelayerSigner, with_relayer};
+
+pub use alloy::dyn_abi::TypedData;
+pub use alloy::network::AnyTransactionReceipt;
+pub use alloy::primitives::PrimitiveSignature;
+
 pub use rrelayer_core::{
     common_types::{EvmAddress, PagingContext, PagingResult},
     gas::GasEstimatorResult,
     network::Network,
     relayer::{CreateRelayerResult, GetRelayerResult, Relayer, RelayerId},
+    signing::{SignTextResult, SignTypedDataResult, SignedTextHistory, SignedTypedDataHistory},
     transaction::{
-        api::{RelayTransactionRequest, SendTransactionResult, RelayTransactionStatusResult, CancelTransactionResponse},
+        api::{
+            CancelTransactionResponse, RelayTransactionRequest, RelayTransactionStatusResult,
+            SendTransactionResult,
+        },
         queue_system::ReplaceTransactionResult,
-        types::{TransactionId, TransactionValue, TransactionData, TransactionSpeed, Transaction},
+        types::{Transaction, TransactionData, TransactionId, TransactionSpeed, TransactionValue},
     },
-    signing::{SignTextResult, SignedTextHistory, SignTypedDataResult, SignedTypedDataHistory}
 };
-
-pub use alloy::primitives::PrimitiveSignature;
-pub use alloy::dyn_abi::TypedData;
-pub use alloy::network::AnyTransactionReceipt;

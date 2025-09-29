@@ -17,7 +17,7 @@ impl TestRunner {
             .relayer_client
             .client
             .network()
-            .get_gas_prices(&self.config.chain_id)
+            .get_gas_prices(self.config.chain_id)
             .await
             .context("Failed to get gas prices")?;
 

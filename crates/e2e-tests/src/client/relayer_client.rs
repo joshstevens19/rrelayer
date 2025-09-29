@@ -40,7 +40,7 @@ impl E2ERelayerClient {
         let result = self
             .client
             .relayer()
-            .create(&chain_id, name)
+            .create(chain_id, name)
             .await
             .context("Failed to create relayer")?;
 

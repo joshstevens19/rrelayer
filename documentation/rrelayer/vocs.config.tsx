@@ -204,7 +204,6 @@ export default defineConfig({
                 },
                 {
                   text: 'Rust',
-                  link: '',
                   items: [
                     {
                       text: 'Alloy',

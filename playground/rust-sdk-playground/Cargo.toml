@@ -3,9 +3,23 @@ name = "rust-sdk-playground"
 version = "0.1.0"
 edition = "2024"
 
+# [[bin]]
+# name = "main"
+# path = "src/main.rs"
+
+[lib]
+name = "rust_sdk_playground"
+path = "src/lib.rs"
+
 [dependencies]
 rrelayer = { path = "../../crates/sdk" }
-anyhow = "1.0.99"
+eyre = "0.6"
+anyhow = "1.0"
 tokio = "1.47.1"
 serde_json = "1.0.142"
+serde = { version = "1.0", features = ["derive"] }
 alloy = { workspace = true, features = ["full", "signer-mnemonic", "eips", "eip712"] }
+hex = "0.4"
+async-trait = "0.1"
+thiserror = "1.0"
+futures-util = "0.3"

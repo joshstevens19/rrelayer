@@ -27,7 +27,7 @@ impl TestRunner {
             return Err(anyhow::anyhow!("SDK should not be authenticated"));
         }
 
-        let relay = client.relayer().create(&31337, "yes").await;
+        let relay = client.relayer().create(31337, "yes").await;
         if relay.is_ok() {
             return Err(anyhow::anyhow!("SDK should not be able to create a relayer"));
         }

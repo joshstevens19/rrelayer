@@ -145,7 +145,12 @@ impl<'a> ClientRelayerApi<'a> {
         self.relayer_api.create(chain_id, name).await
     }
 
-    pub async fn clone_relayer(&self,  id: &RelayerId, chain_id: u64, name: &str) -> ApiResult<CreateRelayerResult> {
+    pub async fn clone_relayer(
+        &self,
+        id: &RelayerId,
+        chain_id: u64,
+        name: &str,
+    ) -> ApiResult<CreateRelayerResult> {
         self.relayer_api.clone(id, chain_id, name).await
     }
 
@@ -320,11 +325,7 @@ impl AdminRelayerClient {
         self.relayer_api.remove_max_gas_price(self.relayer_client.id()).await
     }
 
-    pub async fn clone_relayer(
-        &self,
-        chain_id: u64,
-        name: &str,
-    ) -> ApiResult<CreateRelayerResult> {
+    pub async fn clone_relayer(&self, chain_id: u64, name: &str) -> ApiResult<CreateRelayerResult> {
         self.relayer_api.clone(self.relayer_client.id(), chain_id, name).await
     }
 }

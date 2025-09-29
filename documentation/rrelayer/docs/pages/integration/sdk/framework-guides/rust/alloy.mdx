@@ -1,1 +1,475 @@
-# Alloy
+# Getting started
+
+[Alloy](https://alloy.rs/) is a comprehensive Rust library for interacting with Ethereum and other EVM-compatible blockchains, providing type-safe smart contract bindings, transaction building, and wallet management.
+
+If you are familiar with `Alloy`, this integration will look very familiar to you.
+
+To integrate the relayer within your Rust application, it requires only a few code changes. Once done, you can start using the relayer to send transactions, write to contracts, sign messages and typed data.
+
+## Installation
+
+Add both `rrelayer` and `alloy` to your `Cargo.toml`:
+
+:::code-group
+
+```toml [Cargo.toml]
+[dependencies]
+rrelayer = "0.1.0"
+alloy = { version = "0.7", features = ["full", "signer-mnemonic", "eips", "eip712"] }
+tokio = { version = "1", features = ["full"] }
+eyre = "0.6"
+```
+
+:::
+
+## RelayerSigner Setup
+
+rrelayer provides `RelayerSigner` which implements Alloy's `Signer` trait, allowing you to use it as a drop-in replacement for any Alloy signer. The relayer has two ways to create signers based on the authentication method:
+
+1. Using the basic authentication which uses the username and password in your [api config](/config/api-config)
+2. Using API keys that have restricted permissions to only use the relayer - docs [here](config/networks/api-keys)
+
+:::code-group
+
+```rust [Basic Auth - config.rs]
+use std::sync::Arc;
+use eyre::Result;
+use rrelayer::{
+    AdminRelayerClient, AdminRelayerClientConfig, AdminRelayerClientAuth,
+    RelayerSigner, TransactionSpeed, RelayerId
+};
+
+pub async fn create_relayer_signer() -> Result<RelayerSigner> {
+    let relayer_id = RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?;
+    
+    let config = AdminRelayerClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        provider_url: "https://eth.llamarpc.com".to_string(),
+        relayer_id,
+        auth: AdminRelayerClientAuth::BasicAuth {
+            username: "your_username".to_string(),
+            password: "your_password".to_string(),
+        },
+        speed: Some(TransactionSpeed::FAST),
+    };
+    
+    let client = Arc::new(AdminRelayerClient::new(config));
+    
+    // Auto-fetch address from relayer
+    let signer = RelayerSigner::from_admin_client_auto_address(
+        client,
+        Some(1), // mainnet chain ID
+    ).await?;
+    
+    Ok(signer)
+}
+```
+
+```rust [API Key - config.rs]
+use std::sync::Arc;
+use eyre::Result;
+use rrelayer::{
+    RelayerClient, RelayerClientConfig, RelayerClientAuth, RelayerId,
+    RelayerSigner, TransactionSpeed
+};
+
+pub async fn create_relayer_signer() -> Result<RelayerSigner> {
+    let relayer_id = RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?;
+    
+    let config = RelayerClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        relayer_id: relayer_id.clone(),
+        auth: RelayerClientAuth::ApiKey { 
+            api_key: "your-api-key-here".to_string() 
+        },
+        speed: Some(TransactionSpeed::FAST),
+    };
+    
+    let client = Arc::new(RelayerClient::new(config));
+    
+    // Auto-fetch address from relayer
+    let signer = RelayerSigner::from_relayer_client_auto_address(
+        client, 
+        Some(1), // mainnet chain ID
+    ).await?;
+    
+    Ok(signer)
+}
+```
+
+:::
+
+## Sign message
+
+You can sign messages with the relayer using standard Alloy patterns:
+
+:::info
+Remember the config examples are [above](/integration/sdk/framework-guides/rust/alloy#relayersigner-setup)
+:::
+
+```rust [example.rs]
+use alloy::signers::Signer;
+use eyre::Result;
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let signer = create_relayer_signer().await?;
+    
+    let message = b"Hello from Alloy + Relayer!";
+    
+    // Sign the message - routes through relayer.sign().text()
+    let signature = signer.sign_message(message).await?;
+    
+    println!("Signature: 0x{}", hex::encode(signature.as_bytes()));
+    
+    // Verify signature recovery
+    let recovered_addr = signature.recover_address_from_msg(message)?;
+    assert_eq!(recovered_addr, signer.address());
+    
+    Ok(())
+}
+```
+
+## Sign typed data
+
+You can sign EIP-712 typed data with the relayer using standard Alloy patterns:
+
+:::info
+Remember the config examples are [above](/integration/sdk/framework-guides/rust/alloy#relayersigner-setup)
+:::
+
+```rust [example.rs]
+use alloy::{
+    signers::Signer,
+    dyn_abi::TypedData,
+    primitives::Address,
+};
+use serde_json::json;
+use eyre::Result;
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let signer = create_relayer_signer().await?;
+    
+    // Create EIP-712 typed data
+    let typed_data_json = json!({
+        "types": {
+            "EIP712Domain": [
+                {"name": "name", "type": "string"},
+                {"name": "version", "type": "string"},
+                {"name": "chainId", "type": "uint256"},
+                {"name": "verifyingContract", "type": "address"}
+            ],
+            "Mail": [
+                {"name": "from", "type": "address"},
+                {"name": "to", "type": "address"},
+                {"name": "contents", "type": "string"}
+            ]
+        },
+        "primaryType": "Mail",
+        "domain": {
+            "name": "Ether Mail",
+            "version": "1",
+            "chainId": 1,
+            "verifyingContract": "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC"
+        },
+        "message": {
+            "from": "0x742d35cc6634c0532925a3b8d67e8000c942b1b5",
+            "to": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+            "contents": "Hello, EIP-712!"
+        }
+    });
+    
+    let typed_data: TypedData = serde_json::from_value(typed_data_json)?;
+    
+    // Sign typed data - routes through relayer.sign().typed_data()
+    let signature = signer.sign_dynamic_typed_data(&typed_data).await?;
+    
+    println!("Signature: 0x{}", hex::encode(signature.as_bytes()));
+    
+    Ok(())
+}
+```
+
+## Send transaction
+
+Send transactions with the relayer using the `RelayerProvider` wrapper with complete Alloy transaction building:
+
+:::info
+Remember the config examples are [above](/integration/sdk/framework-guides/rust/alloy#relayersigner-setup)
+:::
+
+:::code-group
+
+```rust [Simple Transfer - example.rs]
+use alloy::{
+    primitives::{Address, U256},
+    providers::{ProviderBuilder, Provider},
+    rpc::types::TransactionRequest,
+    network::TransactionBuilder,
+};
+use rrelayer::with_relayer;
+use std::str::FromStr;
+use eyre::Result;
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let signer = create_relayer_signer().await?;
+    
+    // Create HTTP provider for reading blockchain state
+    let rpc_url = "https://eth.llamarpc.com".parse()?;
+    let http_provider = ProviderBuilder::new().on_http(rpc_url);
+    
+    // Wrap provider with relayer functionality for transactions
+    let relayer_provider = with_relayer(http_provider, signer.clone());
+    
+    // Build transaction using standard Alloy patterns
+    let to = Address::from_str("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045")?;
+    let value = U256::from(1000000000000000000u64); // 1 ETH
+    
+    // Get current gas price from the network
+    let gas_price = relayer_provider.inner().get_gas_price().await?;
+    
+    // Get nonce for the signer
+    let nonce = relayer_provider.inner()
+        .get_transaction_count(signer.address())
+        .await?;
+    
+    // Build complete transaction request
+    let tx_request = TransactionRequest::default()
+        .with_from(signer.address())
+        .with_to(to)
+        .with_value(value)
+        .with_gas_limit(21000) // Standard ETH transfer
+        .with_gas_price(gas_price)
+        .with_nonce(nonce);
+    
+    println!("📋 Transaction Details:");
+    println!("   From: {}", signer.address());
+    println!("   To: {}", to);
+    println!("   Value: {} ETH", value / U256::from(10u64.pow(18)));
+    println!("   Gas Limit: {:?}", tx_request.gas_limit);
+    println!("   Gas Price: {} gwei", gas_price / U256::from(1_000_000_000u64));
+    println!("   Nonce: {}", nonce);
+    
+    // Send transaction via relayer using standard Alloy TransactionRequest
+    let tx_id = relayer_provider
+        .send_transaction(&tx_request)
+        .await?;
+    
+    println!("✅ Transaction sent via relayer!");
+    println!("   Transaction ID: {}", tx_id);
+    
+    Ok(())
+}
+```
+
+```rust [EIP-1559 Transaction - example.rs]
+use alloy::{
+    primitives::{Address, U256},
+    providers::{ProviderBuilder, Provider},
+    rpc::types::TransactionRequest,
+    network::TransactionBuilder,
+};
+use rrelayer::with_relayer;
+use std::str::FromStr;
+use eyre::Result;
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let signer = create_relayer_signer().await?;
+    
+    // Create HTTP provider
+    let rpc_url = "https://eth.llamarpc.com".parse()?;
+    let http_provider = ProviderBuilder::new().on_http(rpc_url);
+    let relayer_provider = with_relayer(http_provider, signer.clone());
+    
+    let to = Address::from_str("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045")?;
+    let value = U256::from(500000000000000000u64); // 0.5 ETH
+    
+    // Get EIP-1559 fee estimates
+    let fee_history = relayer_provider.inner().get_fee_history(10, "latest".into(), &[25.0]).await?;
+    let base_fee = fee_history.base_fee_per_gas.last().unwrap();
+    let max_priority_fee = U256::from(2_000_000_000u64); // 2 gwei tip
+    let max_fee = base_fee * 2 + max_priority_fee; // 2x base fee + tip
+    
+    // Get nonce
+    let nonce = relayer_provider.inner().get_transaction_count(signer.address()).await?;
+    
+    // Build EIP-1559 transaction
+    let tx_request = TransactionRequest::default()
+        .with_from(signer.address())
+        .with_to(to)
+        .with_value(value)
+        .with_gas_limit(21000)
+        .with_max_fee_per_gas(max_fee)
+        .with_max_priority_fee_per_gas(max_priority_fee)
+        .with_nonce(nonce);
+    
+    println!("📋 EIP-1559 Transaction:");
+    println!("   Base Fee: {} gwei", base_fee / U256::from(1_000_000_000u64));
+    println!("   Max Fee: {} gwei", max_fee / U256::from(1_000_000_000u64));
+    println!("   Priority Fee: {} gwei", max_priority_fee / U256::from(1_000_000_000u64));
+    
+    // Send via relayer using the TransactionRequest
+    let tx_id = relayer_provider
+        .send_transaction(&tx_request)
+        .await?;
+    
+    println!("✅ EIP-1559 transaction sent: {}", tx_id);
+    
+    Ok(())
+}
+```
+
+:::
+
+## Advanced transaction building
+
+For more complex transactions with data and gas estimation:
+
+```rust [Advanced - example.rs]
+use alloy::{
+    primitives::{Address, U256, Bytes},
+    providers::{ProviderBuilder, Provider},
+    rpc::types::TransactionRequest,
+    network::TransactionBuilder,
+};
+use rrelayer::with_relayer;
+use std::str::FromStr;
+use eyre::Result;
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let signer = create_relayer_signer().await?;
+    let rpc_url = "https://eth.llamarpc.com".parse()?;
+    let http_provider = ProviderBuilder::new().on_http(rpc_url);
+    let relayer_provider = with_relayer(http_provider, signer.clone());
+    
+    // Contract interaction with data
+    let contract_address = Address::from_str("0xA0b86a33E6417Efc5a1b1C0e9F6f12C1C9E5e5dA")?;
+    let recipient = Address::from_str("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045")?;
+    let amount = U256::from(1000000000000000000u64);
+    
+    // ERC-20 transfer function selector + encoded params
+    // transfer(address,uint256)
+    let mut data = Vec::new();
+    data.extend_from_slice(&[0xa9, 0x05, 0x9c, 0xbb]); // transfer selector
+    data.extend_from_slice(&recipient.into_word().0); // to address (32 bytes)
+    data.extend_from_slice(&amount.to_be_bytes::<32>()); // amount (32 bytes)
+    let call_data = Bytes::from(data);
+    
+    // Build transaction with data
+    let mut tx_request = TransactionRequest::default()
+        .with_from(signer.address())
+        .with_to(contract_address)
+        .with_value(U256::ZERO) // No ETH for ERC-20 transfer
+        .with_input(call_data.clone());
+    
+    // Estimate gas for this transaction
+    let estimated_gas = relayer_provider.inner()
+        .estimate_gas(&tx_request)
+        .await?;
+    
+    // Add 20% buffer to gas estimate
+    let gas_limit = estimated_gas * U256::from(120) / U256::from(100);
+    
+    // Get current gas price and nonce
+    let gas_price = relayer_provider.inner().get_gas_price().await?;
+    let nonce = relayer_provider.inner().get_transaction_count(signer.address()).await?;
+    
+    // Complete the transaction
+    tx_request = tx_request
+        .with_gas_limit(gas_limit.to::<u64>())
+        .with_gas_price(gas_price)
+        .with_nonce(nonce);
+    
+    println!("📋 Contract Transaction:");
+    println!("   Contract: {}", contract_address);
+    println!("   Data: 0x{}", hex::encode(&call_data));
+    println!("   Gas Estimate: {}", estimated_gas);
+    println!("   Gas Limit: {} (+20% buffer)", gas_limit);
+    
+    // This would be automatically routed through relayer
+    // In practice, you'd convert tx_request to relayer format
+    println!("🔄 Transaction ready to send via relayer!");
+    
+    Ok(())
+}
+```
+
+## Write contract
+
+Use with Alloy's contract bindings for seamless smart contract interactions:
+
+:::info
+Remember the config examples are [above](/integration/sdk/framework-guides/rust/alloy#relayersigner-setup)
+:::
+
+:::code-group
+
+```rust [example.rs]
+use alloy::{
+    primitives::{Address, U256},
+    providers::{ProviderBuilder, Provider},
+    sol,
+};
+use rrelayer::with_relayer;
+use std::str::FromStr;
+use eyre::Result;
+
+// Define contract ABI using Alloy's sol! macro
+sol!(
+    #[allow(missing_docs)]
+    #[sol(rpc)]
+    ERC20,
+    "abi/ERC20.json"
+);
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let signer = create_relayer_signer().await?;
+    let rpc_url = "https://eth.llamarpc.com".parse()?;
+    let provider = ProviderBuilder::new().on_http(rpc_url);
+    
+    // Wrap provider with relayer
+    let relayer_provider = with_relayer(provider, signer.clone());
+    
+    let contract_address = Address::from_str("0xA0b86a33E6417Efc5a1b1C0e9F6f12C1C9E5e5dA")?;
+    let contract = ERC20::new(contract_address, &relayer_provider);
+    
+    let recipient = Address::from_str("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045")?;
+    let amount = U256::from(1000000000000000000u64); // 1 token
+    
+    // Note: Full contract integration requires implementing the Provider trait
+    // For now, you can build the transaction manually and use send_transaction()
+    
+    // Build transaction manually for now
+    let call = contract.transfer(recipient, amount);
+    let tx_request = call.into_transaction_request();
+    
+    // Send via relayer
+    let tx_id = relayer_provider.send_transaction(&tx_request).await?;
+    
+    println!("✅ Contract transaction sent via relayer: {}", tx_id);
+    
+    Ok(())
+}
+```
+
+```rust [abi/ERC20.json]
+[
+  {
+    "inputs": [
+      {"name": "to", "type": "address"},
+      {"name": "amount", "type": "uint256"}
+    ],
+    "name": "transfer",
+    "outputs": [{"name": "", "type": "bool"}],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+]
+```
+
+:::
