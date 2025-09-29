@@ -176,7 +176,7 @@ export default defineConfig({
               collapsed: false,
               items: [
                 {
-                  text: 'Node - TS/JS',
+                  text: 'Node',
                   link: '/integration/sdk/installation/node',
                 },
                 {

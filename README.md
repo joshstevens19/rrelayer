@@ -1,24 +1,25 @@
 # rrelayer
 
-## The last core feature to see how much scope gets added:
-- cron job to hit a contract call with parameters every n minutes
-- send tx on event firing using rindexer
-
 ## TODO List
 
-- Finish documentation - in-progress
-- Internal documentation in the README.MD throughout
-- AI write go and python SDK
-- Publish NPM packages for TS package + Go + Python + Rust
+30th September plan:
+- Finish documentation
+- Do internal documentation throughout the .MD files
+- Get install script working locally
+- Get domain working
+- Get CI builds / releases working
 
-## BUG
-
-- Testing loading up ALL supported gas providers so it works
-- Testing handling custom gas with http call
-- rrelayer auth without being in project
-- look at signers in the networks
+31st September plan:
+- Testing
+    - loading up ALL supported gas providers so it works
+    - Testing handling custom gas with http call
+- Look into authentication to login and then use it outside rrelayer.yaml
+- Publish packages - TS + Rust
+- Release—20:00 UK time
 
 # AFTER
 
-- Create CI to run E2E tests
-- Create CI to build CLI binary (copy from rindexer)
+- Create CI to run E2E tests on push
+- Write go and python SDK (create issues)
+- cron job to hit a contract call with parameters every n minutes
+- send tx on event firing using rindexer
