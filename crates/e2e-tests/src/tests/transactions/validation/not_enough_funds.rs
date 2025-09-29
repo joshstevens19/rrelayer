@@ -21,7 +21,7 @@ impl TestRunner {
         let result = self
             .relayer_client
             .send_transaction(
-                &relayer.id(),
+                relayer.id(),
                 &EvmAddress::zero(),
                 alloy::primitives::utils::parse_ether("1000")?.into(),
                 TransactionData::empty(),

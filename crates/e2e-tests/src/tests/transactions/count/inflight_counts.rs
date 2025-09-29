@@ -51,7 +51,7 @@ impl TestRunner {
                 .await
                 .context(format!("Failed to send transaction {}", i))?;
 
-            transaction_ids.push(send_result.id.clone());
+            transaction_ids.push(send_result.id);
             info!("Sent transaction {}: {}", i, send_result.id);
 
             self.mine_and_wait().await?;

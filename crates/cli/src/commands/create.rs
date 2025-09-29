@@ -15,7 +15,7 @@ pub async fn handle_create(
         return Ok(());
     }
 
-    let chain_id = get_chain_id_for_network(&network, project_path).await?;
+    let chain_id = get_chain_id_for_network(network, project_path).await?;
 
     let result = client.relayer().create(chain_id, name).await?;
 

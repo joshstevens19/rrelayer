@@ -36,6 +36,7 @@ pub enum SafeProxyError {
 
 sol! {
     #[sol(rpc)]
+    #[allow(clippy::too_many_arguments)]
     interface ISafeContract {
         function nonce() external view returns (uint256);
         function getTransactionHash(
@@ -127,7 +128,7 @@ impl SafeProxyManager {
     ) -> Result<(EvmAddress, SafeTransaction), SafeProxyError> {
         let safe_address = self
             .get_safe_proxy_for_relayer(relayer_address, chain_id)
-            .ok_or_else(|| SafeProxyError::SafeProxyNotFound(*relayer_address))?;
+            .ok_or(SafeProxyError::SafeProxyNotFound(*relayer_address))?;
 
         let value = original_value.into_inner();
         let data = original_data.into_inner();

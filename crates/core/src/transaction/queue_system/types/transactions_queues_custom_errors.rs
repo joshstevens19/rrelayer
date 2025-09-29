@@ -197,6 +197,7 @@ pub enum ProcessMinedTransactionError {
 }
 
 #[derive(Error, Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum MovePendingTransactionToInmempoolError {
     #[error("Relayer transaction not found for relayer {0} and tx {1}")]
     TransactionNotFound(RelayerId, TransactionSentWithRelayer),
@@ -206,6 +207,7 @@ pub enum MovePendingTransactionToInmempoolError {
 }
 
 #[derive(Error, Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum MoveInmempoolTransactionToMinedError {
     #[error("Relayer transaction not found for relayer {0} and tx {1}")]
     TransactionNotFound(RelayerId, TransactionId),

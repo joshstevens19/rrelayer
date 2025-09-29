@@ -852,7 +852,7 @@ impl AutomaticTopUpTask {
 
             (*safe_address, U256::ZERO, encoded_data)
         } else {
-            (token_config.address.into(), U256::ZERO, transfer_call.abi_encode().into())
+            (token_config.address, U256::ZERO, transfer_call.abi_encode().into())
         };
 
         let transaction_to_send = TransactionToSend::new(

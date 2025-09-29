@@ -13,6 +13,12 @@ use uuid::Uuid;
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq)]
 pub struct RelayerId(Uuid);
 
+impl Default for RelayerId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RelayerId {
     pub fn new() -> RelayerId {
         RelayerId(Uuid::new_v4())

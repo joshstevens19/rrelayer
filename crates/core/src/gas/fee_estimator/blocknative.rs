@@ -143,7 +143,7 @@ impl BaseGasFeeEstimator for BlockNativeGasFeeEstimator {
             .header("Authorization", &self.config.api_key)
             .send()
             .await
-            .map_err(|e| GasEstimatorError::ReqwestError(e))?;
+            .map_err(GasEstimatorError::ReqwestError)?;
 
         if !response.status().is_success() {
             return Err(GasEstimatorError::CustomError(format!(

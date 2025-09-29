@@ -80,19 +80,19 @@ pub async fn sign_typed_data(
             .await?;
 
         let record_request = RecordSignedTypedDataRequest {
-            relayer_id: relayer_id.into(),
+            relayer_id,
             domain_data: serde_json::to_value(&typed_data.domain).unwrap_or_default(),
             message_data: serde_json::to_value(&typed_data.message).unwrap_or_default(),
             primary_type: typed_data.primary_type.clone(),
             signature: signature.into(),
-            chain_id: relayer_provider_context.provider.chain_id.into(),
+            chain_id: relayer_provider_context.provider.chain_id,
         };
 
         state.db.record_signed_typed_data(&record_request).await?;
 
         if let Some(ref webhook_manager) = state.webhook_manager {
             let webhook_manager = webhook_manager.clone();
-            let relayer_id_clone = relayer_id.clone();
+            let relayer_id_clone = relayer_id;
             let chain_id = relayer_provider_context.provider.chain_id;
             let domain_data = serde_json::to_value(&typed_data.domain).unwrap_or_default();
             let message_data = serde_json::to_value(&typed_data.message).unwrap_or_default();

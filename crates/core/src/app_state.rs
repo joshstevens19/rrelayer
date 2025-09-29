@@ -101,7 +101,7 @@ impl AppState {
     }
 
     pub fn validate_allowed_passed_basic_auth(&self, headers: &HeaderMap) -> Result<(), HttpError> {
-        let api_keys_enabled = self.api_keys.len() > 0;
+        let api_keys_enabled = !self.api_keys.is_empty();
         if !api_keys_enabled && !self.is_basic_auth_valid(headers) {
             return Err(unauthorized(None));
         }
@@ -234,7 +234,7 @@ impl AppState {
         let network_permission = self.find_network_permission(chain_id);
         if let Some(network_permissions) = network_permission {
             for network_permission in network_permissions {
-                if network_permission.relayers.contains(&relayer) {
+                if network_permission.relayers.contains(relayer) {
                     addresses.extend_from_slice(&network_permission.allowlist);
                 }
             }
@@ -251,13 +251,12 @@ impl AppState {
         let network_permission = self.find_network_permission(chain_id);
         if let Some(network_permissions) = network_permission {
             for network_permission in network_permissions {
-                if network_permission.relayers.contains(&relayer) {
-                    if network_permission.disable_personal_sign.unwrap_or_default() {
+                if network_permission.relayers.contains(relayer)
+                    && network_permission.disable_personal_sign.unwrap_or_default() {
                         return Err(unauthorized(Some(
                             "Relayer have disabled personal signing".to_string(),
                         )));
                     }
-                }
             }
         }
 
@@ -275,7 +274,7 @@ impl AppState {
         let network_permissions = self.find_network_permission(chain_id);
         if let Some(network_permissions) = network_permissions {
             for network_permission in network_permissions {
-                if network_permission.relayers.contains(&relayer) {
+                if network_permission.relayers.contains(relayer) {
                     match action {
                         NetworkValidateAction::Transaction => {
                             if network_permission.disable_transactions.unwrap_or_default() {
@@ -293,8 +292,8 @@ impl AppState {
                         }
                     }
 
-                    if network_permission.allowlist.len() > 0
-                        && !network_permission.allowlist.contains(&to)
+                    if !network_permission.allowlist.is_empty()
+                        && !network_permission.allowlist.contains(to)
                     {
                         return Err(unauthorized(Some(
                             format!("relayer is not allowed to send transactions to {}", to)

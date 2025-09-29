@@ -27,7 +27,7 @@ pub async fn handle_balance(
         }
         Some(relayer_result) => match &token {
             Some(token_address) => {
-                let provider_url = relayer_result.provider_urls.get(0).ok_or_else(|| {
+                let provider_url = relayer_result.provider_urls.first().ok_or_else(|| {
                     BalanceError::Provider("No provider URLs found for relayer".to_string())
                 })?;
 
@@ -47,13 +47,12 @@ pub async fn handle_balance(
                     })?;
 
                 let decimals =
-                    token_contract.decimals().call().await.map(|result| result).unwrap_or(18u8);
+                    token_contract.decimals().call().await.unwrap_or(18u8);
 
                 let token_symbol = token_contract
                     .symbol()
                     .call()
                     .await
-                    .map(|result| result)
                     .unwrap_or_else(|_| "TOKEN".to_string());
 
                 let divisor = U256::from(10).pow(U256::from(decimals));
@@ -84,7 +83,7 @@ pub async fn handle_balance(
             }
             None => {
                 let provider =
-                    create_retry_client(relayer_result.provider_urls.get(0).ok_or_else(|| {
+                    create_retry_client(relayer_result.provider_urls.first().ok_or_else(|| {
                         BalanceError::Provider("No provider URLs found for relayer".to_string())
                     })?)
                     .await

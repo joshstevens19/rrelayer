@@ -1,10 +1,10 @@
 use crate::wallet::WalletError;
 use crate::yaml::GcpSecretManagerProviderConfig;
 use google_secretmanager1::{hyper, hyper_rustls, oauth2, SecretManager};
-use std::path::PathBuf;
+use std::path::Path;
 
 pub async fn get_gcp_secret(
-    project_path: &PathBuf,
+    project_path: &Path,
     config: &GcpSecretManagerProviderConfig,
 ) -> Result<String, WalletError> {
     let key_path = project_path.join(&config.service_account_key_path);

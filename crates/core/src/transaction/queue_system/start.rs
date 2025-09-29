@@ -201,7 +201,7 @@ async fn repopulate_transaction_queue(
             .await
             .map_err(|e| {
                 RepopulateTransactionsQueueError::CouldNotGetTransactionsByStatusFromDatabase(
-                    status.clone(),
+                    *status,
                     *relayer_id,
                     e,
                 )

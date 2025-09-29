@@ -507,7 +507,7 @@ async fn handle_fund(
             println!("Sending {} ETH to {}...", amount, target_address);
 
             let tx_request = alloy::rpc::types::TransactionRequest::default()
-                .to((target_address.into_address()).into())
+                .to(target_address.into_address())
                 .value(amount_wei);
 
             let tx_hash = provider
@@ -563,7 +563,7 @@ fn log_transactions(transactions: Vec<Transaction>) -> Result<(), TransactionErr
         println!("│ Status:            {}", tx.status);
         println!("│ From:              {}", tx.from);
         println!("│ To:                {}", tx.to);
-        println!("│ Value:             {}", tx.value.into_inner().to_string());
+        println!("│ Value:             {}", tx.value.into_inner());
         println!("│ Data:              {}", tx.data.hex());
         println!("│ Chain ID:          {}", tx.chain_id);
         println!("│ Speed:             {}", tx.speed);

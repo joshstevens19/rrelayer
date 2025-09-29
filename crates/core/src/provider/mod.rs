@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::Path;
 
 use thiserror::Error;
 
@@ -34,7 +34,7 @@ pub enum LoadProvidersError {
 
 /// Loads and initializes EVM providers for all configured networks.
 pub async fn load_providers(
-    project_path: &PathBuf,
+    project_path: &Path,
     setup_config: &SetupConfig,
 ) -> Result<Vec<EvmProvider>, LoadProvidersError> {
     let mut providers = Vec::new();
@@ -58,7 +58,7 @@ pub async fn load_providers(
 
         let provider = if let Some(privy) = &signing_key.privy {
             EvmProvider::new_with_privy(
-                &config,
+                config,
                 privy.app_id.clone(),
                 privy.app_secret.clone(),
                 get_gas_estimator(&config.provider_urls, setup_config, config).await?,
@@ -66,14 +66,14 @@ pub async fn load_providers(
             .await?
         } else if let Some(aws_kms) = &signing_key.aws_kms {
             EvmProvider::new_with_aws_kms(
-                &config,
+                config,
                 aws_kms.clone(),
                 get_gas_estimator(&config.provider_urls, setup_config, config).await?,
             )
             .await?
         } else if let Some(turnkey) = &signing_key.turnkey {
             EvmProvider::new_with_turnkey(
-                &config,
+                config,
                 turnkey.clone(),
                 get_gas_estimator(&config.provider_urls, setup_config, config).await?,
             )
@@ -82,7 +82,7 @@ pub async fn load_providers(
             let mnemonic = get_mnemonic_from_signing_key(project_path, signing_key).await?;
 
             EvmProvider::new_with_mnemonic(
-                &config,
+                config,
                 &mnemonic,
                 get_gas_estimator(&config.provider_urls, setup_config, config).await?,
             )

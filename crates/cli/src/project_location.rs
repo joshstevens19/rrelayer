@@ -27,7 +27,7 @@ impl ProjectLocation {
 
     pub fn overwrite_setup_config(&self, config: SetupConfig) -> Result<(), ProjectLocationError> {
         let yaml = serde_yaml::to_string(&config)?;
-        fs::write(&self.output_dir.join("rrelayer.yaml"), yaml)?;
+        fs::write(self.output_dir.join("rrelayer.yaml"), yaml)?;
         Ok(())
     }
 

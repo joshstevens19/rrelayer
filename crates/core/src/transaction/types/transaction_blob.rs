@@ -3,10 +3,17 @@ use alloy_eips::eip4844::{Blob, BYTES_PER_BLOB};
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::{convert::TryFrom, str::FromStr};
+use std::fmt::Display;
 use tokio_postgres::types::{FromSql, IsNull, ToSql, Type};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TransactionBlob(Vec<u8>);
+
+impl Display for TransactionBlob {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_hex())
+    }
+}
 
 impl TransactionBlob {
     pub fn new(blob: &Blob) -> Self {
@@ -52,7 +59,7 @@ impl TransactionBlob {
     }
 
     pub fn as_slice(&self) -> &[u8] {
-        &self.0.as_slice()
+        self.0.as_slice()
     }
 }
 
@@ -85,12 +92,6 @@ impl FromStr for TransactionBlob {
 
     fn from_str(s: &str) -> Result<Self> {
         TransactionBlob::from_hex(s)
-    }
-}
-
-impl ToString for TransactionBlob {
-    fn to_string(&self) -> String {
-        self.to_hex()
     }
 }
 

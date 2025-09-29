@@ -101,7 +101,7 @@ struct TenderlyGasEstimateResult {
 }
 
 impl TenderlyGasFeeEstimator {
-    pub fn new(api_key: &String) -> Self {
+    pub fn new(api_key: &str) -> Self {
         let supported_chains = vec![
             TenderlyGasFeeChainConfig {
                 rpc_url: "https://mainnet.gateway.tenderly.co".to_string(),
@@ -409,7 +409,7 @@ impl TenderlyGasFeeEstimator {
             },
         ];
 
-        Self { supported_chains, api_key: api_key.clone() }
+        Self { supported_chains, api_key: api_key.to_string() }
     }
 
     fn build_suggested_gas_price_endpoint(&self, chain_id: &ChainId) -> Result<String, String> {

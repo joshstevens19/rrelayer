@@ -74,13 +74,13 @@ pub async fn handle_config(command: &ConfigCommand, client: &Client) -> Result<(
 }
 
 pub async fn handle_get(relayer_id: &RelayerId, client: &Client) -> Result<(), ConfigError> {
-    let result = client.relayer().get(&relayer_id).await?;
+    let result = client.relayer().get(relayer_id).await?;
     match result {
         Some(result) => {
             let relayer = &result.relayer;
             let provider_urls = &result.provider_urls;
 
-            let created_at = chrono::DateTime::<chrono::Utc>::from(relayer.created_at)
+            let created_at = relayer.created_at
                 .format("%Y-%m-%d %H:%M:%S UTC");
 
             let max_gas = match &relayer.max_gas_price {

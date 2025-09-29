@@ -10,7 +10,7 @@ pub fn update_yaml_for_provider(_original_config: &str, provider: SigningProvide
         anyhow::bail!("Config file not found: {}", config_filename);
     }
 
-    std::fs::copy(&config_path, "rrelayer.yaml")?;
+    std::fs::copy(config_path, "rrelayer.yaml")?;
 
     let safe_owner_address = match provider {
         SigningProvider::Privy => "0xdE3D9699427d15d0a1419736141997E352f10f61",

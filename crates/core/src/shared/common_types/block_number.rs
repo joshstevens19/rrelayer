@@ -31,7 +31,7 @@ impl PartialEq for BlockNumber {
 
 impl<'a> FromSql<'a> for BlockNumber {
     fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
-        i64::from_sql(ty, raw).map(|value| BlockNumber::from(value))
+        i64::from_sql(ty, raw).map(BlockNumber::from)
     }
 
     fn accepts(ty: &Type) -> bool {
@@ -45,7 +45,7 @@ impl ToSql for BlockNumber {
         ty: &Type,
         out: &mut BytesMut,
     ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
-        i64::to_sql(&self.clone().into(), ty, out)
+        i64::to_sql(&(*self).into(), ty, out)
     }
 
     fn accepts(ty: &Type) -> bool {

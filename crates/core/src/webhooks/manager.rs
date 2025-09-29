@@ -398,7 +398,7 @@ impl WebhookManager {
         signature: alloy::primitives::Signature,
     ) {
         let payload =
-            WebhookSigningPayload::text_signed(relayer_id.clone(), chain_id, message, signature);
+            WebhookSigningPayload::text_signed(*relayer_id, chain_id, message, signature);
         self.queue_signing_webhook(relayer_id, chain_id, payload).await;
     }
 
@@ -412,7 +412,7 @@ impl WebhookManager {
         signature: alloy::primitives::Signature,
     ) {
         let payload = WebhookSigningPayload::typed_data_signed(
-            relayer_id.clone(),
+            *relayer_id,
             chain_id,
             domain_data,
             message_data,
@@ -434,7 +434,7 @@ impl WebhookManager {
             .collect()
     }
 
-    /// Queue a low balance webhook
+    #[allow(clippy::too_many_arguments)]
     pub async fn queue_low_balance_webhook(
         &self,
         relayer_id: &str,

@@ -15,7 +15,7 @@ impl NetworkApi {
 
     /// Get a single network by ID
     pub async fn get(&self, chain_id: &ChainId) -> ApiResult<Option<Network>> {
-        let endpoint = format!("networks/{}", chain_id.to_string());
+        let endpoint = format!("networks/{}", chain_id);
         self.client.get(&endpoint).await
     }
 
@@ -34,7 +34,7 @@ impl NetworkApi {
     ///
     /// Returns a Result containing either the gas prices or an error
     pub async fn get_gas_prices(&self, chain_id: u64) -> ApiResult<Option<GasEstimatorResult>> {
-        let endpoint = format!("networks/gas/price/{}", chain_id.to_string());
+        let endpoint = format!("networks/gas/price/{}", chain_id);
         self.client.get(&endpoint).await
     }
 }

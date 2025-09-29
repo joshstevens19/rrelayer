@@ -28,7 +28,7 @@ impl TestRunner {
         let tx_response = self
             .relayer_client
             .send_transaction(
-                &relayer.id(),
+                relayer.id(),
                 &self.config.anvil_accounts[3],
                 transfer_amount.into(),
                 TransactionData::empty(),

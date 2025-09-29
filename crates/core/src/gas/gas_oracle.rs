@@ -12,6 +12,12 @@ pub struct GasOracleCache {
     gas_prices: Mutex<HashMap<ChainId, GasEstimatorResult>>,
 }
 
+impl Default for GasOracleCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GasOracleCache {
     pub fn new() -> Self {
         GasOracleCache { gas_prices: Mutex::new(HashMap::new()) }

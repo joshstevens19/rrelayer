@@ -21,7 +21,7 @@ impl TransactionHash {
     }
 
     pub fn from_alloy_hash(hash: &TxHash) -> Self {
-        Self(hash.clone())
+        Self(*hash)
     }
 
     pub fn into_alloy_hash(self) -> TxHash {

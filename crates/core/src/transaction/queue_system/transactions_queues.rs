@@ -639,20 +639,18 @@ impl TransactionsQueues {
                         Ok(CancelTransactionResult::success(cancel_transaction_id))
                     }
                 }
+            } else if transactions_queue.is_transaction_mined(&transaction.id).await {
+                info!(
+                    "cancel_transaction: transaction {} is already mined, cannot cancel",
+                    transaction.id
+                );
+                Ok(CancelTransactionResult::failed())
             } else {
-                if transactions_queue.is_transaction_mined(&transaction.id).await {
-                    info!(
-                        "cancel_transaction: transaction {} is already mined, cannot cancel",
-                        transaction.id
-                    );
-                    Ok(CancelTransactionResult::failed())
-                } else {
-                    info!(
-                        "cancel_transaction: transaction {} not found in any queue",
-                        transaction.id
-                    );
-                    Ok(CancelTransactionResult::failed())
-                }
+                info!(
+                    "cancel_transaction: transaction {} not found in any queue",
+                    transaction.id
+                );
+                Ok(CancelTransactionResult::failed())
             }
         } else {
             Err(CancelTransactionError::RelayerNotFound(transaction.relayer_id))
@@ -825,7 +823,7 @@ impl TransactionsQueues {
                                 CompetitionType::Replace,
                             )
                             .await
-                            .map_err(|e| ReplaceTransactionError::SendTransactionError(e.into()))?;
+                            .map_err(ReplaceTransactionError::SendTransactionError)?;
 
                         self.db
                             .save_transaction(&transaction.relayer_id, &replace_transaction)

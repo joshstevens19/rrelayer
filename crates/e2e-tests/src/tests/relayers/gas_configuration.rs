@@ -20,7 +20,7 @@ impl TestRunner {
 
         relayer.update_eip1559_status(false).await?;
 
-        let config_after_legacy = self.relayer_client.client.relayer().get(&relayer.id()).await?;
+        let config_after_legacy = self.relayer_client.client.relayer().get(relayer.id()).await?;
         if let Some(config) = config_after_legacy {
             if config.relayer.eip_1559_enabled {
                 return Err(anyhow!("Relayer should not be using EIP1559 but it is enabled"));
@@ -29,7 +29,7 @@ impl TestRunner {
 
         relayer.update_eip1559_status(true).await?;
 
-        let config_after_latest = self.relayer_client.client.relayer().get(&relayer.id()).await?;
+        let config_after_latest = self.relayer_client.client.relayer().get(relayer.id()).await?;
         if let Some(config) = config_after_latest {
             if !config.relayer.eip_1559_enabled {
                 return Err(anyhow!("Relayer should be using EIP1559 but it is not enabled"));
@@ -40,7 +40,7 @@ impl TestRunner {
 
         relayer.update_max_gas_price(1000000).await?;
 
-        let config_after_max = self.relayer_client.client.relayer().get(&relayer.id()).await?;
+        let config_after_max = self.relayer_client.client.relayer().get(relayer.id()).await?;
         if let Some(config) = config_after_max {
             if let Some(max) = config.relayer.max_gas_price {
                 if max != GasPrice::new(1000000) {
@@ -59,7 +59,7 @@ impl TestRunner {
         let tx_result = self
             .relayer_client
             .send_transaction(
-                &relayer.id(),
+                relayer.id(),
                 &self.config.anvil_accounts[1],
                 alloy::primitives::utils::parse_ether("0.5")?.into(),
                 TransactionData::empty(),
@@ -75,7 +75,7 @@ impl TestRunner {
 
         relayer.remove_max_gas_price().await?;
 
-        let config_after_none = self.relayer_client.client.relayer().get(&relayer.id()).await?;
+        let config_after_none = self.relayer_client.client.relayer().get(relayer.id()).await?;
         if let Some(config) = config_after_none {
             if config.relayer.max_gas_price.is_some() {
                 return Err(anyhow!("Relayer should not have a max gas price"));

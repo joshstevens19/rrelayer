@@ -9,6 +9,7 @@ use tokio::{sync::Mutex, time::sleep};
 use crate::{network::Network, relayer::Relayer, transaction::types::Transaction};
 
 #[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
 pub enum CacheValue {
     Networks(Vec<Network>),
     Relayer(Option<Relayer>),

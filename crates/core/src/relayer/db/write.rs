@@ -62,7 +62,7 @@ impl PostgresClient {
                     .map_err(|e| {
                         CreateRelayerError::CouldNotSaveRelayerDb(name.to_string(), *chain_id, e)
                     })?
-                    .ok_or_else(|| CreateRelayerError::RelayerNotFound(clone_relayer_id.clone()))?;
+                    .ok_or_else(|| CreateRelayerError::RelayerNotFound(clone_relayer_id))?;
 
                 self.execute(
                     "
@@ -80,7 +80,7 @@ impl PostgresClient {
                 )
                     .await
                     .map_err(|e| {
-                        println!("{}", e.to_string());
+                        println!("{}", e);
                         CreateRelayerError::CouldNotSaveRelayerDb(name.to_string(), *chain_id, e)
                     })?;
 

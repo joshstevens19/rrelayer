@@ -126,7 +126,7 @@ impl E2ERelayerClient {
         info!("Sending transaction to: {} via relayer: {}", to, relayer_id);
 
         let request = RelayTransactionRequest {
-            to: to.clone(),
+            to: *to,
             value,
             data,
             speed: Some(TransactionSpeed::FAST),
@@ -158,7 +158,7 @@ impl E2ERelayerClient {
         let result = self
             .client
             .transaction()
-            .get_status(&transaction_id)
+            .get_status(transaction_id)
             .await
             .context("Failed to get transaction status")?;
 
@@ -175,7 +175,7 @@ impl E2ERelayerClient {
         let result = self
             .client
             .transaction()
-            .get(&transaction_id)
+            .get(transaction_id)
             .await
             .context("Failed to get transaction status")?;
 

@@ -42,7 +42,7 @@ impl TestRunner {
 
         let tx_response = self
             .relayer_client
-            .send_transaction(&relayer.id(), &contract_address, TransactionValue::zero(), calldata)
+            .send_transaction(relayer.id(), &contract_address, TransactionValue::zero(), calldata)
             .await
             .context("Failed to send contract interaction")?;
 

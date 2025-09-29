@@ -45,7 +45,7 @@ impl Add<i32> for TransactionNonce {
 
 impl<'a> FromSql<'a> for TransactionNonce {
     fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
-        i64::from_sql(ty, raw).map(|value| TransactionNonce::from(value))
+        i64::from_sql(ty, raw).map(TransactionNonce::from)
     }
 
     fn accepts(ty: &Type) -> bool {
@@ -59,7 +59,7 @@ impl ToSql for TransactionNonce {
         ty: &Type,
         out: &mut BytesMut,
     ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
-        i64::to_sql(&self.clone().into(), ty, out)
+        i64::to_sql(&(*self).into(), ty, out)
     }
 
     fn accepts(ty: &Type) -> bool {

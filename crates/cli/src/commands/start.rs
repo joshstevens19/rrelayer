@@ -21,7 +21,7 @@ pub async fn handle_start(project_path: &PathBuf) -> Result<(), ProjectStartupEr
         return Err(ProjectStartupError::DockerComposeNotFound);
     }
 
-    match start_docker_compose(&project_path) {
+    match start_docker_compose(project_path) {
         Ok(_) => {
             rrelayer_info!("Docker postgres containers started up successfully");
         }
@@ -60,7 +60,7 @@ fn check_docker_compose_status(
             if !output.contains("Exit") && output.contains("Up") {
                 rrelayer_info!("All containers are up and running.");
 
-                return if let Ok(_) = env::var("DATABASE_URL") {
+                return if env::var("DATABASE_URL").is_ok() {
                     Ok(())
                 } else {
                     let error = "DATABASE_URL not set.".to_string();

@@ -15,7 +15,7 @@ pub async fn handle_list(
     client: &Client,
 ) -> Result<(), RelayerManagementError> {
     if let Some(network) = network {
-        let chain_id = get_chain_id_for_network(&network, project_path).await?;
+        let chain_id = get_chain_id_for_network(network, project_path).await?;
         log_relayers(client, Some(chain_id), limit, offset).await?;
         return Ok(());
     } else {

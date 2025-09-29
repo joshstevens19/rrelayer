@@ -65,7 +65,7 @@ pub fn format_token_amount(amount: &U256) -> String {
 }
 
 pub async fn get_chain_id(provider_url: &str) -> Result<ChainId, String> {
-    let provider = create_retry_client(&provider_url)
+    let provider = create_retry_client(provider_url)
         .await
         .map_err(|e| format!("RPC provider is not valid as cannot get chain ID: {}", e))?;
     let chain_id = provider

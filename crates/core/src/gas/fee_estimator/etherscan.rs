@@ -225,7 +225,7 @@ impl BaseGasFeeEstimator for EtherscanGasFeeEstimator {
         );
 
         let response =
-            self.client.get(&url).send().await.map_err(|e| GasEstimatorError::ReqwestError(e))?;
+            self.client.get(&url).send().await.map_err(GasEstimatorError::ReqwestError)?;
 
         if !response.status().is_success() {
             return Err(GasEstimatorError::CustomError(format!(

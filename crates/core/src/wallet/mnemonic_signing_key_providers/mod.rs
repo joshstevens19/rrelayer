@@ -1,6 +1,6 @@
 use crate::wallet::WalletError;
 use crate::SigningProvider;
-use std::path::PathBuf;
+use std::path::Path;
 
 mod aws_secret_manager;
 use aws_secret_manager::get_aws_secret;
@@ -8,7 +8,7 @@ mod gcp_secret_manager;
 use gcp_secret_manager::get_gcp_secret;
 
 pub async fn get_mnemonic_from_signing_key(
-    project_path: &PathBuf,
+    project_path: &Path,
     signing_key: &SigningProvider,
 ) -> Result<String, WalletError> {
     if let Some(raw) = &signing_key.raw {

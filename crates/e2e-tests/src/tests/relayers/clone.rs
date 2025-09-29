@@ -22,7 +22,7 @@ impl TestRunner {
             .relayer_client
             .client
             .relayer()
-            .get(&relayer.id())
+            .get(relayer.id())
             .await?
             .context("Relayer should exist")?;
 
@@ -86,7 +86,7 @@ impl TestRunner {
             cloned_relayer_transactions.items.len()
         );
 
-        if first_relayer_transactions.items.len() != 0 {
+        if !first_relayer_transactions.items.is_empty() {
             return Err(anyhow!(
                 "First relayer expected at 0 transactions, but got {}",
                 first_relayer_transactions.items.len()

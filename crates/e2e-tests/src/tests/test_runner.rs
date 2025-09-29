@@ -190,16 +190,23 @@ impl TestRunner {
         target_index: usize,
     ) -> anyhow::Result<AdminRelayerClient> {
         {
-            let relayers = self.created_relayers.lock().unwrap();
-            if target_index < relayers.len() {
-                info!("Returning existing relayer at index {}", target_index);
-                let relayer = relayers[target_index].clone();
+            let relayer_clone = {
+                let relayers = self.created_relayers.lock().unwrap();
+                if target_index < relayers.len() {
+                    info!("Returning existing relayer at index {}", target_index);
+                    Some((relayers[target_index].clone(), relayers[target_index].id))
+                } else {
+                    None
+                }
+            };
+            
+            if let Some((relayer, relayer_id)) = relayer_clone {
                 self.fund_relayer(&relayer.address, alloy::primitives::utils::parse_ether("10")?)
                     .await?;
                 let relayer_client = self
                     .relayer_client
                     .client
-                    .get_relayer_client(&relayers[target_index].id, None)
+                    .get_relayer_client(&relayer_id, None)
                     .await?;
                 return Ok(relayer_client);
             }
@@ -244,12 +251,20 @@ impl TestRunner {
             }
         }
 
-        let relayers = self.created_relayers.lock().unwrap();
-        if target_index < relayers.len() {
+        let relayer_id = {
+            let relayers = self.created_relayers.lock().unwrap();
+            if target_index < relayers.len() {
+                Some(relayers[target_index].id)
+            } else {
+                None
+            }
+        };
+        
+        if let Some(id) = relayer_id {
             let relayer_client = self
                 .relayer_client
                 .client
-                .get_relayer_client(&relayers[target_index].id, None)
+                .get_relayer_client(&id, None)
                 .await?;
             Ok(relayer_client)
         } else {
@@ -310,7 +325,7 @@ impl TestRunner {
                     info!("Transaction {} completed successfully", transaction_id);
                     let transaction = self
                         .relayer_client
-                        .get_transaction(&transaction_id)
+                        .get_transaction(transaction_id)
                         .await
                         .context("Could not get the transaction")?;
 

@@ -110,7 +110,7 @@ async fn main() -> Result<(), CliError> {
             auth::handle_auth_command(command).await?;
         }
         Commands::Start { path } => {
-            let resolved_path = resolve_path(&path).inspect_err(|e| print_error_message(e))?;
+            let resolved_path = resolve_path(path).inspect_err(|e| print_error_message(e))?;
             load_env_from_project_path(&resolved_path);
 
             start::handle_start(&resolved_path).await?;

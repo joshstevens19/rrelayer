@@ -123,9 +123,7 @@ impl WalletManagerTrait for PrivyWalletManager {
 
         {
             let mut wallets = self.wallets.lock().await;
-            if !wallets.contains_key(&wallet_index) {
-                wallets.insert(wallet_index, new_wallet);
-            }
+            wallets.entry(wallet_index).or_insert(new_wallet);
         }
 
         Ok(address)
@@ -218,7 +216,7 @@ impl WalletManagerTrait for PrivyWalletManager {
 
         let response = self
             .client
-            .post(&format!("https://api.privy.io/v1/wallets/{}/rpc", wallet.id))
+            .post(format!("https://api.privy.io/v1/wallets/{}/rpc", wallet.id))
             .basic_auth(&self.app_id, Some(&self.app_secret))
             .header("privy-app-id", &self.app_id)
             .header("Content-Type", "application/json")
@@ -255,9 +253,9 @@ impl WalletManagerTrait for PrivyWalletManager {
         let tx_envelope = TxEnvelope::decode(&mut tx_bytes.as_slice())?;
 
         let signature = match tx_envelope {
-            TxEnvelope::Eip1559(signed_tx) => signed_tx.signature().clone(),
-            TxEnvelope::Legacy(signed_tx) => signed_tx.signature().clone(),
-            TxEnvelope::Eip2930(signed_tx) => signed_tx.signature().clone(),
+            TxEnvelope::Eip1559(signed_tx) => *signed_tx.signature(),
+            TxEnvelope::Legacy(signed_tx) => *signed_tx.signature(),
+            TxEnvelope::Eip2930(signed_tx) => *signed_tx.signature(),
             _ => {
                 return Err(WalletError::UnsupportedTransactionType {
                     tx_type: "Unknown transaction envelope type".to_string(),
@@ -276,7 +274,7 @@ impl WalletManagerTrait for PrivyWalletManager {
 
         let response = self
             .client
-            .post(&format!("https://api.privy.io/v1/wallets/{}/rpc", wallet.id))
+            .post(format!("https://api.privy.io/v1/wallets/{}/rpc", wallet.id))
             .basic_auth(&self.app_id, Some(&self.app_secret))
             .header("privy-app-id", &self.app_id)
             .header("Content-Type", "application/json")
@@ -332,7 +330,7 @@ impl WalletManagerTrait for PrivyWalletManager {
 
         let response = self
             .client
-            .post(&format!("https://api.privy.io/v1/wallets/{}/rpc", wallet.id))
+            .post(format!("https://api.privy.io/v1/wallets/{}/rpc", wallet.id))
             .basic_auth(&self.app_id, Some(&self.app_secret))
             .header("privy-app-id", &self.app_id)
             .header("Content-Type", "application/json")

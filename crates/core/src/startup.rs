@@ -1,5 +1,5 @@
-use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Instant};
-
+use std::{net::SocketAddr, sync::Arc, time::Instant};
+use std::path::Path;
 use crate::app_state::RelayersInternalOnly;
 use crate::authentication::{create_basic_auth_routes, inject_basic_auth_status};
 use crate::background_tasks::run_background_tasks;
@@ -149,6 +149,7 @@ async fn activity_logger(req: Request<Body>, next: Next) -> Result<Response, Sta
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn start_api(
     api_config: ApiConfig,
     rate_limit_config: Option<RateLimitConfig>,
@@ -186,7 +187,7 @@ async fn start_api(
 
     let cors = CorsLayer::new()
         .allow_origin(
-            if api_config.allowed_origins.as_ref().map_or(true, |origins| origins.is_empty()) {
+            if api_config.allowed_origins.as_ref().is_none_or(|origins| origins.is_empty()) {
                 AllowOrigin::any()
             } else {
                 AllowOrigin::list(
@@ -265,7 +266,7 @@ pub enum StartError {
     NoNetworksDefinedInYaml,
 }
 
-pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
+pub async fn start(project_path: &Path) -> Result<(), StartError> {
     setup_info_logger();
     dotenv().ok();
 
@@ -279,7 +280,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
 
     let config = read(&yaml_path, false)?;
 
-    if config.networks.len() == 0 {
+    if config.networks.is_empty() {
         return Err(StartError::NoNetworksDefinedInYaml);
     }
 
@@ -290,7 +291,7 @@ pub async fn start(project_path: &PathBuf) -> Result<(), StartError> {
 
     let cache = Arc::new(Cache::new().await);
 
-    let providers = Arc::new(load_providers(&project_path, &config).await?);
+    let providers = Arc::new(load_providers(project_path, &config).await?);
 
     let gas_oracle_cache = Arc::new(Mutex::new(GasOracleCache::new()));
     let blob_gas_oracle_cache = Arc::new(Mutex::new(BlobGasOracleCache::new()));

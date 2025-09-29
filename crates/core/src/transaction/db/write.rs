@@ -281,8 +281,8 @@ impl PostgresClient {
         let trans = conn.transaction().await.map_err(PostgresError::PgError)?;
 
         let gas_used = GasLimit::from(transaction_receipt.gas_used);
-        let block_hash = transaction_receipt.block_hash.map(|h| BlockHash::new(h));
-        let block_number = transaction_receipt.block_number.map(|n| BlockNumber::new(n));
+        let block_hash = transaction_receipt.block_hash.map(BlockHash::new);
+        let block_number = transaction_receipt.block_number.map(BlockNumber::new);
 
         trans
             .execute(

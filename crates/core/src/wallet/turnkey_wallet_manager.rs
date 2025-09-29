@@ -8,7 +8,6 @@ use alloy::primitives::{keccak256, Signature};
 use alloy_rlp::Decodable;
 use async_trait::async_trait;
 use base64::{engine::general_purpose, Engine as _};
-use hex;
 use p256::{
     ecdsa::{signature::Signer, Signature as EcdsaSignature, SigningKey},
     SecretKey,
@@ -283,7 +282,7 @@ impl TurnkeyWalletManager {
 
     fn extract_wallet_index_from_path(&self, path: &str) -> Option<u32> {
         // Extract index from path like "m/44'/60'/0'/0/{index}"
-        if let Some(last_part) = path.split('/').last() {
+        if let Some(last_part) = path.split('/').next_back() {
             last_part.parse::<u32>().ok()
         } else {
             None
@@ -304,9 +303,9 @@ impl WalletManagerTrait for TurnkeyWalletManager {
         {
             let accounts = self.accounts.lock().await;
             if let Some(account) = accounts.get(&wallet_index) {
-                return Ok(EvmAddress::from_str(&account.address).map_err(|e| {
+                return EvmAddress::from_str(&account.address).map_err(|e| {
                     WalletError::ApiError { message: format!("Invalid address format: {}", e) }
-                })?);
+                });
             }
         }
 
@@ -405,9 +404,7 @@ impl WalletManagerTrait for TurnkeyWalletManager {
 
         {
             let mut accounts = self.accounts.lock().await;
-            if !accounts.contains_key(&wallet_index) {
-                accounts.insert(wallet_index, new_account);
-            }
+            accounts.entry(wallet_index).or_insert(new_account);
         }
 
         Ok(address)
@@ -621,21 +618,21 @@ impl WalletManagerTrait for TurnkeyWalletManager {
         let signature = match tx_envelope {
             TxEnvelope::Eip1559(signed_tx) => {
                 info!("Turnkey sign_transaction: extracted signature from EIP1559 transaction");
-                signed_tx.signature().clone()
+                *signed_tx.signature()
             }
             TxEnvelope::Legacy(signed_tx) => {
                 info!("Turnkey sign_transaction: extracted signature from Legacy transaction");
-                signed_tx.signature().clone()
+                *signed_tx.signature()
             }
             TxEnvelope::Eip2930(signed_tx) => {
                 info!("Turnkey sign_transaction: extracted signature from EIP2930 transaction");
-                signed_tx.signature().clone()
+                *signed_tx.signature()
             }
             TxEnvelope::Eip4844(signed_tx) => {
                 info!(
                     "Turnkey sign_transaction: extracted signature from EIP4844 blob transaction"
                 );
-                signed_tx.signature().clone()
+                *signed_tx.signature()
             }
             _ => {
                 error!("Turnkey sign_transaction: unsupported transaction envelope type");

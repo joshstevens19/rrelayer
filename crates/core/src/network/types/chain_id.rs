@@ -58,7 +58,7 @@ impl PartialEq for ChainId {
 
 impl<'a> FromSql<'a> for ChainId {
     fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
-        i64::from_sql(ty, raw).map(|value| ChainId::from(value))
+        i64::from_sql(ty, raw).map(ChainId::from)
     }
 
     fn accepts(ty: &Type) -> bool {
@@ -72,7 +72,7 @@ impl ToSql for ChainId {
         ty: &Type,
         out: &mut BytesMut,
     ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
-        i64::to_sql(&self.clone().into(), ty, out)
+        i64::to_sql(&(*self).into(), ty, out)
     }
 
     fn accepts(ty: &Type) -> bool {

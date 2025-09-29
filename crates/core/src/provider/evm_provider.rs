@@ -124,6 +124,7 @@ pub async fn create_retry_client(rpc_url: &str) -> Result<Arc<RelayerProvider>, 
 }
 
 #[derive(Error, Debug)]
+#[allow(clippy::enum_variant_names)]
 pub enum SendTransactionError {
     #[error("Wallet error: {0}")]
     WalletError(#[from] LocalSignerError),
@@ -321,7 +322,7 @@ impl EvmProvider {
     pub async fn sign_text(
         &self,
         wallet_index: &u32,
-        text: &String,
+        text: &str,
     ) -> Result<Signature, WalletError> {
         self.wallet_manager.sign_text(*wallet_index, text).await
     }

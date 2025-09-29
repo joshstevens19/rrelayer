@@ -21,7 +21,7 @@ impl TestRunner {
             .relayer_client
             .client
             .relayer()
-            .get(&created_relayer.id())
+            .get(created_relayer.id())
             .await?
             .context("Failed to fetch relayer")?
             .relayer;

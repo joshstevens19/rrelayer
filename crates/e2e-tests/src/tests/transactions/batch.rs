@@ -30,7 +30,7 @@ impl TestRunner {
             let tx_response = self
                 .relayer_client
                 .send_transaction(
-                    &relayer.id(),
+                    relayer.id(),
                     &self.config.anvil_accounts[4],
                     alloy::primitives::utils::parse_ether("0.01")?.into(),
                     TransactionData::empty(),

@@ -393,7 +393,7 @@ impl AnvilManager {
 impl Drop for AnvilManager {
     fn drop(&mut self) {
         if let Some(mut child) = self.process.take() {
-            let _ = child.kill();
+            let _ = child.try_wait();
         }
     }
 }

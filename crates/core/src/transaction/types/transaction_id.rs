@@ -31,6 +31,12 @@ impl Display for TransactionId {
     }
 }
 
+impl Default for TransactionId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TransactionId {
     /// Creates a new random transaction ID.
     ///

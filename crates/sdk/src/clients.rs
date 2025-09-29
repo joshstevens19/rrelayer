@@ -155,11 +155,11 @@ impl<'a> ClientRelayerApi<'a> {
     }
 
     pub async fn delete(&self, id: &RelayerId) -> ApiResult<()> {
-        self.relayer_api.delete(&id).await
+        self.relayer_api.delete(id).await
     }
 
     pub async fn get(&self, id: &RelayerId) -> ApiResult<Option<GetRelayerResult>> {
-        self.relayer_api.get(&id).await
+        self.relayer_api.get(id).await
     }
 
     pub async fn get_all(
@@ -196,14 +196,14 @@ pub struct ClientTransactionApi<'a> {
 
 impl<'a> ClientTransactionApi<'a> {
     pub async fn get(&self, transaction_id: &TransactionId) -> ApiResult<Option<Transaction>> {
-        self.transaction_api.get(&transaction_id).await
+        self.transaction_api.get(transaction_id).await
     }
 
     pub async fn get_status(
         &self,
         transaction_id: &TransactionId,
     ) -> ApiResult<Option<RelayTransactionStatusResult>> {
-        self.transaction_api.get_status(&transaction_id).await
+        self.transaction_api.get_status(transaction_id).await
     }
 }
 
@@ -217,7 +217,7 @@ impl<'a> ClientAllowlistApi<'a> {
         relayer_id: &RelayerId,
         paging_context: &PagingContext,
     ) -> ApiResult<PagingResult<EvmAddress>> {
-        self.relayer_api.allowlist.get_all(&relayer_id, paging_context).await
+        self.relayer_api.allowlist.get_all(relayer_id, paging_context).await
     }
 }
 
@@ -245,7 +245,7 @@ impl AdminRelayerClient {
     pub fn new(config: AdminRelayerClientConfig) -> Self {
         let relayer_client_config = RelayerClientConfig {
             server_url: config.server_url.clone(),
-            relayer_id: config.relayer_id.clone(),
+            relayer_id: config.relayer_id,
             auth: match &config.auth {
                 AdminRelayerClientAuth::BasicAuth { username, password } => {
                     RelayerClientAuth::BasicAuth {
@@ -340,14 +340,14 @@ pub struct AdminRelayerClientTransactionApi<'a> {
 
 impl<'a> AdminRelayerClientTransactionApi<'a> {
     pub async fn get(&self, transaction_id: &TransactionId) -> ApiResult<Option<Transaction>> {
-        self.transaction_api.get(&transaction_id).await
+        self.transaction_api.get(transaction_id).await
     }
 
     pub async fn get_status(
         &self,
         transaction_id: &TransactionId,
     ) -> ApiResult<Option<RelayTransactionStatusResult>> {
-        self.transaction_api.get_status(&transaction_id).await
+        self.transaction_api.get_status(transaction_id).await
     }
 
     pub async fn get_all(
@@ -363,7 +363,7 @@ impl<'a> AdminRelayerClientTransactionApi<'a> {
         replacement_transaction: &RelayTransactionRequest,
         rate_limit_key: Option<String>,
     ) -> ApiResult<rrelayer_core::transaction::queue_system::ReplaceTransactionResult> {
-        self.transaction_api.replace(&transaction_id, replacement_transaction, rate_limit_key).await
+        self.transaction_api.replace(transaction_id, replacement_transaction, rate_limit_key).await
     }
 
     pub async fn cancel(
@@ -371,7 +371,7 @@ impl<'a> AdminRelayerClientTransactionApi<'a> {
         transaction_id: &TransactionId,
         rate_limit_key: Option<String>,
     ) -> ApiResult<CancelTransactionResponse> {
-        self.transaction_api.cancel(&transaction_id, rate_limit_key).await
+        self.transaction_api.cancel(transaction_id, rate_limit_key).await
     }
 
     pub async fn send(
@@ -387,7 +387,7 @@ impl<'a> AdminRelayerClientTransactionApi<'a> {
         transaction_id: &TransactionId,
     ) -> ApiResult<RelayTransactionStatusResult> {
         loop {
-            let result = self.transaction_api.get_status(&transaction_id).await?;
+            let result = self.transaction_api.get_status(transaction_id).await?;
             if let Some(status_result) = result {
                 match status_result.status {
                     TransactionStatus::PENDING | TransactionStatus::INMEMPOOL => {
@@ -579,14 +579,14 @@ pub struct RelayerClientTransactionApi<'a> {
 
 impl<'a> RelayerClientTransactionApi<'a> {
     pub async fn get(&self, transaction_id: &TransactionId) -> ApiResult<Option<Transaction>> {
-        self.transaction_api.get(&transaction_id).await
+        self.transaction_api.get(transaction_id).await
     }
 
     pub async fn get_status(
         &self,
         transaction_id: &TransactionId,
     ) -> ApiResult<Option<RelayTransactionStatusResult>> {
-        self.transaction_api.get_status(&transaction_id).await
+        self.transaction_api.get_status(transaction_id).await
     }
 
     pub async fn get_all(
@@ -626,7 +626,7 @@ impl<'a> RelayerClientTransactionApi<'a> {
         transaction_id: &TransactionId,
     ) -> ApiResult<RelayTransactionStatusResult> {
         loop {
-            let result = self.transaction_api.get_status(&transaction_id).await?;
+            let result = self.transaction_api.get_status(transaction_id).await?;
             if let Some(status_result) = result {
                 use rrelayer_core::transaction::types::TransactionStatus;
                 match status_result.status {

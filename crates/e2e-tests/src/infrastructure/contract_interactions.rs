@@ -69,7 +69,7 @@ impl ContractInteractor {
         let provider_url_str = "http://localhost:8545";
         let deploy_provider = ProviderBuilder::new()
             .wallet(wallet)
-            .connect(&provider_url_str)
+            .connect(provider_url_str)
             .await
             .context("Failed to connect to provider")?;
 
@@ -431,7 +431,7 @@ impl ContractInteractor {
         let provider_url_str = "http://localhost:8545"; // Use default URL
         let transfer_provider = ProviderBuilder::new()
             .wallet(wallet)
-            .connect(&provider_url_str)
+            .connect(provider_url_str)
             .await
             .context("Failed to connect to provider")?;
 

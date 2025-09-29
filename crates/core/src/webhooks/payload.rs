@@ -94,28 +94,27 @@ pub struct WebhookTransactionData {
 impl From<&Transaction> for WebhookTransactionData {
     fn from(transaction: &Transaction) -> Self {
         Self {
-            id: transaction.id.clone(),
-            relayer_id: transaction.relayer_id.clone(),
+            id: transaction.id,
+            relayer_id: transaction.relayer_id,
             to: transaction.to,
             from: transaction.from,
-            value: transaction.value.clone(),
+            value: transaction.value,
             data: transaction.data.clone(),
             chain_id: transaction.chain_id,
             status: transaction.status,
-            transaction_hash: transaction.known_transaction_hash.clone(),
-            queued_at: transaction.queued_at.into(),
-            sent_at: transaction.sent_at.map(|dt| dt.into()),
-            confirmed_at: transaction.confirmed_at.map(|dt| dt.into()),
-            expires_at: transaction.expires_at.into(),
+            transaction_hash: transaction.known_transaction_hash,
+            queued_at: transaction.queued_at,
+            sent_at: transaction.sent_at,
+            confirmed_at: transaction.confirmed_at,
+            expires_at: transaction.expires_at,
             external_id: transaction.external_id.clone(),
             blobs: transaction.blobs.clone(),
-            nonce: transaction.nonce.clone(),
-            mined_at: transaction.mined_at.map(|dt| dt.into()),
+            nonce: transaction.nonce,
+            mined_at: transaction.mined_at,
             mined_at_block_number: transaction.mined_at_block_number,
             sent_with_max_priority_fee_per_gas: transaction
-                .sent_with_max_priority_fee_per_gas
-                .clone(),
-            sent_with_max_fee_per_gas: transaction.sent_with_max_fee_per_gas.clone(),
+                .sent_with_max_priority_fee_per_gas,
+            sent_with_max_fee_per_gas: transaction.sent_with_max_fee_per_gas,
             is_noop: transaction.is_noop,
         }
     }

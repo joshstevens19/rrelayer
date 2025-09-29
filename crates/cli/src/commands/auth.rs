@@ -119,7 +119,7 @@ async fn status() -> () {
     println!("\n💡 Note: Environment variables take precedence over stored credentials.");
     println!("   Use 'rrelayer auth login' to store credentials securely.");
 
-    ()
+    
 }
 
 async fn login(profile_name: &str) -> Result<(), CliError> {

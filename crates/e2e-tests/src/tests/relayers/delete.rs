@@ -21,7 +21,7 @@ impl TestRunner {
             .relayer_client
             .client
             .relayer()
-            .get(&relayer.id())
+            .get(relayer.id())
             .await?
             .context("Relayer should exist")?;
 
@@ -29,9 +29,9 @@ impl TestRunner {
             return Err(anyhow!("Relayer should exist"));
         }
 
-        self.relayer_client.client.relayer().delete(&relayer.id()).await?;
+        self.relayer_client.client.relayer().delete(relayer.id()).await?;
 
-        let created_relayer = self.relayer_client.client.relayer().get(&relayer.id()).await?;
+        let created_relayer = self.relayer_client.client.relayer().get(relayer.id()).await?;
 
         if created_relayer.is_some() {
             return Err(anyhow!("Relayer has not have been deleted"));

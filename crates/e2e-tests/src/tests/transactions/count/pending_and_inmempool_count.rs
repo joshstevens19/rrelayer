@@ -45,7 +45,7 @@ impl TestRunner {
             let tx_response = self
                 .relayer_client
                 .send_transaction(
-                    &relayer.id(),
+                    relayer.id(),
                     &self.config.anvil_accounts[4],
                     alloy::primitives::utils::parse_ether("0.01")?.into(),
                     TransactionData::empty(),
@@ -97,7 +97,7 @@ impl TestRunner {
                 .await
                 .context("Failed to get inmempool count")?;
 
-            attempts = attempts + 1;
+            attempts += 1;
 
             if inmempool_count != 0 {
                 if attempts > 10 {

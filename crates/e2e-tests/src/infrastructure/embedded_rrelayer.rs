@@ -6,6 +6,7 @@ use std::{
     thread,
     time::Duration,
 };
+use std::path::Path;
 use tokio::time::sleep;
 use tracing::{error, info, warn};
 
@@ -106,7 +107,7 @@ impl EmbeddedRRelayerServer {
         Err(anyhow::anyhow!("RRelayer server did not become ready after 60 seconds"))
     }
 
-    async fn run_server(project_path: &PathBuf) -> Result<(), StartError> {
+    async fn run_server(project_path: &Path) -> Result<(), StartError> {
         info!("Starting up the embedded RRelayer server");
         start(project_path).await
     }

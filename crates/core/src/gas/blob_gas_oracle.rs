@@ -31,6 +31,12 @@ pub struct BlobGasOracleCache {
     blob_gas_prices: Mutex<HashMap<ChainId, BlobGasEstimatorResult>>,
 }
 
+impl Default for BlobGasOracleCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BlobGasOracleCache {
     pub fn new() -> Self {
         BlobGasOracleCache { blob_gas_prices: Mutex::new(HashMap::new()) }

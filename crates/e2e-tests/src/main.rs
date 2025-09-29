@@ -47,7 +47,7 @@ impl SigningProvider {
         ]
     }
 
-    pub fn from_str(s: &str) -> Option<SigningProvider> {
+    pub fn parse_provider(s: &str) -> Option<SigningProvider> {
         match s {
             "raw" => Some(SigningProvider::Raw),
             "aws_secret_manager" => Some(SigningProvider::AwsSecretManager),
@@ -168,7 +168,7 @@ async fn run_multi_provider_tests(
     info!("Multi-Provider E2E Test Mode Activated!");
 
     let providers = if let Some(provider_list) = specific_providers {
-        provider_list.split(',').filter_map(|p| SigningProvider::from_str(p.trim())).collect()
+        provider_list.split(',').filter_map(|p| SigningProvider::parse_provider(p.trim())).collect()
     } else {
         SigningProvider::all_providers()
     };
@@ -233,7 +233,7 @@ async fn run_multi_provider_tests(
                 failed_providers.push(provider.as_str().to_string());
                 total_failed += 1;
 
-                save_provider_results(*provider, 0, 1, &vec![format!("Runtime error: {}", e)]);
+                save_provider_results(*provider, 0, 1, &[format!("Runtime error: {}", e)]);
             }
         }
 

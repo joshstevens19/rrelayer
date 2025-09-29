@@ -20,7 +20,7 @@ impl TestRunner {
         let valid_data_result = self
             .relayer_client
             .send_transaction(
-                &relayer.id(),
+                relayer.id(),
                 &self.config.anvil_accounts[1],
                 alloy::primitives::utils::parse_ether("0.5")?.into(),
                 TransactionData::from_str("0x1234abcd").unwrap(),
@@ -37,7 +37,7 @@ impl TestRunner {
         let empty_data_result = self
             .relayer_client
             .send_transaction(
-                &relayer.id(),
+                relayer.id(),
                 &self.config.anvil_accounts[1],
                 alloy::primitives::utils::parse_ether("0.5")?.into(),
                 TransactionData::empty(),

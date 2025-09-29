@@ -141,13 +141,13 @@ impl TestRunner {
             if !has_transaction && !has_signing {
                 return Err(anyhow!("Webhook payload missing nested transaction or signing data"));
             }
-            if !webhook.payload.get("event_type").is_some() {
+            if webhook.payload.get("event_type").is_none() {
                 return Err(anyhow!("Webhook payload missing event_type at root"));
             }
-            if !webhook.payload.get("timestamp").is_some() {
+            if webhook.payload.get("timestamp").is_none() {
                 return Err(anyhow!("Webhook payload missing timestamp at root"));
             }
-            if !webhook.payload.get("delivery_id").is_some() {
+            if webhook.payload.get("delivery_id").is_none() {
                 return Err(anyhow!("Webhook payload missing delivery_id at root"));
             }
 
@@ -360,18 +360,18 @@ impl TestRunner {
         // Validate text signing webhook payload
         let text_webhook = &text_signing_webhooks[0];
         let nested_payload = text_webhook.payload.get("payload");
-        if !nested_payload.and_then(|p| p.get("signing")).is_some() {
+        if nested_payload.and_then(|p| p.get("signing")).is_none() {
             return Err(anyhow!("Text signing webhook missing 'signing' data in nested payload"));
         }
 
         let signing_data = nested_payload.unwrap().get("signing").unwrap();
-        if !signing_data.get("message").is_some() {
+        if signing_data.get("message").is_none() {
             return Err(anyhow!("Text signing webhook missing 'message' field"));
         }
-        if !signing_data.get("signature").is_some() {
+        if signing_data.get("signature").is_none() {
             return Err(anyhow!("Text signing webhook missing 'signature' field"));
         }
-        if !signing_data.get("relayerId").is_some() {
+        if signing_data.get("relayerId").is_none() {
             return Err(anyhow!("Text signing webhook missing 'relayerId' field"));
         }
 
@@ -436,23 +436,23 @@ impl TestRunner {
 
         let typed_data_webhook = &typed_data_signing_webhooks[0];
         let typed_nested_payload = typed_data_webhook.payload.get("payload");
-        if !typed_nested_payload.and_then(|p| p.get("signing")).is_some() {
+        if typed_nested_payload.and_then(|p| p.get("signing")).is_none() {
             return Err(anyhow!(
                 "Typed data signing webhook missing 'signing' data in nested payload"
             ));
         }
 
         let typed_signing_data = typed_nested_payload.unwrap().get("signing").unwrap();
-        if !typed_signing_data.get("domainData").is_some() {
+        if typed_signing_data.get("domainData").is_none() {
             return Err(anyhow!("Typed data signing webhook missing 'domainData' field"));
         }
-        if !typed_signing_data.get("messageData").is_some() {
+        if typed_signing_data.get("messageData").is_none() {
             return Err(anyhow!("Typed data signing webhook missing 'messageData' field"));
         }
-        if !typed_signing_data.get("primaryType").is_some() {
+        if typed_signing_data.get("primaryType").is_none() {
             return Err(anyhow!("Typed data signing webhook missing 'primaryType' field"));
         }
-        if !typed_signing_data.get("signature").is_some() {
+        if typed_signing_data.get("signature").is_none() {
             return Err(anyhow!("Typed data signing webhook missing 'signature' field"));
         }
 
@@ -472,13 +472,13 @@ impl TestRunner {
                 return Err(anyhow!("Signing webhook missing shared secret header"));
             }
 
-            if !signing_webhook.payload.get("event_type").is_some() {
+            if signing_webhook.payload.get("event_type").is_none() {
                 return Err(anyhow!("Signing webhook payload missing event_type"));
             }
-            if !signing_webhook.payload.get("timestamp").is_some() {
+            if signing_webhook.payload.get("timestamp").is_none() {
                 return Err(anyhow!("Signing webhook payload missing timestamp"));
             }
-            if !signing_webhook.payload.get("payload").and_then(|p| p.get("api_version")).is_some()
+            if signing_webhook.payload.get("payload").and_then(|p| p.get("api_version")).is_none()
             {
                 return Err(anyhow!(
                     "Signing webhook payload missing api_version in nested payload"

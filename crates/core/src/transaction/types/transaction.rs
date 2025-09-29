@@ -170,11 +170,11 @@ impl Transaction {
 
         Ok(TypedTransaction::Eip1559(TxEip1559 {
             to: TxKind::Call(self.to.into()),
-            value: self.value.clone().into(),
+            value: self.value.into(),
             input: self.data.clone().into(),
             gas_limit: gas_limit.into(),
             nonce: self.nonce.into(),
-            max_priority_fee_per_gas: gas_price_result.max_priority_fee.clone().into(),
+            max_priority_fee_per_gas: gas_price_result.max_priority_fee.into(),
             max_fee_per_gas: gas_price_result.max_fee.into(),
             chain_id: self.chain_id.into(),
             access_list: AccessList::default(),
@@ -209,7 +209,7 @@ impl Transaction {
 
         Ok(TypedTransaction::Legacy(TxLegacy {
             to: TxKind::Call(self.to.into()),
-            value: self.value.clone().into(),
+            value: self.value.into(),
             input: self.data.clone().into(),
             gas_limit: gas_limit.into(),
             nonce: self.nonce.into(),
@@ -272,10 +272,10 @@ impl Transaction {
             max_fee_per_gas: gas_price_result.max_fee.into(),
             gas_limit: gas_limit.into(),
             to: self.to.into(),
-            value: self.value.clone().into(),
+            value: self.value.into(),
             access_list: Default::default(),
             blob_versioned_hashes,
-            max_fee_per_blob_gas: blob_gas_price.into(),
+            max_fee_per_blob_gas: blob_gas_price,
             input: self.data.clone().into(),
         };
 

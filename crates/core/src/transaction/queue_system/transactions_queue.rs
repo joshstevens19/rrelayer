@@ -382,7 +382,7 @@ impl TransactionsQueue {
                 transaction.sent_with_max_fee_per_gas =
                     replacement_transaction.sent_with_max_fee_per_gas;
                 transaction.sent_with_max_priority_fee_per_gas =
-                    transaction.sent_with_max_priority_fee_per_gas;
+                    replacement_transaction.sent_with_max_priority_fee_per_gas;
                 transaction.is_noop = replacement_transaction.is_noop;
                 transaction.external_id = replacement_transaction.external_id.clone();
             }
@@ -405,7 +405,7 @@ impl TransactionsQueue {
         let item = transactions.front().cloned();
 
         if let Some(comp_tx) = item {
-            if let Some(_) = comp_tx.get_transaction_by_id(id) {
+            if comp_tx.get_transaction_by_id(id).is_some() {
                 let transaction_status: TransactionStatus;
 
                 if receipt.status() {
@@ -431,54 +431,52 @@ impl TransactionsQueue {
                         };
 
                         let winner = Transaction {
-                            status: transaction_status.clone(),
+                            status: transaction_status,
                             mined_at: Some(Utc::now()),
                             cancelled_by_transaction_id: None,
                             ..comp_tx.original
                         };
 
                         (winner, comp_tx.competitive.map(|(tx, _)| tx), loser_status)
+                    } else if let Some((competitor, comp_type)) = comp_tx.competitive {
+                        let (loser_status, loser_transaction) = match comp_type {
+                            CompetitionType::Cancel => {
+                                // When cancel wins, original transaction becomes a cancelled no-op
+                                let cancelled_original = Transaction {
+                                    status: TransactionStatus::CANCELLED,
+                                    is_noop: true,
+                                    to: self.relay_address(),
+                                    value: TransactionValue::zero(),
+                                    data: TransactionData::empty(),
+                                    cancelled_by_transaction_id: Some(competitor.id),
+                                    ..comp_tx.original
+                                };
+                                (TransactionStatus::CANCELLED, cancelled_original)
+                            }
+                            CompetitionType::Replace => {
+                                let replaced_original = Transaction {
+                                    status: TransactionStatus::REPLACED,
+                                    ..comp_tx.original
+                                };
+                                (TransactionStatus::REPLACED, replaced_original)
+                            }
+                        };
+
+                        let winner = Transaction {
+                            status: transaction_status,
+                            mined_at: Some(Utc::now()),
+                            ..competitor
+                        };
+
+                        (winner, Some(loser_transaction), loser_status)
                     } else {
-                        if let Some((competitor, comp_type)) = comp_tx.competitive {
-                            let (loser_status, loser_transaction) = match comp_type {
-                                CompetitionType::Cancel => {
-                                    // When cancel wins, original transaction becomes a cancelled no-op
-                                    let cancelled_original = Transaction {
-                                        status: TransactionStatus::CANCELLED,
-                                        is_noop: true,
-                                        to: self.relay_address(),
-                                        value: TransactionValue::zero(),
-                                        data: TransactionData::empty(),
-                                        cancelled_by_transaction_id: Some(competitor.id),
-                                        ..comp_tx.original
-                                    };
-                                    (TransactionStatus::CANCELLED, cancelled_original)
-                                }
-                                CompetitionType::Replace => {
-                                    let replaced_original = Transaction {
-                                        status: TransactionStatus::REPLACED,
-                                        ..comp_tx.original
-                                    };
-                                    (TransactionStatus::REPLACED, replaced_original)
-                                }
-                            };
-
-                            let winner = Transaction {
-                                status: transaction_status.clone(),
-                                mined_at: Some(Utc::now()),
-                                ..competitor
-                            };
-
-                            (winner, Some(loser_transaction), loser_status)
-                        } else {
-                            return Err(
-                                MoveInmempoolTransactionToMinedError::TransactionIdDoesNotMatch(
-                                    self.relayer.id,
-                                    *id,
-                                    comp_tx.original,
-                                ),
-                            );
-                        }
+                        return Err(
+                            MoveInmempoolTransactionToMinedError::TransactionIdDoesNotMatch(
+                                self.relayer.id,
+                                *id,
+                                comp_tx.original,
+                            ),
+                        );
                     };
 
                 let mut mining_transactions = self.mined_transactions.lock().await;
@@ -876,7 +874,7 @@ impl TransactionsQueue {
                     &self.relayer.address,
                     transaction.chain_id,
                     transaction.to,
-                    transaction.value.clone(),
+                    transaction.value,
                     transaction.data.clone(),
                     safe_nonce,
                 )

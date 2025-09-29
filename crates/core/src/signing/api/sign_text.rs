@@ -77,17 +77,17 @@ pub async fn sign_text(
         .await?;
 
     let record_request = RecordSignedTextRequest {
-        relayer_id: relayer_id.into(),
+        relayer_id,
         message: sign.text.clone(),
         signature: signature.into(),
-        chain_id: relayer_provider_context.provider.chain_id.into(),
+        chain_id: relayer_provider_context.provider.chain_id,
     };
 
     state.db.record_signed_text(&record_request).await?;
 
     if let Some(ref webhook_manager) = state.webhook_manager {
         let webhook_manager = webhook_manager.clone();
-        let relayer_id_clone = relayer_id.clone();
+        let relayer_id_clone = relayer_id;
         let chain_id = relayer_provider_context.provider.chain_id;
         let message_clone = sign.text.clone();
         let signature_clone = signature;

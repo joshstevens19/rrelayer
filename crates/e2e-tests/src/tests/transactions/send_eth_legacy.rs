@@ -25,7 +25,7 @@ impl TestRunner {
         let tx_response = self
             .relayer_client
             .send_transaction(
-                &relayer.id(),
+                relayer.id(),
                 recipient,
                 alloy::primitives::utils::parse_ether("0.5")?.into(),
                 TransactionData::empty(),

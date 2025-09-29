@@ -55,7 +55,7 @@ impl RelayerApi {
     pub async fn create(&self, chain_id: u64, name: &str) -> ApiResult<CreateRelayerResult> {
         self.client
             .post(
-                &format!("relayers/{}/new", chain_id.to_string()),
+                &format!("relayers/{}/new", chain_id),
                 &serde_json::json!({ "name": name }),
             )
             .await

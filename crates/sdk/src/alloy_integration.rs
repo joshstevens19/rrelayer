@@ -226,7 +226,7 @@ impl Signer for RelayerSigner {
             RelayerClientType::Relayer(client) => client.sign().text(&hash_hex, None).await,
             RelayerClientType::Admin(client) => client.sign().text(&hash_hex, None).await,
         }
-        .map_err(|e| alloy::signers::Error::other(e))?;
+        .map_err(alloy::signers::Error::other)?;
 
         Ok(sign_result.signature)
     }
@@ -242,7 +242,7 @@ impl Signer for RelayerSigner {
             RelayerClientType::Relayer(client) => client.sign().typed_data(payload, None).await,
             RelayerClientType::Admin(client) => client.sign().typed_data(payload, None).await,
         }
-        .map_err(|e| alloy::signers::Error::other(e))?;
+        .map_err(alloy::signers::Error::other)?;
 
         Ok(sign_result.signature)
     }
@@ -314,7 +314,6 @@ impl<P> RelayerProvider<P> {
     /// # Returns
     ///
     /// The transaction ID from the relayer service
-
     /// Send a transaction using standard Alloy TransactionRequest.
     ///
     /// This accepts a standard Alloy `TransactionRequest` and automatically
@@ -388,7 +387,7 @@ impl<P> RelayerProvider<P> {
         // Extract value (default to 0 if not specified)
         let value = tx_request
             .value
-            .map(|v| TransactionValue::new(v))
+            .map(TransactionValue::new)
             .unwrap_or_else(TransactionValue::zero);
 
         // Extract transaction data - simplified for now

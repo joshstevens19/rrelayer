@@ -110,6 +110,7 @@ async fn check_balances_for_chain(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn send_low_balance_webhook(
     webhook_manager: &Arc<Mutex<WebhookManager>>,
     relayer_id: &str,

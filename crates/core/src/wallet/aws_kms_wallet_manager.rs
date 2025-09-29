@@ -202,7 +202,7 @@ impl AwsKmsWalletManager {
                 let (account_id, after) = rest.split_at(pos);
                 let parts: Vec<&str> =
                     after.trim_start_matches(":assumed-role/").split('/').collect();
-                if let Some(role_name) = parts.get(0) {
+                if let Some(role_name) = parts.first() {
                     return format!("arn:aws:iam::{}:role/{}", account_id, role_name);
                 }
             }
@@ -279,7 +279,7 @@ impl AwsKmsWalletManager {
                 WalletError::ApiError { message: error_msg }
             })?;
 
-            let key_id = out.key_metadata().and_then(|m| Some(m.key_id())).ok_or_else(|| {
+            let key_id = out.key_metadata().map(|m| m.key_id()).ok_or_else(|| {
                 WalletError::ApiError { message: "No key_id in CreateKey response".to_string() }
             })?;
 

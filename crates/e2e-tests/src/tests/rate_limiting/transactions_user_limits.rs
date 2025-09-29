@@ -26,7 +26,7 @@ impl TestRunner {
             let tx_result = self
                 .relayer_client
                 .send_transaction_with_rate_limit_key(
-                    &relayer.id(),
+                    relayer.id(),
                     &self.config.anvil_accounts[1],
                     alloy::primitives::utils::parse_ether("0.5")?.into(),
                     TransactionData::empty(),
@@ -34,10 +34,7 @@ impl TestRunner {
                 )
                 .await;
 
-            match tx_result {
-                Ok(_) => successful_transactions += 1,
-                Err(_) => {}
-            }
+            if tx_result.is_ok() { successful_transactions += 1 }
         }
         if successful_transactions != 1 {
             return Err(anyhow!("Sending transactions rate limiting not enforced"));
@@ -52,7 +49,7 @@ impl TestRunner {
         let tx_result = self
             .relayer_client
             .send_transaction_with_rate_limit_key(
-                &relayer.id(),
+                relayer.id(),
                 &self.config.anvil_accounts[1],
                 alloy::primitives::utils::parse_ether("0.5")?.into(),
                 TransactionData::empty(),

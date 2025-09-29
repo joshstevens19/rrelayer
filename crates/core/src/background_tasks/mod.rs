@@ -15,6 +15,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::info;
 
+#[allow(clippy::too_many_arguments)]
 pub async fn run_background_tasks(
     config: &SetupConfig,
     gas_oracle_cache: Arc<Mutex<GasOracleCache>>,
