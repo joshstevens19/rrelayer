@@ -15,7 +15,7 @@ Web3 applications with enterprise-grade reliability and focus exclusively on you
 logic. rrelayer out of the box gives you transaction relay, message signing, automated
 gas management, and real-time monitoring through intuitive APIs.
 
-You can get to the full rrelayer [documentation](https://rrelayer.xyz/).
+You can get to the full rrelayer documentation [here](https://rrelayer.xyz/).
 
 ## Install
 
@@ -83,21 +83,10 @@ Coming soon.
 * Production infrastructure: Enterprise-grade transaction reliability with comprehensive monitoring
 - Much more...
 
-## Installing
+## SDKs
 
-### Github
-
-```bash [github]
-cargo add --git https://github.com/joshstevens19/rrelayer --package rrelayer
-```
-
-### Crate.io
-
-https://crates.io/crates/rrelayer
-
-```bash [crates.io]
-cargo add rrelayer
-```
+- Node - https://rrelayer.xyz/integration/sdk/installation/node
+- Rust - https://rrelayer.xyz/integration/sdk/installation/rust
 
 ## What networks do you support?
 
