@@ -4,7 +4,11 @@ help:
 	cargo run -- auth --help
 new:
 	cargo run -- new --path $(CURDIR)/../../playground
-start:
+auth_login:
+	RUST_BACKTRACE=1 cargo run -- start --path $(CURDIR)/../../playground/example
+network_list_local: # using this with auth_login to see if i can get it working
+	cargo run -- network list
+start_example:
 	RUST_BACKTRACE=1 cargo run -- start --path $(CURDIR)/../../playground/example
 start_local:
 	RUST_BACKTRACE=1 cargo run -- start --path $(CURDIR)/../../playground/local-node

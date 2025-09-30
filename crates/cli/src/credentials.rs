@@ -44,17 +44,17 @@ impl std::fmt::Display for CredentialError {
 
 impl std::error::Error for CredentialError {}
 
-pub fn store_credentials(
-    profile_name: &str,
-    credentials: &StoredCredentials,
-) -> Result<(), CredentialError> {
-    let storage_dir = get_storage_dir()?;
-    let file_path = storage_dir.join(format!("{}.json", profile_name));
-    let json_data = serde_json::to_string_pretty(credentials)?;
-    fs::write(file_path, json_data)
-        .map_err(|e| CredentialError::Io(format!("Failed to write credentials: {}", e)))?;
-    Ok(())
-}
+// pub fn store_credentials(
+//     profile_name: &str,
+//     credentials: &StoredCredentials,
+// ) -> Result<(), CredentialError> {
+//     let storage_dir = get_storage_dir()?;
+//     let file_path = storage_dir.join(format!("{}.json", profile_name));
+//     let json_data = serde_json::to_string_pretty(credentials)?;
+//     fs::write(file_path, json_data)
+//         .map_err(|e| CredentialError::Io(format!("Failed to write credentials: {}", e)))?;
+//     Ok(())
+// }
 
 pub fn load_credentials(profile_name: &str) -> Result<StoredCredentials, CredentialError> {
     let storage_dir = get_storage_dir()?;
@@ -68,15 +68,15 @@ pub fn load_credentials(profile_name: &str) -> Result<StoredCredentials, Credent
     Ok(credentials)
 }
 
-pub fn delete_credentials(profile_name: &str) -> Result<(), CredentialError> {
-    let storage_dir = get_storage_dir()?;
-    let file_path = storage_dir.join(format!("{}.json", profile_name));
-    if file_path.exists() {
-        fs::remove_file(file_path)
-            .map_err(|e| CredentialError::Io(format!("Failed to delete credentials: {}", e)))?;
-    }
-    Ok(())
-}
+// pub fn delete_credentials(profile_name: &str) -> Result<(), CredentialError> {
+//     let storage_dir = get_storage_dir()?;
+//     let file_path = storage_dir.join(format!("{}.json", profile_name));
+//     if file_path.exists() {
+//         fs::remove_file(file_path)
+//             .map_err(|e| CredentialError::Io(format!("Failed to delete credentials: {}", e)))?;
+//     }
+//     Ok(())
+// }
 
 pub fn list_profiles() -> Result<Vec<String>, CredentialError> {
     let mut profiles = Vec::new();
@@ -101,12 +101,12 @@ pub fn list_profiles() -> Result<Vec<String>, CredentialError> {
     Ok(profiles)
 }
 
-pub fn add_profile_to_list(_profile_name: &str) -> Result<(), CredentialError> {
-    // No-op for file-based storage - profiles are auto-discovered
-    Ok(())
-}
-
-pub fn remove_profile_from_list(_profile_name: &str) -> Result<(), CredentialError> {
-    // No-op for file-based storage - profiles are auto-discovered
-    Ok(())
-}
+// pub fn add_profile_to_list(_profile_name: &str) -> Result<(), CredentialError> {
+//     // No-op for file-based storage - profiles are auto-discovered
+//     Ok(())
+// }
+//
+// pub fn remove_profile_from_list(_profile_name: &str) -> Result<(), CredentialError> {
+//     // No-op for file-based storage - profiles are auto-discovered
+//     Ok(())
+// }

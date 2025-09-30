@@ -42,48 +42,46 @@ fn resolve_path(override_path: &Option<String>) -> Result<PathBuf, String> {
     path.canonicalize().map_err(|e| format!("Failed to resolve path '{}': {}", path.display(), e))
 }
 
-// TODO: handle
 fn create_sdk_with_basic_auth(
     project_location: &ProjectLocation,
 ) -> Result<Client, ProjectLocationError> {
-    use std::env;
+    // use std::env;
 
-    // Try environment variables first (for backward compatibility)
-    if let (Ok(username), Ok(password)) =
-        (env::var("RRELAYER_AUTH_USERNAME"), env::var("RRELAYER_AUTH_PASSWORD"))
-    {
+    // // Try environment variables first (for backward compatibility)
+    // if let (Ok(username), Ok(password)) =
+    //     (env::var("RRELAYER_AUTH_USERNAME"), env::var("RRELAYER_AUTH_PASSWORD"))
+    // {
+    //     return Ok(Client::new(CreateClientConfig {
+    //         server_url: project_location.get_api_url()?,
+    //         auth: CreateClientAuth { username, password },
+    //     }));
+    // }
+
+    // Try to read from rrelayer.yaml file
+    if let Ok(setup_config) = project_location.setup_config(false) {
         return Ok(Client::new(CreateClientConfig {
             server_url: project_location.get_api_url()?,
-            auth: CreateClientAuth { username, password },
+            auth: CreateClientAuth {
+                username: setup_config.api_config.authentication_username,
+                password: setup_config.api_config.authentication_password,
+            },
         }));
     }
 
-    Err(ProjectLocationError::ProjectConfig(
-        "No authentication credentials found. Please either:\n\
-                1. Set RRELAYER_AUTH_USERNAME and RRELAYER_AUTH_PASSWORD environment variables\n\
-                2. Ensure rrelayer.yaml exists with authentication config\n\
-                3. Run 'rrelayer auth login' to store credentials securely"
-            .to_string(),
-    ))
+    Err(ProjectLocationError::ProjectConfig("You can only run rrelayer in the root of the rrelayer project (where the rrelayer.yaml is)".to_string()))
 
-    // // Try to read from rrelayer.yaml file
-    // if let Ok(setup_config) = project_location.setup_config(false) {
-    //     return Ok(SDK::new(
-    //         project_location.get_api_url()?,
-    //         setup_config.api_config.authentication_username,
-    //         setup_config.api_config.authentication_password,
-    //     ));
-    // }
-    //
     // // Try stored credentials as fallback
-    // let default_profile = credentials::get_default_profile();
-    // match credentials::load_credentials(&default_profile) {
-    //     Ok(creds) => Ok(SDK::new(creds.api_url, creds.username, creds.password)),
+    // let default_profile = "default";
+    // match credentials::load_credentials(default_profile) {
+    //     Ok(creds) => Ok(Client::new(CreateClientConfig {
+    //         server_url: creds.api_url,
+    //         auth: CreateClientAuth { username: creds.username, password: creds.password },
+    //     })),
     //     Err(_) => {
     //         return Err(ProjectLocationError::ProjectConfig(
     //             "No authentication credentials found. Please either:\n\
     //             1. Set RRELAYER_AUTH_USERNAME and RRELAYER_AUTH_PASSWORD environment variables\n\
-    //             2. Ensure rrelayer.yaml exists with authentication config\n\
+    //             2. Run rrelayer where rrelayer.yaml exists with authentication config\n\
     //             3. Run 'rrelayer auth login' to store credentials securely"
     //                 .to_string(),
     //         ));
