@@ -929,7 +929,7 @@ impl TransactionsQueues {
                             TransactionQueueSendTransactionError::GasPriceTooHigh => {
                                 Ok(ProcessResult::<ProcessPendingStatus>::other(
                                     ProcessPendingStatus::GasPriceTooHigh,
-                                    self.relayer_block_times_ms.get(relayer_id), /* gas to high check back on next block */
+                                    self.relayer_block_times_ms.get(relayer_id), // gas to high check back on the next block - do not do the / 10 part
                                 ))
                             }
                             TransactionQueueSendTransactionError::GasCalculationError => {
@@ -1167,7 +1167,10 @@ impl TransactionsQueues {
                                     );
                                     return Ok(ProcessResult::<ProcessInmempoolStatus>::other(
                                         ProcessInmempoolStatus::StillInmempool,
-                                        Some(&500), // TODO: maybe pick from block??
+                                        self.relayer_block_times_ms
+                                            .get(relayer_id)
+                                            .map(|&block_time| block_time / 10)
+                                            .as_ref(),
                                     ));
                                 }
 
@@ -1206,7 +1209,10 @@ impl TransactionsQueues {
 
                             Ok(ProcessResult::<ProcessInmempoolStatus>::other(
                                 ProcessInmempoolStatus::StillInmempool,
-                                Some(&500), // recheck again in 500ms TODO: maybe pick from block??
+                                self.relayer_block_times_ms
+                                    .get(relayer_id)
+                                    .map(|&block_time| block_time / 10)
+                                    .as_ref(),
                             ))
                         }
                         Err(e) => {
