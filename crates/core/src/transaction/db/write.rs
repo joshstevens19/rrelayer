@@ -1,6 +1,6 @@
 use crate::{
     common_types::EvmAddress,
-    gas::{GasLimit, GasPriceResult},
+    gas::{BlobGasPriceResult, GasLimit, GasPriceResult},
     postgres::{PostgresClient, PostgresError},
     relayer::RelayerId,
     shared::{
@@ -13,6 +13,7 @@ use crate::{
     },
 };
 use alloy::network::AnyTransactionReceipt;
+use serde_json;
 
 const TRANSACTION_TABLES: [&str; 2] = ["relayer.transaction", "relayer.transaction_audit_log"];
 
@@ -63,6 +64,7 @@ impl PostgresClient {
         transaction_id: &TransactionId,
         transaction_hash: &TransactionHash,
         sent_with_gas: &GasPriceResult,
+        sent_with_blob_gas: Option<&BlobGasPriceResult>,
         legacy_transaction: bool,
     ) -> Result<(), PostgresError> {
         let mut conn = self.pool.get().await?;
@@ -73,6 +75,12 @@ impl PostgresClient {
         let max_fee_fee_option = option_if(!legacy_transaction, &sent_with_gas.max_fee);
         let legacy_gas_price = option_if(legacy_transaction, sent_with_gas.legacy_gas_price());
 
+        let sent_with_gas_json =
+            serde_json::to_value(sent_with_gas).unwrap_or_else(|_| serde_json::Value::Null);
+
+        let sent_with_blob_gas_json = sent_with_blob_gas
+            .map(|blob_gas| serde_json::to_value(blob_gas).unwrap_or(serde_json::Value::Null));
+
         trans
             .execute(
                 "
@@ -82,6 +90,8 @@ impl PostgresClient {
                         sent_max_priority_fee_per_gas = $4,
                         sent_max_fee_per_gas = $5,
                         gas_price = $6,
+                        sent_with_gas = $7,
+                        sent_with_blob_gas = $8,
                         sent_at = NOW()
                     WHERE id = $1;
                 ",
@@ -92,6 +102,8 @@ impl PostgresClient {
                     &max_priority_fee_option,
                     &max_fee_fee_option,
                     &legacy_gas_price,
+                    &sent_with_gas_json,
+                    &sent_with_blob_gas_json,
                 ],
             )
             .await?;
@@ -103,12 +115,12 @@ impl PostgresClient {
                         id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit, 
                         speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at, 
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas, 
-                        sent_max_fee_per_gas, gas_price, external_id
+                        sent_max_fee_per_gas, gas_price, sent_with_gas, sent_with_blob_gas, external_id
                     )
                     SELECT 
                         id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
                         speed, $2, expires_at, queued_at, NOW(), mined_at, confirmed_at,
-                        failed_at, failed_reason, $3, $4, $5, $6, external_id
+                        failed_at, failed_reason, $3, $4, $5, $6, $7, $8, external_id
                     FROM relayer.transaction
                     WHERE id = $1;
                 ",
@@ -119,6 +131,8 @@ impl PostgresClient {
                     &max_priority_fee_option,
                     &max_fee_fee_option,
                     &legacy_gas_price,
+                    &sent_with_gas_json,
+                    &sent_with_blob_gas_json,
                 ],
             )
             .await?;
@@ -462,6 +476,16 @@ impl PostgresClient {
         let mut conn = self.pool.get().await?;
         let trans = conn.transaction().await.map_err(PostgresError::PgError)?;
 
+        let sent_with_gas_json = transaction
+            .sent_with_gas
+            .as_ref()
+            .map(|gas| serde_json::to_value(gas).unwrap_or(serde_json::Value::Null));
+
+        let sent_with_blob_gas_json = transaction
+            .sent_with_blob_gas
+            .as_ref()
+            .map(|blob_gas| serde_json::to_value(blob_gas).unwrap_or(serde_json::Value::Null));
+
         trans
             .execute(
                 "
@@ -484,8 +508,10 @@ impl PostgresClient {
                         hash = $17,
                         sent_max_fee_per_gas = $18,
                         sent_max_priority_fee_per_gas = $19,
-                        external_id = $20,
-                        cancelled_by_transaction_id = $21
+                        sent_with_gas = $20,
+                        sent_with_blob_gas = $21,
+                        external_id = $22,
+                        cancelled_by_transaction_id = $23
                     WHERE id = $1
                 ",
                 &[
@@ -508,6 +534,8 @@ impl PostgresClient {
                     &transaction.known_transaction_hash,
                     &transaction.sent_with_max_fee_per_gas,
                     &transaction.sent_with_max_priority_fee_per_gas,
+                    &sent_with_gas_json,
+                    &sent_with_blob_gas_json,
                     &transaction.external_id,
                     &transaction.cancelled_by_transaction_id,
                 ],
@@ -522,13 +550,15 @@ impl PostgresClient {
                         id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
                         speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
-                        sent_max_fee_per_gas, gas_price, block_hash, block_number, expired_at, external_id
+                        sent_max_fee_per_gas, gas_price, sent_with_gas, sent_with_blob_gas, 
+                        block_hash, block_number, expired_at, external_id
                     )
                     SELECT 
                         id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
                         speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
-                        sent_max_fee_per_gas, gas_price, block_hash, block_number, expired_at, external_id
+                        sent_max_fee_per_gas, gas_price, sent_with_gas, sent_with_blob_gas,
+                        block_hash, block_number, expired_at, external_id
                     FROM relayer.transaction
                     WHERE id = $1
                 ",

@@ -1,3 +1,4 @@
+use serde_json;
 use tokio_postgres::Row;
 
 use crate::{shared::common_types::EvmAddress, transaction::types::Transaction};
@@ -23,10 +24,12 @@ pub fn build_transaction_from_transaction_view(row: &Row) -> Transaction {
         expires_at: row.get("expires_at"),
         sent_at: row.get("sent_at"),
         confirmed_at: row.get("confirmed_at"),
-        // TODO! load from db
-        sent_with_gas: None,
-        // TODO! load from db
-        sent_with_blob_gas: None,
+        sent_with_gas: row
+            .get::<_, Option<serde_json::Value>>("sent_with_gas")
+            .and_then(|v| serde_json::from_value(v).ok()),
+        sent_with_blob_gas: row
+            .get::<_, Option<serde_json::Value>>("sent_with_blob_gas")
+            .and_then(|v| serde_json::from_value(v).ok()),
         mined_at: row.get("mined_at"),
         mined_at_block_number: row.get("block_number"),
         speed: row.get("speed"),

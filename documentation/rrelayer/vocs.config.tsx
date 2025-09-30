@@ -713,5 +713,6 @@ export default defineConfig({
       ],
     },
     { text: 'Changelog', link: '/changelog' },
+    { text: 'Shoutout', link: '/shoutout' },
   ],
 });

@@ -51,6 +51,8 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
             gas_price NUMERIC NULL,
             sent_max_priority_fee_per_gas NUMERIC(80) NULL,
             sent_max_fee_per_gas NUMERIC(80) NULL,
+            sent_with_gas JSONB NULL,
+            sent_with_blob_gas JSONB NULL,
             gas_limit NUMERIC(80) NULL,
             block_hash BYTEA NULL,
             block_number BIGINT NULL,
@@ -89,6 +91,8 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
             gas_price NUMERIC NULL,
             sent_max_priority_fee_per_gas NUMERIC(80) NULL,
             sent_max_fee_per_gas NUMERIC(80) NULL,
+            sent_with_gas JSONB NULL,
+            sent_with_blob_gas JSONB NULL,
             gas_limit NUMERIC(80) NULL,
             block_hash BYTEA NULL,
             block_number BIGINT NULL,
@@ -125,6 +129,12 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
 
         CREATE INDEX IF NOT EXISTS idx_transaction_cancelled_by 
         ON relayer.transaction(cancelled_by_transaction_id) WHERE cancelled_by_transaction_id IS NOT NULL;
+
+        CREATE INDEX IF NOT EXISTS idx_transaction_sent_with_gas 
+        ON relayer.transaction(sent_with_gas) WHERE sent_with_gas IS NOT NULL;
+
+        CREATE INDEX IF NOT EXISTS idx_transaction_sent_with_blob_gas 
+        ON relayer.transaction(sent_with_blob_gas) WHERE sent_with_blob_gas IS NOT NULL;
 
         CREATE INDEX IF NOT EXISTS idx_relayer_chain_deleted 
         ON relayer.record(chain_id, deleted);

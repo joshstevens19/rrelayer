@@ -191,6 +191,7 @@ impl TransactionsQueue {
                         transaction_sent.sent_with_gas.max_priority_fee,
                     ),
                     sent_with_gas: Some(transaction_sent.sent_with_gas.clone()),
+                    sent_with_blob_gas: transaction_sent.sent_with_blob_gas.clone(),
                     sent_at: Some(Utc::now()),
                     ..transaction
                 };
@@ -306,6 +307,7 @@ impl TransactionsQueue {
                 comp_tx.original.sent_with_max_priority_fee_per_gas =
                     Some(transaction_sent.sent_with_gas.max_priority_fee);
                 comp_tx.original.sent_with_gas = Some(transaction_sent.sent_with_gas.clone());
+                comp_tx.original.sent_with_blob_gas = transaction_sent.sent_with_blob_gas.clone();
                 comp_tx.original.sent_at = Some(Utc::now());
             } else if let Some((ref mut competitor, _)) = comp_tx.competitive {
                 if competitor.id == transaction_sent.id {
@@ -319,6 +321,7 @@ impl TransactionsQueue {
                     competitor.sent_with_max_priority_fee_per_gas =
                         Some(transaction_sent.sent_with_gas.max_priority_fee);
                     competitor.sent_with_gas = Some(transaction_sent.sent_with_gas.clone());
+                    competitor.sent_with_blob_gas = transaction_sent.sent_with_blob_gas.clone();
                     competitor.sent_at = Some(Utc::now());
                 }
             }
@@ -377,7 +380,8 @@ impl TransactionsQueue {
                 transaction.sent_at = replacement_transaction.sent_at;
                 transaction.sent_with_gas =
                     Some(transaction_sent_with_relayer.sent_with_gas.clone());
-                transaction.sent_with_blob_gas = replacement_transaction.sent_with_blob_gas.clone();
+                transaction.sent_with_blob_gas =
+                    transaction_sent_with_relayer.sent_with_blob_gas.clone();
                 transaction.speed = replacement_transaction.speed.clone();
                 transaction.sent_with_max_fee_per_gas =
                     replacement_transaction.sent_with_max_fee_per_gas;
@@ -1021,7 +1025,10 @@ impl TransactionsQueue {
         working_transaction.gas_limit = Some(estimated_gas_limit);
         transaction.gas_limit = Some(estimated_gas_limit);
 
-        let transaction_request: TypedTransaction = if working_transaction.is_blob_transaction() {
+        let (transaction_request, sent_with_blob_gas): (
+            TypedTransaction,
+            Option<BlobGasPriceResult>,
+        ) = if working_transaction.is_blob_transaction() {
             info!("Creating final blob transaction for relayer: {}", self.relayer.name);
             let blob_gas_price = self
                 .compute_blob_gas_price_for_transaction(
@@ -1029,7 +1036,7 @@ impl TransactionsQueue {
                     &working_transaction.sent_with_blob_gas,
                 )
                 .await?;
-            working_transaction
+            let tx_request = working_transaction
                 .to_blob_typed_transaction_with_gas_limit(
                     Some(&gas_price),
                     Some(&blob_gas_price),
@@ -1037,27 +1044,30 @@ impl TransactionsQueue {
                 )
                 .map_err(|e| {
                     TransactionQueueSendTransactionError::TransactionConversionError(e.to_string())
-                })?
+                })?;
+            (tx_request, Some(blob_gas_price))
         } else if self.is_legacy_transactions() {
             info!("Creating final legacy transaction for relayer: {}", self.relayer.name);
-            working_transaction
+            let tx_request = working_transaction
                 .to_legacy_typed_transaction_with_gas_limit(
                     Some(&gas_price),
                     Some(estimated_gas_limit),
                 )
                 .map_err(|e| {
                     TransactionQueueSendTransactionError::TransactionConversionError(e.to_string())
-                })?
+                })?;
+            (tx_request, None)
         } else {
             info!("Creating final EIP-1559 transaction for relayer: {}", self.relayer.name);
-            working_transaction
+            let tx_request = working_transaction
                 .to_eip1559_typed_transaction_with_gas_limit(
                     Some(&gas_price),
                     Some(estimated_gas_limit),
                 )
                 .map_err(|e| {
                     TransactionQueueSendTransactionError::TransactionConversionError(e.to_string())
-                })?
+                })?;
+            (tx_request, None)
         };
         info!(
             "Set gas limit {} for transaction {} on relayer: {}",
@@ -1080,6 +1090,7 @@ impl TransactionsQueue {
             id: transaction.id,
             hash: transaction_hash,
             sent_with_gas: gas_price,
+            sent_with_blob_gas,
         };
 
         info!(
@@ -1097,6 +1108,7 @@ impl TransactionsQueue {
                     &transaction_sent.id,
                     &transaction_sent.hash,
                     &transaction_sent.sent_with_gas,
+                    transaction_sent.sent_with_blob_gas.as_ref(),
                     self.is_legacy_transactions(),
                 )
                 .await?;
