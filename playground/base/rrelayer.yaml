@@ -1,0 +1,20 @@
+name: base
+signing_provider:
+  raw:
+    mnemonic: ${RAW_DANGEROUS_MNEMONIC}
+networks:
+- name: sepolia_ethereum
+  chain_id: 11155111
+  provider_urls:
+  - https://sepolia.gateway.tenderly.co
+  block_explorer_url: https://sepolia.etherscan.io
+  enable_sending_blobs: true
+  gas_bump_blocks_every:
+    slow: 10
+    medium: 5
+    fast: 4
+    super_fast: 2
+api_config:
+  port: 8000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}

@@ -5,6 +5,7 @@ use crate::{
     provider::EvmProvider,
     relayer::Relayer,
     transaction::types::{Transaction, TransactionId},
+    yaml::GasBumpBlockConfig,
 };
 
 pub struct TransactionRelayerSetup {
@@ -13,6 +14,7 @@ pub struct TransactionRelayerSetup {
     pub pending_transactions: VecDeque<Transaction>,
     pub inmempool_transactions: VecDeque<CompetitiveTransaction>,
     pub mined_transactions: HashMap<TransactionId, Transaction>,
+    pub gas_bump_config: GasBumpBlockConfig,
 }
 
 impl TransactionRelayerSetup {
@@ -22,6 +24,7 @@ impl TransactionRelayerSetup {
         pending_transactions: VecDeque<Transaction>,
         inmempool_transactions: VecDeque<CompetitiveTransaction>,
         mined_transactions: HashMap<TransactionId, Transaction>,
+        gas_bump_config: GasBumpBlockConfig,
     ) -> Self {
         TransactionRelayerSetup {
             relayer,
@@ -29,6 +32,7 @@ impl TransactionRelayerSetup {
             pending_transactions,
             inmempool_transactions,
             mined_transactions,
+            gas_bump_config,
         }
     }
 }

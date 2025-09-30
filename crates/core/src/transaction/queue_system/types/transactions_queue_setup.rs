@@ -7,6 +7,7 @@ use crate::{
         nonce_manager::NonceManager,
         types::{Transaction, TransactionId},
     },
+    yaml::GasBumpBlockConfig,
 };
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
@@ -19,6 +20,7 @@ pub struct TransactionsQueueSetup {
     pub inmempool_transactions: VecDeque<CompetitiveTransaction>,
     pub mined_transactions: HashMap<TransactionId, Transaction>,
     pub safe_proxy_manager: Arc<SafeProxyManager>,
+    pub gas_bump_config: GasBumpBlockConfig,
 }
 
 impl TransactionsQueueSetup {
@@ -30,6 +32,7 @@ impl TransactionsQueueSetup {
         inmempool_transactions: VecDeque<CompetitiveTransaction>,
         mined_transactions: HashMap<TransactionId, Transaction>,
         safe_proxy_manager: Arc<SafeProxyManager>,
+        gas_bump_config: GasBumpBlockConfig,
     ) -> Self {
         TransactionsQueueSetup {
             relayer,
@@ -39,6 +42,7 @@ impl TransactionsQueueSetup {
             inmempool_transactions,
             mined_transactions,
             safe_proxy_manager,
+            gas_bump_config,
         }
     }
 }

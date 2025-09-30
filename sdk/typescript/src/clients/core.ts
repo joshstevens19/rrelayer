@@ -186,12 +186,12 @@ export class Client {
   /**
    * Create admin relayer client
    * @param relayerId The relayer id
-   * @param speed How fast you want the transactions to be mined at - optional defaults to fast
+   * @param defaultSpeed How fast you want the transactions to be mined set at relayer level - optional defaults to fast
    * @returns AdminRelayerClient The admin relayer client
    */
   public async getRelayerClient(
-    relayerId: string,
-    speed?: TransactionSpeed
+      relayerId: string,
+      defaultSpeed?: TransactionSpeed
   ): Promise<AdminRelayerClient> {
     const relayer = await this.relayer.get(relayerId);
     if (!relayer) {
@@ -203,7 +203,7 @@ export class Client {
       providerUrl: 'TODO',
       relayerId,
       auth: this._config.auth,
-      speed,
+      fallbackSpeed: defaultSpeed,
     });
   }
 

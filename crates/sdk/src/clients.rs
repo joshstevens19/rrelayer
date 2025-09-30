@@ -38,7 +38,7 @@ pub struct CreateRelayerClientConfig {
     pub server_url: String,
     pub relayer_id: RelayerId,
     pub api_key: String,
-    pub speed: Option<TransactionSpeed>,
+    pub fallback_speed: Option<TransactionSpeed>,
 }
 
 #[derive(Clone)]
@@ -94,7 +94,7 @@ impl Client {
     pub async fn get_relayer_client(
         &self,
         relayer_id: &RelayerId,
-        speed: Option<TransactionSpeed>,
+        fallback_speed: Option<TransactionSpeed>,
     ) -> ApiResult<AdminRelayerClient> {
         let relayer = self.relayer_api.get(relayer_id).await?.ok_or_else(|| {
             ApiSdkError::ConfigError(format!("Relayer '{}' not found", relayer_id))
@@ -123,7 +123,7 @@ impl Client {
                 username: self.config.auth.username.clone(),
                 password: self.config.auth.password.clone(),
             },
-            speed,
+            fallback_speed,
         }))
     }
 
@@ -227,7 +227,7 @@ pub struct AdminRelayerClientConfig {
     pub provider_url: String,
     pub relayer_id: RelayerId,
     pub auth: AdminRelayerClientAuth,
-    pub speed: Option<TransactionSpeed>,
+    pub fallback_speed: Option<TransactionSpeed>,
 }
 
 #[derive(Debug, Clone)]
@@ -254,7 +254,7 @@ impl AdminRelayerClient {
                     }
                 }
             },
-            speed: config.speed,
+            fallback_speed: config.fallback_speed,
         };
 
         let relayer_client = RelayerClient::new(relayer_client_config);
@@ -447,7 +447,7 @@ pub struct RelayerClientConfig {
     pub server_url: String,
     pub relayer_id: RelayerId,
     pub auth: RelayerClientAuth,
-    pub speed: Option<TransactionSpeed>,
+    pub fallback_speed: Option<TransactionSpeed>,
 }
 
 #[derive(Debug, Clone)]
@@ -459,7 +459,7 @@ pub enum RelayerClientAuth {
 #[derive(Debug, Clone)]
 pub struct RelayerClient {
     id: RelayerId,
-    speed: Option<TransactionSpeed>,
+    fallback_speed: Option<TransactionSpeed>,
     #[allow(dead_code)]
     api_base_config: ApiBaseConfig,
     relayer_api: RelayerApi,
@@ -482,7 +482,7 @@ impl RelayerClient {
 
         Self {
             id: config.relayer_id,
-            speed: config.speed,
+            fallback_speed: config.fallback_speed,
             api_base_config,
             relayer_api: RelayerApi::new(Arc::clone(&client)),
             sign_api: SignApi::new(Arc::clone(&client)),
@@ -495,7 +495,7 @@ impl RelayerClient {
     }
 
     pub fn speed(&self) -> Option<&TransactionSpeed> {
-        self.speed.as_ref()
+        self.fallback_speed.as_ref()
     }
 
     pub async fn address(&self) -> ApiResult<EvmAddress> {
@@ -685,6 +685,6 @@ pub fn create_relayer_client(config: CreateRelayerClientConfig) -> RelayerClient
         server_url: config.server_url,
         relayer_id: config.relayer_id,
         auth: RelayerClientAuth::ApiKey { api_key: config.api_key },
-        speed: config.speed,
+        fallback_speed: config.fallback_speed,
     })
 }

@@ -26,6 +26,7 @@ use crate::{
         nonce_manager::NonceManager,
         types::{Transaction, TransactionHash, TransactionId, TransactionSpeed, TransactionStatus},
     },
+    yaml::GasBumpBlockConfig,
     WalletError,
 };
 use alloy::network::{AnyTransactionReceipt, ReceiptResponse};
@@ -50,6 +51,7 @@ pub struct TransactionsQueue {
     blob_oracle_cache: Arc<Mutex<BlobGasOracleCache>>,
     confirmations: u64,
     safe_proxy_manager: Arc<SafeProxyManager>,
+    gas_bump_config: GasBumpBlockConfig,
 }
 
 impl TransactionsQueue {
@@ -74,16 +76,12 @@ impl TransactionsQueue {
             blob_oracle_cache,
             confirmations,
             safe_proxy_manager: setup.safe_proxy_manager,
+            gas_bump_config: setup.gas_bump_config,
         }
     }
 
     fn blocks_to_wait_before_bump(&self, speed: &TransactionSpeed) -> u64 {
-        match speed {
-            TransactionSpeed::SLOW => 10,
-            TransactionSpeed::MEDIUM => 5,
-            TransactionSpeed::FAST => 4,
-            TransactionSpeed::SUPER => 2,
-        }
+        self.gas_bump_config.blocks_to_wait_before_bump(speed)
     }
 
     pub fn should_bump_gas(&self, ms_between_times: u64, speed: &TransactionSpeed) -> bool {

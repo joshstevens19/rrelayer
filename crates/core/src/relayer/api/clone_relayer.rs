@@ -52,6 +52,13 @@ pub async fn clone_relayer(
     let id = relayer.id;
     let address = relayer.address;
 
+    let gas_bump_config = state
+        .network_configs
+        .iter()
+        .find(|config| config.chain_id == relayer.chain_id)
+        .map(|config| config.gas_bump_blocks_every.clone())
+        .unwrap_or_default();
+
     state
         .transactions_queues
         .lock()
@@ -65,6 +72,7 @@ pub async fn clone_relayer(
                 Default::default(),
                 Default::default(),
                 state.safe_proxy_manager.clone(),
+                gas_bump_config,
             ),
             state.transactions_queues.clone(),
         )

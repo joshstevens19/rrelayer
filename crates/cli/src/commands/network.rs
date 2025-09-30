@@ -108,6 +108,7 @@ async fn handle_add(project_path: &ProjectLocation) -> Result<(), NetworkError> 
         permissions: None,
         api_keys: None,
         enable_sending_blobs: Some(true),
+        gas_bump_blocks_every: Default::default(),
     });
 
     project_path.overwrite_setup_config(setup_config)?;

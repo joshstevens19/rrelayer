@@ -85,7 +85,7 @@ fn create_relayer_signer() -> Result<RelayerSigner> {
         server_url: "https://api.relayer.example.com".to_string(),
         relayer_id: relayer_id.clone(),
         auth: RelayerClientAuth::ApiKey { api_key: "your-api-key-here".to_string() },
-        speed: None,
+        fallback_speed: None,
     };
     let relayer_client = Arc::new(RelayerClient::new(config));
 

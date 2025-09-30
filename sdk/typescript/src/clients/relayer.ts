@@ -51,17 +51,17 @@ export interface RelayerClientConfig {
         username: string;
         password: string;
       };
-  speed?: TransactionSpeed;
+  fallbackSpeed?: TransactionSpeed;
 }
 
 export class RelayerClient {
   public readonly id: string;
-  public readonly speed: TransactionSpeed | undefined = undefined;
+  public readonly fallbackSpeed: TransactionSpeed | undefined = undefined;
   protected readonly _apiBaseConfig: ApiBaseConfig;
   private readonly _ethereumProvider: Provider;
   constructor(config: RelayerClientConfig) {
     this.id = config.relayerId;
-    this.speed = config.speed;
+    this.fallbackSpeed = config.fallbackSpeed;
     this._ethereumProvider = new Provider(config.providerUrl, this);
     if ('apiKey' in config.auth) {
       this._apiBaseConfig = {

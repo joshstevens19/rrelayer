@@ -13,6 +13,7 @@ use crate::gas::{
     TenderlyGasProviderSetupConfig,
 };
 use crate::network::{ChainId, Network};
+use crate::transaction::types::TransactionSpeed;
 use crate::{rrelayer_error, shared::common_types::EvmAddress};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -208,6 +209,56 @@ pub struct ApiKey {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GasBumpBlockConfig {
+    #[serde(default = "default_slow_blocks")]
+    pub slow: u64,
+    #[serde(default = "default_medium_blocks")]
+    pub medium: u64,
+    #[serde(default = "default_fast_blocks")]
+    pub fast: u64,
+    #[serde(default = "default_super_blocks")]
+    pub super_fast: u64,
+}
+
+impl Default for GasBumpBlockConfig {
+    fn default() -> Self {
+        Self {
+            slow: default_slow_blocks(),
+            medium: default_medium_blocks(),
+            fast: default_fast_blocks(),
+            super_fast: default_super_blocks(),
+        }
+    }
+}
+
+impl GasBumpBlockConfig {
+    pub fn blocks_to_wait_before_bump(&self, speed: &TransactionSpeed) -> u64 {
+        match speed {
+            TransactionSpeed::SLOW => self.slow,
+            TransactionSpeed::MEDIUM => self.medium,
+            TransactionSpeed::FAST => self.fast,
+            TransactionSpeed::SUPER => self.super_fast,
+        }
+    }
+}
+
+fn default_slow_blocks() -> u64 {
+    10
+}
+
+fn default_medium_blocks() -> u64 {
+    6
+}
+
+fn default_fast_blocks() -> u64 {
+    4
+}
+
+fn default_super_blocks() -> u64 {
+    2
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NetworkSetupConfig {
     pub name: String,
     pub chain_id: ChainId,
@@ -232,6 +283,8 @@ pub struct NetworkSetupConfig {
     pub confirmations: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub enable_sending_blobs: Option<bool>,
+    #[serde(default)]
+    pub gas_bump_blocks_every: GasBumpBlockConfig,
 }
 
 impl From<NetworkSetupConfig> for Network {

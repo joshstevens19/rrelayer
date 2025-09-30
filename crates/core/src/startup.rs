@@ -346,6 +346,7 @@ pub async fn start(project_path: &Path) -> Result<(), StartError> {
         cache.clone(),
         webhook_manager.clone(),
         safe_proxy_manager.clone(),
+        Arc::new(config.networks.clone()),
     )
     .await?;
 

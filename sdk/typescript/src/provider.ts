@@ -65,7 +65,7 @@ export class Provider {
           to: transaction.to,
           value: transaction.value ? transaction.value.toString() : undefined,
           data: transaction.data,
-          speed: this._relayer.speed,
+          speed: this._relayer.fallbackSpeed,
         });
 
         return result.hash;

@@ -359,6 +359,7 @@ pub async fn startup_transactions_queues(
     cache: Arc<Cache>,
     webhook_manager: Option<Arc<Mutex<WebhookManager>>>,
     safe_proxy_manager: Arc<SafeProxyManager>,
+    network_configs: Arc<Vec<crate::yaml::NetworkSetupConfig>>,
 ) -> Result<Arc<Mutex<TransactionsQueues>>, StartTransactionsQueuesError> {
     let postgres = PostgresClient::new()
         .await
@@ -388,6 +389,12 @@ pub async fn startup_transactions_queues(
                     repopulate_transaction_queue(&postgres, &relayer_id, &TransactionStatus::MINED)
                         .await?;
 
+                let gas_bump_config = network_configs
+                    .iter()
+                    .find(|config| config.chain_id == relayer.chain_id)
+                    .map(|config| config.gas_bump_blocks_every.clone())
+                    .unwrap_or_default();
+
                 transaction_relayer_setups.push(TransactionRelayerSetup::new(
                     relayer,
                     evm_provider,
@@ -402,6 +409,7 @@ pub async fn startup_transactions_queues(
                         .into_iter()
                         .map(|transaction| (transaction.id, transaction))
                         .collect(),
+                    gas_bump_config,
                 ));
             }
         }

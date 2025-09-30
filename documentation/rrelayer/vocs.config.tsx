@@ -81,6 +81,7 @@ export default defineConfig({
           collapsed: false,
           items: [
             { text: 'Config', link: '/config/networks/config' },
+            { text: 'Transaction Speed', link: '/config/networks/transaction-speed' },
             {
               text: 'Automatic Top Up',
               collapsed: false,

@@ -1,0 +1,128 @@
+# Transaction speed
+
+rrelayer will bump gas prices higher on transactions which have not been mined yet based on the `gas_bump_blocks_every`.
+This will allow you to config how often rrelayer will try to increase and resubmit the transactions this allows you to
+do crazy aggressive relaying or less aggressive relaying.
+
+- slow = `TransactionSpeed::SLOW`
+- medium = `TransactionSpeed::MEDIUM`
+- fast = `TransactionSpeed::FAST`
+- superfast = `TransactionSpeed::SUPER`
+
+This lives under networks, so you can have different configurations based on the networks:
+
+```yaml
+name: base
+signing_provider:
+  raw:
+    mnemonic: ${RAW_DANGEROUS_MNEMONIC}
+networks:
+- name: sepolia_ethereum
+  chain_id: 11155111
+  provider_urls:
+  - https://sepolia.gateway.tenderly.co
+  block_explorer_url: https://sepolia.etherscan.io
+  enable_sending_blobs: true
+  gas_bump_blocks_every: // [!code focus]
+    slow: 10 // [!code focus]
+    medium: 6 // [!code focus]
+    fast: 4 // [!code focus]
+    super_fast: 2 // [!code focus]
+api_config:
+  port: 8000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+```
+
+Code examples:
+
+:::code-group
+
+```ts [node]
+// config.ts
+import { createClient, TransactionSpeed } from 'rrelayer';
+
+const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: 'your_username',
+    password: 'your_password',
+  },
+});
+
+export const relayerClient = await client.getRelayerClient(
+  // The relayer id you want to connect to
+  '94afb207-bb47-4392-9229-ba87e4d783cb',
+);
+
+...
+
+// send-eth-transaction.ts
+import { relayerClient } from './config';
+import { TransactionToSend } from 'rrelayer';
+
+const txRequest: TransactionToSend = {
+    to: '0x5FCD072a0BD58B6fa413031582E450FE724dba6D',
+    value: '1000000000000000000',
+    speed: TransactionSpeed.FAST // [!code focus]
+};
+
+// Will send this transaction as fast and bump based on the gas_bump_blocks_every // [!code focus]
+let response = await relayerClient.transaction.send(txRequest); // [!code focus]
+...
+```
+
+```rs [rust]
+use anyhow::Result;
+use rrelayer::{
+    AdminRelayerClient, CreateClientAuth, CreateClientConfig, EvmAddress, RelayTransactionRequest,
+    RelayerId, SendTransactionResult, TransactionData, TransactionSpeed, TransactionValue,
+    create_client,
+};
+use std::str::FromStr;
+
+async fn get_relayer_client() -> Result<AdminRelayerClient> {
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username: "your_username".to_string(),
+            password: "your_password".to_string(),
+        },
+    });
+
+    let relayer_client: AdminRelayerClient = client
+        .get_relayer_client(
+            &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+            None,
+        )
+        .await?;
+
+    Ok(relayer_client)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let request = RelayTransactionRequest {
+        to: EvmAddress::from_str("0x5FCD072a0BD58B6fa413031582E450FE724dba6D")?,
+        value: TransactionValue::from_str("1000000000000000000")
+            .map_err(|e| anyhow::anyhow!("Invalid value: {}", e))?, // 1 ETH in wei
+        data: TransactionData::empty(),
+        speed: Some(TransactionSpeed::FAST), // [!code focus]
+        external_id: None,
+        blobs: None,
+    };
+
+    // Will send this transaction as fast and bump based on the gas_bump_blocks_every // [!code focus]
+    let result: SendTransactionResult = relayer_client.transaction().send(&request, None).await?; // [!code focus]
+    println!("{:?}", result);
+
+    let relay_transaction_result =
+        relayer_client.transaction().wait_for_transaction_receipt_by_id(&result.id).await?;
+    println!("{:?}", relay_transaction_result);
+
+    Ok(())
+}
+```
+
+:::

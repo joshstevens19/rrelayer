@@ -452,49 +452,14 @@ export const waitForAnvil = async (
   throw new Error('Anvil failed to start within the expected time');
 };
 
-/**
- * Quick setup result containing everything you need to test
- */
 export interface BeginResult {
-  /** Admin relayer client - ready to use for all operations */
   relayer: AdminRelayerClient;
-  /** Basic client for creating/managing multiple relayers */
   client: Client;
-  /** Relayer info (id, address, etc.) */
   relayerInfo: { id: string; address: string };
-  /** Anvil accounts with private keys */
   accounts: ReturnType<typeof getAnvilAccounts>;
-  /** End function - call this when done to cleanup and shutdown */
   end: () => Promise<void>;
 }
 
-/**
- * 🚀 One-call setup for RRelayer testing
- *
- * Sets up everything you need:
- * - Starts Anvil (if not running)
- * - Starts RRelayer server (if not running)
- * - Creates and funds a relayer with 5 ETH
- * - Returns ready-to-use AdminRelayerClient
- *
- * @param fundingAmount - ETH to fund the relayer with (default: "5")
- * @param relayerName - Optional name for the relayer
- * @returns BeginResult with relayer client and end function
- *
- * @example
- * ```typescript
- * import { begin } from './src/___PLAYGROUND___/helpers';
- *
- * const { relayer, end } = await begin();
- *
- * // Use the relayer
- * const address = await relayer.address();
- * const balance = await relayer.getBalanceOf();
- *
- * // End when done
- * await end();
- * ```
- */
 export const begin = async (
   fundingAmount: string = '5',
   relayerName?: string,
@@ -506,7 +471,6 @@ export const begin = async (
   let serverProcess: ChildProcess | null = null;
 
   try {
-    // // Step 1: Start Anvil if needed
     // const anvilRunning = await isAnvilRunning();
     // if (!anvilRunning) {
     //   if (!quiet) console.log('🔨 Starting Anvil...');
@@ -514,7 +478,6 @@ export const begin = async (
     //   await waitForAnvil(30, 1000, quiet);
     // }
     //
-    // // Step 2: Start RRelayer server if needed
     // const serverRunning = await isServerRunning();
     // if (!serverRunning) {
     //   if (!quiet) console.log('🚀 Starting RRelayer server...');
@@ -522,7 +485,6 @@ export const begin = async (
     //   await waitForServer(60, 1000, quiet);
     // }
 
-    // Step 3: Create client and funded relayer
     const client = createBasicAuthClient();
 
     const { relayer: relayerInfo } = await createRelayerAndFund(
@@ -533,10 +495,8 @@ export const begin = async (
       quiet
     );
 
-    // Step 4: Create admin relayer client
     const relayer = await client.getRelayerClient(relayerInfo.id);
 
-    // Step 5: Get accounts
     const accounts = getAnvilAccounts();
 
     if (!quiet)
@@ -544,7 +504,6 @@ export const begin = async (
         `✅ Ready! Relayer ${relayerInfo.id} at ${relayerInfo.address}\n`
       );
 
-    // End function
     const end = async () => {
       try {
         await client.relayer.delete(relayerInfo.id);

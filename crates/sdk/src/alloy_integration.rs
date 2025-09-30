@@ -49,7 +49,7 @@ pub enum RelayerSignerError {
 ///     server_url: "http://localhost:8000".to_string(),
 ///     relayer_id: relayer_id.clone(),
 ///     auth: RelayerClientAuth::ApiKey { api_key: "your-key".to_string() },
-///     speed: None,
+///     fallback_speed: None,
 /// };
 /// let relayer_client = Arc::new(RelayerClient::new(config));
 /// let address = Address::from_str("0x742d35cc6634c0532925a3b8d67e8000c942b1b5")?;

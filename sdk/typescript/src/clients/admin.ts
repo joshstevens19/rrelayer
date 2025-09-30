@@ -19,7 +19,7 @@ export interface AdminRelayerClientConfig {
     username: string;
     password: string;
   };
-  speed?: TransactionSpeed;
+  fallbackSpeed?: TransactionSpeed;
 }
 
 export class AdminRelayerClient extends RelayerClient {
@@ -29,7 +29,7 @@ export class AdminRelayerClient extends RelayerClient {
       providerUrl: config.providerUrl,
       relayerId: config.relayerId,
       auth: config.auth,
-      speed: config.speed,
+      fallbackSpeed: config.fallbackSpeed,
     });
   }
 
