@@ -10,6 +10,9 @@ export const sendTransaction = async () => {
   }
   const transaction = await relayerClient.transaction.send(request);
   console.log('transaction', transaction);
+
+  let receipt = await relayerClient.transaction.waitForTransactionReceiptById(transaction.id);
+  console.log('receipt', receipt);
 };
 
 sendTransaction().then(() => console.log('send-transaction done'));
