@@ -4,7 +4,6 @@
 
 31st September plan:
 - Last change for the gas bumping + price in bump_every config
-- Fix the TODOs on the missing data 
 - Reread documentation 
 - Get CI builds / releases working
 - Testing
