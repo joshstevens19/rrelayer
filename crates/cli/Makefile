@@ -14,6 +14,8 @@ start_local:
 	RUST_BACKTRACE=1 cargo run -- start --path $(CURDIR)/../../playground/local-node
 start_base:
 	RUST_BACKTRACE=1 cargo run -- start --path $(CURDIR)/../../playground/base
+start_sepolia:
+	RUST_BACKTRACE=1 cargo run -- start --path $(CURDIR)/../../playground/sepolia
 
 auth_login:
 	cargo run -- auth login

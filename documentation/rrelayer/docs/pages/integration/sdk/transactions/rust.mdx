@@ -316,9 +316,11 @@ async fn example() -> Result<()> {
 
 ### Blob Transaction
 
-:::warn
+:::warning
 To send blob transactions you need to make sure [enable_sending_blobs](/config/networks/config#enable_sending_blobs---optional)
 is enabled and your on a chain which supports blobs.
+
+Alongside only paid nodes will send blobs due to payload size.
 :::
 
 #### Basic Auth

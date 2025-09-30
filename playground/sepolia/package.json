@@ -1,0 +1,24 @@
+{
+  "name": "sepolia",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "relayer::create": "ts-node src/relayer/create-relayer.ts",
+    "transaction::send": "ts-node src/transaction/send-transaction.ts",
+    "transaction::send-blob": "ts-node src/transaction/send-blob-transaction.ts",
+    "gas::price": "ts-node src/network/get-gas-price.ts"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "rrelayer": "^1.0.5"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
+  }
+}

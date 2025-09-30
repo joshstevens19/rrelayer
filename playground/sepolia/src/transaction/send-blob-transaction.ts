@@ -3,7 +3,7 @@ import {client} from "../client";
 import { TransactionToSend , createBlobFromString}  from "rrelayer";
 
 export const sendBlobTransaction = async () => {
-  const relayerClient = await client.getRelayerClient('d6dd6bcc-6a7d-4645-bf83-663da3bae8cd');
+  const relayerClient = await client.getRelayerClient('51207abe-b9e0-4dd0-b843-76522d3e47c6');
 
   const blobData = createBlobFromString('hello world');
 
@@ -13,6 +13,13 @@ export const sendBlobTransaction = async () => {
   }
   const transaction = await relayerClient.transaction.send(request);
   console.log('transaction', transaction);
+  const startTime = Date.now();
+
+  let receipt = await relayerClient.transaction.waitForTransactionReceiptById(transaction.id);
+  console.log('receipt', receipt);
+  const endTime = Date.now();
+  const timeTaken = endTime - startTime;
+  console.log(`⏱️  Time to receipt: ${timeTaken}ms (${(timeTaken / 1000).toFixed(2)}s)`);
 };
 
 sendBlobTransaction().then(() => console.log('send-transaction done'));
