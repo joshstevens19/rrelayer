@@ -17,6 +17,9 @@ gas management, and real-time monitoring through intuitive APIs.
 
 You can get to the full rrelayer documentation [here](https://rrelayer.xyz/).
 
+> [!NOTE]
+> This project was sponsored by the Ethereum Foundation
+
 ## Install
 
 ```bash
