@@ -27,7 +27,7 @@ export const getGasPrices = async (
   try {
     const response = await getApi<GasEstimatorResult | null>(
       baseConfig,
-      `gas/price/${chainId}`
+      `networks/gas/price/${chainId}`
     );
     return response.data;
   } catch (error: any) {
