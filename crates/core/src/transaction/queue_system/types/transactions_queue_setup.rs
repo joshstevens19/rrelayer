@@ -25,6 +25,7 @@ pub struct TransactionsQueueSetup {
 }
 
 impl TransactionsQueueSetup {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         relayer: Relayer,
         evm_provider: EvmProvider,
