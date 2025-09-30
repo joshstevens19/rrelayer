@@ -6,6 +6,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "relayer::create": "ts-node src/relayer/create-relayer.ts",
     "transaction::send": "ts-node src/transaction/send-transaction.ts",
+    "transaction::send-blob": "ts-node src/transaction/send-blob-transaction.ts",
     "gas::price": "ts-node src/network/get-gas-price.ts"
   },
   "author": "",
