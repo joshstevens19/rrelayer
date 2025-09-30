@@ -21,7 +21,8 @@ Cargo.lock
 *.pdb
 
 *.tmp
-Cargo.toml.tmp
+*.toml.tmp
+*.toml.bak
 
 .claude
 
