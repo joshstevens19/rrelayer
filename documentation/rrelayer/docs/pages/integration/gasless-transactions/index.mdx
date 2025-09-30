@@ -1,0 +1,525 @@
+# Gasless Transactions
+
+In every EVM network you have a native token which is the token used to pay for gas which in turn is paying someone to mine and put your transaction in a block.
+To interact with the network you need to pay gas, but what if you don't have any gas? You can't do anything, you can't even send a transaction to someone to ask for gas.
+This becomes a huge problem when you onboard a new user to the network, now they have to go to crypto exchange and buy some native token to pay for gas,
+and they have to do this before they can do anything on your app. You can just see from reading that how most users would just give up then as buying the native token can take time and be a hassle.
+rrelayer gives you the infrastructure to solve this issue.
+
+## How it works?
+
+So a user tends to send the transaction directly to the blockchain via a JSONRPC call which in turn will add it to the mempool and then a miner will pick it up and put it in a block.
+With a relayer the flows are slightly different, the user sends the transaction to the rrelayer, the rrelayer then sends the transaction to the blockchain and pays for the gas.
+The relayer then makes sure the transaction being supported has the correct gas prices and gets the transaction over the line.
+
+## Support on users byhalf or just submit transactions?
+
+This is an important thing to consider their are two ways a person may be wanting to use a relayer.
+
+1. You just want to submit a transaction and anyone can call it or the relayer address can call it only. Lets imagine you got some state you want to push back to Ethereum,
+you can just call the relayer and it will submit the transaction its not about the address itself its just something which needs actioning. Also if you need to do a migration script
+and migration a ton of state from a contract you could allowlist the relayer address and fire it.
+2. You want the user to do the action but the relayer paying the gas for them to do it. We will focus more on this point below so we can be sure we all understand.
+
+## How does the relayer pay for the gas on the users behalf then?
+
+So this is the bit more complicated bit, this does not work by default it depends how the smart contracts are designed.
+A lot of smart contracts have thought about this and have a way to support gasless transactions.
+There are many ways to do this, but the most common is to use EIP-2771 or EIP-721 style signatures to approve allowance for a relayer to pay for the gas on the users behalf.
+Just note here there are many ways to do this and it depends on the smart contract you are interacting with or the smart contract you are building.
+
+## EIP-712
+
+EIP-712 is a standard for hashing and signing typed structured data. It allows users to sign messages off-chain that can then be verified on-chain, enabling gasless transactions where your backend relayer can submit the transaction with the user's signature.
+
+### How EIP-712 Works with rrelayer
+
+1. **User signs typed data off-chain** - The user signs a structured message in your frontend
+2. **Send signature to your backend** - Your frontend sends the signature and data to your backend API
+3. **Backend submits via rrelayer** - Your backend uses rrelayer to submit the transaction with the signature data
+4. **Contract verifies signature** - The smart contract verifies the signature and executes the transaction
+
+### Example: EIP-712 Token Transfer
+
+Here's how to implement gasless ERC-20 transfers using EIP-712 signatures with rrelayer backend integration:
+
+#### Smart Contract (Solidity)
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+
+contract GaslessERC20 is ERC20, EIP712 {
+    using ECDSA for bytes32;
+
+    mapping(address => uint256) private _nonces;
+
+    bytes32 private constant TRANSFER_TYPEHASH = 
+        keccak256("Transfer(address from,address to,uint256 value,uint256 nonce,uint256 deadline)");
+
+    constructor() ERC20("GaslessToken", "GLT") EIP712("GaslessToken", "1") {}
+
+    function nonces(address owner) public view returns (uint256) {
+        return _nonces[owner];
+    }
+
+    function transferWithSignature(
+        address from,
+        address to,
+        uint256 value,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external {
+        require(block.timestamp <= deadline, "Signature expired");
+
+        bytes32 structHash = keccak256(
+            abi.encode(TRANSFER_TYPEHASH, from, to, value, _nonces[from]++, deadline)
+        );
+
+        bytes32 hash = _hashTypedDataV4(structHash);
+        address signer = hash.recover(v, r, s);
+        require(signer == from, "Invalid signature");
+
+        _transfer(from, to, value);
+    }
+}
+```
+
+#### Backend Integration with rrelayer
+
+```typescript
+import { createRelayerClient, TransactionSpeed } from 'rrelayer-ts';
+import { createWalletClient, createPublicClient, custom, http, parseEther } from 'viem';
+import { mainnet } from 'viem/chains';
+
+// Configure rrelayer client
+const relayer = createRelayerClient({
+  serverUrl: 'http://localhost:8000', // Your rrelayer server
+  relayerId: '94afb207-bb47-4392-9229-ba87e4d783cb',
+  apiKey: 'YOUR_API_KEY',
+  speed: TransactionSpeed.FAST,
+});
+
+const chain = await relayer.getViemChain();
+
+const walletClient = createWalletClient({
+  account: await relayer.address(),
+  chain,
+  transport: custom(relayer.ethereumProvider()),
+});
+
+const publicClient = createPublicClient({
+  chain,
+  transport: http('YOUR_NODE_URL'),
+});
+
+// Your API endpoint handler
+app.post('/api/gasless-transfer', async (req, res) => {
+  try {
+    // IMPORTANT: Implement authentication and rate limiting
+    // This endpoint pays for gas - protect it from abuse!
+    
+    // Example: Verify JWT token
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token || !verifyJWT(token)) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    // Example: Rate limiting per user
+    const userId = getUserFromToken(token);
+    if (await isRateLimited(userId)) {
+      return res.status(429).json({ error: 'Rate limit exceeded' });
+    }
+    
+    const { from, to, value, deadline, signature } = req.body;
+    
+    // Additional validation: Verify the 'from' address matches authenticated user
+    const userAddress = getUserAddressFromToken(token);
+    if (from.toLowerCase() !== userAddress.toLowerCase()) {
+      return res.status(403).json({ error: 'Cannot transfer from different address' });
+    }
+    
+    // Validate transfer amount limits (prevent large transfers)
+    if (BigInt(value) > parseEther('100')) { // Max 100 tokens per transaction
+      return res.status(400).json({ error: 'Transfer amount too large' });
+    }
+    
+    // Parse the signature components
+    const sig = parseSignature(signature);
+    
+    // ABI for the gasless transfer function
+    const gaslessTokenAbi = [
+      {
+        inputs: [
+          { name: 'from', type: 'address' },
+          { name: 'to', type: 'address' },
+          { name: 'value', type: 'uint256' },
+          { name: 'deadline', type: 'uint256' },
+          { name: 'v', type: 'uint8' },
+          { name: 'r', type: 'bytes32' },
+          { name: 's', type: 'bytes32' }
+        ],
+        name: 'transferWithSignature',
+        outputs: [],
+        stateMutability: 'nonpayable',
+        type: 'function',
+      }
+    ] as const;
+
+    // Submit transaction via rrelayer - relayer pays gas
+    const { request } = await publicClient.simulateContract({
+      address: '0x...', // Your GaslessERC20 contract address
+      abi: gaslessTokenAbi,
+      functionName: 'transferWithSignature',
+      args: [from, to, BigInt(value), BigInt(deadline), sig.v, sig.r, sig.s]
+    });
+    
+    const hash = await walletClient.writeContract(request);
+    
+    res.json({ success: true, transactionHash: hash });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+function parseSignature(signature: string) {
+  const r = signature.slice(0, 66);
+  const s = '0x' + signature.slice(66, 130);
+  const v = parseInt(signature.slice(130, 132), 16);
+  return { v, r, s };
+}
+```
+
+#### Frontend (User Signs)
+
+```typescript
+// Frontend code for user to sign the transfer
+async function signTransfer(
+  userWallet: any,
+  from: string,
+  to: string,
+  value: string,
+  deadline: number,
+  nonce: number
+) {
+  const domain = {
+    name: 'GaslessToken',
+    version: '1',
+    chainId: 1,
+    verifyingContract: '0x...' // Your contract address
+  };
+
+  const types = {
+    Transfer: [
+      { name: 'from', type: 'address' },
+      { name: 'to', type: 'address' },
+      { name: 'value', type: 'uint256' },
+      { name: 'nonce', type: 'uint256' },
+      { name: 'deadline', type: 'uint256' }
+    ]
+  };
+
+  const message = {
+    from,
+    to,
+    value,
+    nonce,
+    deadline
+  };
+
+  return await userWallet._signTypedData(domain, types, message);
+}
+
+// Frontend submits to your backend
+async function requestGaslessTransfer(from: string, to: string, value: string) {
+  const deadline = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
+  const nonce = await contract.nonces(from); // Get current nonce
+  
+  const signature = await signTransfer(userWallet, from, to, value, deadline, nonce);
+  
+  const response = await fetch('/api/gasless-transfer', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from, to, value, deadline, signature })
+  });
+  
+  return response.json();
+}
+```
+
+## ERC-2771
+
+ERC-2771 defines a standard way to enable meta-transactions by having contracts trust specific forwarder contracts. The forwarder verifies signatures and appends the original sender's address to the call data.
+
+### How ERC-2771 Works with rrelayer
+
+1. **User signs meta-transaction** - User signs a message containing the function call they want to execute
+2. **Send to your backend** - The signed meta-transaction is sent to your backend API
+3. **Backend submits via rrelayer** - Your backend uses rrelayer to send the transaction to the trusted forwarder
+4. **Forwarder verifies and forwards** - The forwarder verifies the signature and forwards the call to the target contract
+
+### Example: ERC-2771 NFT Minting
+
+Here's how to implement gasless NFT minting using ERC-2771 with rrelayer backend integration:
+
+#### Smart Contract (Solidity)
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
+
+contract GaslessNFT is ERC721, ERC2771Context {
+    uint256 private _tokenIds;
+    
+    constructor(address trustedForwarder) 
+        ERC721("GaslessNFT", "GNFT") 
+        ERC2771Context(trustedForwarder) 
+    {}
+
+    function mint(address to) external {
+        uint256 newTokenId = _tokenIds++;
+        _mint(to, newTokenId);
+    }
+
+    // Override required for ERC2771Context
+    function _msgSender() internal view override(Context, ERC2771Context) returns (address) {
+        return ERC2771Context._msgSender();
+    }
+
+    function _msgData() internal view override(Context, ERC2771Context) returns (bytes calldata) {
+        return ERC2771Context._msgData();
+    }
+}
+```
+
+#### Backend Integration with rrelayer
+
+```typescript
+import { createRelayerClient, TransactionSpeed } from 'rrelayer-ts';
+import { createWalletClient, createPublicClient, custom, http, encodeFunctionData } from 'viem';
+
+// Configure rrelayer client
+const relayer = createRelayerClient({
+  serverUrl: 'http://localhost:8000',
+  relayerId: '94afb207-bb47-4392-9229-ba87e4d783cb',
+  apiKey: 'YOUR_API_KEY',
+  speed: TransactionSpeed.FAST,
+});
+
+const chain = await relayer.getViemChain();
+
+const walletClient = createWalletClient({
+  account: await relayer.address(),
+  chain,
+  transport: custom(relayer.ethereumProvider()),
+});
+
+const publicClient = createPublicClient({
+  chain,
+  transport: http('YOUR_NODE_URL'),
+});
+
+// Your API endpoint handler
+app.post('/api/gasless-mint', async (req, res) => {
+  try {
+    // IMPORTANT: Implement authentication and rate limiting
+    // This endpoint pays for gas - protect it from abuse!
+    
+    // Example: Verify JWT token
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token || !verifyJWT(token)) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    // Example: Rate limiting per user (e.g., max 5 mints per day)
+    const userId = getUserFromToken(token);
+    if (await hasExceededMintLimit(userId)) {
+      return res.status(429).json({ error: 'Daily mint limit exceeded' });
+    }
+    
+    const { request, signature } = req.body;
+    
+    // Validate the request is from the authenticated user
+    const userAddress = getUserAddressFromToken(token);
+    if (request.from.toLowerCase() !== userAddress.toLowerCase()) {
+      return res.status(403).json({ error: 'Cannot mint from different address' });
+    }
+    
+    // MinimalForwarder ABI
+    const forwarderAbi = [
+      {
+        inputs: [
+          {
+            components: [
+              { name: 'from', type: 'address' },
+              { name: 'to', type: 'address' },
+              { name: 'value', type: 'uint256' },
+              { name: 'gas', type: 'uint256' },
+              { name: 'nonce', type: 'uint256' },
+              { name: 'data', type: 'bytes' }
+            ],
+            name: 'req',
+            type: 'tuple'
+          },
+          { name: 'signature', type: 'bytes' }
+        ],
+        name: 'execute',
+        outputs: [{ name: '', type: 'bool' }, { name: '', type: 'bytes' }],
+        stateMutability: 'payable',
+        type: 'function'
+      }
+    ] as const;
+
+    // Submit meta-transaction via rrelayer through trusted forwarder
+    const { request: simulatedRequest } = await publicClient.simulateContract({
+      address: '0x...', // Trusted forwarder address
+      abi: forwarderAbi,
+      functionName: 'execute',
+      args: [request, signature]
+    });
+    
+    const hash = await walletClient.writeContract(simulatedRequest);
+    
+    res.json({ success: true, transactionHash: hash });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+```
+
+#### Frontend (User Signs Meta-Transaction)
+
+```typescript
+// Frontend code for user to sign meta-transaction
+async function signMintRequest(
+  userWallet: any,
+  forwarderAddress: string,
+  nftContractAddress: string,
+  userAddress: string
+) {
+  const domain = {
+    name: 'MinimalForwarder',
+    version: '0.0.1',
+    chainId: 1,
+    verifyingContract: forwarderAddress
+  };
+
+  const types = {
+    ForwardRequest: [
+      { name: 'from', type: 'address' },
+      { name: 'to', type: 'address' },
+      { name: 'value', type: 'uint256' },
+      { name: 'gas', type: 'uint256' },
+      { name: 'nonce', type: 'uint256' },
+      { name: 'data', type: 'bytes' }
+    ]
+  };
+
+  // Encode the mint function call
+  const mintData = encodeFunctionData({
+    abi: [{ 
+      inputs: [{ name: 'to', type: 'address' }],
+      name: 'mint',
+      outputs: [],
+      stateMutability: 'nonpayable',
+      type: 'function'
+    }],
+    functionName: 'mint',
+    args: [userAddress]
+  });
+  
+  // Get nonce from forwarder contract
+  const nonce = await forwarderContract.read.getNonce([userAddress]);
+
+  const request = {
+    from: userAddress,
+    to: nftContractAddress,
+    value: 0n,
+    gas: 100000n,
+    nonce: Number(nonce),
+    data: mintData
+  };
+
+  const signature = await userWallet._signTypedData(domain, types, request);
+  
+  return { request, signature };
+}
+
+// Frontend submits to your backend
+async function requestGaslessMint(userAddress: string) {
+  const { request, signature } = await signMintRequest(
+    userWallet,
+    forwarderAddress,
+    nftContractAddress,
+    userAddress
+  );
+
+  const response = await fetch('/api/gasless-mint', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ request, signature })
+  });
+  
+  return response.json();
+}
+```
+
+## Security Considerations
+
+**⚠️ CRITICAL: These API endpoints pay for gas costs - they must be protected from abuse!**
+
+### Required Security Measures
+
+#### 1. Authentication
+```typescript
+// Implement JWT or API key authentication
+const token = req.headers.authorization?.replace('Bearer ', '');
+if (!token || !verifyJWT(token)) {
+  return res.status(401).json({ error: 'Unauthorized' });
+}
+```
+
+#### 2. Rate Limiting
+
+rrelayer has built-in rate limiting that works with direct SDK integration. Configure rate limits per relayer or API key in your rrelayer dashboard - see the [rate limiting documentation](/integration/sdk/create-client-authentication/node#rate-limiting) for details.
+
+#### 3. User Validation
+```typescript
+// Ensure users can only submit transactions for their own addresses
+const userAddress = getUserAddressFromToken(token);
+if (from.toLowerCase() !== userAddress.toLowerCase()) {
+  return res.status(403).json({ error: 'Address mismatch' });
+}
+```
+
+#### 4. Value Limits
+```typescript
+// Implement value limits to prevent large transfers
+if (BigInt(value) > parseEther('100')) {
+  return res.status(400).json({ error: 'Amount too large' });
+}
+```
+
+#### 5. Signature Validation
+```typescript
+// Verify the signature is recent (prevent replay attacks)
+const currentTime = Math.floor(Date.now() / 1000);
+if (deadline < currentTime) {
+  return res.status(400).json({ error: 'Signature expired' });
+}
+
+// Additional nonce validation can be implemented
+const expectedNonce = await contract.nonces(from);
+if (nonce !== expectedNonce) {
+  return res.status(400).json({ error: 'Invalid nonce' });
+}
+```

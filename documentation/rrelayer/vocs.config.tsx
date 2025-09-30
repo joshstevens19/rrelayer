@@ -679,6 +679,15 @@ export default defineConfig({
             },
           ],
         },
+        {
+          text: 'Gasless Transactions',
+          collapsed: false,
+          items: [
+            { text: 'Introduction', link: '/integration/gasless-transactions#gasless-transactions' },
+            { text: 'EIP-712', link: '/integration/gasless-transactions#eip-712' },
+            { text: 'ERC-2771', link: '/integration/gasless-transactions#erc-2771' },
+          ]
+        }
       ],
     },
     {
