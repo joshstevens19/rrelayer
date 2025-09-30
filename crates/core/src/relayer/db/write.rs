@@ -62,7 +62,7 @@ impl PostgresClient {
         match &mode {
             CreateRelayerMode::Clone(clone_relayer_id) => {
                 let source_relayer = self
-                    .get_relayer(&clone_relayer_id)
+                    .get_relayer(clone_relayer_id)
                     .await
                     .map_err(|e| {
                         CreateRelayerError::CouldNotSaveRelayerDb(name.to_string(), *chain_id, e)

@@ -76,7 +76,7 @@ impl PostgresClient {
         let legacy_gas_price = option_if(legacy_transaction, sent_with_gas.legacy_gas_price());
 
         let sent_with_gas_json =
-            serde_json::to_value(sent_with_gas).unwrap_or_else(|_| serde_json::Value::Null);
+            serde_json::to_value(sent_with_gas).unwrap_or(serde_json::Value::Null);
 
         let sent_with_blob_gas_json = sent_with_blob_gas
             .map(|blob_gas| serde_json::to_value(blob_gas).unwrap_or(serde_json::Value::Null));
