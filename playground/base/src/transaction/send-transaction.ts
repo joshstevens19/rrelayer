@@ -10,9 +10,13 @@ export const sendTransaction = async () => {
   }
   const transaction = await relayerClient.transaction.send(request);
   console.log('transaction', transaction);
+  const startTime = Date.now();
 
   let receipt = await relayerClient.transaction.waitForTransactionReceiptById(transaction.id);
   console.log('receipt', receipt);
+  const endTime = Date.now();
+  const timeTaken = endTime - startTime;
+  console.log(`⏱️  Time to receipt: ${timeTaken}ms (${(timeTaken / 1000).toFixed(2)}s)`);
 };
 
 sendTransaction().then(() => console.log('send-transaction done'));

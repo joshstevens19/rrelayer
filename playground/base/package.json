@@ -14,7 +14,7 @@
   "description": "",
   "dependencies": {
     "dotenv": "^17.2.3",
-    "rrelayer": "^1.0.4"
+    "rrelayer": "^1.0.5"
   },
   "devDependencies": {
     "prettier": "^3.6.2",
