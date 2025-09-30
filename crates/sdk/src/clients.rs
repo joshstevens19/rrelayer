@@ -391,7 +391,7 @@ impl<'a> AdminRelayerClientTransactionApi<'a> {
             if let Some(status_result) = result {
                 match status_result.status {
                     TransactionStatus::PENDING | TransactionStatus::INMEMPOOL => {
-                        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
                         continue;
                     }
                     TransactionStatus::MINED

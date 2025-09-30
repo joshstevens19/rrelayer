@@ -264,7 +264,8 @@ export class RelayerClient {
         );
       },
       waitForTransactionReceiptById: async (
-        transactionId: string
+        transactionId: string,
+        tryEveryMs: number = 100,
       ): Promise<TransactionReceipt> => {
         while (true) {
           const result = await this.transaction.getStatus(transactionId);
@@ -275,7 +276,7 @@ export class RelayerClient {
           switch (result.status.toUpperCase()) {
             case TransactionStatus.PENDING:
             case TransactionStatus.INMEMPOOL:
-              await new Promise((resolve) => setTimeout(resolve, 500));
+              await new Promise((resolve) => setTimeout(resolve, tryEveryMs));
               break;
             case TransactionStatus.MINED:
             case TransactionStatus.CONFIRMED:
