@@ -95,6 +95,7 @@ impl TransactionsQueues {
                         setup.mined_transactions,
                         safe_proxy_manager.clone(),
                         setup.gas_bump_config,
+                        setup.max_gas_price_multiplier,
                     ),
                     gas_oracle_cache.clone(),
                     blob_gas_oracle_cache.clone(),
@@ -184,6 +185,7 @@ impl TransactionsQueues {
                     HashMap::new(),
                     self.safe_proxy_manager.clone(),
                     setup.gas_bump_config,
+                    setup.max_gas_price_multiplier,
                 ),
                 self.gas_oracle_cache.clone(),
                 self.blob_gas_oracle_cache.clone(),
@@ -1140,6 +1142,35 @@ impl TransactionsQueues {
                         Ok(None) => {
                             if let Some(sent_at) = transaction.sent_at {
                                 let elapsed = Utc::now() - sent_at;
+
+                                let at_max_gas_cap =
+                                    if let Some(ref sent_gas) = transaction.sent_with_gas {
+                                        transactions_queue.is_at_max_gas_price_cap(sent_gas).await
+                                    } else {
+                                        false
+                                    };
+
+                                let at_max_blob_gas_cap = if let Some(ref sent_blob_gas) =
+                                    transaction.sent_with_blob_gas
+                                {
+                                    transactions_queue
+                                        .is_at_max_blob_gas_price_cap(sent_blob_gas)
+                                        .await
+                                } else {
+                                    false
+                                };
+
+                                if at_max_gas_cap || at_max_blob_gas_cap {
+                                    info!(
+                                        "Transaction {} has reached maximum gas price cap (gas: {}, blob: {}), skipping gas bump for relayer: {}",
+                                        transaction.id, at_max_gas_cap, at_max_blob_gas_cap, transactions_queue.relayer_name()
+                                    );
+                                    return Ok(ProcessResult::<ProcessInmempoolStatus>::other(
+                                        ProcessInmempoolStatus::StillInmempool,
+                                        Some(&500), // TODO: maybe pick from block??
+                                    ));
+                                }
+
                                 if transactions_queue.should_bump_gas(
                                     elapsed.num_milliseconds() as u64,
                                     &transaction.speed,
@@ -1175,7 +1206,7 @@ impl TransactionsQueues {
 
                             Ok(ProcessResult::<ProcessInmempoolStatus>::other(
                                 ProcessInmempoolStatus::StillInmempool,
-                                Some(&500), // recheck again in 500ms
+                                Some(&500), // recheck again in 500ms TODO: maybe pick from block??
                             ))
                         }
                         Err(e) => {

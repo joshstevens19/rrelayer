@@ -56,12 +56,13 @@ pub async fn create_relayer(
     let id = relayer.id;
     let address = relayer.address;
 
-    let gas_bump_config = state
-        .network_configs
-        .iter()
-        .find(|config| config.chain_id == chain_id)
-        .map(|config| config.gas_bump_blocks_every.clone())
-        .unwrap_or_default();
+    let network_config = state.network_configs.iter().find(|config| config.chain_id == chain_id);
+
+    let gas_bump_config =
+        network_config.map(|config| config.gas_bump_blocks_every.clone()).unwrap_or_default();
+
+    let max_gas_price_multiplier =
+        network_config.map(|config| config.max_gas_price_multiplier).unwrap_or(2);
 
     state
         .transactions_queues
@@ -77,6 +78,7 @@ pub async fn create_relayer(
                 Default::default(),
                 state.safe_proxy_manager.clone(),
                 gas_bump_config,
+                max_gas_price_multiplier,
             ),
             state.transactions_queues.clone(),
         )

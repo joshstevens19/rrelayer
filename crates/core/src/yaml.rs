@@ -258,6 +258,10 @@ fn default_super_blocks() -> u64 {
     2
 }
 
+fn default_max_gas_price_multiplier() -> u64 {
+    4
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NetworkSetupConfig {
     pub name: String,
@@ -285,6 +289,8 @@ pub struct NetworkSetupConfig {
     pub enable_sending_blobs: Option<bool>,
     #[serde(default)]
     pub gas_bump_blocks_every: GasBumpBlockConfig,
+    #[serde(default = "default_max_gas_price_multiplier")]
+    pub max_gas_price_multiplier: u64,
 }
 
 impl From<NetworkSetupConfig> for Network {

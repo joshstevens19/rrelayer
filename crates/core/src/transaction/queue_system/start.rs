@@ -389,11 +389,15 @@ pub async fn startup_transactions_queues(
                     repopulate_transaction_queue(&postgres, &relayer_id, &TransactionStatus::MINED)
                         .await?;
 
-                let gas_bump_config = network_configs
-                    .iter()
-                    .find(|config| config.chain_id == relayer.chain_id)
+                let network_config =
+                    network_configs.iter().find(|config| config.chain_id == relayer.chain_id);
+
+                let gas_bump_config = network_config
                     .map(|config| config.gas_bump_blocks_every.clone())
                     .unwrap_or_default();
+
+                let max_gas_price_multiplier =
+                    network_config.map(|config| config.max_gas_price_multiplier).unwrap_or(2);
 
                 transaction_relayer_setups.push(TransactionRelayerSetup::new(
                     relayer,
@@ -410,6 +414,7 @@ pub async fn startup_transactions_queues(
                         .map(|transaction| (transaction.id, transaction))
                         .collect(),
                     gas_bump_config,
+                    max_gas_price_multiplier,
                 ));
             }
         }

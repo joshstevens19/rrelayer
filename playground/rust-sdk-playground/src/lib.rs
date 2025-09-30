@@ -1,4 +1,4 @@
-#![allow(dead_code)]
+#![allow(dead_code, unused_variables, unused)]
 
 pub mod networks;
 pub mod rate_limit;

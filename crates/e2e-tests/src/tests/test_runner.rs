@@ -441,7 +441,7 @@ impl TestRunner {
     }
 
     async fn run_registry_test(&mut self, test_def: &registry::TestDefinition) -> TestInfo {
-        print!("[TEST] {} ... ", test_def.description);
+        println!("[TEST] {} ... ", test_def.description);
         let start = Instant::now();
 
         let webhook_server =

@@ -34,6 +34,15 @@ impl TransactionSpeed {
             TransactionSpeed::SUPER => "SUPER".to_string(),
         }
     }
+
+    pub fn next_speed(&self) -> Option<TransactionSpeed> {
+        match self {
+            TransactionSpeed::SLOW => Some(TransactionSpeed::MEDIUM),
+            TransactionSpeed::MEDIUM => Some(TransactionSpeed::FAST),
+            TransactionSpeed::FAST => Some(TransactionSpeed::SUPER),
+            TransactionSpeed::SUPER => None,
+        }
+    }
 }
 
 impl<'a> FromSql<'a> for TransactionSpeed {

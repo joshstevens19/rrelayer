@@ -13,7 +13,7 @@ use crate::transaction::types::{TransactionNonce, TransactionValue};
 use crate::{
     gas::{
         BlobGasOracleCache, BlobGasPriceResult, GasLimit, GasOracleCache, GasPrice, GasPriceResult,
-        BLOB_GAS_PER_BLOB,
+        MaxFee, MaxPriorityFee, BLOB_GAS_PER_BLOB,
     },
     network::ChainId,
     postgres::PostgresClient,
@@ -52,6 +52,7 @@ pub struct TransactionsQueue {
     confirmations: u64,
     safe_proxy_manager: Arc<SafeProxyManager>,
     gas_bump_config: GasBumpBlockConfig,
+    max_gas_price_multiplier: u64,
 }
 
 impl TransactionsQueue {
@@ -77,6 +78,7 @@ impl TransactionsQueue {
             confirmations,
             safe_proxy_manager: setup.safe_proxy_manager,
             gas_bump_config: setup.gas_bump_config,
+            max_gas_price_multiplier: setup.max_gas_price_multiplier,
         }
     }
 
@@ -85,18 +87,85 @@ impl TransactionsQueue {
     }
 
     pub fn should_bump_gas(&self, ms_between_times: u64, speed: &TransactionSpeed) -> bool {
-        let should_bump = ms_between_times
+        let time_threshold_met = ms_between_times
             > (self.evm_provider.blocks_every * self.blocks_to_wait_before_bump(speed));
-        if should_bump {
-            info!(
-                "Gas bump required for relayer: {} - elapsed: {}ms, threshold: {}ms, speed: {:?}",
-                self.relayer.name,
-                ms_between_times,
-                self.evm_provider.blocks_every * self.blocks_to_wait_before_bump(speed),
-                speed
-            );
+
+        if !time_threshold_met {
+            return false;
         }
-        should_bump
+
+        info!(
+            "Gas bump time threshold met for relayer: {} - elapsed: {}ms, threshold: {}ms, speed: {:?}",
+            self.relayer.name,
+            ms_between_times,
+            self.evm_provider.blocks_every * self.blocks_to_wait_before_bump(speed),
+            speed
+        );
+
+        true
+    }
+
+    /// Checks if a transaction has reached the maximum gas price cap and shouldn't be bumped further
+    pub async fn is_at_max_gas_price_cap(&self, sent_gas: &GasPriceResult) -> bool {
+        // Get SUPER speed gas price for cap calculation
+        let super_gas_price = {
+            let gas_oracle = self.gas_oracle_cache.lock().await;
+            gas_oracle
+                .get_gas_price_for_speed(&self.relayer.chain_id, &TransactionSpeed::SUPER)
+                .await
+        };
+
+        if let Some(super_price) = super_gas_price {
+            let max_allowed_max_fee =
+                super_price.max_fee.into_u128() * (self.max_gas_price_multiplier as u128);
+            let max_allowed_priority_fee =
+                super_price.max_priority_fee.into_u128() * (self.max_gas_price_multiplier as u128);
+
+            let at_max_fee_cap = sent_gas.max_fee.into_u128() >= max_allowed_max_fee;
+            let at_max_priority_fee_cap =
+                sent_gas.max_priority_fee.into_u128() >= max_allowed_priority_fee;
+
+            if at_max_fee_cap || at_max_priority_fee_cap {
+                info!(
+                    "Transaction at maximum gas price cap for relayer: {} - max_fee: {} (cap: {}), max_priority_fee: {} (cap: {})",
+                    self.relayer.name,
+                    sent_gas.max_fee.into_u128(),
+                    max_allowed_max_fee,
+                    sent_gas.max_priority_fee.into_u128(),
+                    max_allowed_priority_fee
+                );
+                return true;
+            }
+        }
+
+        false
+    }
+
+    /// Checks if a transaction has reached the maximum blob gas price cap and shouldn't be bumped further
+    pub async fn is_at_max_blob_gas_price_cap(&self, sent_blob_gas: &BlobGasPriceResult) -> bool {
+        let super_blob_gas_price = {
+            let blob_gas_oracle = self.blob_oracle_cache.lock().await;
+            blob_gas_oracle
+                .get_blob_gas_price_for_speed(&self.relayer.chain_id, &TransactionSpeed::SUPER)
+                .await
+        };
+
+        if let Some(super_price) = super_blob_gas_price {
+            let max_allowed_blob_gas_price =
+                super_price.blob_gas_price * (self.max_gas_price_multiplier as u128);
+
+            if sent_blob_gas.blob_gas_price >= max_allowed_blob_gas_price {
+                info!(
+                    "Transaction at maximum blob gas price cap for relayer: {} - blob_gas_price: {} (cap: {})",
+                    self.relayer.name,
+                    sent_blob_gas.blob_gas_price,
+                    max_allowed_blob_gas_price
+                );
+                return true;
+            }
+        }
+
+        false
     }
 
     pub async fn add_pending_transaction(&mut self, transaction: Transaction) {
@@ -608,6 +677,10 @@ impl TransactionsQueue {
         self.relayer.chain_id
     }
 
+    pub fn relayer_name(&self) -> &str {
+        &self.relayer.name
+    }
+
     /// Returns whether the wallet manager supports EIP-4844 blob transactions
     pub fn supports_blobs(&self) -> bool {
         self.evm_provider.supports_blobs()
@@ -666,37 +739,125 @@ impl TransactionsQueue {
             transaction_speed, self.relayer.name
         );
 
-        let gas_oracle = self.gas_oracle_cache.lock().await;
-        let mut gas_price = gas_oracle
-            .get_gas_price_for_speed(&self.relayer.chain_id, transaction_speed)
-            .await
-            .ok_or(SendTransactionGasPriceError::GasCalculationError)?;
+        let mut gas_price = {
+            let gas_oracle = self.gas_oracle_cache.lock().await;
+            gas_oracle
+                .get_gas_price_for_speed(&self.relayer.chain_id, transaction_speed)
+                .await
+                .ok_or(SendTransactionGasPriceError::GasCalculationError)?
+        };
 
         if let Some(sent_gas) = sent_last_with {
             info!("Adjusting gas price based on previous attempt for relayer: {}. Previous max_fee: {}, max_priority_fee: {}",
                 self.relayer.name, sent_gas.max_fee.into_u128(), sent_gas.max_priority_fee.into_u128());
 
+            // If we haven't escalated to SUPER speed yet, try to get the next speed level
+            if transaction_speed != &TransactionSpeed::SUPER {
+                if let Some(next_speed) = transaction_speed.next_speed() {
+                    info!(
+                        "Using speed escalation for relayer: {} from {:?} to {:?}",
+                        self.relayer.name, transaction_speed, next_speed
+                    );
+                    // Get gas price for the next speed level
+                    if let Some(escalated_gas_price) = {
+                        let gas_oracle = self.gas_oracle_cache.lock().await;
+                        gas_oracle
+                            .get_gas_price_for_speed(&self.relayer.chain_id, &next_speed)
+                            .await
+                    } {
+                        gas_price = escalated_gas_price;
+                        info!(
+                            "Escalated gas price for relayer: {} - max_fee: {}, max_priority_fee: {}",
+                            self.relayer.name,
+                            gas_price.max_fee.into_u128(),
+                            gas_price.max_priority_fee.into_u128()
+                        );
+                    }
+                }
+            } else {
+                // Already at SUPER speed, do small percentage bumps
+                if gas_price.max_fee <= sent_gas.max_fee {
+                    let old_max_fee = gas_price.max_fee;
+                    gas_price.max_fee = sent_gas.max_fee + (sent_gas.max_fee / 20); // 5% bump
+                    info!(
+                        "Small bump max_fee for relayer: {} from {} to {} (5%)",
+                        self.relayer.name,
+                        old_max_fee.into_u128(),
+                        gas_price.max_fee.into_u128()
+                    );
+                }
+
+                if gas_price.max_priority_fee <= sent_gas.max_priority_fee {
+                    let old_priority_fee = gas_price.max_priority_fee;
+                    gas_price.max_priority_fee =
+                        sent_gas.max_priority_fee + (sent_gas.max_priority_fee / 20); // 5% bump
+                    info!(
+                        "Small bump max_priority_fee for relayer: {} from {} to {} (5%)",
+                        self.relayer.name,
+                        old_priority_fee.into_u128(),
+                        gas_price.max_priority_fee.into_u128()
+                    );
+                }
+            }
+
+            // Ensure we never send a transaction with lower or equal gas prices than previously sent
             if gas_price.max_fee <= sent_gas.max_fee {
-                let old_max_fee = gas_price.max_fee;
-                gas_price.max_fee = sent_gas.max_fee + (sent_gas.max_fee / 10);
                 info!(
-                    "Bumped max_fee for relayer: {} from {} to {}",
-                    self.relayer.name,
-                    old_max_fee.into_u128(),
-                    gas_price.max_fee.into_u128()
+                    "Escalated max_fee {} is not higher than previously sent {}, using previous + small bump for relayer: {}",
+                    gas_price.max_fee.into_u128(),
+                    sent_gas.max_fee.into_u128(),
+                    self.relayer.name
                 );
+                gas_price.max_fee = sent_gas.max_fee + (sent_gas.max_fee / 20); // 5% bump
             }
 
             if gas_price.max_priority_fee <= sent_gas.max_priority_fee {
-                let old_priority_fee = gas_price.max_priority_fee;
-                gas_price.max_priority_fee =
-                    sent_gas.max_priority_fee + (sent_gas.max_priority_fee / 10);
                 info!(
-                    "Bumped max_priority_fee for relayer: {} from {} to {}",
-                    self.relayer.name,
-                    old_priority_fee.into_u128(),
-                    gas_price.max_priority_fee.into_u128()
+                    "Escalated max_priority_fee {} is not higher than previously sent {}, using previous + small bump for relayer: {}",
+                    gas_price.max_priority_fee.into_u128(),
+                    sent_gas.max_priority_fee.into_u128(),
+                    self.relayer.name
                 );
+                gas_price.max_priority_fee =
+                    sent_gas.max_priority_fee + (sent_gas.max_priority_fee / 20);
+                // 5% bump
+            }
+
+            // Get SUPER speed gas price for cap calculation
+            let super_gas_price = {
+                let gas_oracle = self.gas_oracle_cache.lock().await;
+                gas_oracle
+                    .get_gas_price_for_speed(&self.relayer.chain_id, &TransactionSpeed::SUPER)
+                    .await
+            };
+
+            if let Some(super_price) = super_gas_price {
+                let max_allowed_max_fee =
+                    super_price.max_fee.into_u128() * (self.max_gas_price_multiplier as u128);
+                let max_allowed_priority_fee = super_price.max_priority_fee.into_u128()
+                    * (self.max_gas_price_multiplier as u128);
+
+                if gas_price.max_fee.into_u128() > max_allowed_max_fee {
+                    info!(
+                        "Gas price max_fee {} exceeds cap {} ({}x SUPER speed), capping for relayer: {}",
+                        gas_price.max_fee.into_u128(),
+                        max_allowed_max_fee,
+                        self.max_gas_price_multiplier,
+                        self.relayer.name
+                    );
+                    gas_price.max_fee = MaxFee::from(max_allowed_max_fee);
+                }
+
+                if gas_price.max_priority_fee.into_u128() > max_allowed_priority_fee {
+                    info!(
+                        "Gas price max_priority_fee {} exceeds cap {} ({}x SUPER speed), capping for relayer: {}",
+                        gas_price.max_priority_fee.into_u128(),
+                        max_allowed_priority_fee,
+                        self.max_gas_price_multiplier,
+                        self.relayer.name
+                    );
+                    gas_price.max_priority_fee = MaxPriorityFee::from(max_allowed_priority_fee);
+                }
             }
         }
 
@@ -720,30 +881,97 @@ impl TransactionsQueue {
             transaction_speed, self.relayer.name
         );
 
-        let blob_gas_oracle = self.blob_oracle_cache.lock().await;
-        let mut blob_gas_price = blob_gas_oracle
-            .get_blob_gas_price_for_speed(&self.relayer.chain_id, transaction_speed)
-            .await
-            .ok_or(SendTransactionGasPriceError::BlobGasCalculationError)?;
+        let mut blob_gas_price = {
+            let blob_gas_oracle = self.blob_oracle_cache.lock().await;
+            blob_gas_oracle
+                .get_blob_gas_price_for_speed(&self.relayer.chain_id, transaction_speed)
+                .await
+                .ok_or(SendTransactionGasPriceError::BlobGasCalculationError)?
+        };
 
         if let Some(sent_blob_gas) = sent_last_with {
             info!("Adjusting blob gas price based on previous attempt for relayer: {}. Previous blob_gas_price: {}",
                 self.relayer.name, sent_blob_gas.blob_gas_price);
 
-            if blob_gas_price.blob_gas_price < sent_blob_gas.blob_gas_price {
-                let old_blob_gas_price = blob_gas_price.blob_gas_price;
+            // If we haven't escalated to SUPER speed yet, try to get the next speed level
+            if transaction_speed != &TransactionSpeed::SUPER {
+                if let Some(next_speed) = transaction_speed.next_speed() {
+                    info!(
+                        "Using speed escalation for blob gas relayer: {} from {:?} to {:?}",
+                        self.relayer.name, transaction_speed, next_speed
+                    );
+                    if let Some(escalated_blob_gas_price) = {
+                        let blob_gas_oracle = self.blob_oracle_cache.lock().await;
+                        blob_gas_oracle
+                            .get_blob_gas_price_for_speed(&self.relayer.chain_id, &next_speed)
+                            .await
+                    } {
+                        blob_gas_price = escalated_blob_gas_price;
+                        info!(
+                            "Escalated blob gas price for relayer: {} - blob_gas_price: {}, total_fee: {}",
+                            self.relayer.name,
+                            blob_gas_price.blob_gas_price,
+                            blob_gas_price.total_fee_for_blob
+                        );
+                    }
+                }
+            } else {
+                // Already at SUPER speed, do small percentage bumps
+                if blob_gas_price.blob_gas_price < sent_blob_gas.blob_gas_price {
+                    let old_blob_gas_price = blob_gas_price.blob_gas_price;
+                    blob_gas_price.blob_gas_price =
+                        sent_blob_gas.blob_gas_price + (sent_blob_gas.blob_gas_price / 20); // 5% bump
+                    blob_gas_price.total_fee_for_blob =
+                        blob_gas_price.blob_gas_price * BLOB_GAS_PER_BLOB;
+
+                    info!(
+                        "Small bump blob gas price for relayer: {} from {} to {} (5%), total_fee: {}",
+                        self.relayer.name,
+                        old_blob_gas_price,
+                        blob_gas_price.blob_gas_price,
+                        blob_gas_price.total_fee_for_blob
+                    );
+                }
+            }
+
+            // Ensure we never send a transaction with lower or equal blob gas price than previously sent
+            if blob_gas_price.blob_gas_price <= sent_blob_gas.blob_gas_price {
+                info!(
+                    "Escalated blob gas price {} is not higher than previously sent {}, using previous + small bump for relayer: {}",
+                    blob_gas_price.blob_gas_price,
+                    sent_blob_gas.blob_gas_price,
+                    self.relayer.name
+                );
                 blob_gas_price.blob_gas_price =
-                    sent_blob_gas.blob_gas_price + (sent_blob_gas.blob_gas_price / 10);
+                    sent_blob_gas.blob_gas_price + (sent_blob_gas.blob_gas_price / 20); // 5% bump
                 blob_gas_price.total_fee_for_blob =
                     blob_gas_price.blob_gas_price * BLOB_GAS_PER_BLOB;
+            }
 
-                info!(
-                    "Bumped blob gas price for relayer: {} from {} to {}, total_fee: {}",
-                    self.relayer.name,
-                    old_blob_gas_price,
-                    blob_gas_price.blob_gas_price,
-                    blob_gas_price.total_fee_for_blob
-                );
+            // Get SUPER speed blob gas price for cap calculation
+            let super_blob_gas_price = {
+                let blob_gas_oracle = self.blob_oracle_cache.lock().await;
+                blob_gas_oracle
+                    .get_blob_gas_price_for_speed(&self.relayer.chain_id, &TransactionSpeed::SUPER)
+                    .await
+            };
+
+            if let Some(super_price) = super_blob_gas_price {
+                let max_allowed_blob_gas_price =
+                    super_price.blob_gas_price * (self.max_gas_price_multiplier as u128);
+
+                if blob_gas_price.blob_gas_price > max_allowed_blob_gas_price {
+                    info!(
+                        "Blob gas price {} exceeds cap {} ({}x SUPER speed), capping for relayer: {}",
+                        blob_gas_price.blob_gas_price,
+                        max_allowed_blob_gas_price,
+                        self.max_gas_price_multiplier,
+                        self.relayer.name
+                    );
+                    blob_gas_price.blob_gas_price = max_allowed_blob_gas_price;
+                    blob_gas_price.total_fee_for_blob =
+                        blob_gas_price.blob_gas_price * BLOB_GAS_PER_BLOB;
+                }
             }
         }
 

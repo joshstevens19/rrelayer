@@ -15,6 +15,7 @@ pub struct TransactionRelayerSetup {
     pub inmempool_transactions: VecDeque<CompetitiveTransaction>,
     pub mined_transactions: HashMap<TransactionId, Transaction>,
     pub gas_bump_config: GasBumpBlockConfig,
+    pub max_gas_price_multiplier: u64,
 }
 
 impl TransactionRelayerSetup {
@@ -25,6 +26,7 @@ impl TransactionRelayerSetup {
         inmempool_transactions: VecDeque<CompetitiveTransaction>,
         mined_transactions: HashMap<TransactionId, Transaction>,
         gas_bump_config: GasBumpBlockConfig,
+        max_gas_price_multiplier: u64,
     ) -> Self {
         TransactionRelayerSetup {
             relayer,
@@ -33,6 +35,7 @@ impl TransactionRelayerSetup {
             inmempool_transactions,
             mined_transactions,
             gas_bump_config,
+            max_gas_price_multiplier,
         }
     }
 }

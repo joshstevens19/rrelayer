@@ -21,6 +21,7 @@ pub struct TransactionsQueueSetup {
     pub mined_transactions: HashMap<TransactionId, Transaction>,
     pub safe_proxy_manager: Arc<SafeProxyManager>,
     pub gas_bump_config: GasBumpBlockConfig,
+    pub max_gas_price_multiplier: u64,
 }
 
 impl TransactionsQueueSetup {
@@ -33,6 +34,7 @@ impl TransactionsQueueSetup {
         mined_transactions: HashMap<TransactionId, Transaction>,
         safe_proxy_manager: Arc<SafeProxyManager>,
         gas_bump_config: GasBumpBlockConfig,
+        max_gas_price_multiplier: u64,
     ) -> Self {
         TransactionsQueueSetup {
             relayer,
@@ -43,6 +45,7 @@ impl TransactionsQueueSetup {
             mined_transactions,
             safe_proxy_manager,
             gas_bump_config,
+            max_gas_price_multiplier,
         }
     }
 }
