@@ -147,29 +147,6 @@ impl PostgresClient {
         conn.prepare_typed(query, parameter_types).await.map_err(PostgresError::PgError)
     }
 
-    pub async fn with_transaction<F, Fut, T, Q>(
-        &self,
-        query: &Q,
-        params: &[&(dyn ToSql + Sync)],
-        f: F,
-    ) -> Result<T, PostgresError>
-    where
-        F: FnOnce(u64) -> Fut + Send,
-        Fut: Future<Output = Result<T, PostgresError>> + Send,
-        Q: ?Sized + ToStatement,
-    {
-        let mut conn = self.pool.get().await.map_err(PostgresError::ConnectionPoolError)?;
-        let transaction = conn.transaction().await.map_err(PostgresError::PgError)?;
-
-        let count = transaction.execute(query, params).await.map_err(PostgresError::PgError)?;
-
-        let result = f(count).await?;
-
-        transaction.commit().await.map_err(PostgresError::PgError)?;
-
-        Ok(result)
-    }
-
     /// Executes a query and returns all matching rows.
     pub async fn query<T>(
         &self,
@@ -260,5 +237,23 @@ impl PostgresClient {
         let conn = self.pool.get().await?;
 
         conn.copy_in(statement).await.map_err(PostgresError::PgError)
+    }
+
+    /// Executes a function within a transaction, with a simpler interface
+    pub async fn with_transaction<F, R>(&self, f: F) -> Result<R, PostgresError>
+    where
+        F: for<'a> FnOnce(
+            &'a tokio_postgres::Transaction<'a>,
+        ) -> std::pin::Pin<
+            Box<dyn std::future::Future<Output = Result<R, PostgresError>> + Send + 'a>,
+        >,
+    {
+        let mut conn = self.pool.get().await?;
+        let tx = conn.transaction().await.map_err(PostgresError::PgError)?;
+
+        let result = f(&tx).await?;
+
+        tx.commit().await.map_err(PostgresError::PgError)?;
+        Ok(result)
     }
 }
