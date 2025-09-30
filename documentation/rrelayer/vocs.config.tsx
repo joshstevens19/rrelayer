@@ -81,7 +81,10 @@ export default defineConfig({
           collapsed: false,
           items: [
             { text: 'Config', link: '/config/networks/config' },
-            { text: 'Transaction Speed', link: '/config/networks/transaction-speed' },
+            {
+              text: 'Transaction Speed',
+              link: '/config/networks/transaction-speed',
+            },
             {
               text: 'Automatic Top Up',
               collapsed: false,
@@ -684,11 +687,20 @@ export default defineConfig({
           text: 'Gasless Transactions',
           collapsed: false,
           items: [
-            { text: 'Introduction', link: '/integration/gasless-transactions#gasless-transactions' },
-            { text: 'EIP-712', link: '/integration/gasless-transactions#eip-712' },
-            { text: 'ERC-2771', link: '/integration/gasless-transactions#erc-2771' },
-          ]
-        }
+            {
+              text: 'Introduction',
+              link: '/integration/gasless-transactions#gasless-transactions',
+            },
+            {
+              text: 'EIP-712',
+              link: '/integration/gasless-transactions#eip-712',
+            },
+            {
+              text: 'ERC-2771',
+              link: '/integration/gasless-transactions#erc-2771',
+            },
+          ],
+        },
       ],
     },
     {

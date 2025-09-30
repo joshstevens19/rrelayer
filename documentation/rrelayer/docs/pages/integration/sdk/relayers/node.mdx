@@ -52,7 +52,8 @@ let created_result = await client.relayer.create(11155111, 'fancy-relayer');
 // You can then create the relayer client doing this
 const relayerClient = await client.getRelayerClient(
   created_result.id,
-  // This is optional it defaults to fast
+  // This is optional it defaults to fast and is a fallback
+  // You can override this with the transaction request
   TransactionSpeed.FAST
 );
 ```
@@ -242,7 +243,8 @@ export let relayerClient = createRelayerClient({
   serverUrl: 'http://localhost:8000',
   relayerId: '94afb207-bb47-4392-9229-ba87e4d783cb',
   apiKey: 'YOUR_API_KEY',
-  // This is optional it defaults to fast
+  // This is optional it defaults to fast and is a fallback
+  // You can override this with the transaction request
   speed: TransactionSpeed.FAST,
 });
 
@@ -309,7 +311,8 @@ let clonedResult = await client.relayer.clone(
 // You can then create the relayer client doing this
 const relayerClient = await client.getRelayerClient(
   clonedResult.id,
-  // This is optional it defaults to fast
+  // This is optional it defaults to fast and is a fallback
+  // You can override this with the transaction request
   TransactionSpeed.FAST
 );
 ```
@@ -347,7 +350,8 @@ const client = createClient({
 export const relayerClient = await client.getRelayerClient(
   // The relayer id you want to connect to
   '94afb207-bb47-4392-9229-ba87e4d783cb',
-  // This is optional it defaults to fast
+  // This is optional it defaults to fast and is a fallback
+  // You can override this with the transaction request
   TransactionSpeed.FAST
 );
 
@@ -374,7 +378,8 @@ const client = createClient({
 export const relayerClient = await client.getRelayerClient(
   // The relayer id you want to connect to
   '94afb207-bb47-4392-9229-ba87e4d783cb',
-  // This is optional it defaults to fast
+  // This is optional it defaults to fast and is a fallback
+  // You can override this with the transaction request
   TransactionSpeed.FAST
 );
 
@@ -421,7 +426,8 @@ const client = createClient({
 export const relayerClient = await client.getRelayerClient(
   // The relayer id you want to connect to
   '94afb207-bb47-4392-9229-ba87e4d783cb',
-  // This is optional it defaults to fast
+  // This is optional it defaults to fast and is a fallback
+  // You can override this with the transaction request
   TransactionSpeed.FAST
 );
 
@@ -448,7 +454,8 @@ const client = createClient({
 export const relayerClient = await client.getRelayerClient(
   // The relayer id you want to connect to
   '94afb207-bb47-4392-9229-ba87e4d783cb',
-  // This is optional it defaults to fast
+  // This is optional it defaults to fast and is a fallback
+  // You can override this with the transaction request
   TransactionSpeed.FAST
 );
 
@@ -494,7 +501,8 @@ const client = createClient({
 export const relayerClient = await client.getRelayerClient(
   // The relayer id you want to connect to
   '94afb207-bb47-4392-9229-ba87e4d783cb',
-  // This is optional it defaults to fast
+  // This is optional it defaults to fast and is a fallback
+  // You can override this with the transaction request
   TransactionSpeed.FAST
 );
 
@@ -538,7 +546,8 @@ const client = createClient({
 export const relayerClient = await client.getRelayerClient(
   // The relayer id you want to connect to
   '94afb207-bb47-4392-9229-ba87e4d783cb',
-  // This is optional it defaults to fast
+  // This is optional it defaults to fast and is a fallback
+  // You can override this with the transaction request
   TransactionSpeed.FAST
 );
 
@@ -630,7 +639,8 @@ const client = createClient({
 export const relayerClient = await client.getRelayerClient(
   // The relayer id you want to connect to
   '94afb207-bb47-4392-9229-ba87e4d783cb',
-  // This is optional it defaults to fast
+  // This is optional it defaults to fast and is a fallback
+  // You can override this with the transaction request
   TransactionSpeed.FAST
 );
 
@@ -656,7 +666,8 @@ export let relayerClient = createRelayerClient({
   serverUrl: 'http://localhost:8000',
   relayerId: '94afb207-bb47-4392-9229-ba87e4d783cb',
   apiKey: 'YOUR_API_KEY',
-  // This is optional it defaults to fast
+  // This is optional it defaults to fast and is a fallback
+  // You can override this with the transaction request
   speed: TransactionSpeed.FAST,
 });
 

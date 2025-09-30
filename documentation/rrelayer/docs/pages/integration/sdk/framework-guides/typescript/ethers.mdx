@@ -55,6 +55,7 @@ const relayer = await client.getRelayerClient(
      // The relayer id you want to connect to
     '94afb207-bb47-4392-9229-ba87e4d783cb',
      // This is optional it defaults to fast
+     // As you are using viems native interface, all your tx will be sent at this speed
     TransactionSpeed.FAST
 );
 
@@ -102,6 +103,7 @@ const relayer = await client.getRelayerClient(
      // The relayer id you want to connect to
     '94afb207-bb47-4392-9229-ba87e4d783cb',
      // This is optional it defaults to fast
+     // As you are using viems native interface, all your tx will be sent at this speed
     TransactionSpeed.FAST
 );
 
@@ -213,12 +215,13 @@ Write a contract with the relayer
 :::code-group
 
 ```ts [example]
+import { Contract } from 'ethers';
 import { signer } from './config';
 import { wagmiAbi } from './abi';
 
 const contract = new Contract(
   '0xFBA3912Ca04dd458c843e2EE08967fC04f3579c2',
-  abi,
+  wagmiAbi,
   signer
 );
 

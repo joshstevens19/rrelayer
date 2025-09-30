@@ -11,6 +11,12 @@ networks:
     provider_urls:
       - http://127.0.0.1:8545
     block_explorer_url: http://localhost:8545
+    max_gas_price_multiplier: 4
+    gas_bump_blocks_every:
+      slow: 10
+      medium: 5
+      fast: 4
+      super_fast: 2
     enable_sending_blobs: true
     automatic_top_up:
       from:

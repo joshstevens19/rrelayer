@@ -31,19 +31,19 @@ api_config:
   authentication_username: "${RRELAYER_AUTH_USERNAME}" // [!code focus]
 ```
 
-### authentication_username
+### authentication_password
 
 :::info
 rrelayer users basic authentication for the API.
 :::
 
-The basic authentication username
+The basic authentication password
 
 ```yaml [rrelayer.yaml]
 name: first-rrelayer
 description: "my first rrelayer"
 api_config:
   port: 3000
-  authentication_username: "${RRELAYER_AUTH_USERNAME}" // [!code focus]
+  authentication_username: "${RRELAYER_AUTH_USERNAME}"
   authentication_password: "${RRELAYER_AUTH_PASSWORD}" // [!code focus]
 ```

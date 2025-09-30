@@ -84,6 +84,8 @@ async fn get_relayer_client() -> Result<AdminRelayerClient> {
     let relayer_client: AdminRelayerClient = client
         .get_relayer_client(
             &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+            // This is optional it defaults to fast and is a fallback
+            // You can override this with the transaction request
             Some(TransactionSpeed::FAST),
         )
         .await?;
@@ -99,7 +101,9 @@ async fn example() -> Result<()> {
         value: TransactionValue::from_str("1000000000000000000")
             .map_err(|e| anyhow::anyhow!("Invalid value: {}", e))?, // 1 ETH in wei
         data: TransactionData::empty(),
-        speed: Some(TransactionSpeed::FAST),
+        // This is optional it defaults to what is set in the client creation
+        // You can override this here per transaction if you wish though
+        // speed: Some(TransactionSpeed::SUPER),
         external_id: None,
         blobs: None,
     };
@@ -132,6 +136,8 @@ async fn get_relayer_client() -> Result<RelayerClient> {
         server_url: "http://localhost:8000".to_string(),
         relayer_id: RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
         api_key: "YOUR_API_KEY".to_string(),
+        // This is optional it defaults to fast and is a fallback
+        // You can override this with the transaction request
         speed: Some(TransactionSpeed::FAST),
     });
 
@@ -146,7 +152,9 @@ async fn example() -> Result<()> {
         value: TransactionValue::from_str("1000000000000000000")
             .map_err(|e| anyhow::anyhow!("Invalid value: {}", e))?, // 1 ETH in wei
         data: TransactionData::empty(),
-        speed: Some(TransactionSpeed::FAST),
+        // This is optional it defaults to what is set in the client creation
+        // You can override this here per transaction if you wish though
+        // speed: Some(TransactionSpeed::SUPER),
         external_id: None,
         blobs: None,
     };
@@ -221,7 +229,9 @@ async fn example() -> Result<()> {
         to: EvmAddress::from_str("0x5FCD072a0BD58B6fa413031582E450FE724dba6D")?,
         value: TransactionValue::zero(),
         data: TransactionData::from(encoded_data),
-        speed: Some(TransactionSpeed::FAST),
+        // This is optional it defaults to what is set in the client creation
+        // You can override this here per transaction if you wish though
+        // speed: Some(TransactionSpeed::SUPER),
         external_id: None,
         blobs: None,
     };
@@ -256,6 +266,8 @@ async fn get_relayer_client() -> Result<RelayerClient> {
         server_url: "http://localhost:8000".to_string(),
         relayer_id: RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
         api_key: "YOUR_API_KEY".to_string(),
+        // This is optional it defaults to fast and is a fallback
+        // You can override this with the transaction request
         speed: Some(TransactionSpeed::FAST),
     });
 
@@ -284,7 +296,9 @@ async fn example() -> Result<()> {
         to: EvmAddress::from_str("0x5FCD072a0BD58B6fa413031582E450FE724dba6D")?,
         value: TransactionValue::zero(),
         data: TransactionData::from(encoded_data),
-        speed: Some(TransactionSpeed::FAST),
+        // This is optional it defaults to what is set in the client creation
+        // You can override this here per transaction if you wish though
+        // speed: Some(TransactionSpeed::SUPER),
         external_id: None,
         blobs: None,
     };
@@ -330,6 +344,8 @@ async fn get_relayer_client() -> Result<AdminRelayerClient> {
     let relayer_client: AdminRelayerClient = client
         .get_relayer_client(
             &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+            // This is optional it defaults to fast and is a fallback
+            // You can override this with the transaction request
             Some(TransactionSpeed::FAST),
         )
         .await?;
@@ -347,7 +363,9 @@ async fn example() -> Result<()> {
         to: EvmAddress::from_str("0x5FCD072a0BD58B6fa413031582E450FE724dba6D")?,
         value: TransactionValue::zero(),
         data: TransactionData::empty(),
-        speed: Some(TransactionSpeed::FAST),
+        // This is optional it defaults to what is set in the client creation
+        // You can override this here per transaction if you wish though
+        // speed: Some(TransactionSpeed::SUPER),
         external_id: None,
         blobs: Some(vec![hex_blob]),
     };
@@ -379,6 +397,8 @@ async fn get_relayer_client() -> Result<RelayerClient> {
         server_url: "http://localhost:8000".to_string(),
         relayer_id: RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
         api_key: "YOUR_API_KEY".to_string(),
+        // This is optional it defaults to fast and is a fallback
+        // You can override this with the transaction request
         speed: Some(TransactionSpeed::FAST),
     });
 
@@ -395,7 +415,9 @@ async fn example() -> Result<()> {
         to: EvmAddress::from_str("0x5FCD072a0BD58B6fa413031582E450FE724dba6D")?,
         value: TransactionValue::zero(),
         data: TransactionData::empty(),
-        speed: Some(TransactionSpeed::FAST),
+        // This is optional it defaults to what is set in the client creation
+        // You can override this here per transaction if you wish though
+        // speed: Some(TransactionSpeed::SUPER),
         external_id: None,
         blobs: Some(vec![hex_blob]),
     };
@@ -564,6 +586,8 @@ async fn get_relayer_client() -> Result<AdminRelayerClient> {
     let relayer_client: AdminRelayerClient = client
         .get_relayer_client(
             &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+            // This is optional it defaults to fast and is a fallback
+            // You can override this with the transaction request
             Some(TransactionSpeed::FAST),
         )
         .await?;
@@ -602,6 +626,8 @@ async fn get_relayer_client() -> Result<RelayerClient> {
         server_url: "http://localhost:8000".to_string(),
         relayer_id: RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
         api_key: "YOUR_API_KEY".to_string(),
+        // This is optional it defaults to fast and is a fallback
+        // You can override this with the transaction request
         speed: Some(TransactionSpeed::FAST),
     });
 
@@ -686,6 +712,8 @@ async fn get_relayer_client() -> Result<AdminRelayerClient> {
     let relayer_client: AdminRelayerClient = client
         .get_relayer_client(
             &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+            // This is optional it defaults to fast and is a fallback
+            // You can override this with the transaction request
             Some(TransactionSpeed::FAST),
         )
         .await?;
@@ -724,6 +752,8 @@ async fn get_relayer_client() -> Result<RelayerClient> {
         server_url: "http://localhost:8000".to_string(),
         relayer_id: RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
         api_key: "YOUR_API_KEY".to_string(),
+        // This is optional it defaults to fast and is a fallback
+        // You can override this with the transaction request
         speed: Some(TransactionSpeed::FAST),
     });
 
@@ -795,6 +825,8 @@ async fn get_relayer_client() -> Result<AdminRelayerClient> {
     let relayer_client: AdminRelayerClient = client
         .get_relayer_client(
             &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+            // This is optional it defaults to fast and is a fallback
+            // You can override this with the transaction request
             Some(TransactionSpeed::FAST),
         )
         .await?;
@@ -810,7 +842,9 @@ async fn example() -> Result<()> {
         value: TransactionValue::from_str("1000000000000000000")
             .map_err(|e| anyhow::anyhow!("Invalid value: {}", e))?, // 1 ETH in wei
         data: TransactionData::empty(),
-        speed: Some(TransactionSpeed::FAST),
+        // This is optional it defaults to what is set in the client creation
+        // You can override this here per transaction if you wish though
+        // speed: Some(TransactionSpeed::SUPER),
         external_id: None,
         blobs: None,
     };
@@ -856,6 +890,8 @@ async fn get_relayer_client() -> Result<RelayerClient> {
         server_url: "http://localhost:8000".to_string(),
         relayer_id: RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
         api_key: "YOUR_API_KEY".to_string(),
+        // This is optional it defaults to fast and is a fallback
+        // You can override this with the transaction request
         speed: Some(TransactionSpeed::FAST),
     });
 
@@ -870,7 +906,9 @@ async fn example() -> Result<()> {
         value: TransactionValue::from_str("1000000000000000000")
             .map_err(|e| anyhow::anyhow!("Invalid value: {}", e))?, // 1 ETH in wei
         data: TransactionData::empty(),
-        speed: Some(TransactionSpeed::FAST),
+        // This is optional it defaults to what is set in the client creation
+        // You can override this here per transaction if you wish though
+        // speed: Some(TransactionSpeed::SUPER),
         external_id: None,
         blobs: None,
     };
@@ -947,6 +985,8 @@ async fn get_relayer_client() -> Result<AdminRelayerClient> {
     let relayer_client: AdminRelayerClient = client
         .get_relayer_client(
             &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+            // This is optional it defaults to fast and is a fallback
+            // You can override this with the transaction request
             Some(TransactionSpeed::FAST),
         )
         .await?;
@@ -996,6 +1036,8 @@ async fn get_relayer_client() -> Result<RelayerClient> {
         server_url: "http://localhost:8000".to_string(),
         relayer_id: RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
         api_key: "YOUR_API_KEY".to_string(),
+        // This is optional it defaults to fast and is a fallback
+        // You can override this with the transaction request
         speed: Some(TransactionSpeed::FAST),
     });
 
@@ -1065,6 +1107,8 @@ async fn get_relayer_client() -> Result<AdminRelayerClient> {
     let relayer_client: AdminRelayerClient = client
         .get_relayer_client(
             &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+            // This is optional it defaults to fast and is a fallback
+            // You can override this with the transaction request
             Some(TransactionSpeed::FAST),
         )
         .await?;

@@ -22,6 +22,8 @@ let client = create_client(CreateClientConfig {
 
 let relayer: AdminRelayerClient = client.get_relayer_client(
     &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+    // This is optional it defaults to fast and is a fallback
+    // You can override this with the transaction request
     Some(TransactionSpeed::FAST),
 ).await?;
 ```
@@ -41,6 +43,8 @@ let relayer: RelayerClient = create_relayer_client(CreateRelayerClientConfig {
     server_url: "http://localhost:8000".to_string(),
     relayer_id: RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
     api_key: "YOUR_API_KEY".to_string(),
+    // This is optional it defaults to fast and is a fallback
+    // You can override this with the transaction request
     speed: Some(TransactionSpeed::FAST),
 });
 ```
@@ -65,6 +69,8 @@ async fn get_relayer() -> Result<RelayerClient> {
         server_url: "http://localhost:8000".to_string(),
         relayer_id: RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
         api_key: "YOUR_API_KEY".to_string(),
+        // This is optional it defaults to fast and is a fallback
+        // You can override this with the transaction request
         speed: Some(TransactionSpeed::FAST),
     });
 
@@ -79,6 +85,7 @@ async fn rate_limit_example() -> Result<()> {
         value: TransactionValue::from_str("1000000000000000000")
             .map_err(|e| anyhow::anyhow!("Invalid value: {}", e))?, // 1 ETH in wei
         data: Default::default(),
+        // using default set above but you can you can override sending transactions speed like this
         speed: None,
         external_id: None,
         blobs: None,

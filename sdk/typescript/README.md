@@ -14,17 +14,58 @@ Web3 applications with enterprise-grade reliability and focus exclusively on you
 logic. rrelayer out of the box gives you transaction relay, message signing, automated 
 gas management, and real-time monitoring through intuitive APIs.
 
+## Features
+
+- Config Driven: Define everything in a simple rrelayer.yaml file, making it easy to turn on and off features
+- Multi-Chain Support: Supports all EVM networks
+- Transaction Relaying: Submit transactions to supported blockchain networks efficiently.
+- Transaction Signing: Securely sign transactions using many of the signing providers.
+- Transaction Fee Estimation: Estimate transaction fees for better cost management.
+- Transaction Nonce Management: Handle nonce management to ensure transaction order.
+- Transaction Status Monitoring: Track the status of submitted transactions.
+- Transaction/Signing History: See all the transactions signed by the relayer or messages signed with a deep audit log
+- SDK Integration: Integrate easily with our JS/TS API or rust API or
+- Exposed API: If the SDK is not supported, you can just hit the API directly
+- Extensible Architecture: Easily add support for new blockchain networks with a config update.
+- Configurable Network Policies: Define and enforce network-specific policies for transaction processing.
+- Automated top-ups: Build in background tasks to automatically top up relayers when gas or token funds are becoming low, with safe proxy support.
+- Permissions: Add contract/addresses allowlists to relayers and turn on and off if they can sign messages, typed data, send transactions, and send native ETH.
+- API Keys: Built-in API keys for relayers to allow you to give access to a system without giving access to every part of the rrelayer
+- Webhooks: Notifications built in get notified of the transaction's status every step of the way or if balances are low.
+- Rate Limiting: Built-in rate limiting allowing you to rate limit user transactions allowance by just updating the rrelayer.yaml
+- Flexibility: No hard constraints on features like you can config how often it bumps gas depending on your need. Maybe a liquidation bot may want to bump every block for example.
+- CLI: rrelayer is CLI first, so you can do everything with the command line tool.
+- Full transactions support: rrelayer can send blob transactions and any kind of EVM transaction.
+
+## What can I use rrelayer for?
+
+- DApp backends: Handle user transactions without wallet management complexity
+- NFT platforms: Automated minting, transfers, and marketplace operations with reliable execution
+- DeFi protocols: Yield farming automation, liquidation bots, and cross-chain operations
+- Enterprise Web3: Simplified blockchain integration for traditional businesses with audit compliance
+- Development workflows: Consistent APIs for local development and comprehensive E2E testing
+- Gasless transactions: Meta-transaction infrastructure for improved user experience
+- Multi-chain applications: Unified transaction interface across different EVM networks
+- High-frequency operations: Advanced queuing system for batch processing and optimization
+- Production infrastructure: Enterprise-grade transaction reliability with comprehensive monitoring
+- Loads more stuff like liquidation bot or trading bots etc
+
+
 ## Installation
 
-```bash [npm]
+
+### NPM
+```bash
 npm i rrelayer
 ```
 
-```bash [pnpm]
+### PNPM
+```bash
 pnpm i rrelayer
 ```
 
-```bash [bun]
+### BUN
+```bash
 bun i rrelayer
 ```
 

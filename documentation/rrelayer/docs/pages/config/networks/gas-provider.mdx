@@ -29,20 +29,23 @@ networks:
   provider_urls:
   - "https://sepolia.gateway.tenderly.co"
   block_explorer_url: "https://sepolia.etherscan.io"
+  max_gas_price_multiplier: 4
+  gas_bump_blocks_every:
+    slow: 10
+    medium: 5
+    fast: 4
+    super_fast: 2
   gas_provider: "FALLBACK" // [!code focus]
 # No additional configuration needed for fallback // [!code focus]
 ```
 
 ## Block Native
 
-TODO
-
-## Infura
-
-You can go to infura docs to see what chains they support https://docs.metamask.io/services/get-started/endpoints#gas-api.
-You can sign up to the developer dashboard https://developer.metamask.io/register and get a free API key.
-A note as we hit the gas price in a cron it only hits it every few seconds, so a free key tends to work fine,
-the free rate limit gives you 2k credits a second and 6 million credits a day, which is plenty for this.
+Block Native provides real-time gas price estimates based on their global mempool monitoring network,
+making it one of the most accurate gas estimation services available. They currently support 43+ chains including Ethereum, Polygon,
+Arbitrum, Optimism, Base, and most major EVM networks. You can sign up for a free API key at https://www.blocknative.com/request-api-key.
+The free tier provides updated gas estimates every 5 seconds, while paid tiers offer per-second updates. For most use cases,
+the free tier works perfectly with rrelayer's cron-based gas polling.
 
 ```yaml [rrelayer.yaml]
 name: first-rrelayer
@@ -60,6 +63,47 @@ networks:
   provider_urls:
   - "https://sepolia.gateway.tenderly.co"
   block_explorer_url: "https://sepolia.etherscan.io"
+  max_gas_price_multiplier: 4
+  gas_bump_blocks_every:
+    slow: 10
+    medium: 5
+    fast: 4
+    super_fast: 2
+  gas_provider: "BLOCKNATIVE" // [!code focus]
+gas_providers: // [!code focus]
+  blocknative: // [!code focus]
+    api_key: "${BLOCK_NATIVE_API_KEY}" // [!code focus]
+```
+
+## Infura
+
+Infura provides gas price APIs through MetaMask's developer platform, supporting Ethereum mainnet and testnets, along with Polygon,
+Arbitrum, Optimism, and other major EVM chains. You can view the full list of supported chains at https://docs.metamask.io/services/get-started/endpoints#gas-api.
+Sign up for a free API key at https://developer.metamask.io/register. The free tier provides 2,000 credits per second and 6 million credits per day,
+which is more than sufficient since rrelayer queries gas prices every few seconds via cron.
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: "${RRELAYER_AUTH_USERNAME}"
+  authentication_password: "${RRELAYER_AUTH_PASSWORD}"
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+networks:
+- name: "sepolia_ethereum"
+  chain_id: 11155111
+  provider_urls:
+  - "https://sepolia.gateway.tenderly.co"
+  block_explorer_url: "https://sepolia.etherscan.io"
+  max_gas_price_multiplier: 4
+  gas_bump_blocks_every:
+    slow: 10
+    medium: 5
+    fast: 4
+    super_fast: 2
   gas_provider: "INFURA" // [!code focus]
 gas_providers: // [!code focus]
   infura: // [!code focus]
@@ -69,9 +113,10 @@ gas_providers: // [!code focus]
 
 ## Tenderly
 
-You can go to tenderly docs to see what chains they support https://docs.tenderly.co/supported-networks which is most EVM chains.
-You can sign up to the developer dashboard https://dashboard.tenderly.co/ and get a free API key.
-A note as we hit the gas price in a cron it only hits it every few seconds, so a free key tends to work fine.
+Tenderly provides gas price estimation for most EVM chains, supporting Ethereum, Polygon, Arbitrum, Optimism, Base, and many more.
+You can view the complete list of supported networks at https://docs.tenderly.co/supported-networks.
+Sign up for a free API key at https://dashboard.tenderly.co/. The free tier works well for rrelayer since gas prices are
+queried every few seconds via cron, keeping API usage within free tier limits.
 
 ```yaml [rrelayer.yaml]
 name: first-rrelayer
@@ -89,6 +134,12 @@ networks:
   provider_urls:
   - "https://sepolia.gateway.tenderly.co"
   block_explorer_url: "https://sepolia.etherscan.io"
+  max_gas_price_multiplier: 4
+  gas_bump_blocks_every:
+    slow: 10
+    medium: 5
+    fast: 4
+    super_fast: 2
   gas_provider: "TENDERLY" // [!code focus]
 gas_providers: // [!code focus]
   tenderly: // [!code focus]
@@ -97,7 +148,38 @@ gas_providers: // [!code focus]
 
 ## Etherscan
 
-// TODO
+Etherscan provides gas price APIs for multiple EVM chains. You can sign up at https://etherscan.io/apis to get a free API key.
+The free tier provides 5 calls/second which is more than sufficient since rrelayer queries gas prices every few seconds via cron.
+Etherscan supports Ethereum mainnet and testnets (Sepolia, Holesky), along with other major chains through their multi-chain explorer
+network (Polygonscan, Arbiscan, Optimistic Etherscan, etc.).
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: "${RRELAYER_AUTH_USERNAME}"
+  authentication_password: "${RRELAYER_AUTH_PASSWORD}"
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+networks:
+- name: "sepolia_ethereum"
+  chain_id: 11155111
+  provider_urls:
+  - "https://sepolia.gateway.tenderly.co"
+  block_explorer_url: "https://sepolia.etherscan.io"
+  max_gas_price_multiplier: 4
+  gas_bump_blocks_every:
+    slow: 10
+    medium: 5
+    fast: 4
+    super_fast: 2
+  gas_provider: "ETHERSCAN" // [!code focus]
+gas_providers: // [!code focus]
+  etherscan: // [!code focus]
+    api_key: "${ETHERSCAN_API_KEY}" // [!code focus]
+```
 
 ## Custom
 
@@ -158,6 +240,12 @@ networks:
   provider_urls:
   - "https://sepolia.gateway.tenderly.co"
   block_explorer_url: "https://sepolia.etherscan.io"
+  max_gas_price_multiplier: 4
+  gas_bump_blocks_every:
+    slow: 10
+    medium: 5
+    fast: 4
+    super_fast: 2
   gas_provider: "CUSTOM" // [!code focus]
 gas_providers: // [!code focus]
   custom: // [!code focus]

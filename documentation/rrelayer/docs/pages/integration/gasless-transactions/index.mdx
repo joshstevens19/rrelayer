@@ -17,8 +17,8 @@ The relayer then makes sure the transaction being supported has the correct gas 
 This is an important thing to consider their are two ways a person may be wanting to use a relayer.
 
 1. You just want to submit a transaction and anyone can call it or the relayer address can call it only. Lets imagine you got some state you want to push back to Ethereum,
-you can just call the relayer and it will submit the transaction its not about the address itself its just something which needs actioning. Also if you need to do a migration script
-and migration a ton of state from a contract you could allowlist the relayer address and fire it.
+   you can just call the relayer and it will submit the transaction its not about the address itself its just something which needs actioning. Also if you need to do a migration script
+   and migration a ton of state from a contract you could allowlist the relayer address and fire it.
 2. You want the user to do the action but the relayer paying the gas for them to do it. We will focus more on this point below so we can be sure we all understand.
 
 ## How does the relayer pay for the gas on the users behalf then?
@@ -58,7 +58,7 @@ contract GaslessERC20 is ERC20, EIP712 {
 
     mapping(address => uint256) private _nonces;
 
-    bytes32 private constant TRANSFER_TYPEHASH = 
+    bytes32 private constant TRANSFER_TYPEHASH =
         keccak256("Transfer(address from,address to,uint256 value,uint256 nonce,uint256 deadline)");
 
     constructor() ERC20("GaslessToken", "GLT") EIP712("GaslessToken", "1") {}
@@ -95,7 +95,13 @@ contract GaslessERC20 is ERC20, EIP712 {
 
 ```typescript
 import { createRelayerClient, TransactionSpeed } from 'rrelayer-ts';
-import { createWalletClient, createPublicClient, custom, http, parseEther } from 'viem';
+import {
+  createWalletClient,
+  createPublicClient,
+  custom,
+  http,
+  parseEther,
+} from 'viem';
 import { mainnet } from 'viem/chains';
 
 // Configure rrelayer client
@@ -124,35 +130,38 @@ app.post('/api/gasless-transfer', async (req, res) => {
   try {
     // IMPORTANT: Implement authentication and rate limiting
     // This endpoint pays for gas - protect it from abuse!
-    
+
     // Example: Verify JWT token
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (!token || !verifyJWT(token)) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
-    
+
     // Example: Rate limiting per user
     const userId = getUserFromToken(token);
     if (await isRateLimited(userId)) {
       return res.status(429).json({ error: 'Rate limit exceeded' });
     }
-    
+
     const { from, to, value, deadline, signature } = req.body;
-    
+
     // Additional validation: Verify the 'from' address matches authenticated user
     const userAddress = getUserAddressFromToken(token);
     if (from.toLowerCase() !== userAddress.toLowerCase()) {
-      return res.status(403).json({ error: 'Cannot transfer from different address' });
+      return res
+        .status(403)
+        .json({ error: 'Cannot transfer from different address' });
     }
-    
+
     // Validate transfer amount limits (prevent large transfers)
-    if (BigInt(value) > parseEther('100')) { // Max 100 tokens per transaction
+    if (BigInt(value) > parseEther('100')) {
+      // Max 100 tokens per transaction
       return res.status(400).json({ error: 'Transfer amount too large' });
     }
-    
+
     // Parse the signature components
     const sig = parseSignature(signature);
-    
+
     // ABI for the gasless transfer function
     const gaslessTokenAbi = [
       {
@@ -163,13 +172,13 @@ app.post('/api/gasless-transfer', async (req, res) => {
           { name: 'deadline', type: 'uint256' },
           { name: 'v', type: 'uint8' },
           { name: 'r', type: 'bytes32' },
-          { name: 's', type: 'bytes32' }
+          { name: 's', type: 'bytes32' },
         ],
         name: 'transferWithSignature',
         outputs: [],
         stateMutability: 'nonpayable',
         type: 'function',
-      }
+      },
     ] as const;
 
     // Submit transaction via rrelayer - relayer pays gas
@@ -177,11 +186,11 @@ app.post('/api/gasless-transfer', async (req, res) => {
       address: '0x...', // Your GaslessERC20 contract address
       abi: gaslessTokenAbi,
       functionName: 'transferWithSignature',
-      args: [from, to, BigInt(value), BigInt(deadline), sig.v, sig.r, sig.s]
+      args: [from, to, BigInt(value), BigInt(deadline), sig.v, sig.r, sig.s],
     });
-    
+
     const hash = await walletClient.writeContract(request);
-    
+
     res.json({ success: true, transactionHash: hash });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -212,7 +221,7 @@ async function signTransfer(
     name: 'GaslessToken',
     version: '1',
     chainId: 1,
-    verifyingContract: '0x...' // Your contract address
+    verifyingContract: '0x...', // Your contract address
   };
 
   const types = {
@@ -221,8 +230,8 @@ async function signTransfer(
       { name: 'to', type: 'address' },
       { name: 'value', type: 'uint256' },
       { name: 'nonce', type: 'uint256' },
-      { name: 'deadline', type: 'uint256' }
-    ]
+      { name: 'deadline', type: 'uint256' },
+    ],
   };
 
   const message = {
@@ -230,7 +239,7 @@ async function signTransfer(
     to,
     value,
     nonce,
-    deadline
+    deadline,
   };
 
   return await userWallet._signTypedData(domain, types, message);
@@ -240,15 +249,22 @@ async function signTransfer(
 async function requestGaslessTransfer(from: string, to: string, value: string) {
   const deadline = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
   const nonce = await contract.nonces(from); // Get current nonce
-  
-  const signature = await signTransfer(userWallet, from, to, value, deadline, nonce);
-  
+
+  const signature = await signTransfer(
+    userWallet,
+    from,
+    to,
+    value,
+    deadline,
+    nonce
+  );
+
   const response = await fetch('/api/gasless-transfer', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from, to, value, deadline, signature })
+    body: JSON.stringify({ from, to, value, deadline, signature }),
   });
-  
+
   return response.json();
 }
 ```
@@ -279,10 +295,10 @@ import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 
 contract GaslessNFT is ERC721, ERC2771Context {
     uint256 private _tokenIds;
-    
-    constructor(address trustedForwarder) 
-        ERC721("GaslessNFT", "GNFT") 
-        ERC2771Context(trustedForwarder) 
+
+    constructor(address trustedForwarder)
+        ERC721("GaslessNFT", "GNFT")
+        ERC2771Context(trustedForwarder)
     {}
 
     function mint(address to) external {
@@ -305,7 +321,13 @@ contract GaslessNFT is ERC721, ERC2771Context {
 
 ```typescript
 import { createRelayerClient, TransactionSpeed } from 'rrelayer-ts';
-import { createWalletClient, createPublicClient, custom, http, encodeFunctionData } from 'viem';
+import {
+  createWalletClient,
+  createPublicClient,
+  custom,
+  http,
+  encodeFunctionData,
+} from 'viem';
 
 // Configure rrelayer client
 const relayer = createRelayerClient({
@@ -333,27 +355,29 @@ app.post('/api/gasless-mint', async (req, res) => {
   try {
     // IMPORTANT: Implement authentication and rate limiting
     // This endpoint pays for gas - protect it from abuse!
-    
+
     // Example: Verify JWT token
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (!token || !verifyJWT(token)) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
-    
+
     // Example: Rate limiting per user (e.g., max 5 mints per day)
     const userId = getUserFromToken(token);
     if (await hasExceededMintLimit(userId)) {
       return res.status(429).json({ error: 'Daily mint limit exceeded' });
     }
-    
+
     const { request, signature } = req.body;
-    
+
     // Validate the request is from the authenticated user
     const userAddress = getUserAddressFromToken(token);
     if (request.from.toLowerCase() !== userAddress.toLowerCase()) {
-      return res.status(403).json({ error: 'Cannot mint from different address' });
+      return res
+        .status(403)
+        .json({ error: 'Cannot mint from different address' });
     }
-    
+
     // MinimalForwarder ABI
     const forwarderAbi = [
       {
@@ -365,18 +389,21 @@ app.post('/api/gasless-mint', async (req, res) => {
               { name: 'value', type: 'uint256' },
               { name: 'gas', type: 'uint256' },
               { name: 'nonce', type: 'uint256' },
-              { name: 'data', type: 'bytes' }
+              { name: 'data', type: 'bytes' },
             ],
             name: 'req',
-            type: 'tuple'
+            type: 'tuple',
           },
-          { name: 'signature', type: 'bytes' }
+          { name: 'signature', type: 'bytes' },
         ],
         name: 'execute',
-        outputs: [{ name: '', type: 'bool' }, { name: '', type: 'bytes' }],
+        outputs: [
+          { name: '', type: 'bool' },
+          { name: '', type: 'bytes' },
+        ],
         stateMutability: 'payable',
-        type: 'function'
-      }
+        type: 'function',
+      },
     ] as const;
 
     // Submit meta-transaction via rrelayer through trusted forwarder
@@ -384,11 +411,11 @@ app.post('/api/gasless-mint', async (req, res) => {
       address: '0x...', // Trusted forwarder address
       abi: forwarderAbi,
       functionName: 'execute',
-      args: [request, signature]
+      args: [request, signature],
     });
-    
+
     const hash = await walletClient.writeContract(simulatedRequest);
-    
+
     res.json({ success: true, transactionHash: hash });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -410,7 +437,7 @@ async function signMintRequest(
     name: 'MinimalForwarder',
     version: '0.0.1',
     chainId: 1,
-    verifyingContract: forwarderAddress
+    verifyingContract: forwarderAddress,
   };
 
   const types = {
@@ -420,23 +447,25 @@ async function signMintRequest(
       { name: 'value', type: 'uint256' },
       { name: 'gas', type: 'uint256' },
       { name: 'nonce', type: 'uint256' },
-      { name: 'data', type: 'bytes' }
-    ]
+      { name: 'data', type: 'bytes' },
+    ],
   };
 
   // Encode the mint function call
   const mintData = encodeFunctionData({
-    abi: [{ 
-      inputs: [{ name: 'to', type: 'address' }],
-      name: 'mint',
-      outputs: [],
-      stateMutability: 'nonpayable',
-      type: 'function'
-    }],
+    abi: [
+      {
+        inputs: [{ name: 'to', type: 'address' }],
+        name: 'mint',
+        outputs: [],
+        stateMutability: 'nonpayable',
+        type: 'function',
+      },
+    ],
     functionName: 'mint',
-    args: [userAddress]
+    args: [userAddress],
   });
-  
+
   // Get nonce from forwarder contract
   const nonce = await forwarderContract.read.getNonce([userAddress]);
 
@@ -446,11 +475,11 @@ async function signMintRequest(
     value: 0n,
     gas: 100000n,
     nonce: Number(nonce),
-    data: mintData
+    data: mintData,
   };
 
   const signature = await userWallet._signTypedData(domain, types, request);
-  
+
   return { request, signature };
 }
 
@@ -466,9 +495,9 @@ async function requestGaslessMint(userAddress: string) {
   const response = await fetch('/api/gasless-mint', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ request, signature })
+    body: JSON.stringify({ request, signature }),
   });
-  
+
   return response.json();
 }
 ```
@@ -480,6 +509,7 @@ async function requestGaslessMint(userAddress: string) {
 ### Required Security Measures
 
 #### 1. Authentication
+
 ```typescript
 // Implement JWT or API key authentication
 const token = req.headers.authorization?.replace('Bearer ', '');
@@ -493,6 +523,7 @@ if (!token || !verifyJWT(token)) {
 rrelayer has built-in rate limiting that works with direct SDK integration. Configure rate limits per relayer or API key in your rrelayer dashboard - see the [rate limiting documentation](/integration/sdk/create-client-authentication/node#rate-limiting) for details.
 
 #### 3. User Validation
+
 ```typescript
 // Ensure users can only submit transactions for their own addresses
 const userAddress = getUserAddressFromToken(token);
@@ -502,6 +533,7 @@ if (from.toLowerCase() !== userAddress.toLowerCase()) {
 ```
 
 #### 4. Value Limits
+
 ```typescript
 // Implement value limits to prevent large transfers
 if (BigInt(value) > parseEther('100')) {
@@ -510,6 +542,7 @@ if (BigInt(value) > parseEther('100')) {
 ```
 
 #### 5. Signature Validation
+
 ```typescript
 // Verify the signature is recent (prevent replay attacks)
 const currentTime = Math.floor(Date.now() / 1000);

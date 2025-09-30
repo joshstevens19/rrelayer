@@ -46,6 +46,12 @@ networks:
   provider_urls:
   - "https://sepolia.gateway.tenderly.co"
   block_explorer_url: "https://sepolia.etherscan.io"
+  max_gas_price_multiplier: 4
+  gas_bump_blocks_every:
+    slow: 10
+    medium: 5
+    fast: 4
+    super_fast: 2
 webhooks: // [!code focus]
 - endpoint: "https://api.yourapp.com/webhooks/rrelayer" // [!code focus]
   shared_secret: "${WEBHOOK_SECRET}" // [!code focus]

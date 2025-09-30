@@ -51,6 +51,7 @@ const relayer = await client.getRelayerClient(
   // The relayer id you want to connect to
   '94afb207-bb47-4392-9229-ba87e4d783cb',
   // This is optional it defaults to fast
+  // As you are using viems native interface, all your tx will be sent at this speed
   TransactionSpeed.FAST
 );
 
@@ -77,6 +78,7 @@ let relayer = createRelayerClient({
   relayerId: '94afb207-bb47-4392-9229-ba87e4d783cb',
   apiKey: 'YOUR_API_KEY',
   // This is optional it defaults to fast
+  // As you are using viems native interface, all your tx will be sent at this speed
   speed: TransactionSpeed.FAST,
 });
 

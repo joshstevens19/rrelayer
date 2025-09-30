@@ -34,6 +34,12 @@ networks:
     provider_urls:
       - https://sepolia.gateway.tenderly.co
     block_explorer_url: https://sepolia.etherscan.io
+    max_gas_price_multiplier: 4
+    gas_bump_blocks_every:
+      slow: 10
+      medium: 5
+      fast: 4
+      super_fast: 2
     automatic_top_up:
       from:
         relayer:
@@ -112,4 +118,10 @@ networks:
     provider_urls:
       - https://sepolia.gateway.tenderly.co
     block_explorer_url: https://sepolia.etherscan.io
+    max_gas_price_multiplier: 4
+    gas_bump_blocks_every:
+      slow: 10
+      medium: 5
+      fast: 4
+      super_fast: 2
 ```

@@ -28,13 +28,13 @@ Do you want Docker support out of the box (will make it easy to run)? [Y/n]: Y
 Project 'MyFirstRelayer' initialized successfully! note we advise to not use the RAW_DANGEROUS_MNEMONIC in production and use one of the secure key management signing keys. Alongside replace RRELAYER_AUTH_USERNAME and RRELAYER_AUTH_PASSWORD in the .env
 ```
 
-Once completed a new boilerplate project will be created in the current directory. You can navigate to the project directory and start building your project.
+Once completed, a new boilerplate project will be created in the current directory. You can navigate to the project directory and start building your project.
 The boilerplate project is configured with sepolia ethereum testnet configured to be able to easily start it up.
 
 ## 2. Environment Variables
 
 On creation, it will generate you a `.env` with some values it to make it easy to run by default it generates you signing provider raw which
-is not the securest to run as the seed is in the `env`, but rrelayer offers many signing key provider which you can find out more [here](/config/signing-providers/aws-kms).
+is not the securest to run as the seed is in the `env`, but rrelayer offers many signing key providers which you can find out more [here](/config/signing-providers/aws-kms).
 
 The `.env` file will look something like this:
 
@@ -48,13 +48,13 @@ RRELAYER_AUTH_PASSWORD=development_password_jkmxXj7pAUcCk67z # these are randoml
 
 ### RAW_DANGEROUS_MNEMONIC
 
-This is just a seed phrase in the env file as said you can use many more secure key providers but we do this to be easy to just run off the bat,
-relayer offers many signing key provider which you can find out more [here](/config/signing-providers/aws-kms).
+This is just a seed phrase in the env file as said you can use many more secure key providers, but we do this to be easy to just run off the bat.
+rrelayer offers many signing key providers which you can find out more [here](/config/signing-providers/aws-kms).
 
 ### DATABASE_URL
 
 For ease of running locally we suggest you enable docker support on the rrelayer project, if you did not
-enable docker support you will need to provide a postgres database information in the `.env` file
+enable docker support you will need to provide a `DATABASE_URL` in the `.env` file
 which has been generated for you.
 
 `sslmode=require` is supported as well just include it in the connection string.
@@ -71,10 +71,18 @@ POSTGRES_PASSWORD=password
 
 ### RRELAYER_AUTH_USERNAME
 
+:::info
+This is just the name of the environment variable rrelayer spins up you can rename it anything and map it in the `rrelayer.yaml`.
+:::
+
 rrelayer uses basic auth to allow you to config who can hit the rrelayer API, so this is the username used, you should replace it
 with one which is more secure before you deploy this to production. Note if anyone gets these details, they can hit your relayers.
 
 ### RRELAYER_AUTH_PASSWORD
+
+:::info
+This is just the name of the environment variable rrelayer spins up you can rename it anything and map it in the `rrelayer.yaml`.
+:::
 
 rrelayer uses basic auth to allow you to config who can hit the rrelayer API, so this is the password used, you should replace it
 with one which is more secure before you deploy this to production. Note if anyone gets these details, they can hit your relayers.
@@ -113,6 +121,12 @@ networks:
     provider_urls:
       - https://sepolia.gateway.tenderly.co
     block_explorer_url: https://sepolia.etherscan.io
+    max_gas_price_multiplier: 4
+    gas_bump_blocks_every:
+      slow: 10
+      medium: 5
+      fast: 4
+      super_fast: 2
 ```
 
 ## 4. Start the project

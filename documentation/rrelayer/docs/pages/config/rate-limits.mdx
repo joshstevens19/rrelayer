@@ -36,6 +36,12 @@ networks:
   provider_urls:
   - "https://sepolia.gateway.tenderly.co"
   block_explorer_url: "https://sepolia.etherscan.io"
+  max_gas_price_multiplier: 4
+  gas_bump_blocks_every:
+    slow: 10
+    medium: 5
+    fast: 4
+    super_fast: 2
 rate_limits: // [!code focus]
   user_limits: // [!code focus]
     per_relayer: // [!code focus]

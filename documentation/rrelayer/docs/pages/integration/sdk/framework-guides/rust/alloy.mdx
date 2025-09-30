@@ -1,5 +1,9 @@
 # Getting started
 
+:::warning
+This may change over the next few days when its tested out properly.
+:::
+
 [Alloy](https://alloy.rs/) is a comprehensive Rust library for interacting with Ethereum and other EVM-compatible blockchains, providing type-safe smart contract bindings, transaction building, and wallet management.
 
 If you are familiar with `Alloy`, this integration will look very familiar to you.
@@ -50,6 +54,8 @@ pub async fn create_relayer_signer() -> Result<RelayerSigner> {
             username: "your_username".to_string(),
             password: "your_password".to_string(),
         },
+        // This is optional it defaults to fast and is a fallback
+        // You can override this with the transaction request
         speed: Some(TransactionSpeed::FAST),
     };
 
@@ -82,6 +88,8 @@ pub async fn create_relayer_signer() -> Result<RelayerSigner> {
         auth: RelayerClientAuth::ApiKey {
             api_key: "your-api-key-here".to_string()
         },
+        // This is optional it defaults to fast and is a fallback
+        // You can override this with the transaction request
         speed: Some(TransactionSpeed::FAST),
     };
 
