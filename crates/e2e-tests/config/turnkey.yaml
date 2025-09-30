@@ -1,5 +1,5 @@
 name: e2e-tests
-signing_key:
+signing_provider:
   turnkey:
     api_public_key: ${TURNKEY_PUBLIC_KEY}
     api_private_key: ${TURNKEY_PRIVATE_KEY}
