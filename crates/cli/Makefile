@@ -12,6 +12,8 @@ start_example:
 	RUST_BACKTRACE=1 cargo run -- start --path $(CURDIR)/../../playground/example
 start_local:
 	RUST_BACKTRACE=1 cargo run -- start --path $(CURDIR)/../../playground/local-node
+start_base:
+	RUST_BACKTRACE=1 cargo run -- start --path $(CURDIR)/../../playground/base
 
 auth_login:
 	cargo run -- auth login

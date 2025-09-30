@@ -1,6 +1,6 @@
 {
   "name": "rrelayer",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "The rrelayer sdk",
   "main": "dist/index.js",
   "scripts": {

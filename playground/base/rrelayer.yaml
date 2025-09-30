@@ -3,11 +3,11 @@ signing_provider:
   raw:
     mnemonic: ${RAW_DANGEROUS_MNEMONIC}
 networks:
-- name: sepolia_ethereum
-  chain_id: 11155111
+- name: base_ethereum
+  chain_id: 8453
   provider_urls:
-  - https://sepolia.gateway.tenderly.co
-  block_explorer_url: https://sepolia.etherscan.io
+  - ${RPC}
+  block_explorer_url: https://basescan.org/
   enable_sending_blobs: true
   gas_bump_blocks_every:
     slow: 10
