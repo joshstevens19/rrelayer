@@ -19,43 +19,54 @@ GET /api/networks
 ### Response
 
 ```json
-{
-  "networks": [
-    {
-      "chain_id": 1,
-      "name": "ethereum_mainnet",
-      "display_name": "Ethereum Mainnet",
-      "rpc_urls": [
-        "https://eth.gateway.tenderly.co",
-        "https://eth-mainnet.g.alchemy.com/v2/..."
-      ],
-      "block_explorer_url": "https://etherscan.io",
-      "native_currency": {
-        "name": "Ether",
-        "symbol": "ETH",
-        "decimals": 18
-      }
-    },
-    {
-      "chain_id": 11155111,
-      "name": "sepolia_ethereum",
-      "display_name": "Sepolia Testnet",
-      "rpc_urls": ["https://sepolia.gateway.tenderly.co"],
-      "block_explorer_url": "https://sepolia.etherscan.io",
-      "native_currency": {
-        "name": "Sepolia Ether",
-        "symbol": "ETH",
-        "decimals": 18
-      }
-    }
-  ]
-}
+[
+  {
+    "name": "ethereum_mainnet",
+    "chainId": 1,
+    "providerUrls": [
+      "https://eth.gateway.tenderly.co",
+      "https://eth-mainnet.g.alchemy.com/v2/..."
+    ]
+  },
+  {
+    "name": "sepolia_ethereum",
+    "chainId": 11155111,
+    "providerUrls": ["https://sepolia.gateway.tenderly.co"]
+  }
+]
 ```
 
 ### Example
 
 ```bash
 curl https://your-rrelayer.com/api/networks \
+  -u "username:password"
+```
+
+## Get Network
+
+Get details for a specific network.
+
+### Endpoint
+
+```
+GET /api/networks/{chain_id}
+```
+
+### Response
+
+```json
+{
+  "name": "sepolia_ethereum",
+  "chainId": 11155111,
+  "providerUrls": ["https://sepolia.gateway.tenderly.co"]
+}
+```
+
+### Example
+
+```bash
+curl https://your-rrelayer.com/api/networks/11155111 \
   -u "username:password"
 ```
 
@@ -73,36 +84,30 @@ GET /api/networks/gas/price/{chain_id}
 
 ```json
 {
-  "chain_id": 11155111,
-  "gas_prices": {
-    "slow": {
-      "max_priority_fee": "0.1",
-      "max_fee": "2.5",
-      "min_wait_time_estimate": 180,
-      "max_wait_time_estimate": 300
-    },
-    "medium": {
-      "max_priority_fee": "0.5",
-      "max_fee": "4.0",
-      "min_wait_time_estimate": 60,
-      "max_wait_time_estimate": 120
-    },
-    "fast": {
-      "max_priority_fee": "1.0",
-      "max_fee": "6.0",
-      "min_wait_time_estimate": 15,
-      "max_wait_time_estimate": 60
-    },
-    "super_fast": {
-      "max_priority_fee": "2.0",
-      "max_fee": "10.0",
-      "min_wait_time_estimate": 5,
-      "max_wait_time_estimate": 15
-    }
+  "slow": {
+    "maxPriorityFee": "0.1",
+    "maxFee": "2.5",
+    "minWaitTimeEstimate": 180,
+    "maxWaitTimeEstimate": 300
   },
-  "base_fee": "1.2",
-  "timestamp": "2025-09-26T10:30:00Z",
-  "provider": "TENDERLY"
+  "medium": {
+    "maxPriorityFee": "0.5",
+    "maxFee": "4.0",
+    "minWaitTimeEstimate": 60,
+    "maxWaitTimeEstimate": 120
+  },
+  "fast": {
+    "maxPriorityFee": "1.0",
+    "maxFee": "6.0",
+    "minWaitTimeEstimate": 15,
+    "maxWaitTimeEstimate": 60
+  },
+  "super_fast": {
+    "maxPriorityFee": "2.0",
+    "maxFee": "10.0",
+    "minWaitTimeEstimate": 5,
+    "maxWaitTimeEstimate": 15
+  }
 }
 ```
 
@@ -110,10 +115,10 @@ GET /api/networks/gas/price/{chain_id}
 
 | Field                    | Type     | Description                  |
 | ------------------------ | -------- | ---------------------------- |
-| `max_priority_fee`       | `string` | Priority fee in Gwei         |
-| `max_fee`                | `string` | Maximum fee in Gwei          |
-| `min_wait_time_estimate` | `number` | Minimum wait time in seconds |
-| `max_wait_time_estimate` | `number` | Maximum wait time in seconds |
+| `maxPriorityFee`         | `string` | Priority fee in Gwei         |
+| `maxFee`                 | `string` | Maximum fee in Gwei          |
+| `minWaitTimeEstimate`    | `number` | Minimum wait time in seconds |
+| `maxWaitTimeEstimate`    | `number` | Maximum wait time in seconds |
 
 ### Example
 
@@ -145,20 +150,14 @@ curl https://your-rrelayer.com/api/networks/gas/price/11155111 \
 
 ## Gas Price Providers
 
-rrelayer supports multiple gas price providers:
+rrelayer supports multiple gas price providers configured per network in the rrelayer configuration:
 
-### Supported Providers
+- **TENDERLY** - Tenderly Gas Station
+- **INFURA** - Infura Gas API  
+- **CUSTOM** - Custom gas provider
+- **FALLBACK** - Fallback gas estimation
 
-| Provider   | Description             |
-| ---------- | ----------------------- |
-| `TENDERLY` | Tenderly Gas Station    |
-| `INFURA`   | Infura Gas API          |
-| `CUSTOM`   | Custom gas provider     |
-| `FALLBACK` | Fallback gas estimation |
-
-### Provider Selection
-
-Gas price providers are configured per network in the rrelayer configuration. The API will return gas prices from the configured provider for each network.
+The API returns gas prices from the configured provider for the requested network.
 
 ## Use Cases
 

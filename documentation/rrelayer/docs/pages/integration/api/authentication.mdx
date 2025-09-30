@@ -114,6 +114,30 @@ curl https://your-rrelayer.com/api/auth/status \
 
 Will throw a 401 http error if none or valid.
 
+## Health Check
+
+Check if the API server is running.
+
+### Endpoint
+
+```
+GET /health
+```
+
+### Response
+
+```json
+"healthy"
+```
+
+### Example
+
+```bash
+curl https://your-rrelayer.com/health
+```
+
+This endpoint does not require authentication and returns a simple "healthy" string when the server is operational.
+
 ## Rate Limiting Headers
 
 When using rate limiting, include the rate limit key header:

@@ -20,6 +20,7 @@ pub struct Relayer {
     pub address: EvmAddress,
 
     /// The relayer wallet index
+    #[serde(rename = "walletIndex")]
     pub wallet_index: u32,
 
     /// The max gas price

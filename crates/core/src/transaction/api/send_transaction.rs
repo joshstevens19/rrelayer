@@ -31,8 +31,9 @@ pub struct RelayTransactionRequest {
     pub data: TransactionData,
     pub speed: Option<TransactionSpeed>,
     /// This allows an app to pass their own custom external id in perfect for webhooks
+    #[serde(rename = "externalId", skip_serializing_if = "Option::is_none", default)]
     pub external_id: Option<String>,
-    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub blobs: Option<Vec<String>>, // will overflow the stack if you use the Blob type directly
 }
 

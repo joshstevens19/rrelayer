@@ -110,7 +110,7 @@ webhooks:
 
 - **`endpoint`**: The URL where webhook requests will be sent
 - **`shared_secret`**: Secret used for webhook authentication and payload verification
-- **`networks`**: Array of network names that should trigger this webhook
+- **`networks`**: Network filter - can be "*" for all networks, or an array of network names
 
 ### Optional Fields
 
@@ -140,7 +140,6 @@ All transaction webhooks send a JSON payload with this structure:
     "txHash": "0xabcdef123456789abcdef123456789abcdef123456789abcdef123456789abcdef",
     "queuedAt": "2025-09-26T10:29:30Z",
     "sentAt": "2025-09-26T10:30:00Z",
-    "confirmedAt": null,
     "expiresAt": "2025-09-26T11:30:00Z",
     "externalId": "order_12345",
     "nonce": 42,
@@ -325,36 +324,25 @@ Balance checks run every 10 minutes and both log warnings and send webhooks when
 
 ## Webhook Authentication
 
-All webhook requests include authentication headers for security:
+Webhook authentication is configured through the `shared_secret` field in your webhook configuration. This secret is used for webhook authentication and payload verification.
 
-### Headers Sent
+### Security Configuration
 
-- **`X-rrelayer-Signature`**: HMAC-SHA256 signature of the request body using your shared secret
-- **`X-rrelayer-Event-Type`**: The event type that triggered the webhook
-- **`X-rrelayer-Timestamp`**: Unix timestamp when the webhook was sent
-- **`Content-Type`**: `application/json`
+Each webhook endpoint requires a shared secret for authentication:
 
-### Verifying Webhooks
-
-To verify webhook authenticity, compute the HMAC-SHA256 signature of the request body using your shared secret and compare it with the `X-rrelayer-Signature` header.
-
-Example verification in Node.js:
-
-```javascript
-const crypto = require('crypto');
-
-function verifyWebhook(body, signature, secret) {
-  const expectedSignature = crypto
-    .createHmac('sha256', secret)
-    .update(body, 'utf8')
-    .digest('hex');
-
-  return crypto.timingSafeEqual(
-    Buffer.from(signature, 'hex'),
-    Buffer.from(expectedSignature, 'hex')
-  );
-}
+```yaml
+webhooks:
+- endpoint: "https://api.yourapp.com/webhooks/rrelayer"
+  shared_secret: "${WEBHOOK_SECRET}"  # Strong secret for authentication
+  networks: "*"
 ```
+
+### Best Practices
+
+1. **Use strong secrets** - Generate cryptographically secure random strings
+2. **Keep secrets secure** - Store in environment variables, not in configuration files
+3. **Rotate secrets regularly** - Update webhook secrets periodically
+4. **Use HTTPS endpoints** - Always use encrypted connections for webhook delivery
 
 ## Delivery and Retry Logic
 

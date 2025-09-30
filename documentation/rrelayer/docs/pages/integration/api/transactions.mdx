@@ -24,21 +24,21 @@ POST /api/transactions/relayers/{relayer_id}/send
   "value": "1000000000000000000",
   "data": "0xa9059cbb000000000000000000000000...",
   "speed": "MEDIUM",
-  "external_id": "order_12345",
+  "externalId": "order_12345",
   "blobs": ["0x01234567..."]
 }
 ```
 
 #### Parameters
 
-| Field         | Type       | Required | Description                                                       |
-| ------------- | ---------- | -------- | ----------------------------------------------------------------- |
-| `to`          | `string`   | Yes      | Recipient address                                                 |
-| `value`       | `string`   | No       | Transaction value in wei (default: "0")                           |
-| `data`        | `string`   | No       | Transaction data/input (default: "0x")                            |
-| `speed`       | `string`   | No       | Transaction speed: `"SLOW"`, `"MEDIUM"`, `"FAST"`, `"SUPER_FAST"` |
-| `external_id` | `string`   | No       | Custom external ID for tracking                                   |
-| `blobs`       | `string[]` | No       | Blob data for EIP-4844 transactions                               |
+| Field        | Type       | Required | Description                                                       |
+| ------------ | ---------- | -------- | ----------------------------------------------------------------- |
+| `to`         | `string`   | Yes      | Recipient address                                                 |
+| `value`      | `string`   | No       | Transaction value in wei (default: "0")                           |
+| `data`       | `string`   | No       | Transaction data/input (default: "0x")                            |
+| `speed`      | `string`   | No       | Transaction speed: `"SLOW"`, `"MEDIUM"`, `"FAST"`, `"SUPER_FAST"` |
+| `externalId` | `string`   | No       | Custom external ID for tracking                                   |
+| `blobs`      | `string[]` | No       | Blob data for EIP-4844 transactions                               |
 
 ### Response
 
@@ -59,7 +59,7 @@ curl -X POST https://your-rrelayer.com/api/transactions/relayers/0x742d35.../sen
     "to": "0x1234567890abcdef1234567890abcdef12345678",
     "value": "1000000000000000000",
     "speed": "MEDIUM",
-    "external_id": "order_12345"
+    "externalId": "order_12345"
   }'
 ```
 
@@ -78,23 +78,24 @@ GET /api/transactions/{transaction_id}
 ```json
 {
   "id": "tx_abc123def456",
-  "relayer_id": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
+  "relayerId": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
   "to": "0x1234567890abcdef1234567890abcdef12345678",
   "from": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
   "value": "1000000000000000000",
   "data": "0xa9059cbb000000000000000000000000...",
   "chain_id": 11155111,
   "status": "CONFIRMED",
-  "transaction_hash": "0xabcdef123456789abcdef123456789abcdef123456789abcdef123456789abcdef",
-  "queued_at": "2025-09-26T10:29:30Z",
-  "sent_at": "2025-09-26T10:30:00Z",
-  "mined_at": "2025-09-26T10:31:30Z",
-  "confirmed_at": "2025-09-26T10:32:00Z",
-  "expires_at": "2025-09-26T11:30:00Z",
-  "external_id": "order_12345",
+  "txHash": "0xabcdef123456789abcdef123456789abcdef123456789abcdef123456789abcdef",
+  "queuedAt": "2025-09-26T10:29:30Z",
+  "sentAt": "2025-09-26T10:30:00Z",
+  "minedAt": "2025-09-26T10:31:30Z",
+  "confirmedAt": "2025-09-26T10:32:00Z",
+  "expiresAt": "2025-09-26T11:30:00Z",
+  "externalId": "order_12345",
   "nonce": 42,
+  "speed": "MEDIUM",
   "is_noop": false,
-  "cancelled_by_transaction_id": null
+  "cancelledByTransactionId": null
 }
 ```
 
@@ -107,7 +108,7 @@ For transactions with status `CANCELLED`, additional fields are included:
   "id": "tx_original456",
   "status": "CANCELLED",
   "is_noop": true,
-  "cancelled_by_transaction_id": "tx_cancel789",
+  "cancelledByTransactionId": "tx_cancel789",
   ...
 }
 ```
@@ -290,18 +291,33 @@ GET /api/transactions/relayers/{relayer_id}
 
 ```json
 {
-  "transactions": [
+  "items": [
     {
       "id": "tx_abc123def456",
+      "relayerId": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
       "to": "0x1234567890abcdef1234567890abcdef12345678",
+      "from": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
       "value": "1000000000000000000",
+      "data": "0x",
+      "nonce": 42,
+      "chain_id": 11155111,
       "status": "CONFIRMED",
-      "transaction_hash": "0xabcdef...",
-      "queued_at": "2025-09-26T10:29:30Z",
-      "external_id": "order_12345"
+      "txHash": "0xabcdef...",
+      "queuedAt": "2025-09-26T10:29:30Z",
+      "expiresAt": "2025-09-26T11:30:00Z",
+      "sentAt": "2025-09-26T10:30:00Z",
+      "minedAt": "2025-09-26T10:31:30Z",
+      "confirmedAt": "2025-09-26T10:32:00Z",
+      "speed": "MEDIUM",
+      "is_noop": false,
+      "externalId": "order_12345"
     }
   ],
-  "total": 1
+  "next": {
+    "limit": 10,
+    "offset": 10
+  },
+  "previous": null
 }
 ```
 

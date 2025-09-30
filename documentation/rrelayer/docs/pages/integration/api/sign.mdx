@@ -20,27 +20,27 @@ POST /api/signing/{relayer_id}/message
 
 ```json
 {
-  "message": "Hello, World! Please sign this message to authenticate."
+  "text": "Hello, World! Please sign this message to authenticate."
 }
 ```
 
 #### Parameters
 
-| Field     | Type     | Required | Description              |
-| --------- | -------- | -------- | ------------------------ |
-| `message` | `string` | Yes      | The text message to sign |
+| Field | Type     | Required | Description              |
+| ----- | -------- | -------- | ------------------------ |
+| `text` | `string` | Yes      | The text message to sign |
 
 ### Response
 
 ```json
 {
+  "messageSigned": "Hello, World! Please sign this message to authenticate.",
   "signature": {
     "r": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     "s": "0xfedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321",
     "v": 27
   },
-  "message": "Hello, World! Please sign this message to authenticate.",
-  "relayer_address": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b"
+  "signed_by": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b"
 }
 ```
 
@@ -51,7 +51,7 @@ curl -X POST https://your-rrelayer.com/api/signing/0x742d35.../message \
   -u "username:password" \
   -H "Content-Type: application/json" \
   -d '{
-    "message": "Hello, World! Please sign this message to authenticate."
+    "text": "Hello, World! Please sign this message to authenticate."
   }'
 ```
 
@@ -112,19 +112,7 @@ POST /api/signing/{relayer_id}/typed-data
     "r": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     "s": "0xfedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321",
     "v": 28
-  },
-  "domain": {
-    "name": "MyApp",
-    "version": "1",
-    "chainId": 11155111,
-    "verifyingContract": "0x1234567890abcdef1234567890abcdef12345678"
-  },
-  "message": {
-    "to": "0x9876543210fedcba9876543210fedcba98765432",
-    "amount": "1000000000000000000"
-  },
-  "primaryType": "Transfer",
-  "relayer_address": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b"
+  }
 }
 ```
 
@@ -182,7 +170,7 @@ GET /api/signing/{relayer_id}/text-history
 
 ```json
 {
-  "signatures": [
+  "items": [
     {
       "id": "sign_abc123def456",
       "message": "Hello, World! Please sign this message to authenticate.",
@@ -194,7 +182,11 @@ GET /api/signing/{relayer_id}/text-history
       "signed_at": "2025-09-26T10:30:00Z"
     }
   ],
-  "total": 1
+  "next": {
+    "limit": 10,
+    "offset": 10
+  },
+  "previous": null
 }
 ```
 
@@ -226,7 +218,7 @@ GET /api/signing/{relayer_id}/typed-data-history
 
 ```json
 {
-  "signatures": [
+  "items": [
     {
       "id": "sign_typed_def456ghi789",
       "domain": {
@@ -248,7 +240,11 @@ GET /api/signing/{relayer_id}/typed-data-history
       "signed_at": "2025-09-26T10:35:00Z"
     }
   ],
-  "total": 1
+  "next": {
+    "limit": 10,
+    "offset": 10
+  },
+  "previous": null
 }
 ```
 
