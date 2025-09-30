@@ -20,13 +20,17 @@ impl FallbackGasFeeEstimator {
         FallbackGasFeeEstimator { provider }
     }
 
-    async fn estimate_with_fee_history(&self) -> Result<(u128, u128), GasEstimatorError> {
-        const PAST_BLOCKS: u64 = 20;
-        const REWARD_PERCENTILE: f64 = 20.0;
+    async fn estimate_with_fee_history(
+        &self,
+        chain_id: &ChainId,
+    ) -> Result<(u128, u128), GasEstimatorError> {
+        let past_blocks = if chain_id.u64() == 1 || chain_id.u64() == 11155111 { 20 } else { 60 };
+        let reward_percentile =
+            if chain_id.u64() == 1 || chain_id.u64() == 11155111 { 60.0 } else { 25.0 };
 
         let fee_history = self
             .provider
-            .get_fee_history(PAST_BLOCKS, BlockNumberOrTag::Latest, &[REWARD_PERCENTILE])
+            .get_fee_history(past_blocks, BlockNumberOrTag::Latest, &[reward_percentile])
             .await
             .map_err(|e| GasEstimatorError::CustomError(e.to_string()))?;
 
@@ -58,19 +62,35 @@ impl FallbackGasFeeEstimator {
                 if !all_rewards.is_empty() {
                     all_rewards.sort();
                     let median_idx = all_rewards.len() / 2;
-                    let min_gwei = parse_units("1", "gwei").unwrap().try_into().unwrap(); // 1 gwei minimum
-                    all_rewards[median_idx].max(min_gwei)
+                    all_rewards[median_idx]
                 } else {
-                    parse_units("2", "gwei").unwrap().try_into().unwrap() // 2 gwei default
+                    if chain_id.u64() == 1 {
+                        parse_units("2", "gwei").unwrap().try_into().unwrap() // 2 gwei default for Ethereum
+                    } else {
+                        parse_units("0.01", "gwei").unwrap().try_into().unwrap()
+                        // 0.01 gwei default for other chains
+                    }
                 }
             } else {
-                parse_units("2", "gwei").unwrap().try_into().unwrap() // 2 gwei default
+                if chain_id.u64() == 1 {
+                    parse_units("2", "gwei").unwrap().try_into().unwrap() // 2 gwei default for Ethereum
+                } else {
+                    parse_units("0.01", "gwei").unwrap().try_into().unwrap() // 0.01 gwei default for other chains
+                }
             }
         } else {
-            parse_units("2", "gwei").unwrap().try_into().unwrap() // 2 gwei default
+            if chain_id.u64() == 1 {
+                parse_units("2", "gwei").unwrap().try_into().unwrap() // 2 gwei default for Ethereum
+            } else {
+                parse_units("0.01", "gwei").unwrap().try_into().unwrap() // 0.01 gwei default for other chains
+            }
         };
 
-        let max_fee = (base_fee_per_gas + priority_fee).max(priority_fee * 2);
+        let max_fee = if chain_id.u64() == 1 {
+            (base_fee_per_gas + priority_fee).max(priority_fee * 2) // Original logic for Ethereum
+        } else {
+            base_fee_per_gas + (priority_fee * 2) // Simplified for other chains
+        };
 
         Ok((priority_fee, max_fee))
     }
@@ -82,21 +102,25 @@ impl BaseGasFeeEstimator for FallbackGasFeeEstimator {
         &self,
         _chain_id: &ChainId,
     ) -> Result<GasEstimatorResult, GasEstimatorError> {
-        let (base_priority_fee, base_max_fee) = match self.estimate_with_fee_history().await {
-            Ok(fees) => fees,
-            Err(_) => {
-                let suggested = self
-                    .provider
-                    .estimate_eip1559_fees()
-                    .await
-                    .map_err(|e| GasEstimatorError::CustomError(e.to_string()))?;
+        let (base_priority_fee, base_max_fee) =
+            match self.estimate_with_fee_history(_chain_id).await {
+                Ok(fees) => fees,
+                Err(_) => {
+                    let suggested = self
+                        .provider
+                        .estimate_eip1559_fees()
+                        .await
+                        .map_err(|e| GasEstimatorError::CustomError(e.to_string()))?;
 
-                let min_gwei = parse_units("1", "gwei").unwrap().try_into().unwrap(); // 1 gwei minimum
-                let priority_fee = suggested.max_priority_fee_per_gas.max(min_gwei);
-                let max_fee = suggested.max_fee_per_gas.max(priority_fee * 2);
-                (priority_fee, max_fee)
-            }
-        };
+                    let priority_fee = suggested.max_priority_fee_per_gas;
+                    let max_fee = if _chain_id.u64() == 1 {
+                        suggested.max_fee_per_gas.max(priority_fee * 2) // Original logic for Ethereum
+                    } else {
+                        suggested.max_fee_per_gas // Simplified for other chains
+                    };
+                    (priority_fee, max_fee)
+                }
+            };
 
         Ok(GasEstimatorResult {
             slow: GasPriceResult {
