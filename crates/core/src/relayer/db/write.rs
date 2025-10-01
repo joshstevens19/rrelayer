@@ -84,7 +84,7 @@ impl PostgresClient {
                     ));
                 }
 
-                let wallet_index = source_relayer.wallet_index as i32;
+                let wallet_index = source_relayer.wallet_index;
                 let address = evm_provider
                     .create_wallet(source_relayer.wallet_index_type().index())
                     .await
