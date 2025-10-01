@@ -34,7 +34,7 @@ POST /api/relayers/{chain_id}/new
 
 ```json
 {
-  "id": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
+  "id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
   "address": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b"
 }
 ```
@@ -72,7 +72,7 @@ GET /api/relayers
 {
   "items": [
     {
-      "id": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
+      "id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
       "name": "my-app-relayer",
       "chainId": 11155111,
       "address": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
@@ -80,6 +80,7 @@ GET /api/relayers
       "maxGasPrice": "50000000000",
       "paused": false,
       "eip1559Enabled": true,
+      "isPrivateKey": false,
       "createdAt": "2025-09-26T10:00:00Z"
     }
   ],
@@ -113,7 +114,7 @@ GET /api/relayers/{relayer_id}
 ```json
 {
   "relayer": {
-    "id": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
+    "id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
     "name": "my-app-relayer",
     "chainId": 11155111,
     "address": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
@@ -121,27 +122,27 @@ GET /api/relayers/{relayer_id}
     "maxGasPrice": "50000000000",
     "paused": false,
     "eip1559Enabled": true,
+    "isPrivateKey": false,
     "createdAt": "2025-09-26T10:00:00Z"
   },
-  "providerUrls": [
-    "https://sepolia.gateway.tenderly.co"
-  ]
+  "providerUrls": ["https://sepolia.gateway.tenderly.co"]
 }
 ```
 
 ### Relayer Fields
 
-| Field           | Type      | Description                          |
-| --------------- | --------- | ------------------------------------ |
-| `paused`        | `boolean` | Whether the relayer is paused        |
-| `eip1559Enabled`| `boolean` | Whether EIP-1559 transactions are enabled |
-| `maxGasPrice`   | `string`  | Maximum gas price (optional)         |
-| `walletIndex`   | `number`  | Wallet index for key derivation      |
+| Field            | Type      | Description                                            |
+| ---------------- | --------- | ------------------------------------------------------ |
+| `paused`         | `boolean` | Whether the relayer is paused                          |
+| `eip1559Enabled` | `boolean` | Whether EIP-1559 transactions are enabled              |
+| `maxGasPrice`    | `string`  | Maximum gas price (optional)                           |
+| `walletIndex`    | `number`  | Wallet index for key derivation                        |
+| `isPrivateKey`   | `boolean` | Whether relayer uses a private key vs mnemonic-derived |
 
 ### Example
 
 ```bash
-curl https://your-rrelayer.com/api/relayers/0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b \
+curl https://your-rrelayer.com/api/relayers/6ba7b810-9dad-11d1-80b4-00c04fd430c8 \
   -u "username:password"
 ```
 
@@ -159,15 +160,23 @@ POST /api/relayers/{relayer_id}/clone
 
 ```json
 {
-  "name": "cloned-relayer"
+  "newRelayerName": "cloned-relayer",
+  "chainId": 1
 }
 ```
+
+#### Parameters
+
+| Field            | Type     | Required | Description                            |
+| ---------------- | -------- | -------- | -------------------------------------- |
+| `newRelayerName` | `string` | Yes      | Name for the cloned relayer            |
+| `chainId`        | `number` | Yes      | Target chain ID for the cloned relayer |
 
 ### Response
 
 ```json
 {
-  "id": "0x853e46dd7577c4c0df3f4e9f0b0e1f1f1c2d3e4f",
+  "id": "550e8400-e29b-41d4-a716-446655440001",
   "address": "0x853e46dd7577c4c0df3f4e9f0b0e1f1f1c2d3e4f"
 }
 ```
@@ -175,10 +184,10 @@ POST /api/relayers/{relayer_id}/clone
 ### Example
 
 ```bash
-curl -X POST https://your-rrelayer.com/api/relayers/0x742d35.../clone \
+curl -X POST https://your-rrelayer.com/api/relayers/6ba7b810-9dad-11d1-80b4-00c04fd430c8/clone \
   -u "username:password" \
   -H "Content-Type: application/json" \
-  -d '{"name": "cloned-relayer"}'
+  -d '{"newRelayerName": "cloned-relayer", "chainId": 1}'
 ```
 
 ## Pause Relayer
@@ -202,7 +211,7 @@ PUT /api/relayers/{relayer_id}/pause
 ### Example
 
 ```bash
-curl -X PUT https://your-rrelayer.com/api/relayers/0x742d35.../pause \
+curl -X PUT https://your-rrelayer.com/api/relayers/6ba7b810-9dad-11d1-80b4-00c04fd430c8/pause \
   -u "username:password"
 ```
 
@@ -227,7 +236,7 @@ PUT /api/relayers/{relayer_id}/unpause
 ### Example
 
 ```bash
-curl -X PUT https://your-rrelayer.com/api/relayers/0x742d35.../unpause \
+curl -X PUT https://your-rrelayer.com/api/relayers/6ba7b810-9dad-11d1-80b4-00c04fd430c8/unpause \
   -u "username:password"
 ```
 
@@ -258,7 +267,7 @@ PUT /api/relayers/{relayer_id}/gas/max/{gas_price_cap}
 ### Example
 
 ```bash
-curl -X PUT https://your-rrelayer.com/api/relayers/0x742d35.../gas/max/50000000000 \
+curl -X PUT https://your-rrelayer.com/api/relayers/6ba7b810-9dad-11d1-80b4-00c04fd430c8/gas/max/50000000000 \
   -u "username:password"
 ```
 
@@ -289,7 +298,7 @@ PUT /api/relayers/{relayer_id}/gas/eip1559/{enabled}
 ### Example
 
 ```bash
-curl -X PUT https://your-rrelayer.com/api/relayers/0x742d35.../gas/eip1559/true \
+curl -X PUT https://your-rrelayer.com/api/relayers/6ba7b810-9dad-11d1-80b4-00c04fd430c8/gas/eip1559/true \
   -u "username:password"
 ```
 
@@ -306,18 +315,16 @@ GET /api/relayers/{relayer_id}/allowlists
 ### Response
 
 ```json
-{
-  "addresses": [
-    "0x1234567890abcdef1234567890abcdef12345678",
-    "0x9876543210fedcba9876543210fedcba98765432"
-  ]
-}
+[
+  "0x1234567890abcdef1234567890abcdef12345678",
+  "0x9876543210fedcba9876543210fedcba98765432"
+]
 ```
 
 ### Example
 
 ```bash
-curl https://your-rrelayer.com/api/relayers/0x742d35.../allowlists \
+curl https://your-rrelayer.com/api/relayers/6ba7b810-9dad-11d1-80b4-00c04fd430c8/allowlists \
   -u "username:password"
 ```
 

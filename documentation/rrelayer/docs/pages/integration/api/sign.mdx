@@ -26,8 +26,8 @@ POST /api/signing/{relayer_id}/message
 
 #### Parameters
 
-| Field | Type     | Required | Description              |
-| ----- | -------- | -------- | ------------------------ |
+| Field  | Type     | Required | Description              |
+| ------ | -------- | -------- | ------------------------ |
 | `text` | `string` | Yes      | The text message to sign |
 
 ### Response
@@ -47,7 +47,7 @@ POST /api/signing/{relayer_id}/message
 ### Example
 
 ```bash
-curl -X POST https://your-rrelayer.com/api/signing/0x742d35.../message \
+curl -X POST https://your-rrelayer.com/api/signing/6ba7b810-9dad-11d1-80b4-00c04fd430c8/message \
   -u "username:password" \
   -H "Content-Type: application/json" \
   -d '{
@@ -119,7 +119,7 @@ POST /api/signing/{relayer_id}/typed-data
 ### Example
 
 ```bash
-curl -X POST https://your-rrelayer.com/api/signing/0x742d35.../typed-data \
+curl -X POST https://your-rrelayer.com/api/signing/6ba7b810-9dad-11d1-80b4-00c04fd430c8/typed-data \
   -u "username:password" \
   -H "Content-Type: application/json" \
   -d '{
@@ -172,14 +172,15 @@ GET /api/signing/{relayer_id}/text-history
 {
   "items": [
     {
-      "id": "sign_abc123def456",
+      "relayerId": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
       "message": "Hello, World! Please sign this message to authenticate.",
       "signature": {
         "r": "0x1234567890abcdef...",
         "s": "0xfedcba0987654321...",
         "v": 27
       },
-      "signed_at": "2025-09-26T10:30:00Z"
+      "chainId": 11155111,
+      "signedAt": "2025-09-26T10:30:00Z"
     }
   ],
   "next": {
@@ -193,7 +194,7 @@ GET /api/signing/{relayer_id}/text-history
 ### Example
 
 ```bash
-curl "https://your-rrelayer.com/api/signing/0x742d35.../text-history?limit=10" \
+curl "https://your-rrelayer.com/api/signing/6ba7b810-9dad-11d1-80b4-00c04fd430c8/text-history?limit=10" \
   -u "username:password"
 ```
 
@@ -220,14 +221,14 @@ GET /api/signing/{relayer_id}/typed-data-history
 {
   "items": [
     {
-      "id": "sign_typed_def456ghi789",
-      "domain": {
+      "relayerId": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+      "domainData": {
         "name": "MyApp",
         "version": "1",
         "chainId": 11155111,
         "verifyingContract": "0x1234567890abcdef1234567890abcdef12345678"
       },
-      "message": {
+      "messageData": {
         "to": "0x9876543210fedcba9876543210fedcba98765432",
         "amount": "1000000000000000000"
       },
@@ -237,7 +238,8 @@ GET /api/signing/{relayer_id}/typed-data-history
         "s": "0xfedcba0987654321...",
         "v": 28
       },
-      "signed_at": "2025-09-26T10:35:00Z"
+      "chainId": 11155111,
+      "signedAt": "2025-09-26T10:35:00Z"
     }
   ],
   "next": {
@@ -251,7 +253,7 @@ GET /api/signing/{relayer_id}/typed-data-history
 ### Example
 
 ```bash
-curl "https://your-rrelayer.com/api/signing/0x742d35.../typed-data-history?limit=10" \
+curl "https://your-rrelayer.com/api/signing/6ba7b810-9dad-11d1-80b4-00c04fd430c8/typed-data-history?limit=10" \
   -u "username:password"
 ```
 
@@ -325,11 +327,11 @@ The EIP-712 domain should include these standard fields:
 Sign a message to prove ownership of an address:
 
 ```bash
-curl -X POST https://your-rrelayer.com/api/signing/0x742d35.../message \
+curl -X POST https://your-rrelayer.com/api/signing/6ba7b810-9dad-11d1-80b4-00c04fd430c8/message \
   -u "username:password" \
   -H "Content-Type: application/json" \
   -d '{
-    "message": "Authenticate with MyApp at 2025-09-26T10:30:00Z"
+    "text": "Authenticate with MyApp at 2025-09-26T10:30:00Z"
   }'
 ```
 
@@ -338,7 +340,7 @@ curl -X POST https://your-rrelayer.com/api/signing/0x742d35.../message \
 Sign structured data for permission grants:
 
 ```bash
-curl -X POST https://your-rrelayer.com/api/signing/0x742d35.../typed-data \
+curl -X POST https://your-rrelayer.com/api/signing/6ba7b810-9dad-11d1-80b4-00c04fd430c8/typed-data \
   -u "username:password" \
   -H "Content-Type: application/json" \
   -d '{
@@ -369,7 +371,7 @@ curl -X POST https://your-rrelayer.com/api/signing/0x742d35.../typed-data \
 Sign transaction data for gasless execution:
 
 ```bash
-curl -X POST https://your-rrelayer.com/api/signing/0x742d35.../typed-data \
+curl -X POST https://your-rrelayer.com/api/signing/6ba7b810-9dad-11d1-80b4-00c04fd430c8/typed-data \
   -u "username:password" \
   -H "Content-Type: application/json" \
   -d '{
@@ -428,11 +430,11 @@ Signing endpoints are subject to rate limiting. See [Rate Limits](/config/rate-l
 Use the `x-rrelayer-rate-limit-key` header to specify a custom rate limit key:
 
 ```bash
-curl -X POST https://your-rrelayer.com/api/signing/0x742d35.../message \
+curl -X POST https://your-rrelayer.com/api/signing/6ba7b810-9dad-11d1-80b4-00c04fd430c8/message \
   -H "x-rrelayer-rate-limit-key: user-12345" \
   -u "username:password" \
   -H "Content-Type: application/json" \
-  -d '{"message": "Hello, World!"}'
+  -d '{"text": "Hello, World!"}'
 ```
 
 ## Security Considerations

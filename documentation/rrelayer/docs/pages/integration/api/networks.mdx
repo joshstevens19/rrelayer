@@ -113,12 +113,12 @@ GET /api/networks/gas/price/{chain_id}
 
 ### Gas Price Fields
 
-| Field                    | Type     | Description                  |
-| ------------------------ | -------- | ---------------------------- |
-| `maxPriorityFee`         | `string` | Priority fee in Gwei         |
-| `maxFee`                 | `string` | Maximum fee in Gwei          |
-| `minWaitTimeEstimate`    | `number` | Minimum wait time in seconds |
-| `maxWaitTimeEstimate`    | `number` | Maximum wait time in seconds |
+| Field                 | Type     | Description                  |
+| --------------------- | -------- | ---------------------------- |
+| `maxPriorityFee`      | `string` | Priority fee in Gwei         |
+| `maxFee`              | `string` | Maximum fee in Gwei          |
+| `minWaitTimeEstimate` | `number` | Minimum wait time in seconds |
+| `maxWaitTimeEstimate` | `number` | Maximum wait time in seconds |
 
 ### Example
 
@@ -153,7 +153,7 @@ curl https://your-rrelayer.com/api/networks/gas/price/11155111 \
 rrelayer supports multiple gas price providers configured per network in the rrelayer configuration:
 
 - **TENDERLY** - Tenderly Gas Station
-- **INFURA** - Infura Gas API  
+- **INFURA** - Infura Gas API
 - **CUSTOM** - Custom gas provider
 - **FALLBACK** - Fallback gas estimation
 
@@ -188,7 +188,7 @@ const data = await response.json();
 // Select speed based on requirements
 let speed;
 if (urgent) {
-  speed = 'SUPER_FAST';
+  speed = 'SUPER';
 } else if (normal) {
   speed = 'MEDIUM';
 } else {
@@ -210,5 +210,5 @@ Verify network support before sending transactions:
 ```bash
 # Check if network is supported
 curl https://your-rrelayer.com/api/networks \
-  -u "username:password" | jq '.networks[] | select(.chain_id == 1)'
+  -u "username:password" | jq '.[] | select(.chainId == 1)'
 ```

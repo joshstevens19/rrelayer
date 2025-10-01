@@ -31,20 +31,20 @@ POST /api/transactions/relayers/{relayer_id}/send
 
 #### Parameters
 
-| Field        | Type       | Required | Description                                                       |
-| ------------ | ---------- | -------- | ----------------------------------------------------------------- |
-| `to`         | `string`   | Yes      | Recipient address                                                 |
-| `value`      | `string`   | No       | Transaction value in wei (default: "0")                           |
-| `data`       | `string`   | No       | Transaction data/input (default: "0x")                            |
-| `speed`      | `string`   | No       | Transaction speed: `"SLOW"`, `"MEDIUM"`, `"FAST"`, `"SUPER_FAST"` |
-| `externalId` | `string`   | No       | Custom external ID for tracking                                   |
-| `blobs`      | `string[]` | No       | Blob data for EIP-4844 transactions                               |
+| Field        | Type       | Required | Description                                                  |
+| ------------ | ---------- | -------- | ------------------------------------------------------------ |
+| `to`         | `string`   | Yes      | Recipient address                                            |
+| `value`      | `string`   | No       | Transaction value in wei (default: "0")                      |
+| `data`       | `string`   | No       | Transaction data/input (default: "0x")                       |
+| `speed`      | `string`   | No       | Transaction speed: `"SLOW"`, `"MEDIUM"`, `"FAST"`, `"SUPER"` |
+| `externalId` | `string`   | No       | Custom external ID for tracking                              |
+| `blobs`      | `string[]` | No       | Blob data for EIP-4844 transactions                          |
 
 ### Response
 
 ```json
 {
-  "id": "tx_abc123def456",
+  "id": "550e8400-e29b-41d4-a716-446655440000",
   "hash": "0xabcdef123456789abcdef123456789abcdef123456789abcdef123456789abcdef"
 }
 ```
@@ -77,8 +77,8 @@ GET /api/transactions/{transaction_id}
 
 ```json
 {
-  "id": "tx_abc123def456",
-  "relayerId": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "relayerId": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
   "to": "0x1234567890abcdef1234567890abcdef12345678",
   "from": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
   "value": "1000000000000000000",
@@ -105,10 +105,10 @@ For transactions with status `CANCELLED`, additional fields are included:
 
 ```json
 {
-  "id": "tx_original456",
+  "id": "550e8400-e29b-41d4-a716-446655440001",
   "status": "CANCELLED",
   "is_noop": true,
-  "cancelledByTransactionId": "tx_cancel789",
+  "cancelledByTransactionId": "550e8400-e29b-41d4-a716-446655440002",
   ...
 }
 ```
@@ -116,7 +116,7 @@ For transactions with status `CANCELLED`, additional fields are included:
 ### Example
 
 ```bash
-curl https://your-rrelayer.com/api/transactions/tx_abc123def456 \
+curl https://your-rrelayer.com/api/transactions/550e8400-e29b-41d4-a716-446655440000 \
   -u "username:password"
 ```
 
@@ -164,7 +164,7 @@ GET /api/transactions/status/{transaction_id}
 ### Example
 
 ```bash
-curl https://your-rrelayer.com/api/transactions/status/tx_abc123def456 \
+curl https://your-rrelayer.com/api/transactions/status/550e8400-e29b-41d4-a716-446655440000 \
   -u "username:password"
 ```
 
@@ -200,24 +200,26 @@ PUT /api/transactions/replace/{transaction_id}
 
 ```json
 {
-  "id": "tx_def456ghi789",
-  "hash": "0xdef456ghi789def456ghi789def456ghi789def456ghi789def456ghi789def456"
+  "success": true,
+  "replaceTransactionId": "550e8400-e29b-41d4-a716-446655440003",
+  "replaceTransactionHash": "0xdef456ghi789def456ghi789def456ghi789def456ghi789def456ghi789def456"
 }
 ```
 
 ### Fields
 
-| Field  | Type     | Description                                                          |
-| ------ | -------- | -------------------------------------------------------------------- |
-| `id`   | `string` | ID of the replacement transaction created                            |
-| `hash` | `string` | Transaction hash of the replacement transaction (for INMEMPOOL only) |
+| Field                    | Type      | Description                                                                 |
+| ------------------------ | --------- | --------------------------------------------------------------------------- |
+| `success`                | `boolean` | Whether the replacement operation was successful                            |
+| `replaceTransactionId`   | `string`  | UUID of the replacement transaction created (null if failed)                |
+| `replaceTransactionHash` | `string`  | Transaction hash of the replacement transaction (null if PENDING or failed) |
 
 **Note**: For PENDING transactions that are replaced immediately, the response contains the same transaction ID with updated parameters, and `hash` will be `null` until sent.
 
 ### Example
 
 ```bash
-curl -X PUT https://your-rrelayer.com/api/transactions/replace/tx_abc123def456 \
+curl -X PUT https://your-rrelayer.com/api/transactions/replace/550e8400-e29b-41d4-a716-446655440000 \
   -u "username:password" \
   -H "Content-Type: application/json" \
   -d '{
@@ -248,24 +250,24 @@ PUT /api/transactions/cancel/{transaction_id}
 
 ```json
 {
-  "id": "tx_cancel789",
-  "hash": "0xcancel789cancel789cancel789cancel789cancel789cancel789cancel789cancel"
+  "success": true,
+  "cancelTransactionId": "550e8400-e29b-41d4-a716-446655440004"
 }
 ```
 
 ### Fields
 
-| Field  | Type     | Description                                                     |
-| ------ | -------- | --------------------------------------------------------------- |
-| `id`   | `string` | ID of the cancel transaction created                            |
-| `hash` | `string` | Transaction hash of the cancel transaction (for INMEMPOOL only) |
+| Field                 | Type      | Description                                             |
+| --------------------- | --------- | ------------------------------------------------------- |
+| `success`             | `boolean` | Whether the cancel operation was successful             |
+| `cancelTransactionId` | `string`  | UUID of the cancel transaction created (null if failed) |
 
-**Note**: For PENDING transactions that are cancelled immediately, `hash` will be `null`.
+**Note**: For PENDING transactions that are cancelled immediately, no competing transaction is created on-chain.
 
 ### Example
 
 ```bash
-curl -X PUT https://your-rrelayer.com/api/transactions/cancel/tx_abc123def456 \
+curl -X PUT https://your-rrelayer.com/api/transactions/cancel/550e8400-e29b-41d4-a716-446655440000 \
   -u "username:password"
 ```
 
@@ -293,8 +295,8 @@ GET /api/transactions/relayers/{relayer_id}
 {
   "items": [
     {
-      "id": "tx_abc123def456",
-      "relayerId": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "relayerId": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
       "to": "0x1234567890abcdef1234567890abcdef12345678",
       "from": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
       "value": "1000000000000000000",
@@ -412,21 +414,21 @@ You can monitor the outcome by:
 ```bash
 # 1. Send a transaction
 POST /api/transactions/relayers/{relayer_id}/send
-# Response: {"id": "tx_original", "hash": "0x..."}
+# Response: {"id": "550e8400-e29b-41d4-a716-446655440000", "hash": "0x..."}
 
 # 2. Cancel the transaction (while INMEMPOOL)
-PUT /api/transactions/cancel/tx_original
-# Response: {"id": "tx_cancel", "hash": "0x..."}
+PUT /api/transactions/cancel/550e8400-e29b-41d4-a716-446655440000
+# Response: {"success": true, "cancelTransactionId": "550e8400-e29b-41d4-a716-446655440001"}
 
 # 3. Monitor the original transaction status
-GET /api/transactions/status/tx_original
+GET /api/transactions/status/550e8400-e29b-41d4-a716-446655440000
 # Possible outcomes:
 # - "status": "CANCELLED" (cancel won)
 # - "status": "MINED" (original won)
 
 # 4. If cancelled, check the relationship
-GET /api/transactions/tx_original
-# Response includes: "cancelled_by_transaction_id": "tx_cancel"
+GET /api/transactions/550e8400-e29b-41d4-a716-446655440000
+# Response includes: "cancelledByTransactionId": "550e8400-e29b-41d4-a716-446655440001"
 ```
 
 ## Rate Limiting

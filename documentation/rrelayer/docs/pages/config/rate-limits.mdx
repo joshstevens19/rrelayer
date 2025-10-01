@@ -62,7 +62,7 @@ rate_limits: // [!code focus]
     global: // [!code focus]
       interval: "minute" // [!code focus]
       transactions: 100 # [!code focus]
-      signing_operations: # [!code focus]
+      signing_operations: 200 # [!code focus]
   fallback_to_relayer: true # [!code focus]
 ```
 
@@ -92,6 +92,7 @@ rate_limits:
 Currently supported interval values:
 
 - **`"minute"`** - Per-minute rate limits (60 seconds)
+- **`"1m"`** - Per-minute rate limits (60 seconds)
 
 **Note**: The current implementation only supports 1-minute intervals. Any interval value defaults to 60 seconds.
 
@@ -183,7 +184,7 @@ rate_limits:
 rate_limits:
   user_limits:
     per_relayer:
-      interval: 'second'
+      interval: 'minute'
       transactions: 5
       signing_operations: 10
     global:

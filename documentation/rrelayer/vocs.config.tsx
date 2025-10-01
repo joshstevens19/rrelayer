@@ -53,7 +53,10 @@ export default defineConfig({
     {
       text: 'Migration',
       items: [
-        { text: 'Defender > rrelayer', link: '/migration/defender-to-rrelayer' },
+        {
+          text: 'Defender > rrelayer',
+          link: '/migration/defender-to-rrelayer',
+        },
       ],
     },
     {
@@ -80,7 +83,10 @@ export default defineConfig({
             },
             { text: 'Privy', link: '/config/signing-providers/privy' },
             { text: 'Turnkey', link: '/config/signing-providers/turnkey' },
-            { text: 'Private Keys', link: '/config/signing-providers/private-keys' },
+            {
+              text: 'Private Keys',
+              link: '/config/signing-providers/private-keys',
+            },
           ],
         },
         {

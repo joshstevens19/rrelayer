@@ -38,7 +38,7 @@ rrelayer has two ways to create clients based on the authentication direction.
 ```ts [Basic Auth - config.ts]
 import { createClient, TransactionSpeed } from 'rrelayer';
 import { createWalletClient, createPublicClient, custom } from 'viem';
-import * as dotenv from "dotenv";
+import * as dotenv from 'dotenv';
 dotenv.config();
 
 let client = createClient({

@@ -43,7 +43,7 @@ First, set up your rrelayer instance and create new relayers:
 
 ```typescript
 import { createClient } from 'rrelayer';
-import * as dotenv from "dotenv";
+import * as dotenv from 'dotenv';
 dotenv.config();
 
 const client = createClient({
@@ -55,8 +55,14 @@ const client = createClient({
 });
 
 // Create relayers for each network you need
-const ethereumRelayer = await client.relayer.create(1, 'ethereum-mainnet-relayer');
-const sepoliaRelayer = await client.relayer.create(11155111, 'sepolia-testnet-relayer');
+const ethereumRelayer = await client.relayer.create(
+  1,
+  'ethereum-mainnet-relayer'
+);
+const sepoliaRelayer = await client.relayer.create(
+  11155111,
+  'sepolia-testnet-relayer'
+);
 
 console.log('New Ethereum relayer:', ethereumRelayer.address);
 console.log('New Sepolia relayer:', sepoliaRelayer.address);
@@ -68,7 +74,10 @@ Use Defender SDK to transfer funds to your new rrelayer addresses:
 
 ```typescript
 import { ethers } from 'ethers';
-import { DefenderRelaySigner, DefenderRelayProvider } from '@openzeppelin/defender-sdk';
+import {
+  DefenderRelaySigner,
+  DefenderRelayProvider,
+} from '@openzeppelin/defender-sdk';
 
 // Set up Defender client
 const provider = new DefenderRelayProvider({
@@ -76,16 +85,19 @@ const provider = new DefenderRelayProvider({
   apiSecret: process.env.DEFENDER_API_SECRET!,
 });
 
-const signer = new DefenderRelaySigner({
-  apiKey: process.env.DEFENDER_API_KEY!,
-  apiSecret: process.env.DEFENDER_API_SECRET!,
-}, provider);
+const signer = new DefenderRelaySigner(
+  {
+    apiKey: process.env.DEFENDER_API_KEY!,
+    apiSecret: process.env.DEFENDER_API_SECRET!,
+  },
+  provider
+);
 
 // Transfer funds to new rrelayer address
 const transferTx = await signer.sendTransaction({
   to: ethereumRelayer.address, // Your new rrelayer address
   value: ethers.parseEther('1.0'), // Amount to transfer
-  speed: 'fast'
+  speed: 'fast',
 });
 
 console.log('Transfer transaction:', transferTx.hash);
@@ -102,8 +114,8 @@ If your smart contracts reference the old Defender relayer address, you'll need 
 import { ethers } from 'ethers';
 
 const contractABI = [
-  "function updateRelayer(address newRelayer) external",
-  "function relayer() external view returns (address)"
+  'function updateRelayer(address newRelayer) external',
+  'function relayer() external view returns (address)',
 ];
 
 // Connect to your contract using the Defender relayer
@@ -136,7 +148,7 @@ const defenderSigner = new DefenderRelaySigner({
 const tx = await defenderSigner.sendTransaction({
   to: '0x179810822f56b0e79469189741a3fa5f2f9a7631',
   value: 1,
-  speed: 'fast'
+  speed: 'fast',
 });
 
 // After (rrelayer)
@@ -155,7 +167,7 @@ const tx = await relayerClient.transaction.send({
   to: '0x179810822f56b0e79469189741a3fa5f2f9a7631',
   value: parseEther('0.0001'),
   // optional can override the default speed if you want
-  speed: TransactionSpeed.SUPER
+  speed: TransactionSpeed.SUPER,
 });
 ```
 
@@ -168,16 +180,18 @@ Here's how Defender SDK methods map to rrelayer equivalents:
 #### Sending Transactions
 
 **Defender:**
+
 ```javascript
 const txResponse = await client.relaySigner.sendTransaction({
   to: '0x179810822f56b0e79469189741a3fa5f2f9a7631',
   value: 1,
   speed: 'fast',
-  gasLimit: '21000'
+  gasLimit: '21000',
 });
 ```
 
 **rrelayer:**
+
 ```typescript
 const txResponse = await relayerClient.transaction.send({
   to: '0x179810822f56b0e79469189741a3fa5f2f9a7631',
@@ -190,18 +204,22 @@ const txResponse = await relayerClient.transaction.send({
 #### Transaction Status/Receipt
 
 **Defender:**
+
 ```javascript
 // Defender handles this through their transaction response
 const receipt = await txResponse.wait();
 ```
 
 **rrelayer:**
+
 ```typescript
 // Get transaction status
 const status = await relayerClient.transaction.getStatus(txResponse.id);
 
 // Wait for transaction receipt
-const receipt = await relayerClient.transaction.waitForTransactionReceiptById(txResponse.id);
+const receipt = await relayerClient.transaction.waitForTransactionReceiptById(
+  txResponse.id
+);
 
 // Get full transaction details
 const transaction = await relayerClient.transaction.get(txResponse.id);
@@ -212,17 +230,19 @@ const transaction = await relayerClient.transaction.get(txResponse.id);
 #### Get Relayer Information
 
 **Defender:**
+
 ```javascript
 // Via Admin API
 const relayers = await client.listRelayers();
 ```
 
 **rrelayer:**
+
 ```typescript
 // Basic Auth - get all relayers
 const relayers = await client.relayer.getAll({
   limit: 100,
-  offset: 0
+  offset: 0,
 });
 
 // Get specific relayer
@@ -235,6 +255,7 @@ const info = await relayerClient.getInfo();
 #### Create/Clone Relayers
 
 **Defender:**
+
 ```javascript
 // Create relayer via API
 const relayerResponse = await defenderClient.createRelayer({
@@ -245,6 +266,7 @@ const relayerResponse = await defenderClient.createRelayer({
 ```
 
 **rrelayer:**
+
 ```typescript
 // Create new relayer
 const result = await client.relayer.create(11155111, 'my-relayer');
@@ -260,11 +282,13 @@ const cloned = await client.relayer.clone(
 #### Pause/Unpause Relayers
 
 **Defender:**
+
 ```javascript
 // Not available via SDK - done through web interface
 ```
 
 **rrelayer:**
+
 ```typescript
 // Pause relayer
 await relayerClient.pause();
@@ -278,11 +302,13 @@ await relayerClient.unpause();
 #### Cancel/Replace Transactions
 
 **Defender:**
+
 ```javascript
 // Limited transaction replacement capabilities
 ```
 
 **rrelayer:**
+
 ```typescript
 // Cancel transaction
 const cancelResult = await relayerClient.transaction.cancel('transaction-id');
@@ -293,7 +319,7 @@ const replaceResult = await relayerClient.transaction.replace(
   {
     to: '0x179810822f56b0e79469189741a3fa5f2f9a7631',
     value: formatEther('2'), // different amount
-    speed: TransactionSpeed.SUPER
+    speed: TransactionSpeed.SUPER,
   }
 );
 ```
@@ -301,15 +327,21 @@ const replaceResult = await relayerClient.transaction.replace(
 #### Queue Management
 
 **Defender:**
+
 ```javascript
 // Not available via SDK
 ```
 
 **rrelayer:**
+
 ```typescript
 // Get queue counts
-const pendingCount = await relayerClient.transaction.getCount(TransactionCountType.PENDING);
-const mempoolCount = await relayerClient.transaction.getCount(TransactionCountType.INMEMPOOL);
+const pendingCount = await relayerClient.transaction.getCount(
+  TransactionCountType.PENDING
+);
+const mempoolCount = await relayerClient.transaction.getCount(
+  TransactionCountType.INMEMPOOL
+);
 ```
 
 ## Authentication Differences
@@ -317,6 +349,7 @@ const mempoolCount = await relayerClient.transaction.getCount(TransactionCountTy
 ### Defender Authentication
 
 Defender uses API keys with different scopes:
+
 - **Relayer API Keys**: Limited to relayer operations
 - **Admin API Keys**: Full resource access
 
@@ -325,6 +358,7 @@ Defender uses API keys with different scopes:
 rrelayer offers two authentication methods:
 
 #### Basic Auth (Full Access)
+
 ```typescript
 const client = createClient({
   serverUrl: 'https://your-rrelayer-instance.com',
@@ -336,6 +370,7 @@ const client = createClient({
 ```
 
 #### API Key Auth (Relayer-Specific)
+
 ```typescript
 const relayerClient = createRelayerClient({
   serverUrl: 'https://your-rrelayer-instance.com',
@@ -360,9 +395,13 @@ const relayerClient = createRelayerClient({
 1. **Set up rrelayer instance** following the [installation guide](/getting-started/installation)
 
 2. **Create new relayers** for each network you need:
+
    ```typescript
    const ethereumRelayer = await client.relayer.create(1, 'ethereum-mainnet');
-   const sepoliaRelayer = await client.relayer.create(11155111, 'sepolia-testnet');
+   const sepoliaRelayer = await client.relayer.create(
+     11155111,
+     'sepolia-testnet'
+   );
    ```
 
 3. **Fund your new relayers** by transferring ETH from Defender relayers

@@ -38,7 +38,7 @@ GET /api/relayers/{relayer_id}/allowlists
 ### Example
 
 ```bash
-curl https://your-rrelayer.com/api/relayers/0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b/allowlists \
+curl https://your-rrelayer.com/api/relayers/550e8400-e29b-41d4-a716-446655440000/allowlists \
   -u "username:password"
 ```
 
@@ -81,10 +81,10 @@ Configure different allowlists for different relayers:
 permissions:
   allowlist:
     relayers:
-      '0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b':
+      '550e8400-e29b-41d4-a716-446655440000':
         - '0x1234567890abcdef1234567890abcdef12345678'
         - '0x9876543210fedcba9876543210fedcba98765432'
-      '0x853e46dd7577c4c0df3f4e9f0b0e1f1f1c2d3e4f':
+      '550e8400-e29b-41d4-a716-446655440001':
         - '0xabcdef1234567890abcdef1234567890abcdef12'
         - '0xfedcba0987654321fedcba0987654321fedcba09'
 ```
@@ -161,10 +161,10 @@ permissions:
   allowlist:
     relayers:
       # Ethereum mainnet relayer
-      '0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b':
+      '550e8400-e29b-41d4-a716-446655440000':
         - '0xa0b86a33e6441e776e21c0b7f0c8de3d5cde6b8e' # Ethereum Bridge
       # Polygon relayer
-      '0x853e46dd7577c4c0df3f4e9f0b0e1f1f1c2d3e4f':
+      '550e8400-e29b-41d4-a716-446655440001':
         - '0x8484ef722627bf18ca5ae6bcf031c23e6e922b30' # Polygon Bridge
 ```
 
@@ -199,11 +199,11 @@ Test your allowlist setup:
 
 ```bash
 # Check current allowlist
-curl https://your-rrelayer.com/api/relayers/0x742d35.../allowlists \
+curl https://your-rrelayer.com/api/relayers/550e8400-e29b-41d4-a716-446655440000/allowlists \
   -u "username:password"
 
 # Test allowed transaction
-curl -X POST https://your-rrelayer.com/api/transactions/relayers/0x742d35.../send \
+curl -X POST https://your-rrelayer.com/api/transactions/relayers/550e8400-e29b-41d4-a716-446655440000/send \
   -u "username:password" \
   -H "Content-Type: application/json" \
   -d '{
@@ -212,7 +212,7 @@ curl -X POST https://your-rrelayer.com/api/transactions/relayers/0x742d35.../sen
   }'
 
 # Test blocked transaction (should fail)
-curl -X POST https://your-rrelayer.com/api/transactions/relayers/0x742d35.../send \
+curl -X POST https://your-rrelayer.com/api/transactions/relayers/550e8400-e29b-41d4-a716-446655440000/send \
   -u "username:password" \
   -H "Content-Type: application/json" \
   -d '{
