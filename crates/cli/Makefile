@@ -60,6 +60,8 @@ config_gas_max_price:
 	cargo run -- config --path $(CURDIR)/../../playground/example gas --relayer-id 7ed18611-1739-4a5f-99e3-e70356029984 max-price --price 1000000
 config_gas_max_price_unset:
 	cargo run -- config --path $(CURDIR)/../../playground/example gas --relayer-id 7ed18611-1739-4a5f-99e3-e70356029984 max-price --price 0
+config_signing_provider_pk:
+	cargo run -- config --path $(CURDIR)/../../playground/example signing-provider private-key
 
 balance:
 	cargo run -- balance --path $(CURDIR)/../../playground/example --relayer-id 7ed18611-1739-4a5f-99e3-e70356029984

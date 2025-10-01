@@ -167,6 +167,36 @@ async fn start_api(
     relayer_internal_only: RelayersInternalOnly,
     config: &SetupConfig,
 ) -> Result<(), StartApiError> {
+    // Calculate which networks are configured with only private keys
+    let private_key_only_networks: Vec<ChainId> = config
+        .networks
+        .iter()
+        .filter_map(|network_config| {
+            // Determine which signing provider to use (network-level or global)
+            let signing_provider = if let Some(ref signing_key) = network_config.signing_provider {
+                signing_key
+            } else if let Some(ref signing_key) = config.signing_provider {
+                signing_key
+            } else {
+                return None;
+            };
+
+            // Check if only private keys are configured
+            if signing_provider.private_keys.is_some()
+                && signing_provider.raw.is_none()
+                && signing_provider.aws_secret_manager.is_none()
+                && signing_provider.gcp_secret_manager.is_none()
+                && signing_provider.privy.is_none()
+                && signing_provider.aws_kms.is_none()
+                && signing_provider.turnkey.is_none()
+            {
+                Some(network_config.chain_id)
+            } else {
+                None
+            }
+        })
+        .collect();
+
     let app_state = Arc::new(AppState {
         db: db.clone(),
         evm_providers: providers,
@@ -183,6 +213,7 @@ async fn start_api(
         network_permissions: Arc::new(network_permissions),
         api_keys: Arc::new(api_keys),
         network_configs: Arc::new(config.networks.clone()),
+        private_key_only_networks: Arc::new(private_key_only_networks),
     });
 
     let cors = CorsLayer::new()
@@ -347,6 +378,7 @@ pub async fn start(project_path: &Path) -> Result<(), StartError> {
         webhook_manager.clone(),
         safe_proxy_manager.clone(),
         Arc::new(config.networks.clone()),
+        config.signing_provider.clone().map(Arc::new),
     )
     .await?;
 

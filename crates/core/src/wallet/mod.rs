@@ -19,8 +19,13 @@ mod privy_wallet_manager;
 pub use privy_wallet_manager::PrivyWalletManager;
 
 mod turnkey_wallet_manager;
-
 pub use turnkey_wallet_manager::TurnkeyWalletManager;
+
+mod private_key_wallet_manager;
+pub use private_key_wallet_manager::PrivateKeyWalletManager;
+
+mod composite_wallet_manager;
+pub use composite_wallet_manager::CompositeWalletManager;
 
 use crate::shared::{internal_server_error, HttpError};
 
@@ -79,6 +84,15 @@ pub enum WalletError {
 
     #[error("EIP712 signing error: {0}")]
     Eip712Error(String),
+
+    #[error("Invalid wallet index {index}, max available: {max_index}")]
+    InvalidIndex { index: u32, max_index: u32 },
+
+    #[error("Private key error: {0}")]
+    PrivateKeyError(String),
+
+    #[error("Unsupported operation: {0}")]
+    UnsupportedOperation(String),
 }
 
 impl From<WalletError> for HttpError {

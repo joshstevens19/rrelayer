@@ -17,4 +17,16 @@ impl NonceManager {
         *nonce_guard = current_nonce + 1;
         current_nonce
     }
+
+    pub async fn sync_with_onchain_nonce(&self, onchain_nonce: TransactionNonce) {
+        let mut nonce_guard = self.nonce.lock().await;
+        if onchain_nonce.into_inner() > nonce_guard.into_inner() {
+            *nonce_guard = onchain_nonce;
+        }
+    }
+
+    pub async fn get_current_nonce(&self) -> TransactionNonce {
+        let nonce_guard = self.nonce.lock().await;
+        *nonce_guard
+    }
 }

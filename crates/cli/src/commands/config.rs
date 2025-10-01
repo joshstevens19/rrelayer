@@ -1,4 +1,6 @@
+use crate::authentication::check_authenticate;
 use crate::commands::error::ConfigError;
+use alloy::signers::local::PrivateKeySigner;
 use clap::Subcommand;
 use rrelayer::{AdminRelayerClient, Client};
 use rrelayer_core::relayer::RelayerId;
@@ -16,6 +18,13 @@ pub enum GasCommand {
     Legacy,
     /// Enable EIP-1559 gas standard for transactions
     Latest,
+}
+
+#[derive(Subcommand)]
+pub enum SigningProviderCommand {
+    /// Generate a new private key for use in configuration
+    #[command(name = "private-key")]
+    PrivateKey,
 }
 
 #[derive(Subcommand)]
@@ -47,20 +56,34 @@ pub enum ConfigCommand {
         #[command(subcommand)]
         command: GasCommand,
     },
+    /// Manage signing providers
+    #[command(name = "signing-provider")]
+    SigningProvider {
+        #[command(subcommand)]
+        command: SigningProviderCommand,
+    },
 }
 
 pub async fn handle_config(command: &ConfigCommand, client: &Client) -> Result<(), ConfigError> {
     match command {
-        ConfigCommand::Get { relayer_id } => handle_get(relayer_id, client).await,
+        ConfigCommand::Get { relayer_id } => {
+            check_authenticate(client).await?;
+            handle_get(relayer_id, client).await
+        }
         ConfigCommand::Pause { relayer_id } => {
+            check_authenticate(client).await?;
             let relayer_client = client.get_relayer_client(relayer_id, None).await?;
             handle_pause(&relayer_client).await
         }
         ConfigCommand::Unpause { relayer_id } => {
+            check_authenticate(client).await?;
+
             let relayer_client = client.get_relayer_client(relayer_id, None).await?;
             handle_unpause(&relayer_client).await
         }
         ConfigCommand::Gas { relayer_id, command } => {
+            check_authenticate(client).await?;
+
             let relayer_client = client.get_relayer_client(relayer_id, None).await?;
             match command {
                 GasCommand::MaxPrice { price } => {
@@ -70,6 +93,9 @@ pub async fn handle_config(command: &ConfigCommand, client: &Client) -> Result<(
                 GasCommand::Latest => handle_update_eip1559_status(true, &relayer_client).await,
             }
         }
+        ConfigCommand::SigningProvider { command } => match command {
+            SigningProviderCommand::PrivateKey => handle_generate_private_key().await,
+        },
     }
 }
 
@@ -157,6 +183,42 @@ async fn handle_update_max_gas_price(
     client.update_max_gas_price(cap).await?;
 
     println!("Updated relayer {} max gas price to {}", client.id(), cap);
+
+    Ok(())
+}
+
+async fn handle_generate_private_key() -> Result<(), ConfigError> {
+    let signer = PrivateKeySigner::random();
+    let private_key = format!("0x{}", hex::encode(signer.to_bytes()));
+    let address = format!("{:#x}", signer.address());
+
+    println!("┌─────────────────────────────────────────────────────────────────────");
+    println!("│ GENERATED PRIVATE KEY");
+    println!("├─────────────────────────────────────────────────────────────────────");
+    println!("│ Private Key:         {}", private_key);
+    println!("│ Address:             {}", address);
+    println!("├─────────────────────────────────────────────────────────────────────");
+    println!("│ YAML CONFIGURATION EXAMPLE");
+    println!("├─────────────────────────────────────────────────────────────────────");
+    println!("│ signing_provider:");
+    println!("│   private_keys:");
+    println!("│     - raw: {}", private_key);
+    println!("│");
+    println!("│ # Or for network-specific configuration:");
+    println!("│ networks:");
+    println!("│   - name: \"my_network\"");
+    println!("│     chain_id: 1");
+    println!("│     signing_provider:");
+    println!("│       private_keys:");
+    println!("│         - raw: {}", private_key);
+    println!("├─────────────────────────────────────────────────────────────────────");
+    println!("│ SECURITY WARNING");
+    println!("├─────────────────────────────────────────────────────────────────────");
+    println!("│ • Store this private key securely");
+    println!("│ • Use environment variables in production: ${{PRIVATE_KEY}}");
+    println!("│ • Never commit private keys to version control");
+    println!("│ • Consider using one of the other secure signing providers for production");
+    println!("└─────────────────────────────────────────────────────────────────────");
 
     Ok(())
 }

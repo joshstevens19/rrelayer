@@ -6,3 +6,6 @@ pub use relayer::Relayer;
 
 mod relayer_provider_context;
 pub use relayer_provider_context::RelayerProviderContext;
+
+mod wallet_index;
+pub use wallet_index::WalletIndex;

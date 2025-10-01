@@ -695,7 +695,7 @@ impl AutomaticTopUpTask {
     ) -> Option<u32> {
         if let Some(relayers) = self.relayer_cache.get(chain_id) {
             if let Some(relayer) = relayers.iter().find(|relayer| &relayer.address == address) {
-                return Some(relayer.wallet_index);
+                return Some(relayer.wallet_index_type().index());
             }
         }
 
@@ -707,7 +707,7 @@ impl AutomaticTopUpTask {
                     "Found wallet index {} for address {} in database",
                     relayer.wallet_index, address
                 );
-                Some(relayer.wallet_index)
+                Some(relayer.wallet_index_type().index())
             }
             Ok(None) => {
                 warn!(

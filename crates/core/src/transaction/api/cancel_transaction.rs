@@ -16,6 +16,7 @@ use std::sync::Arc;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CancelTransactionResponse {
     pub success: bool,
+    #[serde(rename = "cancelTransactionId", skip_serializing_if = "Option::is_none")]
     pub cancel_transaction_id: Option<TransactionId>,
 }
 

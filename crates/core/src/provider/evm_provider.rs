@@ -1,8 +1,8 @@
 use crate::gas::BLOB_GAS_PER_BLOB;
 use crate::provider::layer_extensions::RpcLoggingLayer;
 use crate::wallet::{
-    AwsKmsWalletManager, MnemonicWalletManager, PrivyWalletManager, TurnkeyWalletManager,
-    WalletError, WalletManagerTrait,
+    AwsKmsWalletManager, CompositeWalletManager, MnemonicWalletManager, PrivateKeyWalletManager,
+    PrivyWalletManager, TurnkeyWalletManager, WalletError, WalletManagerTrait,
 };
 use crate::yaml::{AwsKmsSigningProviderConfig, TurnkeySigningProviderConfig};
 use crate::{
@@ -191,6 +191,30 @@ impl EvmProvider {
         Self::new_internal(network_setup_config, wallet_manager, gas_estimator).await
     }
 
+    pub async fn new_with_private_keys(
+        network_setup_config: &NetworkSetupConfig,
+        private_keys: Vec<String>,
+        gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
+    ) -> Result<Self, EvmProviderNewError> {
+        let wallet_manager = Arc::new(PrivateKeyWalletManager::new(private_keys));
+        Self::new_internal(network_setup_config, wallet_manager, gas_estimator).await
+    }
+
+    pub async fn new_with_composite(
+        network_setup_config: &NetworkSetupConfig,
+        primary_manager: Arc<dyn WalletManagerTrait>,
+        private_keys: Option<Vec<String>>,
+        gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
+    ) -> Result<Self, EvmProviderNewError> {
+        let private_key_manager = private_keys.map(|private_keys| {
+            Arc::new(PrivateKeyWalletManager::new(private_keys)) as Arc<dyn WalletManagerTrait>
+        });
+
+        let wallet_manager =
+            Arc::new(CompositeWalletManager::new(primary_manager, private_key_manager));
+        Self::new_internal(network_setup_config, wallet_manager, gas_estimator).await
+    }
+
     async fn new_internal(
         network_setup_config: &NetworkSetupConfig,
         wallet_manager: Arc<dyn WalletManagerTrait>,
@@ -306,6 +330,7 @@ impl EvmProvider {
 
         let provider = self.rpc_client();
         let tx_bytes = tx_envelope.encoded_2718();
+
         let receipt = provider.send_raw_transaction(&tx_bytes).await?;
 
         Ok(TransactionHash::from_alloy_hash(receipt.tx_hash()))

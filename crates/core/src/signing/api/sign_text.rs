@@ -73,7 +73,7 @@ pub async fn sign_text(
 
     let signature = relayer_provider_context
         .provider
-        .sign_text(&relayer_provider_context.relayer.wallet_index, &sign.text)
+        .sign_text(&relayer_provider_context.relayer.wallet_index_type().index(), &sign.text)
         .await?;
 
     let record_request = RecordSignedTextRequest {

@@ -8,7 +8,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 
 use crate::relayer::db::CreateRelayerMode;
-use crate::shared::{not_found, HttpError};
+use crate::shared::{bad_request, not_found, HttpError};
 use crate::{
     app_state::AppState,
     network::ChainId,
@@ -38,6 +38,11 @@ pub async fn create_relayer(
 ) -> Result<Json<CreateRelayerResult>, HttpError> {
     state.validate_basic_auth_valid(&headers)?;
 
+    // Check if this network is configured with only private keys
+    if state.private_key_only_networks.contains(&chain_id) {
+        return Err(bad_request("Cannot create new relayers for networks configured with only private_keys. Private keys are imported automatically on startup.".to_string()));
+    }
+
     let provider = find_provider_for_chain_id(&state.evm_providers, &chain_id)
         .await
         .ok_or(not_found("Could not find provider for the chain id".to_string()))?;
@@ -51,7 +56,7 @@ pub async fn create_relayer(
         .await?;
     invalidate_relayer_cache(&state.cache, &relayer.id).await;
 
-    let current_nonce = provider.get_nonce(&relayer.wallet_index).await?;
+    let current_nonce = provider.get_nonce(&relayer.wallet_index_type().index()).await?;
 
     let id = relayer.id;
     let address = relayer.address;

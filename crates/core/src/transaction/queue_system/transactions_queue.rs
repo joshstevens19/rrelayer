@@ -989,8 +989,10 @@ impl TransactionsQueue {
     ) -> Result<TransactionHash, WalletError> {
         info!("Computing transaction hash for relayer: {}", self.relayer.name);
 
-        let signature =
-            self.evm_provider.sign_transaction(&self.relayer.wallet_index, transaction).await?;
+        let signature = self
+            .evm_provider
+            .sign_transaction(&self.relayer.wallet_index_type().index(), transaction)
+            .await?;
 
         let hash = match transaction {
             TypedTransaction::Legacy(tx) => {
@@ -1120,15 +1122,16 @@ impl TransactionsQueue {
 
             let hash_hex = format!("0x{}", hex::encode(safe_tx_hash));
 
-            let signature =
-                self.evm_provider.sign_text(&self.relayer.wallet_index, &hash_hex).await.map_err(
-                    |e| {
-                        TransactionQueueSendTransactionError::TransactionConversionError(format!(
-                            "Failed to sign safe transaction hash: {}",
-                            e
-                        ))
-                    },
-                )?;
+            let signature = self
+                .evm_provider
+                .sign_text(&self.relayer.wallet_index_type().index(), &hash_hex)
+                .await
+                .map_err(|e| {
+                    TransactionQueueSendTransactionError::TransactionConversionError(format!(
+                        "Failed to sign safe transaction hash: {}",
+                        e
+                    ))
+                })?;
 
             // Encode the signature into bytes according to Safe's requirements
             // Safe signature format: r + s + v where v = recovery_id + 4
@@ -1306,9 +1309,12 @@ impl TransactionsQueue {
             "Sending transaction {:?} to network for relayer: {}",
             transaction_request, self.relayer.name
         );
+
+        let wallet_index_to_use = self.relayer.wallet_index_type().index();
+
         let transaction_hash = self
             .evm_provider
-            .send_transaction(&self.relayer.wallet_index, transaction_request)
+            .send_transaction(&wallet_index_to_use, transaction_request)
             .await
             .map_err(TransactionQueueSendTransactionError::TransactionSendError)?;
 

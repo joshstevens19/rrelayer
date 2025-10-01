@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use super::RelayerId;
+use super::{RelayerId, WalletIndex};
 use crate::{gas::GasPrice, network::ChainId, shared::common_types::EvmAddress};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -19,9 +19,9 @@ pub struct Relayer {
     /// The relayer address
     pub address: EvmAddress,
 
-    /// The relayer wallet index
+    /// The relayer wallet index (i32 to support negative indexes for private keys)
     #[serde(rename = "walletIndex")]
-    pub wallet_index: u32,
+    pub wallet_index: i32,
 
     /// The max gas price
     #[serde(rename = "maxGasPrice", skip_serializing_if = "Option::is_none", default)]
@@ -37,4 +37,19 @@ pub struct Relayer {
     /// The relayer creation time
     #[serde(rename = "createdAt")]
     pub created_at: DateTime<Utc>,
+
+    /// Whether this relayer uses a private key (vs mnemonic-derived)
+    #[serde(rename = "isPrivateKey")]
+    pub is_private_key: bool,
+}
+
+impl Relayer {
+    /// Get the WalletIndex enum for this relayer
+    pub fn wallet_index_type(&self) -> WalletIndex {
+        if self.is_private_key {
+            WalletIndex::PrivateKey(self.wallet_index)
+        } else {
+            WalletIndex::Normal(self.wallet_index as u32)
+        }
+    }
 }

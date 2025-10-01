@@ -56,37 +56,120 @@ pub async fn load_providers(
             return Err(LoadProvidersError::NoSigningKey);
         };
 
+        // Extract private keys if configured
+        let private_key_strings: Option<Vec<String>> = signing_key
+            .private_keys
+            .as_ref()
+            .map(|private_keys| private_keys.iter().map(|pk| pk.raw.clone()).collect());
+
+        // Check if we have a main signing provider (non-private-key)
+        let has_main_signing_provider = signing_key.privy.is_some()
+            || signing_key.aws_kms.is_some()
+            || signing_key.turnkey.is_some()
+            || signing_key.raw.is_some();
+
+        // If we only have private keys and no main signing provider, use private key manager only
+        if private_key_strings.is_some() && !has_main_signing_provider {
+            let provider = EvmProvider::new_with_private_keys(
+                config,
+                private_key_strings.unwrap(),
+                get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+            )
+            .await?;
+
+            providers.push(provider);
+            continue;
+        }
+
         let provider = if let Some(privy) = &signing_key.privy {
-            EvmProvider::new_with_privy(
-                config,
-                privy.app_id.clone(),
-                privy.app_secret.clone(),
-                get_gas_estimator(&config.provider_urls, setup_config, config).await?,
-            )
-            .await?
+            if private_key_strings.is_some() {
+                // Use composite manager with privy + private keys
+                let privy_manager = std::sync::Arc::new(
+                    crate::wallet::PrivyWalletManager::new(
+                        privy.app_id.clone(),
+                        privy.app_secret.clone(),
+                    )
+                    .await?,
+                );
+                EvmProvider::new_with_composite(
+                    config,
+                    privy_manager,
+                    private_key_strings,
+                    get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                )
+                .await?
+            } else {
+                EvmProvider::new_with_privy(
+                    config,
+                    privy.app_id.clone(),
+                    privy.app_secret.clone(),
+                    get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                )
+                .await?
+            }
         } else if let Some(aws_kms) = &signing_key.aws_kms {
-            EvmProvider::new_with_aws_kms(
-                config,
-                aws_kms.clone(),
-                get_gas_estimator(&config.provider_urls, setup_config, config).await?,
-            )
-            .await?
+            if private_key_strings.is_some() {
+                // Use composite manager with aws_kms + private keys
+                let aws_manager =
+                    std::sync::Arc::new(crate::wallet::AwsKmsWalletManager::new(aws_kms.clone()));
+                EvmProvider::new_with_composite(
+                    config,
+                    aws_manager,
+                    private_key_strings,
+                    get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                )
+                .await?
+            } else {
+                EvmProvider::new_with_aws_kms(
+                    config,
+                    aws_kms.clone(),
+                    get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                )
+                .await?
+            }
         } else if let Some(turnkey) = &signing_key.turnkey {
-            EvmProvider::new_with_turnkey(
-                config,
-                turnkey.clone(),
-                get_gas_estimator(&config.provider_urls, setup_config, config).await?,
-            )
-            .await?
+            if private_key_strings.is_some() {
+                // Use composite manager with turnkey + private keys
+                let turnkey_manager = std::sync::Arc::new(
+                    crate::wallet::TurnkeyWalletManager::new(turnkey.clone()).await?,
+                );
+                EvmProvider::new_with_composite(
+                    config,
+                    turnkey_manager,
+                    private_key_strings,
+                    get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                )
+                .await?
+            } else {
+                EvmProvider::new_with_turnkey(
+                    config,
+                    turnkey.clone(),
+                    get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                )
+                .await?
+            }
         } else {
             let mnemonic = get_mnemonic_from_signing_key(project_path, signing_key).await?;
 
-            EvmProvider::new_with_mnemonic(
-                config,
-                &mnemonic,
-                get_gas_estimator(&config.provider_urls, setup_config, config).await?,
-            )
-            .await?
+            if private_key_strings.is_some() {
+                // Use composite manager with mnemonic + private keys
+                let mnemonic_manager =
+                    std::sync::Arc::new(crate::wallet::MnemonicWalletManager::new(&mnemonic));
+                EvmProvider::new_with_composite(
+                    config,
+                    mnemonic_manager,
+                    private_key_strings,
+                    get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                )
+                .await?
+            } else {
+                EvmProvider::new_with_mnemonic(
+                    config,
+                    &mnemonic,
+                    get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                )
+                .await?
+            }
         };
 
         providers.push(provider);

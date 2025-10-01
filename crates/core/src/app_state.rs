@@ -65,6 +65,8 @@ pub struct AppState {
     pub api_keys: Arc<Vec<(ChainId, Vec<ApiKey>)>>,
     /// Network configurations to check feature availability
     pub network_configs: Arc<Vec<NetworkSetupConfig>>,
+    /// Networks that are configured with only private keys (per chain_id)
+    pub private_key_only_networks: Arc<Vec<ChainId>>,
 }
 
 pub enum NetworkValidateAction {

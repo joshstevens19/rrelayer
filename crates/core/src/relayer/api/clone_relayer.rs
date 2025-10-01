@@ -47,7 +47,7 @@ pub async fn clone_relayer(
         )
         .await?;
 
-    let current_nonce = provider.get_nonce(&relayer.wallet_index).await?;
+    let current_nonce = provider.get_nonce(&relayer.wallet_index_type().index()).await?;
 
     let id = relayer.id;
     let address = relayer.address;

@@ -19,6 +19,7 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
             paused BOOLEAN DEFAULT FALSE NOT NULL,
             eip_1559_enabled BOOLEAN DEFAULT TRUE NOT NULL,
             deleted BOOLEAN DEFAULT FALSE NOT NULL,
+            is_private_key BOOLEAN DEFAULT FALSE NOT NULL,
             updated_on TIMESTAMPTZ DEFAULT NOW() NOT NULL,
             created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
         );

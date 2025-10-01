@@ -94,7 +94,7 @@ async fn continuously_process_pending_transactions(
                         break;
                     }
                     _ => {
-                        error!("PENDING ERROR: {}", e)
+                        error!("PENDING QUEUE ERROR: {}", e)
                     }
                 }
             }
@@ -332,6 +332,108 @@ async fn load_relayers(db: &PostgresClient) -> Result<Vec<Relayer>, PostgresErro
     Ok(relayers)
 }
 
+/// Imports private keys as relayers during startup
+async fn import_private_keys_as_relayers(
+    db: &PostgresClient,
+    providers: &Vec<EvmProvider>,
+    network_configs: &Vec<crate::yaml::NetworkSetupConfig>,
+    global_signing_provider: Option<&crate::yaml::SigningProvider>,
+) -> Result<(), StartTransactionsQueuesError> {
+    use crate::relayer::CreateRelayerMode;
+
+    for config in network_configs {
+        // Find provider for this network
+        let provider = match find_provider_for_chain_id(providers, &config.chain_id).await {
+            Some(p) => p,
+            None => {
+                warn!("No provider found for chain {} during private key import", config.chain_id);
+                continue;
+            }
+        };
+
+        // Determine which signing provider to use (network-level or global)
+        let signing_provider = if let Some(ref signing_key) = config.signing_provider {
+            signing_key
+        } else if let Some(global_provider) = global_signing_provider {
+            global_provider
+        } else {
+            // No signing provider configured for this network, skip
+            continue;
+        };
+
+        // Check if this signing provider has private keys
+        if let Some(ref private_keys) = signing_provider.private_keys {
+            info!(
+                "Importing {} private keys as relayers for network {} (chain_id: {})",
+                private_keys.len(),
+                config.name,
+                config.chain_id
+            );
+
+            let mut imported_relayers = Vec::new();
+
+            for (index, _private_key_config) in private_keys.iter().enumerate() {
+                let relayer_name = format!("{}-pk-{}", config.name, index);
+
+                // Use negative wallet indexes for private keys to avoid conflicts with mnemonic wallets
+                // Private key index 0 becomes wallet_index -1, index 1 becomes -2, etc.
+                let private_key_wallet_index = -((index + 1) as i32);
+                match provider.get_address(index as u32).await {
+                    Ok(address) => {
+                        // Check if a relayer with this address already exists on this chain
+                        if let Ok(Some(existing_relayer)) =
+                            db.get_relayer_by_address(&address, &config.chain_id).await
+                        {
+                            info!("Relayer for private key {} already exists on chain {} with address {} (relayer_id: {}), skipping import", 
+                                  index, config.chain_id, address, existing_relayer.id);
+                            continue;
+                        }
+                    }
+                    Err(e) => {
+                        warn!("Failed to get address for private key {}: {}", index, e);
+                        continue;
+                    }
+                }
+
+                // Create the relayer using PrivateKeyImport mode with negative wallet index
+                match db
+                    .create_relayer(
+                        &relayer_name,
+                        &config.chain_id,
+                        provider,
+                        CreateRelayerMode::PrivateKeyImport(private_key_wallet_index),
+                    )
+                    .await
+                {
+                    Ok(relayer) => {
+                        info!("Successfully imported private key {} as relayer {} with address {} (relayer_id: {}) on chain {}", 
+                              index, relayer.name, relayer.address, relayer.id, config.chain_id);
+                        imported_relayers.push((relayer.id, relayer.address));
+                    }
+                    Err(e) => {
+                        warn!("Failed to import private key {} as relayer: {}", index, e);
+                    }
+                }
+            }
+
+            if !imported_relayers.is_empty() {
+                info!(
+                    "Completed importing {} new relayers for network {} (chain_id: {}): {:?}",
+                    imported_relayers.len(),
+                    config.name,
+                    config.chain_id,
+                    imported_relayers
+                        .iter()
+                        .map(|(id, addr)| format!("{}:{}", id, addr))
+                        .collect::<Vec<_>>()
+                );
+            }
+        }
+    }
+
+    Ok(())
+}
+
 #[derive(Error, Debug)]
 pub enum StartTransactionsQueuesError {
     #[error("Failed to connect to the database: {0}")]
@@ -350,8 +452,12 @@ pub enum StartTransactionsQueuesError {
     TransactionsQueuesError(
         #[from] crate::transaction::queue_system::transactions_queues::TransactionsQueuesError,
     ),
+
+    #[error("Failed to import private keys as relayers: {0}")]
+    PrivateKeyImportError(#[from] crate::relayer::CreateRelayerError),
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn startup_transactions_queues(
     gas_oracle_cache: Arc<Mutex<GasOracleCache>>,
     blob_gas_oracle_cache: Arc<Mutex<BlobGasOracleCache>>,
@@ -360,10 +466,20 @@ pub async fn startup_transactions_queues(
     webhook_manager: Option<Arc<Mutex<WebhookManager>>>,
     safe_proxy_manager: Arc<SafeProxyManager>,
     network_configs: Arc<Vec<crate::yaml::NetworkSetupConfig>>,
+    global_signing_provider: Option<Arc<crate::yaml::SigningProvider>>,
 ) -> Result<Arc<Mutex<TransactionsQueues>>, StartTransactionsQueuesError> {
     let postgres = PostgresClient::new()
         .await
         .map_err(StartTransactionsQueuesError::DatabaseConnectionError)?;
+
+    // Import private keys as relayers if configured
+    import_private_keys_as_relayers(
+        &postgres,
+        &providers,
+        &network_configs,
+        global_signing_provider.as_deref(),
+    )
+    .await?;
 
     // has to load them ALL to populate their queues
     let relays = load_relayers(&postgres)

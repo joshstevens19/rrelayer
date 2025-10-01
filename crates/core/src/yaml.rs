@@ -58,6 +58,11 @@ pub struct TurnkeySigningProviderConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PrivateKeyConfig {
+    pub raw: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SigningProvider {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub raw: Option<RawSigningProviderConfig>,
@@ -76,6 +81,9 @@ pub struct SigningProvider {
 
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub turnkey: Option<TurnkeySigningProviderConfig>,
+
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub private_keys: Option<Vec<PrivateKeyConfig>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -139,6 +147,7 @@ impl SigningProvider {
             privy: None,
             aws_kms: None,
             turnkey: None,
+            private_keys: None,
         }
     }
 
@@ -150,6 +159,7 @@ impl SigningProvider {
             privy: None,
             aws_kms: Some(aws_kms),
             turnkey: None,
+            private_keys: None,
         }
     }
 
@@ -161,6 +171,7 @@ impl SigningProvider {
             privy: None,
             aws_kms: None,
             turnkey: Some(turnkey),
+            private_keys: None,
         }
     }
 }
@@ -174,6 +185,7 @@ impl SigningProvider {
             self.privy.is_some(),
             self.aws_kms.is_some(),
             self.turnkey.is_some(),
+            self.private_keys.is_some(),
         ]
         .iter()
         .filter(|&&x| x)

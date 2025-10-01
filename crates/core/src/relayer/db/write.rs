@@ -26,15 +26,22 @@ pub enum CreateRelayerError {
 
     #[error("Relayer {0} not found for cloning")]
     RelayerNotFound(RelayerId),
+
+    #[error("Cannot clone private key relayer '{0}' - private key relayers are automatically imported on all networks")]
+    CannotClonePrivateKeyRelayer(String),
 }
 
 impl From<CreateRelayerError> for HttpError {
     fn from(value: CreateRelayerError) -> Self {
-        if matches!(value, CreateRelayerError::RelayerNotFound(_)) {
-            return not_found("Could not find relayer".to_string());
+        match value {
+            CreateRelayerError::RelayerNotFound(_) => {
+                not_found("Could not find relayer".to_string())
+            }
+            CreateRelayerError::CannotClonePrivateKeyRelayer(_) => {
+                crate::shared::bad_request(value.to_string())
+            }
+            _ => internal_server_error(Some(value.to_string())),
         }
-
-        internal_server_error(Some(value.to_string()))
     }
 }
 
@@ -47,6 +54,7 @@ impl From<PostgresError> for CreateRelayerError {
 pub enum CreateRelayerMode {
     Clone(RelayerId),
     Create,
+    PrivateKeyImport(i32),
 }
 
 impl PostgresClient {
@@ -69,15 +77,24 @@ impl PostgresClient {
                     })?
                     .ok_or_else(|| CreateRelayerError::RelayerNotFound(*clone_relayer_id))?;
 
+                // Prevent cloning private key relayers since they are auto-imported on all networks
+                if source_relayer.is_private_key {
+                    return Err(CreateRelayerError::CannotClonePrivateKeyRelayer(
+                        source_relayer.name.clone(),
+                    ));
+                }
+
                 let wallet_index = source_relayer.wallet_index as i32;
-                let address =
-                    evm_provider.create_wallet(wallet_index as u32).await.map_err(|e| {
+                let address = evm_provider
+                    .create_wallet(source_relayer.wallet_index_type().index())
+                    .await
+                    .map_err(|e| {
                         CreateRelayerError::WalletError(name.to_string(), *chain_id, Box::new(e))
                     })?;
 
                 self.execute(
-                    "INSERT INTO relayer.record (id, name, chain_id, wallet_index, max_gas_price_cap, paused, eip_1559_enabled, address)
-                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+                    "INSERT INTO relayer.record (id, name, chain_id, wallet_index, max_gas_price_cap, paused, eip_1559_enabled, address, is_private_key)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
                     &[
                         &new_relayer_id,
                         &name,
@@ -87,6 +104,7 @@ impl PostgresClient {
                         &source_relayer.paused,
                         &source_relayer.eip_1559_enabled,
                         &address,
+                        &source_relayer.is_private_key,
                     ],
                 )
                 .await
@@ -108,8 +126,8 @@ impl PostgresClient {
                                 FROM relayer.record
                                 WHERE chain_id = $3
                             )
-                            INSERT INTO relayer.record (id, name, chain_id, wallet_index)
-                            SELECT $1, $2, $3, wallet_index
+                            INSERT INTO relayer.record (id, name, chain_id, wallet_index, is_private_key)
+                            SELECT $1, $2, $3, wallet_index, false
                             FROM new_wallet_index
                             RETURNING wallet_index";
 
@@ -133,6 +151,21 @@ impl PostgresClient {
                 })
                 .await
                 .map_err(|e| CreateRelayerError::CouldNotSaveRelayerDb(name.to_string(), *chain_id, e))?
+            }
+            CreateRelayerMode::PrivateKeyImport(wallet_index) => {
+                // Convert negative wallet index to positive private key index for address lookup
+                let private_key_index = (-wallet_index - 1) as u32;
+                let address = evm_provider.get_address(private_key_index).await.map_err(|e| {
+                    CreateRelayerError::WalletError(name.to_string(), *chain_id, Box::new(e))
+                })?;
+
+                self.execute(
+                    "INSERT INTO relayer.record (id, name, chain_id, wallet_index, address, is_private_key)
+                     VALUES ($1, $2, $3, $4, $5, $6)",
+                    &[&new_relayer_id, &name, chain_id, wallet_index, &address, &true],
+                )
+                .await
+                .map_err(|e| CreateRelayerError::CouldNotSaveRelayerDb(name.to_string(), *chain_id, e))?;
             }
         };
 

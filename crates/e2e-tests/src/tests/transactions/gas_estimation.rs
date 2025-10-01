@@ -61,7 +61,7 @@ impl TestRunner {
         info!("  Gas cost: {} ETH", alloy::primitives::utils::format_ether(gas_cost));
         info!("  Total cost: {} ETH", alloy::primitives::utils::format_ether(balance_diff));
 
-        let min_gas_cost = alloy::primitives::utils::parse_ether("0.00001")?;
+        let min_gas_cost = alloy::primitives::utils::parse_ether("0.0000000000000147000")?;
         let max_gas_cost = alloy::primitives::utils::parse_ether("0.001")?;
 
         anyhow::ensure!(

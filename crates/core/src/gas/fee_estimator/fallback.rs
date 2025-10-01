@@ -14,7 +14,6 @@ use crate::{
 pub struct FallbackGasFeeEstimator {
     provider: Arc<RelayerProvider>,
 }
-
 impl FallbackGasFeeEstimator {
     pub fn new(provider: Arc<RelayerProvider>) -> Self {
         FallbackGasFeeEstimator { provider }
@@ -115,29 +114,45 @@ impl BaseGasFeeEstimator for FallbackGasFeeEstimator {
                 }
             };
 
+        // Get current base fee to ensure max_fee is never below it
+        let current_base_fee = self
+            .provider
+            .get_block_by_number(BlockNumberOrTag::Latest)
+            .await
+            .map_err(|e| GasEstimatorError::CustomError(e.to_string()))?
+            .and_then(|block| block.header.base_fee_per_gas)
+            .map(|fee| fee as u128)
+            .unwrap_or(0);
+
         Ok(GasEstimatorResult {
             slow: GasPriceResult {
                 max_priority_fee: MaxPriorityFee::new((base_priority_fee * 80) / 100), // -20%
-                max_fee: MaxFee::new((base_max_fee * 90) / 100),                       // -10%
-                min_wait_time_estimate: Some(120),                                     // 2 minutes
-                max_wait_time_estimate: Some(300),                                     // 5 minutes
+                max_fee: MaxFee::new(
+                    ((base_max_fee * 90) / 100).max(current_base_fee + base_priority_fee),
+                ),
+                min_wait_time_estimate: Some(120), // 2 minutes
+                max_wait_time_estimate: Some(300), // 5 minutes
             },
             medium: GasPriceResult {
                 max_priority_fee: MaxPriorityFee::new(base_priority_fee),
-                max_fee: MaxFee::new(base_max_fee),
+                max_fee: MaxFee::new(base_max_fee.max(current_base_fee + base_priority_fee)),
                 min_wait_time_estimate: Some(30),  // 30 seconds
                 max_wait_time_estimate: Some(120), // 2 minutes
             },
             fast: GasPriceResult {
                 max_priority_fee: MaxPriorityFee::new((base_priority_fee * 130) / 100), // +30%
-                max_fee: MaxFee::new((base_max_fee * 120) / 100),                       // +20%
+                max_fee: MaxFee::new(
+                    ((base_max_fee * 120) / 100).max(current_base_fee + base_priority_fee),
+                ),
                 min_wait_time_estimate: Some(15), // 15 seconds
                 max_wait_time_estimate: Some(60), // 1 minute
             },
             super_fast: GasPriceResult {
                 max_priority_fee: MaxPriorityFee::new((base_priority_fee * 180) / 100), // +80%
-                max_fee: MaxFee::new((base_max_fee * 150) / 100),                       // +50%
-                min_wait_time_estimate: Some(5),                                        // 5 seconds
+                max_fee: MaxFee::new(
+                    ((base_max_fee * 150) / 100).max(current_base_fee + base_priority_fee),
+                ),
+                min_wait_time_estimate: Some(5),  // 5 seconds
                 max_wait_time_estimate: Some(30), // 30 seconds
             },
         })

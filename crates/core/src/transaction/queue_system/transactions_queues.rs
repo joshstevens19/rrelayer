@@ -79,7 +79,8 @@ impl TransactionsQueues {
         let mut relayer_block_times_ms = HashMap::new();
 
         for setup in setups {
-            let current_nonce = setup.evm_provider.get_nonce(&setup.relayer.wallet_index).await?;
+            let current_nonce =
+                setup.evm_provider.get_nonce(&setup.relayer.wallet_index_type().index()).await?;
 
             relayer_block_times_ms.insert(setup.relayer.id, setup.evm_provider.blocks_every);
 
@@ -170,7 +171,8 @@ impl TransactionsQueues {
         setup: TransactionsQueueSetup,
         queues_arc: Arc<Mutex<TransactionsQueues>>,
     ) -> Result<(), WalletOrProviderError> {
-        let current_nonce = setup.evm_provider.get_nonce(&setup.relayer.wallet_index).await?;
+        let current_nonce =
+            setup.evm_provider.get_nonce(&setup.relayer.wallet_index_type().index()).await?;
         let relayer_id = setup.relayer.id;
 
         self.queues.insert(
@@ -369,6 +371,13 @@ impl TransactionsQueues {
             });
         }
 
+        // Sync nonce manager with on-chain nonce to ensure consistency
+        let current_onchain_nonce = transactions_queue
+            .get_nonce()
+            .await
+            .map_err(|e| AddTransactionError::CouldNotGetCurrentOnChainNonce(*relayer_id, e))?;
+
+        transactions_queue.nonce_manager.sync_with_onchain_nonce(current_onchain_nonce).await;
         let assigned_nonce = transactions_queue.nonce_manager.get_and_increment().await;
 
         let mut transaction = Transaction {
@@ -955,19 +964,38 @@ impl TransactionsQueues {
                                 ))
                             }
                             TransactionQueueSendTransactionError::TransactionSendError(error) => {
-                                // if it fails to send it means RPC node must be down as we
-                                // override the gas limits
-                                // this enforces that the tx
-                                // will go through even if estimate gas is wrong
-                                // another point could be low on funds and rejecting the queue
-                                // here seems an odd stance
-                                // as it could
-                                // be a temp issue
-                                Err(ProcessPendingTransactionError::SendTransactionError(
-                                    TransactionQueueSendTransactionError::TransactionSendError(
-                                        error,
-                                    ),
-                                ))
+                                // Check if this is an insufficient funds error - auto-fail these
+                                let error_msg = error.to_string().to_lowercase();
+                                if error_msg.contains("insufficient funds")
+                                    || error_msg.contains("balance")
+                                    || error_msg.contains("overshot")
+                                {
+                                    info!("process_single_pending: transaction {} failed due to insufficient funds moved to failed", transaction.id);
+                                    self.db
+                                        .update_transaction_failed(
+                                            &transaction.id,
+                                            &error.to_string(),
+                                        )
+                                        .await
+                                        .map_err(ProcessPendingTransactionError::DbError)?;
+
+                                    transactions_queue.move_next_pending_to_failed().await;
+
+                                    self.invalidate_transaction_cache(&transaction.id).await;
+
+                                    Err(ProcessPendingTransactionError::SendTransactionError(
+                                        TransactionQueueSendTransactionError::TransactionSendError(
+                                            error,
+                                        ),
+                                    ))
+                                } else {
+                                    // For other send errors (RPC down, etc), keep as temp issue
+                                    Err(ProcessPendingTransactionError::SendTransactionError(
+                                        TransactionQueueSendTransactionError::TransactionSendError(
+                                            error,
+                                        ),
+                                    ))
+                                }
                             }
                             TransactionQueueSendTransactionError::CouldNotUpdateTransactionDb(
                                 error,

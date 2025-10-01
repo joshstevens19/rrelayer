@@ -1,4 +1,4 @@
 mod builders;
 mod read;
 mod write;
-pub use write::CreateRelayerMode;
+pub use write::{CreateRelayerError, CreateRelayerMode};

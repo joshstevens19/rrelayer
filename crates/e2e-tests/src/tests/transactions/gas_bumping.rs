@@ -20,6 +20,8 @@ impl TestRunner {
         let relayer = self.create_and_fund_relayer("gas-bump-relayer").await?;
         info!("Created relayer: {:?}", relayer);
 
+        let relayer = self.create_and_fund_relayer("gas-bump-relayer").await?;
+
         let tx_request = RelayTransactionRequest {
             to: self.config.anvil_accounts[1],
             value: alloy::primitives::utils::parse_ether("0.5")?.into(),
@@ -64,6 +66,10 @@ impl TestRunner {
         // wait 10 seconds as gas bumping happens based on time
         tokio::time::sleep(Duration::from_secs(10)).await;
 
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
         self.mine_and_wait().await?;
         self.mine_and_wait().await?;
         self.mine_and_wait().await?;

@@ -1,0 +1,33 @@
+# Raw Mnemonic
+
+You can just use a mnemonic you have already or a new one to run rrelayer.
+
+:::warning
+Production running of rrelayer we advise you to use a more secure signing provider.
+:::
+
+# Usage
+
+To enable raw mnemonic you need to add its config in the YAML under the `mnemonic` key:
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: "${RRELAYER_AUTH_USERNAME}"
+  authentication_password: "${RRELAYER_AUTH_PASSWORD}"
+signing_provider: // [!code focus]
+  raw: // [!code focus]
+    mnemonic: "${RAW_DANGEROUS_MNEMONIC}" // [!code focus]
+```
+
+You then need to add the RAW_DANGEROUS_MNEMONIC variables to the `.env`
+
+```bash
+RAW_DANGEROUS_MNEMONIC=YOUR_RAW_MNEMONIC
+```
+
+:::info
+You can call RAW_DANGEROUS_MNEMONIC anything it is just advising you to make sure you don't paste it clear text in the YAML
+:::

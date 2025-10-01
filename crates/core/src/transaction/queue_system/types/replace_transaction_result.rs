@@ -4,7 +4,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ReplaceTransactionResult {
     pub success: bool,
+    #[serde(rename = "replaceTransactionId", skip_serializing_if = "Option::is_none", default)]
     pub replace_transaction_id: Option<TransactionId>,
+    #[serde(rename = "replaceTransactionHash", skip_serializing_if = "Option::is_none", default)]
     pub replace_transaction_hash: Option<TransactionHash>,
 }
 

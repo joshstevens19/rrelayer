@@ -120,8 +120,6 @@ async fn main() -> Result<(), CliError> {
             let project_location = ProjectLocation::new(resolved_path);
             let client = create_sdk_with_basic_auth(&project_location)?;
 
-            check_authenticate(&client).await?;
-
             network::handle_network(command, &project_location, &client).await?;
         }
         Commands::List { path, network, limit, offset } => {
@@ -141,8 +139,6 @@ async fn main() -> Result<(), CliError> {
 
             let project_location = ProjectLocation::new(resolved_path);
             let client = create_sdk_with_basic_auth(&project_location)?;
-
-            check_authenticate(&client).await?;
 
             config::handle_config(command, &client).await?;
         }

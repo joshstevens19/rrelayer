@@ -46,7 +46,15 @@ impl TestRunner {
         info!("Successful transactions before rate limit: {}", successful_transactions);
 
         info!("Sleep for 60 seconds to allow the rate limit to expire");
-        tokio::time::sleep(Duration::from_secs(60)).await;
+        tokio::time::sleep(Duration::from_secs(62)).await;
+
+        self.mine_blocks(1).await?;
+        self.mine_blocks(1).await?;
+        self.mine_blocks(1).await?;
+        self.mine_blocks(1).await?;
+        self.mine_blocks(1).await?;
+        self.mine_blocks(1).await?;
+        self.mine_blocks(1).await?;
 
         let tx_result = self
             .relayer_client
@@ -61,9 +69,10 @@ impl TestRunner {
 
         match tx_result {
             Ok(_) => {}
-            Err(_) => {
+            Err(e) => {
                 return Err(anyhow!(
-                    "Sending transactions should go through as rate limit expired"
+                    "Sending transactions should go through as rate limit expired - error {}",
+                    e
                 ));
             }
         }

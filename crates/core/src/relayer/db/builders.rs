@@ -8,10 +8,11 @@ pub fn build_relayer(row: &Row) -> Relayer {
         name: row.get("name"),
         chain_id: row.get("chain_id"),
         address: row.get("address"),
-        wallet_index: row.get::<_, i32>("wallet_index") as u32,
+        wallet_index: row.get::<_, i32>("wallet_index"),
         max_gas_price: row.get("max_gas_price_cap"),
         paused: row.get("paused"),
         eip_1559_enabled: row.get("eip_1559_enabled"),
         created_at: row.get("created_at"),
+        is_private_key: row.get("is_private_key"),
     }
 }
