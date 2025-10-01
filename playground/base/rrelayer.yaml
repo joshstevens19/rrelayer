@@ -1,7 +1,8 @@
 name: base
 signing_provider:
-  raw:
-    mnemonic: ${RAW_DANGEROUS_MNEMONIC}
+  private_keys:
+    - raw: ${PK_1}
+    - raw: ${PK_2}
 networks:
 - name: base_ethereum
   chain_id: 8453

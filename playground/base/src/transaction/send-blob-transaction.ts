@@ -3,7 +3,7 @@ import {client} from "../client";
 import { TransactionToSend , createBlobFromString}  from "rrelayer";
 
 export const sendBlobTransaction = async () => {
-  const relayerClient = await client.getRelayerClient('d6dd6bcc-6a7d-4645-bf83-663da3bae8cd');
+  const relayerClient = await client.getRelayerClient('1ddd52e1-c925-4fa0-86c7-dcc890ca94e1');
 
   const blobData = createBlobFromString('hello world');
 

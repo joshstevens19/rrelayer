@@ -2,11 +2,11 @@ import {client} from "../client";
 import { TransactionToSend }  from "rrelayer";
 
 export const sendTransaction = async () => {
-  const relayerClient = await client.getRelayerClient('1ddd52e1-c925-4fa0-86c7-dcc890ca94e1');
+  const relayerClient = await client.getRelayerClient('2ba12e4f-ca5b-48ec-9bd5-a51179f504dc');
 
   let request: TransactionToSend = {
-    to: "0x12DA2589E40855EC80E017215D8B4B92CF21C8AC",
-    value: '1000000000000000'
+    to: "0xafa06f7fb602f11275c2a2e9afa3a00c0f7c27d6",
+    value: '1000'
   }
   const transaction = await relayerClient.transaction.send(request);
   console.log('transaction', transaction);

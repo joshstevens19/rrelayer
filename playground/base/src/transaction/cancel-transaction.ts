@@ -1,14 +1,10 @@
 import {client} from "../client";
-import { TransactionToSend }  from "rrelayer";
 
 export const sendTransaction = async () => {
   const relayerClient = await client.getRelayerClient('1ddd52e1-c925-4fa0-86c7-dcc890ca94e1');
 
-  let request: TransactionToSend = {
-    to: "0xafa06f7fb602f11275c2a2e9afa3a00c0f7c27d6",
-    value: '1000'
-  }
-  const transaction = await relayerClient.transaction.send(request);
+
+  const transaction = await relayerClient.transaction.cancel('e8b63efa-c96d-4454-ac88-5cb3f50ec400');
   console.log('transaction', transaction);
   const startTime = Date.now();
 
