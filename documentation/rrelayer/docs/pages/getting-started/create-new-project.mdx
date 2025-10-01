@@ -422,12 +422,12 @@ export const relayerClient = await client.getRelayerClient(
 
 // send-eth-transaction.ts
 import { relayerClient } from './config';
-import { TransactionToSend } from 'rrelayer';
+import { TransactionToSend, parseEther } from 'rrelayer';
 
 // Using a framework like viem and ethers is recommended here. Look under framework guides > TypeScript for them.
 const txRequest: TransactionToSend = {
     to: '0x5FCD072a0BD58B6fa413031582E450FE724dba6D',
-    value: '1000000000000000000'
+    value: parseEther('0.0001')
 };
 
 // returns TransactionSent - import { TransactionSent } from 'rrelayer';

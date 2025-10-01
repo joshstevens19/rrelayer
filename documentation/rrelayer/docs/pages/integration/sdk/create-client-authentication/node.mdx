@@ -81,10 +81,11 @@ export const relayer = await client.getRelayerClient(
 ...
 
 import { relayer } from './config';
+import { parseEther } from 'rrelayer';
 
 const txRequest = {
   to: '0xa4635F69E5A64CD48da3FbC999aCed87B00756F6',
-  value: '1000000000000000000',
+  value: parseEther('0.001'),
   // speed: TransactionSpeed.Super - you can override sending transactions speed like this
 };
 

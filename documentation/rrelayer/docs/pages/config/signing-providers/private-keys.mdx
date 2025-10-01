@@ -1,14 +1,19 @@
-# Raw Mnemonic
+# Private Keys
 
-You can just use a mnemonic you have already or a new one to run rrelayer.
+You can use existing private keys if you wish, rrelayer will import them on startup and create relayers
+for you automatically, if you got many networks, it creates a relayer for each pk on every network for you.
 
 :::warning
 Production running of rrelayer we advise you to use a more secure signing provider.
 :::
 
-# Usage
+:::warning
+NOTE USING PRIVATE KEYS ONLY MEANS IF YOU TRY TO CREATE A NEW RELAYER IT WILL THROW AN ERROR.
+:::
 
-To enable raw mnemonic you need to add its config in the YAML under the `mnemonic` key:
+## Usage
+
+To enable private keys signing, you need to add its config in the YAML under the `private_keys` key:
 
 ```yaml [rrelayer.yaml]
 name: first-rrelayer
@@ -18,16 +23,41 @@ api_config:
   authentication_username: "${RRELAYER_AUTH_USERNAME}"
   authentication_password: "${RRELAYER_AUTH_PASSWORD}"
 signing_provider: // [!code focus]
-  raw: // [!code focus]
-    mnemonic: "${RAW_DANGEROUS_MNEMONIC}" // [!code focus]
+  private_keys: // [!code focus]
+    - raw: "${PK_1}" // [!code focus]
+    - raw: "${PK_2}" // [!code focus]
 ```
 
-You then need to add the RAW_DANGEROUS_MNEMONIC variables to the `.env`
-
-```bash
-RAW_DANGEROUS_MNEMONIC=YOUR_RAW_MNEMONIC
-```
+You can have as many PKs as you want and map them in the `.env` file.
 
 :::info
-You can call RAW_DANGEROUS_MNEMONIC anything it is just advising you to make sure you don't paste it clear text in the YAML
+You can call PK_1 or PK_2 anything it is just advising you to make sure you don't paste it clear text in the YAML
 :::
+
+## Using with another signing provider
+
+As private keys only import and don't allow you to create new ones, you can use private key signers with any other
+signing provider you wish.
+
+Example below of having private key signers as well as aws secret manager.
+
+:::info
+Note you can config this with any signing provider aws secret manager is just an example.
+:::
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider: // [!code focus]
+  aws_secret_manager: // [!code focus]
+    id: "testing-josh-relayer" // [!code focus]
+    key: "seed" // [!code focus]
+    region: "eu-west-1" // [!code focus]
+  private_keys: // [!code focus]
+    - raw: "${PK_1}" // [!code focus]
+    - raw: "${PK_2}" // [!code focus]
+```

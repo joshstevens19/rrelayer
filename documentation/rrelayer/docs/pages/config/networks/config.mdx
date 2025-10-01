@@ -162,3 +162,17 @@ networks: // [!code focus]
   max_gas_price_multiplier: 4
   enable_sending_blobs: false # [!code focus]
 ```
+
+### signing_provider - optional
+
+In all our examples we map the signing_provider to the main project, but you can override it in the network itself.
+This follows all the same YAML style as the signing provider logic but within the network's object. You can find all
+the documentation in the signer provider pages:
+
+- [KMS](/config/signing-providers/aws-kms)
+- [AWS Secret Manager](/config/signing-providers/aws-secret-manager)
+- [GCP Secret Manager](/config/signing-providers/gcp-secret-manager)
+- [Raw Mnemonic](/config/signing-providers/raw-mnemonic)
+- [Privy](/config/signing-providers/privy)
+- [Turnkey](/config/signing-providers/turnkey)
+- [Private Keys](/config/signing-providers/private-keys)

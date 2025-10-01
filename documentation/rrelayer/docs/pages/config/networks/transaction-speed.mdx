@@ -61,11 +61,11 @@ export const relayerClient = await client.getRelayerClient(
 
 // send-eth-transaction.ts
 import { relayerClient } from './config';
-import { TransactionToSend } from 'rrelayer';
+import { TransactionToSend, parseEther } from 'rrelayer';
 
 const txRequest: TransactionToSend = {
     to: '0x5FCD072a0BD58B6fa413031582E450FE724dba6D',
-    value: '1000000000000000000',
+    value: parseEther('0.0001'),
     speed: TransactionSpeed.FAST // [!code focus]
 };
 

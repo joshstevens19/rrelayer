@@ -28,7 +28,7 @@ export enum TransactionSpeed {
 
 export interface TransactionToSend {
   to: string;
-  value?: string | null;
+  value?: string | bigint | null;
   data?: string | null;
   speed?: TransactionSpeed | null; // defaults to TransactionSpeed.Fast
   blobs?: `0x${string}`[];
@@ -83,12 +83,12 @@ export const relayerClient = await client.getRelayerClient(
 
 // send-eth-transaction.ts
 import { relayerClient } from './config';
-import { TransactionToSend } from 'rrelayer';
+import { TransactionToSend, parseEther } from 'rrelayer';
 
 // Using a framework like viem and ethers is recommended here. Look under framework guides > TypeScript for them.
 const txRequest: TransactionToSend = {
     to: '0x5FCD072a0BD58B6fa413031582E450FE724dba6D',
-    value: '1000000000000000000'
+    value: parseEther('0.0001')
 };
 
 // returns TransactionSent - import { TransactionSent } from 'rrelayer';
@@ -119,12 +119,12 @@ export let relayerClient = createRelayerClient({
 
 // send-eth-transaction.ts
 import { relayerClient } from './config';
-import { TransactionToSend } from 'rrelayer';
+import { TransactionToSend, parseEther } from 'rrelayer';
 
 // Using a framework like viem and ethers is recommended here. Look under framework guides > TypeScript for them.
 const txRequest: TransactionToSend = {
     to: '0x5FCD072a0BD58B6fa413031582E450FE724dba6D',
-    value: '1000000000000000000'
+    value: parseEther('0.0001'),
 };
 
 // returns TransactionSent - import { TransactionSent } from 'rrelayer';
@@ -558,15 +558,16 @@ be mined before it is replaced.
 ### Response
 
 ```ts
-Promise<TransactionSent>;
+Promise<ReplaceTransactionResult>;
 ```
 
 Just so you understand the properties, the properties you get back when you send
 
 ```ts
-export interface TransactionSent {
-  id: string;
-  hash: `0x${string}`;
+export interface ReplaceTransactionResult {
+  success: boolean;
+  replaceTransactionId?: string;
+  replaceTransactionHash?: `0x${string}`
 }
 ```
 
@@ -598,20 +599,24 @@ export const relayerClient = await client.getRelayerClient(
 
 // replace-transaction.ts
 import { relayerClient } from './config';
-import { TransactionToSend } from 'rrelayer';
+import { TransactionToSend, parseEther } from 'rrelayer';
 
 // Using a framework like viem and ethers is recommended here. Look under framework guides > TypeScript for them.
 const txRequest: TransactionToSend = {
     to: '0x5FCD072a0BD58B6fa413031582E450FE724dba6D',
-    value: '1000000000000000000'
+    value: parseEther('0.001'),
 };
 
-// returns TransactionSent - import { TransactionSent } from 'rrelayer';
+// returns ReplaceTransactionResult - import { ReplaceTransactionResult } from 'rrelayer';
 let response = await relayerClient.transaction.replace('ebf8a8c1-9de5-4307-9810-8e842dad7bde', txRequest);
+
+if (!response.success) {
+    throw new Error("Could not cancel transaction");
+}
 
 // returns a TransactionReceipt - import { TransactionReceipt } from 'rrelayer';
 let receipt = await relayerClient.transaction.waitForTransactionReceiptById(
-    response.id
+    response.replaceTransactionId
 );
 ```
 
@@ -634,20 +639,24 @@ export let relayerClient = createRelayerClient({
 
 // replace-transaction.ts
 import { relayerClient } from './config';
-import { TransactionToSend } from 'rrelayer';
+import { TransactionToSend, parseEther } from 'rrelayer';
 
 // Using a framework like viem and ethers is recommended here. Look under framework guides > TypeScript for them.
 const txRequest: TransactionToSend = {
     to: '0x5FCD072a0BD58B6fa413031582E450FE724dba6D',
-    value: '1000000000000000000'
+    value: parseEther('0.001'),
 };
 
-// returns TransactionSent - import { TransactionSent } from 'rrelayer';
+// returns ReplaceTransactionResult - import { ReplaceTransactionResult } from 'rrelayer';
 let response = await relayerClient.transaction.replace('ebf8a8c1-9de5-4307-9810-8e842dad7bde', txRequest);
+
+if (!response.success) {
+    throw new Error("Could not cancel transaction");
+}
 
 // returns a TransactionReceipt - import { TransactionReceipt } from 'rrelayer';
 let receipt = await relayerClient.transaction.waitForTransactionReceiptById(
-    response.id
+    response.replaceTransactionId
 );
 ```
 
@@ -663,15 +672,15 @@ be mined before it is cancelled.
 ### Response
 
 ```ts
-Promise<TransactionSent>;
+Promise<CancelTransactionResult>;
 ```
 
 Just so you understand the properties, the properties you get back when you send
 
 ```ts
-export interface TransactionSent {
-  id: string;
-  hash: `0x${string}`;
+export interface CancelTransactionResult {
+  success: boolean;
+  cancelTransactionId?: string;
 }
 ```
 
@@ -704,12 +713,16 @@ export const relayerClient = await client.getRelayerClient(
 // cancel-transaction.ts
 import { relayerClient } from './config';
 
-// returns TransactionSent - import { TransactionSent } from 'rrelayer';
+// returns CancelTransactionResult - import { CancelTransactionResult } from 'rrelayer';
 let response = await relayerClient.transaction.cancel('ebf8a8c1-9de5-4307-9810-8e842dad7bde');
+
+if (!response.success) {
+    throw new Error("Could not cancel transaction");
+}
 
 // returns a TransactionReceipt - import { TransactionReceipt } from 'rrelayer';
 let receipt = await relayerClient.transaction.waitForTransactionReceiptById(
-    response.id
+    response.cancelTransactionId
 );
 ```
 
@@ -733,12 +746,16 @@ export let relayerClient = createRelayerClient({
 // cancel-transaction.ts
 import { relayerClient } from './config';
 
-// returns TransactionSent - import { TransactionSent } from 'rrelayer';
+// returns CancelTransactionResult - import { CancelTransactionResult } from 'rrelayer';
 let response = await relayerClient.transaction.cancel('ebf8a8c1-9de5-4307-9810-8e842dad7bde');
+
+if (!response.success) {
+    throw new Error("Could not cancel transaction");
+}
 
 // returns a TransactionReceipt - import { TransactionReceipt } from 'rrelayer';
 let receipt = await relayerClient.transaction.waitForTransactionReceiptById(
-    response.id
+    response.cancelTransactionId
 );
 ```
 
