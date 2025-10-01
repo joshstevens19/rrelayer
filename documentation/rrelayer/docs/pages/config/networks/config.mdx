@@ -39,7 +39,7 @@ signing_provider:
     region: "eu-west-1"
 networks: // [!code focus]
 - name: "sepolia_ethereum"
-  chain_id: 11155111 // [!code focus]
+  chain_id: 11155111 # [!code focus]
 ```
 
 ### provider_urls
@@ -111,34 +111,7 @@ networks: // [!code focus]
   provider_urls:
   - "https://sepolia.gateway.tenderly.co"
   block_explorer_url: "https://sepolia.etherscan.io"
-  max_gas_price_multiplier: 4 // [!code focus]
-```
-
-### max_gas_price_multiplier - default 4
-
-rrelayer will bump up prices after n numbers of blocks depending on what transaction speed you sent it as,
-with that it could end up on huge spikes trying to bump it a very high amount. The idea with this is rrelayer
-will never send a transaction more then 4x greater then the fastest gas price we have from our gas providers.
-You can change this to say 1000 if you wish to never care about max gas cost. Note each relayer can have its own
-config for max gas price which you can read more about [here](/integration/sdk/relayers/node#update-max-gas-price)
-
-```yaml [rrelayer.yaml]
-name: first-rrelayer
-description: "my first rrelayer"
-api_config:
-  port: 3000
-  authentication_username: ${RRELAYER_AUTH_USERNAME}
-  authentication_password: ${RRELAYER_AUTH_PASSWORD}
-signing_provider:
-  aws_kms:
-    region: "eu-west-1"
-networks: // [!code focus]
-- name: "sepolia_ethereum"
-  chain_id: 11155111
-  provider_urls:
-  - "https://sepolia.gateway.tenderly.co"
-  block_explorer_url: "https://sepolia.etherscan.io"
-  max_gas_price_multiplier: 4 // [!code focus]
+  max_gas_price_multiplier: 4 # [!code focus]
 ```
 
 ### confirmations - optional default 12
@@ -163,12 +136,7 @@ networks: // [!code focus]
   - "https://sepolia.gateway.tenderly.co"
   block_explorer_url: "https://sepolia.etherscan.io"
   max_gas_price_multiplier: 4
-  gas_bump_blocks_every:
-    slow: 10
-    medium: 5
-    fast: 4
-    super_fast: 2
-  confirmations: 2 // [!code focus]
+  confirmations: 2 # [!code focus]
 ```
 
 ### enable_sending_blobs - optional
@@ -192,11 +160,5 @@ networks: // [!code focus]
   - "https://sepolia.gateway.tenderly.co"
   block_explorer_url: "https://sepolia.etherscan.io"
   max_gas_price_multiplier: 4
-  gas_bump_blocks_every:
-    slow: 10
-    medium: 5
-    fast: 4
-    super_fast: 2
-  confirmations: 12
-  enable_sending_blobs: false // [!code focus]
+  enable_sending_blobs: false # [!code focus]
 ```

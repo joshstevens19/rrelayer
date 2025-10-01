@@ -27,8 +27,8 @@ api_config:
   authentication_password: "${RRELAYER_AUTH_PASSWORD}"
 signing_provider: // [!code focus]
   privy: // [!code focus]
-    app_id: ${PRIVY_APP_ID} // [!code focus]
-    app_secret: ${PRIVY_APP_SECRET} // [!code focus]
+    app_id: "${PRIVY_APP_ID}" // [!code focus]
+    app_secret: "${PRIVY_APP_SECRET}" // [!code focus]
 ```
 
 You then need to add the privy credentials to the `.env`

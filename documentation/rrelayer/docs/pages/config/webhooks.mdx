@@ -56,8 +56,8 @@ webhooks: // [!code focus]
 - endpoint: "https://api.yourapp.com/webhooks/rrelayer" // [!code focus]
   shared_secret: "${WEBHOOK_SECRET}" // [!code focus]
   networks: "*" // [!code focus]
-  max_retries: 3 // [!code focus]
-  alert_on_low_balances: true // [!code focus]
+  max_retries: 3 # [!code focus]
+  alert_on_low_balances: true # [!code focus]
 ```
 
 ### Multiple Webhooks
@@ -69,12 +69,12 @@ webhooks: // [!code focus]
 - endpoint: "https://api.yourapp.com/webhooks/transactions" // [!code focus]
   shared_secret: "${TRANSACTION_WEBHOOK_SECRET}" // [!code focus]
   networks: ["sepolia_ethereum", "polygon_mainnet"] // [!code focus]
-  max_retries: 5 // [!code focus]
+  max_retries: 5 # [!code focus]
 - endpoint: "https://monitoring.yourapp.com/webhooks/alerts" // [!code focus]
   shared_secret: "${ALERT_WEBHOOK_SECRET}" // [!code focus]
   networks: "*" // [!code focus]
-  max_retries: 3 // [!code focus]
-  alert_on_low_balances: true // [!code focus]
+  max_retries: 3 # [!code focus]
+  alert_on_low_balances: true # [!code focus]
 ```
 
 ### Network Filtering

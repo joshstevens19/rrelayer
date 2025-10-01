@@ -46,7 +46,7 @@ networks: // [!code focus]
         - address: "0x99bba657f2bbc93c02d617f8ba121cb8fc104acf"
           min_balance: "100"
           top_up_amount: "500"
-          decimals: "18"
+          decimals: 18 # [!code focus]
      permissions: // [!code focus]
       - relayers: // [!code focus]
           - "0x1c09df15fb12656420033eb58067ec9406ef0e26" // [!code focus]
@@ -89,7 +89,7 @@ networks: // [!code focus]
         - address: "0x99bba657f2bbc93c02d617f8ba121cb8fc104acf"
           min_balance: "100"
           top_up_amount: "500"
-          decimals: "18"
+          decimals: 18 # [!code focus]
      permissions: // [!code focus]
       - relayers: "0x1c09df15fb12656420033eb58067ec9406ef0e26" // [!code focus]
 ```
@@ -130,7 +130,7 @@ networks: // [!code focus]
         - address: "0x99bba657f2bbc93c02d617f8ba121cb8fc104acf"
           min_balance: "100"
           top_up_amount: "500"
-          decimals: "18"
+          decimals: 18 # [!code focus]
      permissions: // [!code focus]
       - relayers: "*" // [!code focus]
 ```
@@ -174,7 +174,7 @@ networks: // [!code focus]
         - address: "0x99bba657f2bbc93c02d617f8ba121cb8fc104acf"
           min_balance: "100"
           top_up_amount: "500"
-          decimals: "18"
+          decimals: 18 # [!code focus]
      permissions: // [!code focus]
       - relayers:
           - "0x1c09df15fb12656420033eb58067ec9406ef0e26"
@@ -222,7 +222,7 @@ networks: // [!code focus]
         - address: "0x99bba657f2bbc93c02d617f8ba121cb8fc104acf"
           min_balance: "100"
           top_up_amount: "500"
-          decimals: "18"
+          decimals: 18 # [!code focus]
      permissions: // [!code focus]
       - relayers:
           - "0x1c09df15fb12656420033eb58067ec9406ef0e26"
@@ -230,7 +230,7 @@ networks: // [!code focus]
         allowlist:
           - "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
           - "0xcfe267de230a234c5937f18f239617b7038ec271"
-       disable_native_transfer: true // [!code focus]
+       disable_native_transfer: true # [!code focus]
 ```
 
 ### disable_personal_sign - optional default false
@@ -271,7 +271,7 @@ networks: // [!code focus]
         - address: "0x99bba657f2bbc93c02d617f8ba121cb8fc104acf"
           min_balance: "100"
           top_up_amount: "500"
-          decimals: "18"
+          decimals: 18 # [!code focus]
      permissions: // [!code focus]
       - relayers:
           - "0x1c09df15fb12656420033eb58067ec9406ef0e26"
@@ -280,7 +280,7 @@ networks: // [!code focus]
           - "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
           - "0xcfe267de230a234c5937f18f239617b7038ec271"
        disable_native_transfer: true
-       disable_personal_sign: true // [!code focus]
+       disable_personal_sign: true # [!code focus]
 ```
 
 ### disable_typed_data_sign - optional default false
@@ -321,7 +321,7 @@ networks: // [!code focus]
         - address: "0x99bba657f2bbc93c02d617f8ba121cb8fc104acf"
           min_balance: "100"
           top_up_amount: "500"
-          decimals: "18"
+          decimals: 18 # [!code focus]
      permissions: // [!code focus]
       - relayers:
           - "0x1c09df15fb12656420033eb58067ec9406ef0e26"
@@ -331,7 +331,7 @@ networks: // [!code focus]
           - "0xcfe267de230a234c5937f18f239617b7038ec271"
        disable_native_transfer: true
        disable_personal_sign: true
-       disable_typed_data_sign: true // [!code focus]
+       disable_typed_data_sign: true # [!code focus]
 ```
 
 ### disable_transactions - optional default false
@@ -372,7 +372,7 @@ networks: // [!code focus]
         - address: "0x99bba657f2bbc93c02d617f8ba121cb8fc104acf"
           min_balance: "100"
           top_up_amount: "500"
-          decimals: "18"
+          decimals: 18 # [!code focus]
      permissions: // [!code focus]
       - relayers:
           - "0x1c09df15fb12656420033eb58067ec9406ef0e26"
@@ -383,5 +383,5 @@ networks: // [!code focus]
        disable_native_transfer: true
        disable_personal_sign: true
        disable_typed_data_sign: true
-       disable_transactions: true // [!code focus]
+       disable_transactions: true # [!code focus]
 ```
