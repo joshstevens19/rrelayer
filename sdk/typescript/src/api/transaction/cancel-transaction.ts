@@ -2,10 +2,14 @@ import { putApi } from '../axios-wrapper';
 import { ApiBaseConfig } from '../types';
 import { RATE_LIMIT_HEADER_NAME } from '../index';
 
-export interface CancelTransactionResult {
-  success: boolean;
-  cancelTransactionId?: string;
-}
+export type CancelTransactionResult =
+  | {
+      success: false;
+    }
+  | {
+      success: true;
+      cancelTransactionId: string;
+    };
 
 export const cancelTransaction = async (
   transactionId: string,

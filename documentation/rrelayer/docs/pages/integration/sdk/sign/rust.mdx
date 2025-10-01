@@ -17,13 +17,33 @@ Sign text message with the relayer.
 
 ### Response
 
-```rs
-SignTextResult
+```rust
+#[derive(Error, Debug)]
+pub enum ApiSdkError {
+    #[error("HTTP client error: {0}")]
+    HttpError(#[from] reqwest::Error),
+
+    #[error("Invalid configuration: {0}")]
+    ConfigError(String),
+
+    #[error("Serialization error: {0}")]
+    SerializationError(String),
+
+    #[error("Authentication failed: {0}")]
+    AuthError(String),
+
+    #[error("Rate limit exceeded")]
+    RateLimitError,
+}
+
+pub type ApiResult<T> = Result<T, ApiSdkError>;
+
+pub type Response = ApiResult<SignTextResult>; // [!code focus]
 ```
 
 Just so you understand the properties returned
 
-```rs
+```rust
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SignTextResult {
     #[serde(rename = "messageSigned")]
@@ -35,7 +55,7 @@ pub struct SignTextResult {
 
 ### Basic Auth
 
-```rs
+```rust
 use anyhow::Result;
 use rrelayer::{
     create_client, AdminRelayerClient, CreateClientAuth, CreateClientConfig, RelayerId,
@@ -86,7 +106,7 @@ async fn example() -> Result<()> {
 
 ### API Key Auth
 
-```rs
+```rust
 use anyhow::Result;
 use rrelayer::{
     CreateRelayerClientConfig, RelayerClient, RelayerId, SignTextResult, TransactionSpeed,
@@ -129,13 +149,33 @@ Get the full history of what the relayer has signed via messages.
 
 ### Response
 
-```rs
-PagingResult<SignedTextHistory>
+```rust
+#[derive(Error, Debug)]
+pub enum ApiSdkError {
+    #[error("HTTP client error: {0}")]
+    HttpError(#[from] reqwest::Error),
+
+    #[error("Invalid configuration: {0}")]
+    ConfigError(String),
+
+    #[error("Serialization error: {0}")]
+    SerializationError(String),
+
+    #[error("Authentication failed: {0}")]
+    AuthError(String),
+
+    #[error("Rate limit exceeded")]
+    RateLimitError,
+}
+
+pub type ApiResult<T> = Result<T, ApiSdkError>;
+
+pub type Response = ApiResult<PagingResult<SignedTextHistory>>; // [!code focus]
 ```
 
 Just so you understand the properties returned
 
-```rs
+```rust
 #[derive(Debug, Deserialize, Serialize)]
 pub struct PagingContext {
     pub limit: u32,
@@ -161,7 +201,7 @@ pub struct SignedTextHistory {
 
 ### Basic Auth
 
-```rs
+```rust
 use anyhow::Result;
 use rrelayer::{
     AdminRelayerClient, CreateClientAuth, CreateClientConfig, PagingContext, PagingResult,
@@ -214,7 +254,7 @@ async fn example() -> Result<()> {
 
 ### API Key Auth
 
-```rs
+```rust
 use anyhow::Result;
 use rrelayer::{
     create_relayer_client, CreateRelayerClientConfig, PagingContext, PagingResult, RelayerClient
@@ -256,13 +296,33 @@ Sign typed data with the relayer.
 
 ### Response
 
-```rs
-SignTypedDataResult
+```rust
+#[derive(Error, Debug)]
+pub enum ApiSdkError {
+    #[error("HTTP client error: {0}")]
+    HttpError(#[from] reqwest::Error),
+
+    #[error("Invalid configuration: {0}")]
+    ConfigError(String),
+
+    #[error("Serialization error: {0}")]
+    SerializationError(String),
+
+    #[error("Authentication failed: {0}")]
+    AuthError(String),
+
+    #[error("Rate limit exceeded")]
+    RateLimitError,
+}
+
+pub type ApiResult<T> = Result<T, ApiSdkError>;
+
+pub type Response = ApiResult<SignTypedDataResult>; // [!code focus]
 ```
 
 Just so you understand the properties returned
 
-```rs
+```rust
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SignTypedDataResult {
     pub signature: Signature,
@@ -271,7 +331,7 @@ pub struct SignTypedDataResult {
 
 ### Basic Auth
 
-```rs
+```rust
 use anyhow::{Context, Result};
 use rrelayer::{
     AdminRelayerClient, CreateClientAuth, CreateClientConfig, RelayerId, SignTextResult,
@@ -365,7 +425,7 @@ async fn example() -> Result<()> {
 
 ### API Key Auth
 
-```rs
+```rust
 use anyhow::{Context, Result};
 use rrelayer::{
     CreateRelayerClientConfig, RelayerClient, RelayerId, SignTypedDataResult, TransactionSpeed,
@@ -450,13 +510,33 @@ Get the full history of what the relayer has signed via typed data.
 
 ### Response
 
-```rs
-PagingResult<SignedTypedDataHistory>
+```rust
+#[derive(Error, Debug)]
+pub enum ApiSdkError {
+    #[error("HTTP client error: {0}")]
+    HttpError(#[from] reqwest::Error),
+
+    #[error("Invalid configuration: {0}")]
+    ConfigError(String),
+
+    #[error("Serialization error: {0}")]
+    SerializationError(String),
+
+    #[error("Authentication failed: {0}")]
+    AuthError(String),
+
+    #[error("Rate limit exceeded")]
+    RateLimitError,
+}
+
+pub type ApiResult<T> = Result<T, ApiSdkError>;
+
+pub type Response = ApiResult<PagingResult<SignedTypedDataHistory>>; // [!code focus]
 ```
 
 Just so you understand the properties returned
 
-```rs
+```rust
 #[derive(Debug, Deserialize, Serialize)]
 pub struct PagingContext {
     pub limit: u32,
@@ -484,7 +564,7 @@ pub struct SignedTypedDataHistory {
 
 ### Basic Auth
 
-```rs
+```rust
 use anyhow::Result;
 use rrelayer::{
     AdminRelayerClient, CreateClientAuth, CreateClientConfig, PagingContext, PagingResult,
@@ -537,7 +617,7 @@ async fn example() -> Result<()> {
 
 ### API Key Auth
 
-```rs
+```rust
 use anyhow::Result;
 use rrelayer::{
     CreateRelayerClientConfig, PagingContext, PagingResult, RelayerClient, RelayerId,

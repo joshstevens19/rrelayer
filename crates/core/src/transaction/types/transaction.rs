@@ -55,6 +55,7 @@ pub struct Transaction {
 
     pub nonce: TransactionNonce,
 
+    #[serde(rename = "chainId")]
     pub chain_id: ChainId,
 
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -100,6 +101,7 @@ pub struct Transaction {
     #[serde(rename = "maxFee", skip_serializing_if = "Option::is_none", default)]
     pub sent_with_max_fee_per_gas: Option<MaxFee>,
 
+    #[serde(rename = "isNoop")]
     pub is_noop: bool,
 
     #[serde(rename = "externalId", skip_serializing_if = "Option::is_none", default)]

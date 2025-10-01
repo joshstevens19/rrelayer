@@ -12,7 +12,7 @@ mod get_signed_typed_data_history;
 mod sign_text;
 mod sign_typed_data;
 
-pub use sign_text::{SignTextDto, SignTextResult};
+pub use sign_text::{SignTextRequest, SignTextResult};
 pub use sign_typed_data::SignTypedDataResult;
 
 pub fn create_signing_routes() -> Router<Arc<AppState>> {

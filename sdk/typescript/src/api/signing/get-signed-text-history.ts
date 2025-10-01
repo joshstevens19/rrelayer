@@ -5,8 +5,8 @@ export interface SignedTextHistory {
   relayerId: string;
   message: string;
   signature: string;
-  chain_id: number;
-  signed_at: Date
+  chainId: number;
+  signedAt: Date;
 }
 
 export const getSignedTextHistory = async (

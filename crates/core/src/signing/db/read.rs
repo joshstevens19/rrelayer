@@ -10,21 +10,30 @@ use google_secretmanager1::client::serde_with::serde_derive::{Deserialize, Seria
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SignedTextHistory {
+    #[serde(rename = "relayerId")]
     pub relayer_id: RelayerId,
     pub message: String,
     pub signature: Signature,
+    #[serde(rename = "chainId")]
     pub chain_id: ChainId,
+    #[serde(rename = "signedAt")]
     pub signed_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SignedTypedDataHistory {
+    #[serde(rename = "relayerId")]
     pub relayer_id: RelayerId,
+    #[serde(rename = "domainData")]
     pub domain_data: serde_json::Value,
+    #[serde(rename = "messageData")]
     pub message_data: serde_json::Value,
+    #[serde(rename = "primaryType")]
     pub primary_type: String,
     pub signature: Signature,
+    #[serde(rename = "chainId")]
     pub chain_id: ChainId,
+    #[serde(rename = "signedAt")]
     pub signed_at: DateTime<Utc>,
 }
 

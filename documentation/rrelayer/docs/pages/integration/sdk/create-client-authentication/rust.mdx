@@ -7,50 +7,67 @@ we will explore both below.
 
 Using the basic authentication which uses the username and password in your [api config](/config/api-config)
 
-```rs [Basic Auth - config.rs]
+```rust [Basic Auth - config.rs]
 use std::str::FromStr;
 use rrelayer::{CreateClientAuth, CreateClientConfig, RelayerId, TransactionSpeed, create_client, AdminRelayerClient};
 use dotenvy::dotenv;
 use std::env;
 
 // Client also exposes some admin methods in which API keys cannot do
-let client = create_client(CreateClientConfig {
-    server_url: "http://localhost:8000".to_string(),
-    auth: CreateClientAuth {
-        username: env::var("RRELAYER_AUTH_USERNAME")
+async fn get_client() -> Result<Client> {
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username: env::var("RRELAYER_AUTH_USERNAME")
                           .expect("RRELAYER_AUTH_USERNAME must be set"),
-        password: env::var("RRELAYER_AUTH_PASSWORD")
+            password: env::var("RRELAYER_AUTH_PASSWORD")
                           .expect("RRELAYER_AUTH_PASSWORD must be set"),
-    },
-});
+        },
+    });
 
-let relayer: AdminRelayerClient = client.get_relayer_client(
-    &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
-    // This is optional it defaults to fast and is a fallback
-    // You can override this with the transaction request
-    Some(TransactionSpeed::FAST),
-).await?;
+    Ok(client)
+}
+
+// create the admin relayer client - you use this to send transactions
+async fn get_relayer_client() -> Result<AdminRelayerClient> {
+    let client = get_client();
+
+    let relayer_client: AdminRelayerClient = client
+        .get_relayer_client(
+            &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+            // This is optional it defaults to fast and is a fallback
+            // You can override this with the transaction request
+            Some(TransactionSpeed::FAST),
+        )
+        .await?;
+
+    Ok(relayer_client)
+}
 ```
 
 ## API Key Auth
 
 Using API keys that have restricted permissions to only use the relayer - docs [here](config/networks/api-keys)
 
-```rs [API Key - config.rs]
+```rust [API Key - config.rs]
 use std::str::FromStr;
 use rrelayer::{
     CreateRelayerClientConfig, RelayerClient, RelayerId, TransactionSpeed,
     create_relayer_client,
 };
 
-let relayer: RelayerClient = create_relayer_client(CreateRelayerClientConfig {
-    server_url: "http://localhost:8000".to_string(),
-    relayer_id: RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
-    api_key: "YOUR_API_KEY".to_string(),
-    // This is optional it defaults to fast and is a fallback
-    // You can override this with the transaction request
-    speed: Some(TransactionSpeed::FAST),
-});
+async fn get_relayer_client() -> Result<RelayerClient> {
+    let relayer: RelayerClient = create_relayer_client(CreateRelayerClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        relayer_id: RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+        api_key: "YOUR_API_KEY".to_string(),
+        // This is optional it defaults to fast and is a fallback
+        // You can override this with the transaction request
+        fallback_speed: Some(TransactionSpeed::FAST),
+    });
+
+    Ok(relayer)
+}
 ```
 
 ## Rate Limiting
@@ -63,7 +80,7 @@ You can config this [here](/config/rate-limits)
 rrelayer types have parses from `alloy` typings please reference [this](/integration/sdk/framework-guides/rust/alloy) doc for more information.
 :::
 
-```rs [config.rs]
+```rust [config.rs]
 use anyhow::Result;
 use rrelayer::{create_relayer_client, CreateRelayerClientConfig, EvmAddress, RelayTransactionRequest, RelayerClient, RelayerId, TransactionSpeed, TransactionValue};
 use std::str::FromStr;

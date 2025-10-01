@@ -6,7 +6,9 @@ import {
   updateRelayerMaxGasPrice,
   removeRelayerMaxGasPrice,
   getTransactionsPendingCount,
-  TransactionSpeed, CreateRelayerResult, cloneRelayer,
+  TransactionSpeed,
+  CreateRelayerResult,
+  cloneRelayer,
 } from '../api';
 import { RelayerClient } from './relayer';
 import { TransactionCountType } from './types';

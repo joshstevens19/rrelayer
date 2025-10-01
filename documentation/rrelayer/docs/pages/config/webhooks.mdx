@@ -125,8 +125,8 @@ All transaction webhooks send a JSON payload with this structure:
 
 ```json
 {
-  "event_type": "transaction_sent",
-  "api_version": "1.0",
+  "eventType": "transaction_sent",
+  "apiVersion": "1.0",
   "timestamp": "2025-09-26T10:30:00Z",
   "transaction": {
     "id": "550e8400-e29b-41d4-a716-446655440000",
@@ -145,7 +145,7 @@ All transaction webhooks send a JSON payload with this structure:
     "nonce": 42,
     "maxPriorityFee": "2.0",
     "maxFee": "15.5",
-    "is_noop": false
+    "isNoop": false
   }
 }
 ```
@@ -158,8 +158,8 @@ Some events include additional data:
 
 ```json
 {
-  "event_type": "transaction_mined",
-  "api_version": "1.0",
+  "eventType": "transaction_mined",
+  "apiVersion": "1.0",
   "timestamp": "2025-09-26T10:32:00Z",
   "transaction": {
     "id": "550e8400-e29b-41d4-a716-446655440000",
@@ -181,7 +181,7 @@ Some events include additional data:
     "minedAtBlockNumber": 1193046,
     "maxPriorityFee": "2.0",
     "maxFee": "15.5",
-    "is_noop": false
+    "isNoop": false
   },
   "receipt": {
     "transactionHash": "0xabcdef123456789abcdef123456789abcdef123456789abcdef123456789abcdef",
@@ -198,8 +198,8 @@ Some events include additional data:
 
 ```json
 {
-  "event_type": "transaction_replaced",
-  "api_version": "1.0",
+  "eventType": "transaction_replaced",
+  "apiVersion": "1.0",
   "timestamp": "2025-09-26T10:35:00Z",
   "transaction": {
     "id": "550e8400-e29b-41d4-a716-446655440002",
@@ -216,7 +216,7 @@ Some events include additional data:
     "confirmedAt": null,
     "expiresAt": "2025-09-26T11:35:00Z"
   },
-  "original_transaction": {
+  "originalTransaction": {
     "id": "550e8400-e29b-41d4-a716-446655440000",
     "relayerId": "550e8400-e29b-41d4-a716-446655440001",
     "to": "0x1234567890abcdef1234567890abcdef12345678",
@@ -242,8 +242,8 @@ Signing webhooks have a different payload structure:
 
 ```json
 {
-  "event_type": "text_signed",
-  "api_version": "1.0",
+  "eventType": "text_signed",
+  "apiVersion": "1.0",
   "timestamp": "2025-09-26T10:30:00Z",
   "signing": {
     "relayerId": "550e8400-e29b-41d4-a716-446655440001",
@@ -263,8 +263,8 @@ Signing webhooks have a different payload structure:
 
 ```json
 {
-  "event_type": "typed_data_signed",
-  "api_version": "1.0",
+  "eventType": "typed_data_signed",
+  "apiVersion": "1.0",
   "timestamp": "2025-09-26T10:30:00Z",
   "signing": {
     "relayerId": "550e8400-e29b-41d4-a716-446655440001",
@@ -296,10 +296,10 @@ Balance alert webhooks are sent when a relayer's balance falls below the minimum
 
 ```json
 {
-  "event_type": "low_balance",
-  "api_version": "1.0",
+  "eventType": "low_balance",
+  "apiVersion": "1.0",
   "timestamp": "2025-09-27T14:30:00Z",
-  "balance_alert": {
+  "balanceAlert": {
     "relayerId": "550e8400-e29b-41d4-a716-446655440001",
     "address": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
     "chainId": 1,
@@ -417,7 +417,7 @@ app.post('/webhooks/alerts', (req, res) => {
       chainId,
       currentBalanceFormatted,
       minimumBalanceFormatted,
-    } = balance_alert;
+    } = balanceAlert;
 
     // Send alert to monitoring system
     monitoring.alert({

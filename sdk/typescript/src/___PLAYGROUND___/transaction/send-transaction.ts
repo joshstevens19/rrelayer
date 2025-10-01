@@ -1,5 +1,5 @@
 import { begin, getAnvilAccounts } from '../helpers';
-import {parseEther} from "../../index"
+import { parseEther } from '../../index';
 
 export const sendTransaction = async () => {
   const context = await begin();
@@ -37,7 +37,7 @@ export const sendTransactionLikeForLike = async () => {
   console.log('Transaction sent:', response);
 
   let receipt = await context.relayer.transaction.waitForTransactionReceiptById(
-      response.id
+    response.id
   );
   console.log('Transaction receipt:', receipt);
 

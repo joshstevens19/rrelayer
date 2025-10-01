@@ -32,7 +32,7 @@ export interface TransactionToSend {
   data?: string | null;
   speed?: TransactionSpeed | null; // defaults to TransactionSpeed.Fast
   blobs?: `0x${string}`[];
-  external_id?: string; // Is sent in the webhook and usage for your own custom ids
+  externalId?: string; // Is sent in the webhook and usage for your own custom ids
 }
 ```
 
@@ -564,11 +564,15 @@ Promise<ReplaceTransactionResult>;
 Just so you understand the properties, the properties you get back when you send
 
 ```ts
-export interface ReplaceTransactionResult {
-  success: boolean;
-  replaceTransactionId?: string;
-  replaceTransactionHash?: `0x${string}`;
-}
+export type ReplaceTransactionResult =
+  | {
+      success: false;
+    }
+  | {
+      success: true;
+      replaceTransactionId: string;
+      replaceTransactionHash: `0x${string}`;
+    };
 ```
 
 ### Basic Auth
@@ -678,10 +682,14 @@ Promise<CancelTransactionResult>;
 Just so you understand the properties, the properties you get back when you send
 
 ```ts
-export interface CancelTransactionResult {
-  success: boolean;
-  cancelTransactionId?: string;
-}
+export type CancelTransactionResult =
+  | {
+      success: false;
+    }
+  | {
+      success: true;
+      cancelTransactionId: string;
+    };
 ```
 
 ### Basic Auth

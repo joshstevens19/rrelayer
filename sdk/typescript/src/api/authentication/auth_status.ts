@@ -1,9 +1,19 @@
 import { getApi } from '../axios-wrapper';
 import { ApiBaseConfig } from '../types';
 
+export enum AuthType {
+  BASIC = 'BASIC',
+  APIKEY = 'APIKEY',
+}
+
+export interface ApiKeyAccess {
+  chainId: number;
+  relayers: `0x${string}`[];
+}
+
 export interface StatusResponse {
-  authenticated: Boolean;
-  message: string;
+  authenticatedWith: AuthType;
+  apiKeyAccess?: ApiKeyAccess[];
 }
 
 export const auth_status = async (

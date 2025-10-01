@@ -18,7 +18,7 @@ use serde::Deserialize;
 use std::sync::Arc;
 
 #[derive(Debug, Deserialize)]
-pub struct SignTextDto {
+pub struct SignTextRequest {
     pub text: String,
 }
 
@@ -27,6 +27,7 @@ pub struct SignTextResult {
     #[serde(rename = "messageSigned")]
     pub message_signed: String,
     pub signature: Signature,
+    #[serde(rename = "signedBy")]
     pub signed_by: EvmAddress,
 }
 
@@ -35,7 +36,7 @@ pub async fn sign_text(
     State(state): State<Arc<AppState>>,
     Path(relayer_id): Path<RelayerId>,
     headers: HeaderMap,
-    Json(sign): Json<SignTextDto>,
+    Json(sign): Json<SignTextRequest>,
 ) -> Result<Json<SignTextResult>, HttpError> {
     state.validate_allowed_passed_basic_auth(&headers)?;
 

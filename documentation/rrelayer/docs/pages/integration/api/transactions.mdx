@@ -83,7 +83,7 @@ GET /api/transactions/{transaction_id}
   "from": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
   "value": "1000000000000000000",
   "data": "0xa9059cbb000000000000000000000000...",
-  "chain_id": 11155111,
+  "chainId": 11155111,
   "status": "CONFIRMED",
   "txHash": "0xabcdef123456789abcdef123456789abcdef123456789abcdef123456789abcdef",
   "queuedAt": "2025-09-26T10:29:30Z",
@@ -94,7 +94,7 @@ GET /api/transactions/{transaction_id}
   "externalId": "order_12345",
   "nonce": 42,
   "speed": "MEDIUM",
-  "is_noop": false,
+  "isNoop": false,
   "cancelledByTransactionId": null
 }
 ```
@@ -107,7 +107,7 @@ For transactions with status `CANCELLED`, additional fields are included:
 {
   "id": "550e8400-e29b-41d4-a716-446655440001",
   "status": "CANCELLED",
-  "is_noop": true,
+  "isNoop": true,
   "cancelledByTransactionId": "550e8400-e29b-41d4-a716-446655440002",
   ...
 }
@@ -302,7 +302,7 @@ GET /api/transactions/relayers/{relayer_id}
       "value": "1000000000000000000",
       "data": "0x",
       "nonce": 42,
-      "chain_id": 11155111,
+      "chainId": 11155111,
       "status": "CONFIRMED",
       "txHash": "0xabcdef...",
       "queuedAt": "2025-09-26T10:29:30Z",
@@ -311,7 +311,7 @@ GET /api/transactions/relayers/{relayer_id}
       "minedAt": "2025-09-26T10:31:30Z",
       "confirmedAt": "2025-09-26T10:32:00Z",
       "speed": "MEDIUM",
-      "is_noop": false,
+      "isNoop": false,
       "externalId": "order_12345"
     }
   ],

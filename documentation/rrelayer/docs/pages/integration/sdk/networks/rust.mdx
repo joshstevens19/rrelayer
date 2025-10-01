@@ -12,8 +12,28 @@ Get the network details.
 
 ### Response
 
-```rs
-Option<Network>
+```rust
+#[derive(Error, Debug)]
+pub enum ApiSdkError {
+    #[error("HTTP client error: {0}")]
+    HttpError(#[from] reqwest::Error),
+
+    #[error("Invalid configuration: {0}")]
+    ConfigError(String),
+
+    #[error("Serialization error: {0}")]
+    SerializationError(String),
+
+    #[error("Authentication failed: {0}")]
+    AuthError(String),
+
+    #[error("Rate limit exceeded")]
+    RateLimitError,
+}
+
+pub type ApiResult<T> = Result<T, ApiSdkError>;
+
+pub type Response = ApiResult<Option<Network>>; // [!code focus]
 ```
 
 Just so you understand the properties returned
@@ -78,13 +98,33 @@ Get all networks details.
 
 ### Response
 
-```rs
-Vec<Network>
+```rust
+#[derive(Error, Debug)]
+pub enum ApiSdkError {
+    #[error("HTTP client error: {0}")]
+    HttpError(#[from] reqwest::Error),
+
+    #[error("Invalid configuration: {0}")]
+    ConfigError(String),
+
+    #[error("Serialization error: {0}")]
+    SerializationError(String),
+
+    #[error("Authentication failed: {0}")]
+    AuthError(String),
+
+    #[error("Rate limit exceeded")]
+    RateLimitError,
+}
+
+pub type ApiResult<T> = Result<T, ApiSdkError>;
+
+pub type Response = ApiResult<Vec<Network>>; // [!code focus]
 ```
 
 Just so you understand the properties returned
 
-```rs
+```rust
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Network {
     pub name: String,
@@ -143,8 +183,28 @@ Get the gas prices for the network.
 
 ### Response
 
-```rs
-Option<GasEstimatorResult>
+```rust
+#[derive(Error, Debug)]
+pub enum ApiSdkError {
+    #[error("HTTP client error: {0}")]
+    HttpError(#[from] reqwest::Error),
+
+    #[error("Invalid configuration: {0}")]
+    ConfigError(String),
+
+    #[error("Serialization error: {0}")]
+    SerializationError(String),
+
+    #[error("Authentication failed: {0}")]
+    AuthError(String),
+
+    #[error("Rate limit exceeded")]
+    RateLimitError,
+}
+
+pub type ApiResult<T> = Result<T, ApiSdkError>;
+
+pub type Response = ApiResult<Option<GasEstimatorResult>>; // [!code focus]
 ```
 
 Just so you understand the properties returned

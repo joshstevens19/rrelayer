@@ -12,13 +12,33 @@ Create a new relayer for a network.
 
 ### Response
 
-```rs
-CreateRelayerResult
+```rust
+#[derive(Error, Debug)]
+pub enum ApiSdkError {
+    #[error("HTTP client error: {0}")]
+    HttpError(#[from] reqwest::Error),
+
+    #[error("Invalid configuration: {0}")]
+    ConfigError(String),
+
+    #[error("Serialization error: {0}")]
+    SerializationError(String),
+
+    #[error("Authentication failed: {0}")]
+    AuthError(String),
+
+    #[error("Rate limit exceeded")]
+    RateLimitError,
+}
+
+pub type ApiResult<T> = Result<T, ApiSdkError>;
+
+pub type Response = ApiResult<CreateRelayerResult>; // [!code focus]
 ```
 
 Just so you understand the properties returned
 
-```rs
+```rust
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CreateRelayerResult {
     pub id: RelayerId,
@@ -81,13 +101,33 @@ Get all the relayers across all networks or a single network.
 
 ### Response
 
-```rs
-PagingResult<Relayer>;
+```rust
+#[derive(Error, Debug)]
+pub enum ApiSdkError {
+    #[error("HTTP client error: {0}")]
+    HttpError(#[from] reqwest::Error),
+
+    #[error("Invalid configuration: {0}")]
+    ConfigError(String),
+
+    #[error("Serialization error: {0}")]
+    SerializationError(String),
+
+    #[error("Authentication failed: {0}")]
+    AuthError(String),
+
+    #[error("Rate limit exceeded")]
+    RateLimitError,
+}
+
+pub type ApiResult<T> = Result<T, ApiSdkError>;
+
+pub type Response = ApiResult<PagingResult<Relayer>>; // [!code focus]
 ```
 
 Just so you understand the properties returned
 
-```rs
+```rust
 #[derive(Debug, Deserialize, Serialize)]
 pub struct PagingContext {
     pub limit: u32,
@@ -133,6 +173,10 @@ pub struct Relayer {
     /// The relayer creation time
     #[serde(rename = "createdAt")]
     pub created_at: DateTime<Utc>,
+
+    /// Whether this relayer uses a private key (vs mnemonic-derived)
+    #[serde(rename = "isPrivateKey")]
+    pub is_private_key: bool,
 }
 ```
 
@@ -229,13 +273,33 @@ they have permission to use.
 
 #### Response
 
-```rs
-Option<GetRelayerResult>
+```rust
+#[derive(Error, Debug)]
+pub enum ApiSdkError {
+    #[error("HTTP client error: {0}")]
+    HttpError(#[from] reqwest::Error),
+
+    #[error("Invalid configuration: {0}")]
+    ConfigError(String),
+
+    #[error("Serialization error: {0}")]
+    SerializationError(String),
+
+    #[error("Authentication failed: {0}")]
+    AuthError(String),
+
+    #[error("Rate limit exceeded")]
+    RateLimitError,
+}
+
+pub type ApiResult<T> = Result<T, ApiSdkError>;
+
+pub type Response = ApiResult<Option<GetRelayerResult>>; // [!code focus]
 ```
 
 Just so you understand the properties returned
 
-```rs
+```rust
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Relayer {
     /// The unique identifier for the relayer
@@ -268,6 +332,10 @@ pub struct Relayer {
     /// The relayer creation time
     #[serde(rename = "createdAt")]
     pub created_at: DateTime<Utc>,
+
+    /// Whether this relayer uses a private key (vs mnemonic-derived)
+    #[serde(rename = "isPrivateKey")]
+    pub is_private_key: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -278,7 +346,7 @@ pub struct GetRelayerResult {
 }
 ```
 
-```rs
+```rust
 use anyhow::Result;
 use rrelayer::{
     AdminRelayerClient, CreateClientAuth, CreateClientConfig, Relayer, RelayerId, TransactionSpeed,
@@ -331,13 +399,33 @@ async fn example() -> Result<()> {
 
 #### Response
 
-```rs
-Option<Relayer>;
+```rust
+#[derive(Error, Debug)]
+pub enum ApiSdkError {
+    #[error("HTTP client error: {0}")]
+    HttpError(#[from] reqwest::Error),
+
+    #[error("Invalid configuration: {0}")]
+    ConfigError(String),
+
+    #[error("Serialization error: {0}")]
+    SerializationError(String),
+
+    #[error("Authentication failed: {0}")]
+    AuthError(String),
+
+    #[error("Rate limit exceeded")]
+    RateLimitError,
+}
+
+pub type ApiResult<T> = Result<T, ApiSdkError>;
+
+pub type Response = ApiResult<Option<Relayer>>; // [!code focus]
 ```
 
 Just so you understand the properties returned
 
-```rs
+```rust
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Relayer {
     /// The unique identifier for the relayer
@@ -370,10 +458,14 @@ pub struct Relayer {
     /// The relayer creation time
     #[serde(rename = "createdAt")]
     pub created_at: DateTime<Utc>,
+
+    /// Whether this relayer uses a private key (vs mnemonic-derived)
+    #[serde(rename = "isPrivateKey")]
+    pub is_private_key: bool,
 }
 ```
 
-```rs
+```rust
 use anyhow::Result;
 use rrelayer::{
     create_relayer_client, CreateRelayerClientConfig, Relayer, RelayerClient,
@@ -414,13 +506,33 @@ Clone a relayer to a network.
 
 ### Response
 
-```rs
-CreateRelayerResult
+```rust
+#[derive(Error, Debug)]
+pub enum ApiSdkError {
+    #[error("HTTP client error: {0}")]
+    HttpError(#[from] reqwest::Error),
+
+    #[error("Invalid configuration: {0}")]
+    ConfigError(String),
+
+    #[error("Serialization error: {0}")]
+    SerializationError(String),
+
+    #[error("Authentication failed: {0}")]
+    AuthError(String),
+
+    #[error("Rate limit exceeded")]
+    RateLimitError,
+}
+
+pub type ApiResult<T> = Result<T, ApiSdkError>;
+
+pub type Response = ApiResult<CreateRelayerResult>; // [!code focus]
 ```
 
 Just so you understand the properties returned
 
-```rs
+```rust
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CreateRelayerResult {
     pub id: RelayerId,
@@ -491,7 +603,7 @@ You can pause and unpause a relayers anytime. When you pause, rrelayer will not 
 
 :::code-group
 
-```rs [pause-relayer.rs]
+```rust [pause-relayer.rs]
 use anyhow::Result;
 use rrelayer::{
     AdminRelayerClient, CreateClientAuth, CreateClientConfig, RelayerId, TransactionSpeed,
@@ -538,7 +650,7 @@ async fn example() -> Result<()> {
 }
 ```
 
-```rs [unpause-relayer.rs]
+```rust [unpause-relayer.rs]
 use anyhow::Result;
 use rrelayer::{
     AdminRelayerClient, CreateClientAuth, CreateClientConfig, RelayerId, TransactionSpeed,
@@ -597,7 +709,7 @@ By default, EIP-1559 transactions are enabled, but you can turn on legacy and to
 
 :::code-group
 
-```rs [disable-eip-1559-status.rs]
+```rust [disable-eip-1559-status.rs]
 use anyhow::Result;
 use rrelayer::{
     AdminRelayerClient, CreateClientAuth, CreateClientConfig, RelayerId, TransactionSpeed,
@@ -645,7 +757,7 @@ async fn example() -> Result<()> {
 }
 ```
 
-```rs [enable-eip-1559-status.rs]
+```rust [enable-eip-1559-status.rs]
 use anyhow::Result;
 use rrelayer::{
     AdminRelayerClient, CreateClientAuth, CreateClientConfig, RelayerId, TransactionSpeed,
@@ -705,7 +817,7 @@ Only basic auth authentication can update max gas price
 You can set the max amount the relayer will bump gas up to, this can protect you about network congression/expensive
 periods. You must pass in the wei amount.
 
-```rs
+```rust
 use anyhow::Result;
 use rrelayer::{
     AdminRelayerClient, CreateClientAuth, CreateClientConfig, RelayerId, TransactionSpeed,
@@ -762,7 +874,7 @@ Only basic auth authentication can remove max gas price
 
 You can remove the max gas price set.
 
-```rs
+```rust
 use anyhow::Result;
 use rrelayer::{
     AdminRelayerClient, CreateClientAuth, CreateClientConfig, RelayerId, TransactionSpeed,
@@ -819,7 +931,7 @@ Only basic auth authentication can delete relayers
 Delete a new relayer for a network, it just does a soft delete the database records stay, alongside it will
 clear the current queue.
 
-```rs
+```rust
 use anyhow::Result;
 use rrelayer::{Client, CreateClientAuth, CreateClientConfig, RelayerId, create_client};
 use std::str::FromStr;
@@ -862,8 +974,28 @@ they have permission to use.
 
 ### Response
 
-```rs
-PagingResult<EvmAddress>
+```rust
+#[derive(Error, Debug)]
+pub enum ApiSdkError {
+    #[error("HTTP client error: {0}")]
+    HttpError(#[from] reqwest::Error),
+
+    #[error("Invalid configuration: {0}")]
+    ConfigError(String),
+
+    #[error("Serialization error: {0}")]
+    SerializationError(String),
+
+    #[error("Authentication failed: {0}")]
+    AuthError(String),
+
+    #[error("Rate limit exceeded")]
+    RateLimitError,
+}
+
+pub type ApiResult<T> = Result<T, ApiSdkError>;
+
+pub type Response = ApiResult<PagingResult<EvmAddress>>; // [!code focus]
 ```
 
 Just so you understand the properties returned
@@ -883,7 +1015,7 @@ export interface PagingResult<T> {
 
 ### Basic Auth
 
-```rs
+```rust
 use anyhow::Result;
 use rrelayer::{
     AdminRelayerClient, CreateClientAuth, CreateClientConfig, EvmAddress, PagingContext,
@@ -935,7 +1067,7 @@ async fn example() -> Result<()> {
 
 ### API Key Auth
 
-```rs
+```rust
 use anyhow::Result;
 use rrelayer::{
     CreateRelayerClientConfig, EvmAddress, PagingContext, PagingResult, RelayerClient, RelayerId,

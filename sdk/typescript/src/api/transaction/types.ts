@@ -54,7 +54,7 @@ export interface TransactionToSend {
   data?: string | null;
   speed?: TransactionSpeed | null;
   blobs?: `0x${string}`[];
-  external_id?: string;
+  externalId?: string;
 }
 
 export interface TransactionSent {

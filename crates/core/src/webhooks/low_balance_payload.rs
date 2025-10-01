@@ -7,12 +7,15 @@ use super::types::WebhookEventType;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebhookLowBalancePayload {
     /// Event type that triggered the webhook
+    #[serde(rename = "eventType")]
     pub event_type: WebhookEventType,
     /// Low balance alert data
+    #[serde(rename = "balanceAlert")]
     pub balance_alert: WebhookBalanceAlertData,
     /// Timestamp when the event occurred
     pub timestamp: DateTime<Utc>,
     /// API version for payload compatibility
+    #[serde(rename = "apiVersion")]
     pub api_version: String,
 }
 

@@ -27,7 +27,8 @@ import {
   getSignedTextHistory,
   SignedTypedDataHistory,
   getSignedTypedDataHistory,
-  CancelTransactionResult, ReplaceTransactionResult,
+  CancelTransactionResult,
+  ReplaceTransactionResult,
 } from '../api';
 import {
   ApiBaseConfig,
@@ -153,9 +154,13 @@ export class RelayerClient {
        * @returns PagingResult<SignedTextHistory>
        */
       textHistory: (
-          pagingContext: PagingContext = defaultPagingContext
+        pagingContext: PagingContext = defaultPagingContext
       ): Promise<PagingResult<SignedTextHistory>> => {
-        return getSignedTextHistory(this.id, pagingContext, this._apiBaseConfig);
+        return getSignedTextHistory(
+          this.id,
+          pagingContext,
+          this._apiBaseConfig
+        );
       },
       /**
        * Sign typed data
@@ -180,9 +185,13 @@ export class RelayerClient {
        * @returns PagingResult<SignedTypedDataHistory>
        */
       typedDataHistory: (
-          pagingContext: PagingContext = defaultPagingContext
+        pagingContext: PagingContext = defaultPagingContext
       ): Promise<PagingResult<SignedTypedDataHistory>> => {
-        return getSignedTypedDataHistory(this.id, pagingContext, this._apiBaseConfig);
+        return getSignedTypedDataHistory(
+          this.id,
+          pagingContext,
+          this._apiBaseConfig
+        );
       },
     };
   }
@@ -270,7 +279,7 @@ export class RelayerClient {
       },
       waitForTransactionReceiptById: async (
         transactionId: string,
-        tryEveryMs: number = 100,
+        tryEveryMs: number = 100
       ): Promise<TransactionReceipt> => {
         while (true) {
           const result = await this.transaction.getStatus(transactionId);

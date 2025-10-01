@@ -17,7 +17,7 @@ they have permission to use.
 
 Just so you understand the properties you can pass in to send a transaction
 
-```rs
+```rust
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub enum TransactionSpeed {
     SLOW,
@@ -43,13 +43,33 @@ pub struct RelayTransactionRequest {
 
 ### Transaction Response
 
-```rs
-SendTransactionResult
+```rust
+#[derive(Error, Debug)]
+pub enum ApiSdkError {
+    #[error("HTTP client error: {0}")]
+    HttpError(#[from] reqwest::Error),
+
+    #[error("Invalid configuration: {0}")]
+    ConfigError(String),
+
+    #[error("Serialization error: {0}")]
+    SerializationError(String),
+
+    #[error("Authentication failed: {0}")]
+    AuthError(String),
+
+    #[error("Rate limit exceeded")]
+    RateLimitError,
+}
+
+pub type ApiResult<T> = Result<T, ApiSdkError>;
+
+pub type Response = ApiResult<SendTransactionResult>; // [!code focus]
 ```
 
 Just so you understand the properties, the properties you get back when you send
 
-```rs
+```rust
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SendTransactionResult {
     pub id: TransactionId,
@@ -63,7 +83,7 @@ You can send native funds using the below:
 
 #### Basic Auth
 
-```rs
+```rust
 use anyhow::Result;
 use rrelayer::{
     AdminRelayerClient, CreateClientAuth, CreateClientConfig, EvmAddress, RelayTransactionRequest,
@@ -132,7 +152,7 @@ async fn example() -> Result<()> {
 
 #### API Key Auth
 
-```rs
+```rust
 use anyhow::Result;
 use rrelayer::{
     CreateRelayerClientConfig, EvmAddress, RelayTransactionRequest, RelayerClient, RelayerId,
@@ -187,7 +207,7 @@ You can send contract transactions using the below:
 
 #### Basic Auth
 
-```rs
+```rust
 use alloy::sol;
 use alloy::sol_types::SolCall;
 use anyhow::Result;
@@ -270,7 +290,7 @@ async fn example() -> Result<()> {
 
 #### API Key Auth
 
-```rs
+```rust
 use alloy::sol;
 use alloy::sol_types::SolCall;
 use anyhow::Result;
@@ -345,7 +365,7 @@ Alongside only paid nodes will send blobs due to payload size.
 
 #### Basic Auth
 
-```rs
+```rust
 use anyhow::Result;
 use rrelayer::{
     AdminRelayerClient, CreateClientAuth, CreateClientConfig, EvmAddress, RelayTransactionRequest,
@@ -415,7 +435,7 @@ async fn example() -> Result<()> {
 
 #### API Key Auth
 
-```rs
+```rust
 use anyhow::Result;
 use rrelayer::{
     CreateRelayerClientConfig, EvmAddress, RelayTransactionRequest, RelayerClient, RelayerId,
@@ -475,13 +495,33 @@ Get the transaction sent information by transaction id.
 
 ### Response
 
-```rs
-Option<Transaction>
+```rust
+#[derive(Error, Debug)]
+pub enum ApiSdkError {
+    #[error("HTTP client error: {0}")]
+    HttpError(#[from] reqwest::Error),
+
+    #[error("Invalid configuration: {0}")]
+    ConfigError(String),
+
+    #[error("Serialization error: {0}")]
+    SerializationError(String),
+
+    #[error("Authentication failed: {0}")]
+    AuthError(String),
+
+    #[error("Rate limit exceeded")]
+    RateLimitError,
+}
+
+pub type ApiResult<T> = Result<T, ApiSdkError>;
+
+pub type Response = ApiResult<Option<Transaction>>; // [!code focus]
 ```
 
 Just so you understand, the properties returned on a transaction
 
-```rs
+```rust
 #[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize)]
 pub enum TransactionStatus {
     PENDING,
@@ -598,7 +638,7 @@ pub struct Transaction {
 
 ### Basic Auth
 
-```rs
+```rust
 use anyhow::Result;
 use rrelayer::{
     AdminRelayerClient, CreateClientAuth, CreateClientConfig, RelayerId, Transaction,
@@ -655,7 +695,7 @@ async fn example() -> Result<()> {
 
 ### API Key Auth
 
-```rs
+```rust
 use anyhow::Result;
 use rrelayer::{
     CreateRelayerClientConfig, RelayerClient, RelayerId, Transaction, TransactionId,
@@ -702,14 +742,34 @@ Get the transaction status by transaction id.
 
 ### Response
 
-```ts
-Option<RelayTransactionStatusResult>;
+```rust
+#[derive(Error, Debug)]
+pub enum ApiSdkError {
+    #[error("HTTP client error: {0}")]
+    HttpError(#[from] reqwest::Error),
+
+    #[error("Invalid configuration: {0}")]
+    ConfigError(String),
+
+    #[error("Serialization error: {0}")]
+    SerializationError(String),
+
+    #[error("Authentication failed: {0}")]
+    AuthError(String),
+
+    #[error("Rate limit exceeded")]
+    RateLimitError,
+}
+
+pub type ApiResult<T> = Result<T, ApiSdkError>;
+
+pub type Response = ApiResult<Option<RelayTransactionStatusResult>>; // [!code focus]
 ```
 
 Just so you understand, the properties returned on a transaction status response
 
-```rs
-import { AnyTransactionReceipt } from 'rrelayer';
+```rust
+use rrelayer::{AnyTransactionReceipt, TransactionHash};
 
 #[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize)]
 pub enum TransactionStatus {
@@ -734,7 +794,7 @@ pub struct RelayTransactionStatusResult {
 
 ### Basic Auth
 
-```rs
+```rust
 use anyhow::Result;
 use rrelayer::{
     create_client, AdminRelayerClient, CreateClientAuth, CreateClientConfig,
@@ -791,7 +851,7 @@ async fn example() -> Result<()> {
 
 ### API Key Auth
 
-```rs
+```rust
 use anyhow::Result;
 use rrelayer::{
     CreateRelayerClientConfig, RelayerClient, RelayerId, Transaction, TransactionId,
@@ -839,13 +899,33 @@ be mined before it is replaced.
 
 ### Response
 
-```rs
-ReplaceTransactionResult
+```rust
+#[derive(Error, Debug)]
+pub enum ApiSdkError {
+    #[error("HTTP client error: {0}")]
+    HttpError(#[from] reqwest::Error),
+
+    #[error("Invalid configuration: {0}")]
+    ConfigError(String),
+
+    #[error("Serialization error: {0}")]
+    SerializationError(String),
+
+    #[error("Authentication failed: {0}")]
+    AuthError(String),
+
+    #[error("Rate limit exceeded")]
+    RateLimitError,
+}
+
+pub type ApiResult<T> = Result<T, ApiSdkError>;
+
+pub type Response = ApiResult<ReplaceTransactionResult>; // [!code focus]
 ```
 
 Just so you understand the properties, the properties you get back when you send
 
-```rs
+```rust
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ReplaceTransactionResult {
     pub success: bool,
@@ -856,7 +936,7 @@ pub struct ReplaceTransactionResult {
 
 ### Basic Auth
 
-```rs
+```rust
 use anyhow::Result;
 use rrelayer::{
     create_client, AdminRelayerClient, CreateClientAuth, CreateClientConfig, EvmAddress,
@@ -938,7 +1018,7 @@ async fn example() -> Result<()> {
 
 ### API Key Auth
 
-```rs
+```rust
 use anyhow::Result;
 use rrelayer::{
     CreateRelayerClientConfig, EvmAddress, RelayTransactionRequest, RelayerClient, RelayerId,
@@ -1011,13 +1091,33 @@ be mined before it is cancelled.
 
 ### Response
 
-```rs
-CancelTransactionResponse
+```rust
+#[derive(Error, Debug)]
+pub enum ApiSdkError {
+    #[error("HTTP client error: {0}")]
+    HttpError(#[from] reqwest::Error),
+
+    #[error("Invalid configuration: {0}")]
+    ConfigError(String),
+
+    #[error("Serialization error: {0}")]
+    SerializationError(String),
+
+    #[error("Authentication failed: {0}")]
+    AuthError(String),
+
+    #[error("Rate limit exceeded")]
+    RateLimitError,
+}
+
+pub type ApiResult<T> = Result<T, ApiSdkError>;
+
+pub type Response = ApiResult<CancelTransactionResponse>; // [!code focus]
 ```
 
 Just so you understand the properties, the properties you get back when you send
 
-```rs
+```rust
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CancelTransactionResponse {
     pub success: bool,
@@ -1027,7 +1127,7 @@ pub struct CancelTransactionResponse {
 
 ### Basic Auth
 
-```rs
+```rust
 use anyhow::Result;
 use rrelayer::{
     AdminRelayerClient, CancelTransactionResponse, CreateClientAuth, CreateClientConfig, RelayerId,
@@ -1095,7 +1195,7 @@ async fn example() -> Result<()> {
 
 ### API Key Auth
 
-```rs
+```rust
 use anyhow::Result;
 use rrelayer::{
     CancelTransactionResponse, CreateRelayerClientConfig, RelayerClient, RelayerId, TransactionId,
@@ -1153,13 +1253,33 @@ Get the transaction queue count for the relayer.
 
 ### Response
 
-```rs
-u32
+```rust
+#[derive(Error, Debug)]
+pub enum ApiSdkError {
+    #[error("HTTP client error: {0}")]
+    HttpError(#[from] reqwest::Error),
+
+    #[error("Invalid configuration: {0}")]
+    ConfigError(String),
+
+    #[error("Serialization error: {0}")]
+    SerializationError(String),
+
+    #[error("Authentication failed: {0}")]
+    AuthError(String),
+
+    #[error("Rate limit exceeded")]
+    RateLimitError,
+}
+
+pub type ApiResult<T> = Result<T, ApiSdkError>;
+
+pub type Response = ApiResult<u32>; // [!code focus]
 ```
 
 ### Basic Auth
 
-```rs
+```rust
 use anyhow::Result;
 use rrelayer::{
     AdminRelayerClient, CreateClientAuth, CreateClientConfig, RelayerId, TransactionCountType,
@@ -1215,7 +1335,7 @@ async fn example() -> Result<()> {
 
 ### API Key Auth
 
-```rs
+```rust
 use anyhow::Result;
 use rrelayer::{
     create_relayer_client,

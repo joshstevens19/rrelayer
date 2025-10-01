@@ -8,4 +8,5 @@ export interface Relayer {
   paused: boolean;
   eip1559Enabled: boolean;
   createdAt: Date;
+  isPrivateKey: boolean;
 }

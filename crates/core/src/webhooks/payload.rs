@@ -17,15 +17,17 @@ use super::types::WebhookEventType;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebhookPayload {
     /// Event type that triggered the webhook
+    #[serde(rename = "eventType")]
     pub event_type: WebhookEventType,
     /// Transaction information
     pub transaction: WebhookTransactionData,
     /// Timestamp when the event occurred
     pub timestamp: DateTime<Utc>,
     /// API version for payload compatibility
+    #[serde(rename = "apiVersion")]
     pub api_version: String,
     /// Original transaction data (for replacement events)
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "originalTransaction", skip_serializing_if = "Option::is_none")]
     pub original_transaction: Option<WebhookTransactionData>,
     /// Transaction receipt (for mined/confirmed events)
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -88,6 +90,7 @@ pub struct WebhookTransactionData {
     #[serde(rename = "maxFee", skip_serializing_if = "Option::is_none", default)]
     pub sent_with_max_fee_per_gas: Option<MaxFee>,
     /// Whether this is a no-op transaction
+    #[serde(rename = "isNoop")]
     pub is_noop: bool,
 }
 
@@ -122,12 +125,14 @@ impl From<&Transaction> for WebhookTransactionData {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebhookSigningPayload {
     /// Event type that triggered the webhook
+    #[serde(rename = "eventType")]
     pub event_type: WebhookEventType,
     /// Signing operation data
     pub signing: WebhookSigningData,
     /// Timestamp when the event occurred
     pub timestamp: DateTime<Utc>,
     /// API version for payload compatibility
+    #[serde(rename = "apiVersion")]
     pub api_version: String,
 }
 

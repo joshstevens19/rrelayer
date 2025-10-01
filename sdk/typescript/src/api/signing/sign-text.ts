@@ -5,7 +5,7 @@ import { RATE_LIMIT_HEADER_NAME } from '../index';
 export interface SignTextResult {
   messageSigned: string;
   signature: string;
-  signed_by: `0x${string}`
+  signedBy: `0x${string}`;
 }
 
 export const signText = async (

@@ -15,7 +15,8 @@ import {
   getGasPrices,
   GasEstimatorResult,
   getRelayerAllowlistAddress,
-  TransactionSpeed, cloneRelayer,
+  TransactionSpeed,
+  cloneRelayer,
   getNetwork,
 } from '../api';
 import { RelayerClient } from './relayer';
@@ -76,9 +77,9 @@ export class Client {
        * @returns Promise<CreateRelayerResult>
        */
       clone: async (
-          relayerId: string,
-          chainId: number,
-          name: string
+        relayerId: string,
+        chainId: number,
+        name: string
       ): Promise<CreateRelayerResult> => {
         return cloneRelayer(relayerId, chainId, name, this._apiBaseConfig);
       },
@@ -133,9 +134,7 @@ export class Client {
        * Get gas prices for the network
        * @param chainId The chain id
        */
-      getGasPrices(
-        chainId: number
-      ): Promise<GasEstimatorResult | null> {
+      getGasPrices(chainId: number): Promise<GasEstimatorResult | null> {
         return getGasPrices(chainId, apiBaseConfig);
       },
     };
@@ -190,8 +189,8 @@ export class Client {
    * @returns AdminRelayerClient The admin relayer client
    */
   public async getRelayerClient(
-      relayerId: string,
-      defaultSpeed?: TransactionSpeed
+    relayerId: string,
+    defaultSpeed?: TransactionSpeed
   ): Promise<AdminRelayerClient> {
     const relayer = await this.relayer.get(relayerId);
     if (!relayer) {

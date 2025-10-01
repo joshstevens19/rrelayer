@@ -5,7 +5,7 @@ use axum::{
     extract::{Query, State},
     Json,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::shared::{bad_request, HttpError};
 use crate::{
@@ -16,8 +16,9 @@ use crate::{
     shared::common_types::{PagingContext, PagingResult},
 };
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct GetRelayersQuery {
+    #[serde(rename = "chainId", skip_serializing_if = "Option::is_none")]
     chain_id: Option<ChainId>,
     limit: u32,
     offset: u32,

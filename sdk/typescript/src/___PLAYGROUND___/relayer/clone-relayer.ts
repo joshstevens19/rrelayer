@@ -5,7 +5,7 @@ export const cloneRelayer = async () => {
 
   console.log('Creating new relayer...');
   const relayer = await context.client.relayer.clone(
-      '94afb207-bb47-4392-9229-ba87e4d783cb',
+    '94afb207-bb47-4392-9229-ba87e4d783cb',
     31337,
     `test-relayer-${Date.now()}`
   );

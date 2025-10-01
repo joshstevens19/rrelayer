@@ -74,7 +74,7 @@ GET /api/auth/status
 
 ```json
 {
-  "authenticated_with": "BASIC"
+  "authenticatedWith": "BASIC"
 }
 ```
 
@@ -82,14 +82,14 @@ OR
 
 ```json
 {
-  "authenticated_with": "APIKEY",
-  "api_key_access": [
+  "authenticatedWith": "APIKEY",
+  "apiKeyAccess": [
     {
-      "chain_id": 1,
+      "chainId": 1,
       "relayers": ["0x123...", "0x456..."]
     },
     {
-      "chain_id": 137,
+      "chainId": 137,
       "relayers": ["0x789..."]
     }
   ]

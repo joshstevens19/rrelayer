@@ -5,7 +5,7 @@ use axum::{
     extract::{Path, State},
     Json,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use super::create_relayer::CreateRelayerResult;
 use crate::relayer::db::CreateRelayerMode;
@@ -18,9 +18,11 @@ use crate::{
     transaction::{queue_system::TransactionsQueueSetup, NonceManager},
 };
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct CloneRelayerRequest {
+    #[serde(rename = "newRelayerName")]
     pub new_relayer_name: String,
+    #[serde(rename = "chainId")]
     pub chain_id: ChainId,
 }
 

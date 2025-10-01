@@ -26,14 +26,16 @@ impl fmt::Display for AuthType {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiKeyAccess {
+    #[serde(rename = "chainId")]
     pub chain_id: ChainId,
     pub relayers: Vec<EvmAddress>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StatusResponse {
+    #[serde(rename = "authenticatedWith")]
     pub authenticated_with: AuthType,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "apiKeyAccess", skip_serializing_if = "Option::is_none")]
     pub api_key_access: Option<Vec<ApiKeyAccess>>,
 }
 

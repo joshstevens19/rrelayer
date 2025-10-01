@@ -3,11 +3,15 @@ import { ApiBaseConfig } from '../types';
 import { TransactionToSend } from './types';
 import { RATE_LIMIT_HEADER_NAME } from '../index';
 
-export interface ReplaceTransactionResult {
-  success: boolean;
-  replaceTransactionId?: string;
-  replaceTransactionHash?: `0x${string}`
-}
+export type ReplaceTransactionResult =
+  | {
+      success: false;
+    }
+  | {
+      success: true;
+      replaceTransactionId: string;
+      replaceTransactionHash: `0x${string}`;
+    };
 
 export const replaceTransaction = async (
   transactionId: string,
