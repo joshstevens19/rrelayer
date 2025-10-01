@@ -28,19 +28,29 @@ pub struct CreateRelayerResult {
 
 ### Example
 
-```rs
+```rust
 use anyhow::Result;
 use rrelayer::{
     Client, CreateClientAuth, CreateClientConfig, CreateRelayerResult, TransactionSpeed,
     create_client,
 };
+use dotenvy::dotenv;
+use std::env;
 
 async fn get_client() -> Result<Client> {
+    dotenv().ok();
+
+    let username = env::var("RRELAYER_AUTH_USERNAME")
+        .expect("RRELAYER_AUTH_USERNAME must be set");
+
+    let password = env::var("RRELAYER_AUTH_PASSWORD")
+        .expect("RRELAYER_AUTH_PASSWORD must be set");
+
     let client = create_client(CreateClientConfig {
         server_url: "http://localhost:8000".to_string(),
         auth: CreateClientAuth {
-            username: "your_username".to_string(),
-            password: "your_password".to_string(),
+            username,
+            password,
         },
     });
 
@@ -59,7 +69,6 @@ async fn example() -> Result<()> {
 
     Ok(())
 }
-
 ```
 
 ## Get Relayers
@@ -134,13 +143,23 @@ pub struct Relayer {
 ```rs [get-all-relayers.rs]
 use anyhow::Result;
 use rrelayer::{create_client, Client, CreateClientAuth, CreateClientConfig, PagingContext, PagingResult, Relayer};
+use dotenvy::dotenv;
+use std::env;
 
 async fn get_client() -> Result<Client> {
+    dotenv().ok();
+
+    let username = env::var("RRELAYER_AUTH_USERNAME")
+        .expect("RRELAYER_AUTH_USERNAME must be set");
+
+    let password = env::var("RRELAYER_AUTH_PASSWORD")
+        .expect("RRELAYER_AUTH_PASSWORD must be set");
+
     let client = create_client(CreateClientConfig {
         server_url: "http://localhost:8000".to_string(),
         auth: CreateClientAuth {
-            username: "your_username".to_string(),
-            password: "your_password".to_string(),
+            username,
+            password,
         },
     });
 
@@ -160,16 +179,26 @@ async fn example() -> Result<()> {
 }
 ```
 
-```rs [get-network-relayers.rs]
+```rust [get-network-relayers.rs]
 use anyhow::Result;
 use rrelayer::{create_client, Client, CreateClientAuth, CreateClientConfig, PagingContext, PagingResult, Relayer};
+use dotenvy::dotenv;
+use std::env;
 
 async fn get_client() -> Result<Client> {
+    dotenv().ok();
+
+    let username = env::var("RRELAYER_AUTH_USERNAME")
+        .expect("RRELAYER_AUTH_USERNAME must be set");
+
+    let password = env::var("RRELAYER_AUTH_PASSWORD")
+        .expect("RRELAYER_AUTH_PASSWORD must be set");
+
     let client = create_client(CreateClientConfig {
         server_url: "http://localhost:8000".to_string(),
         auth: CreateClientAuth {
-            username: "your_username".to_string(),
-            password: "your_password".to_string(),
+            username,
+            password,
         },
     });
 
@@ -256,13 +285,23 @@ use rrelayer::{
     create_client,
 };
 use std::str::FromStr;
+use dotenvy::dotenv;
+use std::env;
 
 async fn get_relayer_client() -> Result<AdminRelayerClient> {
+    dotenv().ok();
+
+    let username = env::var("RRELAYER_AUTH_USERNAME")
+        .expect("RRELAYER_AUTH_USERNAME must be set");
+
+    let password = env::var("RRELAYER_AUTH_PASSWORD")
+        .expect("RRELAYER_AUTH_PASSWORD must be set");
+
     let client = create_client(CreateClientConfig {
         server_url: "http://localhost:8000".to_string(),
         auth: CreateClientAuth {
-            username: "your_username".to_string(),
-            password: "your_password".to_string(),
+            username,
+            password,
         },
     });
 
@@ -391,20 +430,30 @@ pub struct CreateRelayerResult {
 
 ### Example
 
-```rs
+```rust
 use std::str::FromStr;
 use anyhow::Result;
 use rrelayer::{
     Client, CreateClientAuth, CreateClientConfig, CreateRelayerResult, RelayerId, TransactionSpeed,
     create_client,
 };
+use dotenvy::dotenv;
+use std::env;
 
 async fn get_client() -> Result<Client> {
+    dotenv().ok();
+
+    let username = env::var("RRELAYER_AUTH_USERNAME")
+        .expect("RRELAYER_AUTH_USERNAME must be set");
+
+    let password = env::var("RRELAYER_AUTH_PASSWORD")
+        .expect("RRELAYER_AUTH_PASSWORD must be set");
+
     let client = create_client(CreateClientConfig {
         server_url: "http://localhost:8000".to_string(),
         auth: CreateClientAuth {
-            username: "your_username".to_string(),
-            password: "your_password".to_string(),
+            username,
+            password,
         },
     });
 
@@ -448,14 +497,23 @@ use rrelayer::{
     AdminRelayerClient, CreateClientAuth, CreateClientConfig, RelayerId, TransactionSpeed,
     create_client,
 };
-use std::str::FromStr;
+use dotenvy::dotenv;
+use std::env;
 
-async fn get_admin_relayer() -> Result<AdminRelayerClient> {
+async fn get_relayer_client() -> Result<AdminRelayerClient> {
+    dotenv().ok();
+
+    let username = env::var("RRELAYER_AUTH_USERNAME")
+        .expect("RRELAYER_AUTH_USERNAME must be set");
+
+    let password = env::var("RRELAYER_AUTH_PASSWORD")
+        .expect("RRELAYER_AUTH_PASSWORD must be set");
+
     let client = create_client(CreateClientConfig {
         server_url: "http://localhost:8000".to_string(),
         auth: CreateClientAuth {
-            username: "your_username".to_string(),
-            password: "your_password".to_string(),
+            username,
+            password,
         },
     });
 
@@ -472,7 +530,7 @@ async fn get_admin_relayer() -> Result<AdminRelayerClient> {
 }
 
 async fn example() -> Result<()> {
-    let relayer_client = get_admin_relayer().await?;
+    let relayer_client = get_relayer_client().await?;
 
     relayer_client.pause().await?;
 
@@ -486,14 +544,23 @@ use rrelayer::{
     AdminRelayerClient, CreateClientAuth, CreateClientConfig, RelayerId, TransactionSpeed,
     create_client,
 };
-use std::str::FromStr;
+use dotenvy::dotenv;
+use std::env;
 
-async fn get_admin_relayer() -> Result<AdminRelayerClient> {
+async fn get_relayer_client() -> Result<AdminRelayerClient> {
+    dotenv().ok();
+
+    let username = env::var("RRELAYER_AUTH_USERNAME")
+        .expect("RRELAYER_AUTH_USERNAME must be set");
+
+    let password = env::var("RRELAYER_AUTH_PASSWORD")
+        .expect("RRELAYER_AUTH_PASSWORD must be set");
+
     let client = create_client(CreateClientConfig {
         server_url: "http://localhost:8000".to_string(),
         auth: CreateClientAuth {
-            username: "your_username".to_string(),
-            password: "your_password".to_string(),
+            username,
+            password,
         },
     });
 
@@ -510,7 +577,7 @@ async fn get_admin_relayer() -> Result<AdminRelayerClient> {
 }
 
 async fn example() -> Result<()> {
-    let relayer_client = get_admin_relayer().await?;
+    let relayer_client = get_relayer_client().await?;
 
     relayer_client.unpause().await?;
 
@@ -537,13 +604,23 @@ use rrelayer::{
     create_client,
 };
 use std::str::FromStr;
+use dotenvy::dotenv;
+use std::env;
 
-async fn get_admin_relayer() -> Result<AdminRelayerClient> {
+async fn get_relayer_client() -> Result<AdminRelayerClient> {
+    dotenv().ok();
+
+    let username = env::var("RRELAYER_AUTH_USERNAME")
+        .expect("RRELAYER_AUTH_USERNAME must be set");
+
+    let password = env::var("RRELAYER_AUTH_PASSWORD")
+        .expect("RRELAYER_AUTH_PASSWORD must be set");
+
     let client = create_client(CreateClientConfig {
         server_url: "http://localhost:8000".to_string(),
         auth: CreateClientAuth {
-            username: "your_username".to_string(),
-            password: "your_password".to_string(),
+            username,
+            password,
         },
     });
 
@@ -560,7 +637,7 @@ async fn get_admin_relayer() -> Result<AdminRelayerClient> {
 }
 
 async fn example() -> Result<()> {
-    let relayer_client = get_admin_relayer().await?;
+    let relayer_client = get_relayer_client().await?;
 
     relayer_client.update_eip1559_status(false).await?;
 
@@ -575,13 +652,23 @@ use rrelayer::{
     create_client,
 };
 use std::str::FromStr;
+use dotenvy::dotenv;
+use std::env;
 
-async fn get_admin_relayer() -> Result<AdminRelayerClient> {
+async fn get_relayer_client() -> Result<AdminRelayerClient> {
+    dotenv().ok();
+
+    let username = env::var("RRELAYER_AUTH_USERNAME")
+        .expect("RRELAYER_AUTH_USERNAME must be set");
+
+    let password = env::var("RRELAYER_AUTH_PASSWORD")
+        .expect("RRELAYER_AUTH_PASSWORD must be set");
+
     let client = create_client(CreateClientConfig {
         server_url: "http://localhost:8000".to_string(),
         auth: CreateClientAuth {
-            username: "your_username".to_string(),
-            password: "your_password".to_string(),
+            username,
+            password,
         },
     });
 
@@ -598,7 +685,7 @@ async fn get_admin_relayer() -> Result<AdminRelayerClient> {
 }
 
 async fn example() -> Result<()> {
-    let relayer_client = get_admin_relayer().await?;
+    let relayer_client = get_relayer_client().await?;
 
     relayer_client.update_eip1559_status(true).await?;
 
@@ -625,13 +712,23 @@ use rrelayer::{
     create_client,
 };
 use std::str::FromStr;
+use dotenvy::dotenv;
+use std::env;
 
-async fn get_admin_relayer() -> Result<AdminRelayerClient> {
+async fn get_relayer_client() -> Result<AdminRelayerClient> {
+    dotenv().ok();
+
+    let username = env::var("RRELAYER_AUTH_USERNAME")
+        .expect("RRELAYER_AUTH_USERNAME must be set");
+
+    let password = env::var("RRELAYER_AUTH_PASSWORD")
+        .expect("RRELAYER_AUTH_PASSWORD must be set");
+
     let client = create_client(CreateClientConfig {
         server_url: "http://localhost:8000".to_string(),
         auth: CreateClientAuth {
-            username: "your_username".to_string(),
-            password: "your_password".to_string(),
+            username,
+            password,
         },
     });
 
@@ -648,7 +745,7 @@ async fn get_admin_relayer() -> Result<AdminRelayerClient> {
 }
 
 async fn example() -> Result<()> {
-    let relayer_client = get_admin_relayer().await?;
+    let relayer_client = get_relayer_client().await?;
 
     // 2 gwei
     relayer_client.update_max_gas_price("2000000000").await?;
@@ -672,13 +769,23 @@ use rrelayer::{
     create_client,
 };
 use std::str::FromStr;
+use dotenvy::dotenv;
+use std::env;
 
-async fn get_admin_relayer() -> Result<AdminRelayerClient> {
+async fn get_relayer_client() -> Result<AdminRelayerClient> {
+    dotenv().ok();
+
+    let username = env::var("RRELAYER_AUTH_USERNAME")
+        .expect("RRELAYER_AUTH_USERNAME must be set");
+
+    let password = env::var("RRELAYER_AUTH_PASSWORD")
+        .expect("RRELAYER_AUTH_PASSWORD must be set");
+
     let client = create_client(CreateClientConfig {
         server_url: "http://localhost:8000".to_string(),
         auth: CreateClientAuth {
-            username: "your_username".to_string(),
-            password: "your_password".to_string(),
+            username,
+            password,
         },
     });
 
@@ -695,7 +802,7 @@ async fn get_admin_relayer() -> Result<AdminRelayerClient> {
 }
 
 async fn example() -> Result<()> {
-    let relayer_client = get_admin_relayer().await?;
+    let relayer_client = get_relayer_client().await?;
 
     relayer_client.remove_max_gas_price().await?;
 
@@ -716,13 +823,23 @@ clear the current queue.
 use anyhow::Result;
 use rrelayer::{Client, CreateClientAuth, CreateClientConfig, RelayerId, create_client};
 use std::str::FromStr;
+use dotenvy::dotenv;
+use std::env;
 
 async fn get_client() -> Result<Client> {
+    dotenv().ok();
+
+    let username = env::var("RRELAYER_AUTH_USERNAME")
+        .expect("RRELAYER_AUTH_USERNAME must be set");
+
+    let password = env::var("RRELAYER_AUTH_PASSWORD")
+        .expect("RRELAYER_AUTH_PASSWORD must be set");
+
     let client = create_client(CreateClientConfig {
         server_url: "http://localhost:8000".to_string(),
         auth: CreateClientAuth {
-            username: "your_username".to_string(),
-            password: "your_password".to_string(),
+            username,
+            password,
         },
     });
 
@@ -773,13 +890,23 @@ use rrelayer::{
     PagingResult, RelayerId, TransactionSpeed, create_client,
 };
 use std::str::FromStr;
+use dotenvy::dotenv;
+use std::env;
 
 async fn get_relayer_client() -> Result<AdminRelayerClient> {
+    dotenv().ok();
+
+    let username = env::var("RRELAYER_AUTH_USERNAME")
+        .expect("RRELAYER_AUTH_USERNAME must be set");
+
+    let password = env::var("RRELAYER_AUTH_PASSWORD")
+        .expect("RRELAYER_AUTH_PASSWORD must be set");
+
     let client = create_client(CreateClientConfig {
         server_url: "http://localhost:8000".to_string(),
         auth: CreateClientAuth {
-            username: "your_username".to_string(),
-            password: "your_password".to_string(),
+            username,
+            password,
         },
     });
 

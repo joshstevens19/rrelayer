@@ -12,7 +12,7 @@ If you not got docker you can install it [here](https://docs.docker.com/get-dock
 
 This will walk you through setting up your project by asking you a series of questions in the terminal.
 
-```bash [rust]
+```bash
 rrelayer new
 ```
 
@@ -170,4 +170,353 @@ rrelayer start
 The boilerplate template uses a free rpc node which may get rate limited. We recommend using a paid node for production.
 :::
 
-That is it your rrelayer is running and you can start using it straight away. Might be good to explore the
+## 5. Create your first relayer
+
+:::code-group
+
+```bash [curl]
+curl -X POST http://localhost:8000/api/relayers/11155111/new \
+  -u "username:password" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "my-first-relayer"}'
+
+# {
+#   id: 'd6dd6bcc-6a7d-4645-bf83-663da3bae8cd',
+#   address: '0x7a0f605c8366373764760673020b6b2d8574f3f2'
+# }
+```
+
+```ts [node]
+// client.ts
+import {createClient} from "rrelayer";
+import * as dotenv from "dotenv";
+
+dotenv.config();
+
+export const client = createClient({
+    serverUrl: 'http://localhost:8000',
+    auth: {
+        username: process.env.RRELAYER_AUTH_USERNAME!,
+        password: process.env.RRELAYER_AUTH_PASSWORD!,
+    },
+});
+
+...
+// send-transaction.ts
+import {client} from "./client";
+
+let createdResult = await client.relayer.create(8453, 'fancy-relayer');
+console.log(createdResult)
+// createdResult {
+//   id: 'd6dd6bcc-6a7d-4645-bf83-663da3bae8cd',
+//   address: '0x7a0f605c8366373764760673020b6b2d8574f3f2'
+// }
+```
+
+```rust [rust]
+use anyhow::Result;
+use rrelayer::{
+    Client, CreateClientAuth, CreateClientConfig, CreateRelayerResult, TransactionSpeed,
+    create_client,
+};
+use dotenvy::dotenv;
+use std::env;
+
+async fn get_client() -> Result<Client> {
+    dotenv().ok();
+
+    let username = env::var("RRELAYER_AUTH_USERNAME")
+        .expect("RRELAYER_AUTH_USERNAME must be set");
+
+    let password = env::var("RRELAYER_AUTH_PASSWORD")
+        .expect("RRELAYER_AUTH_PASSWORD must be set");
+
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username,
+            password,
+        },
+    });
+
+    Ok(client)
+}
+
+async fn example() -> Result<()> {
+    let client = get_client().await?;
+
+    let result: CreateRelayerResult =
+        client.relayer().create(11155111, "fancy_relayer").await?;
+    println!("{:?}", result);
+    // result {
+    //   id: 'd6dd6bcc-6a7d-4645-bf83-663da3bae8cd',
+    //   address: '0x7a0f605c8366373764760673020b6b2d8574f3f2'
+    // }
+
+    let relayer_client =
+        client.get_relayer_client(&result.id, Some(TransactionSpeed::FAST)).await?;
+
+    Ok(())
+}
+```
+
+:::
+
+## 6. Sign your first message
+
+:::code-group
+
+```bash [curl]
+curl -X POST https://your-rrelayer.com/api/signing/INSERT_RELAYER_ID/message \
+  -u "username:password" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Hello, World! Please sign this message to authenticate."
+  }'
+
+# result {
+#  messageSigned: "Hello, World! Please sign this message to authenticate.",
+#  signature: "0x8f3e5d2a1c4b7e9f6d8a2c5e1f4b7d9a3c6e8f1a4b7d9e2c5f8a1d4e7b9c2f5a8d1e4b7c9f2a5d8e1b4c7f9a2e5d8b1f4c7e9d2a5f8e1c4b7d9f2a5e8c1b",
+#  signedBy: "0x7a0f605c8366373764760673020b6b2d8574f3f2"
+#}
+```
+
+```ts [node]
+// config.ts
+import { createClient } from 'rrelayer';
+import * as dotenv from "dotenv";
+dotenv.config();
+
+const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: process.env.RRELAYER_AUTH_USERNAME!,
+    password: process.env.RRELAYER_AUTH_PASSWORD!,
+  },
+});
+
+export const relayerClient = await client.getRelayerClient(
+  // The relayer id you want to connect to
+  '94afb207-bb47-4392-9229-ba87e4d783cb',
+  // This is optional it defaults to fast and is a fallback
+  // You can override this with the transaction request
+  TransactionSpeed.FAST
+);
+
+...
+
+// sign-text.ts
+import { relayerClient } from './config';
+
+// Using a framework like viem and ethers is recommended here. Look under framework guides > TypeScript for them.
+// returns a SignTextResult - import { SignTextResult } from 'rrelayer';
+let result = await relayerClient.sign.text('sign this message');
+console.log(result)
+// result {
+//  messageSigned: "Hello, World! Please sign this message to authenticate.",
+//  signature: "0x8f3e5d2a1c4b7e9f6d8a2c5e1f4b7d9a3c6e8f1a4b7d9e2c5f8a1d4e7b9c2f5a8d1e4b7c9f2a5d8e1b4c7f9a2e5d8b1f4c7e9d2a5f8e1c4b7d9f2a5e8c1b",
+//  signedBy: "0x7a0f605c8366373764760673020b6b2d8574f3f2"
+// }
+```
+
+```rust [rust]
+use anyhow::Result;
+use rrelayer::{
+    create_client, AdminRelayerClient, CreateClientAuth, CreateClientConfig, RelayerId,
+    SignTextResult, TransactionSpeed,
+};
+use std::str::FromStr;
+use dotenvy::dotenv;
+use std::env;
+
+async fn get_relayer_client() -> Result<AdminRelayerClient> {
+    dotenv().ok();
+
+    let username = env::var("RRELAYER_AUTH_USERNAME")
+        .expect("RRELAYER_AUTH_USERNAME must be set");
+
+    let password = env::var("RRELAYER_AUTH_PASSWORD")
+        .expect("RRELAYER_AUTH_PASSWORD must be set");
+
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username,
+            password,
+        },
+    });
+
+    let relayer_client: AdminRelayerClient = client
+        .get_relayer_client(
+            &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+            // This is optional it defaults to fast and is a fallback
+            // You can override this with the transaction request
+            Some(TransactionSpeed::FAST),
+        )
+        .await?;
+
+    Ok(relayer_client)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let result: SignTextResult = relayer_client.sign().text("sign this message", None).await?;
+    println!("{:?}", result);
+    // result {
+    //  messageSigned: "Hello, World! Please sign this message to authenticate.",
+    //  signature: "0x8f3e5d2a1c4b7e9f6d8a2c5e1f4b7d9a3c6e8f1a4b7d9e2c5f8a1d4e7b9c2f5a8d1e4b7c9f2a5d8e1b4c7f9a2e5d8b1f4c7e9d2a5f8e1c4b7d9f2a5e8c1b",
+    //  signedBy: "0x7a0f605c8366373764760673020b6b2d8574f3f2"
+    // }
+
+    Ok(())
+}
+```
+
+:::
+
+## 7. Send your first transaction
+
+:::code-group
+
+```bash [curl]
+curl -X POST https://your-rrelayer.com/api/transactions/relayers/YOUR_RELAYER_ID/send \
+  -u "username:password" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": "0x1234567890abcdef1234567890abcdef12345678",
+    "value": "1000000000000000000",
+    "speed": "MEDIUM",
+    "externalId": "order_12345"
+  }'
+
+# result {
+#  "id": "94afb207-bb47-4392-9229-ba87e4d783cb",
+#  "hash": "0xabcdef123456789abcdef123456789abcdef123456789abcdef123456789abcdef"
+#}
+```
+
+```ts [node]
+// config.ts
+import { createClient, TransactionSpeed } from 'rrelayer';
+import * as dotenv from "dotenv";
+dotenv.config();
+
+const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: process.env.RRELAYER_AUTH_USERNAME!,
+    password: process.env.RRELAYER_AUTH_PASSWORD!,
+  },
+});
+
+export const relayerClient = await client.getRelayerClient(
+  // The relayer id you want to connect to
+  '94afb207-bb47-4392-9229-ba87e4d783cb',
+  // This is optional it defaults to fast and is a fallback
+  // You can override this with the transaction request
+  TransactionSpeed.FAST
+);
+
+...
+
+// send-eth-transaction.ts
+import { relayerClient } from './config';
+import { TransactionToSend } from 'rrelayer';
+
+// Using a framework like viem and ethers is recommended here. Look under framework guides > TypeScript for them.
+const txRequest: TransactionToSend = {
+    to: '0x5FCD072a0BD58B6fa413031582E450FE724dba6D',
+    value: '1000000000000000000'
+};
+
+// returns TransactionSent - import { TransactionSent } from 'rrelayer';
+let response = await relayerClient.transaction.send(txRequest);
+console.log(response);
+// response {
+//  "id": "94afb207-bb47-4392-9229-ba87e4d783cb",
+//  "hash": "0xabcdef123456789abcdef123456789abcdef123456789abcdef123456789abcdef"
+//}
+
+// wait for the tx to be mined
+// returns a TransactionReceipt - import { TransactionReceipt } from 'rrelayer';
+let relayTransactionResult = await relayerClient.transaction.waitForTransactionReceiptById(
+    response.id
+);
+```
+
+```rust [rust]
+use anyhow::Result;
+use rrelayer::{
+    AdminRelayerClient, CreateClientAuth, CreateClientConfig, EvmAddress, RelayTransactionRequest,
+    RelayerId, SendTransactionResult, TransactionData, TransactionSpeed, TransactionValue,
+    create_client,
+};
+use std::str::FromStr;
+use dotenvy::dotenv;
+use std::env;
+
+async fn get_relayer_client() -> Result<AdminRelayerClient> {
+    dotenv().ok();
+
+    let username = env::var("RRELAYER_AUTH_USERNAME")
+        .expect("RRELAYER_AUTH_USERNAME must be set");
+
+    let password = env::var("RRELAYER_AUTH_PASSWORD")
+        .expect("RRELAYER_AUTH_PASSWORD must be set");
+
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username,
+            password,
+        },
+    });
+
+    let relayer_client: AdminRelayerClient = client
+        .get_relayer_client(
+            &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+            // This is optional it defaults to fast and is a fallback
+            // You can override this with the transaction request
+            Some(TransactionSpeed::FAST),
+        )
+        .await?;
+
+    Ok(relayer_client)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let request = RelayTransactionRequest {
+        to: EvmAddress::from_str("0x5FCD072a0BD58B6fa413031582E450FE724dba6D")?,
+        value: TransactionValue::from_str("1000000000000000000")
+            .map_err(|e| anyhow::anyhow!("Invalid value: {}", e))?, // 1 ETH in wei
+        data: TransactionData::empty(),
+        // This is optional it defaults to what is set in the client creation
+        // You can override this here per transaction if you wish though
+        // speed: Some(TransactionSpeed::SUPER),
+        external_id: None,
+        blobs: None,
+    };
+
+    // Using a framework like alloy is recommended here. Look under framework guides > rust > alloy for it.
+    let result: SendTransactionResult = relayer_client.transaction().send(&request, None).await?;
+    println!("{:?}", result);
+    // result {
+    //  "id": "94afb207-bb47-4392-9229-ba87e4d783cb",
+    //  "hash": "0xabcdef123456789abcdef123456789abcdef123456789abcdef123456789abcdef"
+    //}
+
+    // wait for the tx to be mined will return a receipt
+    let relay_transaction_result =
+        relayer_client.transaction().wait_for_transaction_receipt_by_id(&result.id).await?;
+    println!("{:?}", relay_transaction_result);
+
+    Ok(())
+}
+```
+
+:::
+
+Great you can learn more about all the features and integrations in the config and integration sections.

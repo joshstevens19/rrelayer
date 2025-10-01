@@ -34,13 +34,23 @@ pub struct Network {
 ```rs
 use anyhow::Result;
 use rrelayer::{create_client, Client, CreateClientAuth, CreateClientConfig, Network};
+use dotenvy::dotenv;
+use std::env;
 
 async fn get_client() -> Result<Client> {
+    dotenv().ok();
+
+    let username = env::var("RRELAYER_AUTH_USERNAME")
+        .expect("RRELAYER_AUTH_USERNAME must be set");
+
+    let password = env::var("RRELAYER_AUTH_PASSWORD")
+        .expect("RRELAYER_AUTH_PASSWORD must be set");
+
     let client = create_client(CreateClientConfig {
         server_url: "http://localhost:8000".to_string(),
         auth: CreateClientAuth {
-            username: "your_username".to_string(),
-            password: "your_password".to_string(),
+            username,
+            password,
         },
     });
 
@@ -87,16 +97,26 @@ pub struct Network {
 
 ### Example
 
-```rs
+```rust
 use anyhow::Result;
 use rrelayer::{create_client, Client, CreateClientAuth, CreateClientConfig, Network};
+use dotenvy::dotenv;
+use std::env;
 
 async fn get_client() -> Result<Client> {
+    dotenv().ok();
+
+    let username = env::var("RRELAYER_AUTH_USERNAME")
+        .expect("RRELAYER_AUTH_USERNAME must be set");
+
+    let password = env::var("RRELAYER_AUTH_PASSWORD")
+        .expect("RRELAYER_AUTH_PASSWORD must be set");
+
     let client = create_client(CreateClientConfig {
         server_url: "http://localhost:8000".to_string(),
         auth: CreateClientAuth {
-            username: "your_username".to_string(),
-            password: "your_password".to_string(),
+            username,
+            password,
         },
     });
 
@@ -129,7 +149,7 @@ Option<GasEstimatorResult>
 
 Just so you understand the properties returned
 
-```rs
+```rust
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct GasPriceResult {
     #[serde(rename = "maxPriorityFee")]
@@ -160,16 +180,25 @@ pub struct GasEstimatorResult {
 
 ### Example
 
-```rs
+```rust
 use anyhow::Result;
 use rrelayer::{Client, CreateClientAuth, CreateClientConfig, GasEstimatorResult, create_client};
+use dotenvy::dotenv;
+use std::env;
 
 async fn get_client() -> Result<Client> {
+    dotenv().ok();
+
+    let username = env::var("RRELAYER_AUTH_USERNAME")
+        .expect("RRELAYER_AUTH_USERNAME must be set");
+    let password = env::var("RRELAYER_AUTH_PASSWORD")
+        .expect("RRELAYER_AUTH_PASSWORD must be set");
+
     let client = create_client(CreateClientConfig {
         server_url: "http://localhost:8000".to_string(),
         auth: CreateClientAuth {
-            username: "your_username".to_string(),
-            password: "your_password".to_string(),
+            username,
+            password,
         },
     });
 

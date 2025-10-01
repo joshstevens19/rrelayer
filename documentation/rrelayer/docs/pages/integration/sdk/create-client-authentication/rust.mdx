@@ -10,13 +10,17 @@ Using the basic authentication which uses the username and password in your [api
 ```rs [Basic Auth - config.rs]
 use std::str::FromStr;
 use rrelayer::{CreateClientAuth, CreateClientConfig, RelayerId, TransactionSpeed, create_client, AdminRelayerClient};
+use dotenvy::dotenv;
+use std::env;
 
 // Client also exposes some admin methods in which API keys cannot do
 let client = create_client(CreateClientConfig {
     server_url: "http://localhost:8000".to_string(),
     auth: CreateClientAuth {
-        username: "your_username".to_string(),
-        password: "your_password".to_string(),
+        username: env::var("RRELAYER_AUTH_USERNAME")
+                          .expect("RRELAYER_AUTH_USERNAME must be set"),
+        password: env::var("RRELAYER_AUTH_PASSWORD")
+                          .expect("RRELAYER_AUTH_PASSWORD must be set"),
     },
 });
 

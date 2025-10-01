@@ -60,12 +60,14 @@ You can send native funds using the below:
 ```ts
 // config.ts
 import { createClient, TransactionSpeed } from 'rrelayer';
+import * as dotenv from "dotenv";
+dotenv.config();
 
 const client = createClient({
   serverUrl: 'http://localhost:8000',
   auth: {
-    username: 'your_username',
-    password: 'your_password',
+    username: process.env.RRELAYER_AUTH_USERNAME!,
+    password: process.env.RRELAYER_AUTH_PASSWORD!,
   },
 });
 
@@ -143,12 +145,14 @@ You can send contract transactions using the below:
 ```ts
 // config.ts
 import { createClient, TransactionSpeed } from 'rrelayer';
+import * as dotenv from "dotenv";
+dotenv.config();
 
 const client = createClient({
   serverUrl: 'http://localhost:8000',
   auth: {
-    username: 'your_username',
-    password: 'your_password',
+    username: process.env.RRELAYER_AUTH_USERNAME!,
+    password: process.env.RRELAYER_AUTH_PASSWORD!,
   },
 });
 
@@ -231,12 +235,14 @@ Alongside only paid nodes will send blobs due to payload size.
 ```ts
 // config.ts
 import { createClient, TransactionSpeed } from 'rrelayer';
+import * as dotenv from "dotenv";
+dotenv.config();
 
 const client = createClient({
   serverUrl: 'http://localhost:8000',
   auth: {
-    username: 'your_username',
-    password: 'your_password',
+    username: process.env.RRELAYER_AUTH_USERNAME!,
+    password: process.env.RRELAYER_AUTH_PASSWORD!,
   },
 });
 
@@ -392,12 +398,14 @@ export interface Transaction {
 ```ts
 // config.ts
 import { createClient, TransactionSpeed } from 'rrelayer';
+import * as dotenv from "dotenv";
+dotenv.config();
 
 const client = createClient({
   serverUrl: 'http://localhost:8000',
   auth: {
-    username: 'your_username',
-    password: 'your_password',
+    username: process.env.RRELAYER_AUTH_USERNAME!,
+    password: process.env.RRELAYER_AUTH_PASSWORD!,
   },
 });
 
@@ -486,12 +494,14 @@ export interface TransactionStatusResult {
 ```ts
 // config.ts
 import { createClient, TransactionSpeed } from 'rrelayer';
+import * as dotenv from "dotenv";
+dotenv.config();
 
 const client = createClient({
   serverUrl: 'http://localhost:8000',
   auth: {
-    username: 'your_username',
-    password: 'your_password',
+    username: process.env.RRELAYER_AUTH_USERNAME!,
+    password: process.env.RRELAYER_AUTH_PASSWORD!,
   },
 });
 
@@ -565,12 +575,14 @@ export interface TransactionSent {
 ```ts
 // config.ts
 import { createClient, TransactionSpeed } from 'rrelayer';
+import * as dotenv from "dotenv";
+dotenv.config();
 
 const client = createClient({
   serverUrl: 'http://localhost:8000',
   auth: {
-    username: 'your_username',
-    password: 'your_password',
+    username: process.env.RRELAYER_AUTH_USERNAME!,
+    password: process.env.RRELAYER_AUTH_PASSWORD!,
   },
 });
 
@@ -668,12 +680,14 @@ export interface TransactionSent {
 ```ts
 // config.ts
 import { createClient, TransactionSpeed } from 'rrelayer';
+import * as dotenv from "dotenv";
+dotenv.config();
 
 const client = createClient({
   serverUrl: 'http://localhost:8000',
   auth: {
-    username: 'your_username',
-    password: 'your_password',
+    username: process.env.RRELAYER_AUTH_USERNAME!,
+    password: process.env.RRELAYER_AUTH_PASSWORD!,
   },
 });
 
@@ -747,12 +761,14 @@ Promise<number>;
 ```ts
 // config.ts
 import { createClient, TransactionSpeed } from 'rrelayer';
+import * as dotenv from "dotenv";
+dotenv.config();
 
 const client = createClient({
   serverUrl: 'http://localhost:8000',
   auth: {
-    username: 'your_username',
-    password: 'your_password',
+    username: process.env.RRELAYER_AUTH_USERNAME!,
+    password: process.env.RRELAYER_AUTH_PASSWORD!,
   },
 });
 

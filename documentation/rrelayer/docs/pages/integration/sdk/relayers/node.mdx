@@ -30,12 +30,14 @@ export interface CreateRelayerResult {
 ```ts
 // config.ts
 import { createClient } from 'rrelayer';
+import * as dotenv from "dotenv";
+dotenv.config();
 
 export const client = createClient({
   serverUrl: 'http://localhost:8000',
   auth: {
-    username: 'your_username',
-    password: 'your_password',
+    username: process.env.RRELAYER_AUTH_USERNAME!,
+    password: process.env.RRELAYER_AUTH_PASSWORD!,
   },
 });
 
@@ -106,12 +108,14 @@ export interface Relayer {
 ```ts [get-all-relayers.ts]
 // config.ts
 import { createClient } from 'rrelayer';
+import * as dotenv from "dotenv";
+dotenv.config();
 
 export const client = createClient({
   serverUrl: 'http://localhost:8000',
   auth: {
-    username: 'your_username',
-    password: 'your_password',
+    username: process.env.RRELAYER_AUTH_USERNAME!,
+    password: process.env.RRELAYER_AUTH_PASSWORD!,
   },
 });
 
@@ -130,12 +134,14 @@ let relayers = await client.relayer.getAll({
 ```ts [get-network-relayers.ts]
 // config.ts
 import { createClient } from 'rrelayer';
+import * as dotenv from "dotenv";
+dotenv.config();
 
 export const client = createClient({
   serverUrl: 'http://localhost:8000',
   auth: {
-    username: 'your_username',
-    password: 'your_password',
+    username: process.env.RRELAYER_AUTH_USERNAME!,
+    password: process.env.RRELAYER_AUTH_PASSWORD!,
   },
 });
 
@@ -193,12 +199,14 @@ export interface GetRelayerResult {
 ```ts
 // config.ts
 import { createClient } from 'rrelayer';
+import * as dotenv from "dotenv";
+dotenv.config();
 
 export const client = createClient({
   serverUrl: 'http://localhost:8000',
   auth: {
-    username: 'your_username',
-    password: 'your_password',
+    username: process.env.RRELAYER_AUTH_USERNAME!,
+    password: process.env.RRELAYER_AUTH_PASSWORD!,
   },
 });
 
@@ -285,12 +293,14 @@ export interface CreateRelayerResult {
 ```ts
 // config.ts
 import { createClient } from 'rrelayer';
+import * as dotenv from "dotenv";
+dotenv.config();
 
 export const client = createClient({
   serverUrl: 'http://localhost:8000',
   auth: {
-    username: 'your_username',
-    password: 'your_password',
+    username: process.env.RRELAYER_AUTH_USERNAME!,
+    password: process.env.RRELAYER_AUTH_PASSWORD!,
   },
 });
 
@@ -338,12 +348,14 @@ Promise<Void>;
 ```ts [pause-relayer.ts]
 // config.ts
 import { createClient, TransactionSpeed } from 'rrelayer';
+import * as dotenv from "dotenv";
+dotenv.config();
 
 const client = createClient({
   serverUrl: 'http://localhost:8000',
   auth: {
-    username: 'your_username',
-    password: 'your_password',
+    username: process.env.RRELAYER_AUTH_USERNAME!,
+    password: process.env.RRELAYER_AUTH_PASSWORD!,
   },
 });
 
@@ -366,12 +378,14 @@ await relayerClient.pause();
 ```ts [unpause-relayer.ts]
 // config.ts
 import { createClient, TransactionSpeed } from 'rrelayer';
+import * as dotenv from "dotenv";
+dotenv.config();
 
 const client = createClient({
   serverUrl: 'http://localhost:8000',
   auth: {
-    username: 'your_username',
-    password: 'your_password',
+    username: process.env.RRELAYER_AUTH_USERNAME!,
+    password: process.env.RRELAYER_AUTH_PASSWORD!,
   },
 });
 
@@ -414,12 +428,14 @@ Promise<Void>;
 ```ts [disable-eip-1559-status.ts]
 // config.ts
 import { createClient, TransactionSpeed } from 'rrelayer';
+import * as dotenv from "dotenv";
+dotenv.config();
 
 const client = createClient({
   serverUrl: 'http://localhost:8000',
   auth: {
-    username: 'your_username',
-    password: 'your_password',
+    username: process.env.RRELAYER_AUTH_USERNAME!,
+    password: process.env.RRELAYER_AUTH_PASSWORD!,
   },
 });
 
@@ -442,12 +458,14 @@ await relayerClient.updateEIP1559Status(false);
 ```ts [enable-eip-1559-status.ts]
 // config.ts
 import { createClient, TransactionSpeed } from 'rrelayer';
+import * as dotenv from "dotenv";
+dotenv.config();
 
 const client = createClient({
   serverUrl: 'http://localhost:8000',
   auth: {
-    username: 'your_username',
-    password: 'your_password',
+    username: process.env.RRELAYER_AUTH_USERNAME!,
+    password: process.env.RRELAYER_AUTH_PASSWORD!,
   },
 });
 
@@ -489,12 +507,14 @@ Promise<Void>;
 ```ts
 // config.ts
 import { createClient, TransactionSpeed } from 'rrelayer';
+import * as dotenv from "dotenv";
+dotenv.config();
 
 const client = createClient({
   serverUrl: 'http://localhost:8000',
   auth: {
-    username: 'your_username',
-    password: 'your_password',
+    username: process.env.RRELAYER_AUTH_USERNAME!,
+    password: process.env.RRELAYER_AUTH_PASSWORD!,
   },
 });
 
@@ -534,12 +554,14 @@ Promise<Void>;
 ```ts
 // config.ts
 import { createClient, TransactionSpeed } from 'rrelayer';
+import * as dotenv from "dotenv";
+dotenv.config();
 
 const client = createClient({
   serverUrl: 'http://localhost:8000',
   auth: {
-    username: 'your_username',
-    password: 'your_password',
+    username: process.env.RRELAYER_AUTH_USERNAME!,
+    password: process.env.RRELAYER_AUTH_PASSWORD!,
   },
 });
 
@@ -579,12 +601,14 @@ Promise<Void>;
 ```ts
 // config.ts
 import { createClient } from 'rrelayer';
+import * as dotenv from "dotenv";
+dotenv.config();
 
 export const client = createClient({
   serverUrl: 'http://localhost:8000',
   auth: {
-    username: 'your_username',
-    password: 'your_password',
+    username: process.env.RRELAYER_AUTH_USERNAME!,
+    password: process.env.RRELAYER_AUTH_PASSWORD!,
   },
 });
 
@@ -627,12 +651,14 @@ export interface PagingResult<T> {
 ```ts
 // config.ts
 import { createClient, TransactionSpeed } from 'rrelayer';
+import * as dotenv from "dotenv";
+dotenv.config();
 
 const client = createClient({
   serverUrl: 'http://localhost:8000',
   auth: {
-    username: 'your_username',
-    password: 'your_password',
+    username: process.env.RRELAYER_AUTH_USERNAME!,
+    password: process.env.RRELAYER_AUTH_PASSWORD!,
   },
 });
 

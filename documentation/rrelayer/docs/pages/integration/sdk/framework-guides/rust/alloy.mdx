@@ -42,17 +42,25 @@ use rrelayer::{
     AdminRelayerClient, AdminRelayerClientConfig, AdminRelayerClientAuth,
     RelayerSigner, TransactionSpeed, RelayerId
 };
+use dotenvy::dotenv;
+use std::env;
 
 pub async fn create_relayer_signer() -> Result<RelayerSigner> {
-    let relayer_id = RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?;
+    dotenv().ok();
+
+    let username = env::var("RRELAYER_AUTH_USERNAME")
+        .expect("RRELAYER_AUTH_USERNAME must be set");
+
+    let password = env::var("RRELAYER_AUTH_PASSWORD")
+        .expect("RRELAYER_AUTH_PASSWORD must be set");
 
     let config = AdminRelayerClientConfig {
         server_url: "http://localhost:8000".to_string(),
         provider_url: "https://eth.llamarpc.com".to_string(),
-        relayer_id,
-        auth: AdminRelayerClientAuth::BasicAuth {
-            username: "your_username".to_string(),
-            password: "your_password".to_string(),
+        relayer_id: RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+        auth: CreateClientAuth {
+            username,
+            password,
         },
         // This is optional it defaults to fast and is a fallback
         // You can override this with the transaction request

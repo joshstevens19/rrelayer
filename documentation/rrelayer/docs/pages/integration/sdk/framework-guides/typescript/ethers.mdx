@@ -42,12 +42,14 @@ rrelayer has two ways to create clients based on the authentication direction.
 ```ts [Basic Auth - config.ts]
 import { createClient, TransactionSpeed } from 'rrelayer';
 import { BrowserProvider } from 'ethers';
+import * as dotenv from "dotenv";
+dotenv.config();
 
 let client = createClient({
     serverUrl: 'http://localhost:8000',
     auth: {
-      username: 'your_username',
-      password: 'your_password',
+        username: process.env.RRELAYER_AUTH_USERNAME!,
+        password: process.env.RRELAYER_AUTH_PASSWORD!,
     },
 });
 
@@ -90,12 +92,14 @@ export const signer = await provider.getSigner();
 ```ts [Basic Auth - config.ts]
 import { createClient, TransactionSpeed } from 'rrelayer';
 import { BrowserProvider } from 'ethers';
+import * as dotenv from "dotenv";
+dotenv.config();
 
 let client = createClient({
     serverUrl: 'http://localhost:8000',
     auth: {
-      username: 'your_username',
-      password: 'your_password',
+        username: process.env.RRELAYER_AUTH_USERNAME!,
+        password: process.env.RRELAYER_AUTH_PASSWORD!,
     },
 });
 

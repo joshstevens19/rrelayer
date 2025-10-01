@@ -82,13 +82,15 @@ Using the basic authentication which uses the username and password in your [api
 
 ```ts
 import { createClient, TransactionSpeed } from 'rrelayer';
+import * as dotenv from "dotenv";
+dotenv.config();
 
 // Client also holds some admin methods in which API keys cannot do
 export const client = createClient({
   serverUrl: 'http://localhost:8000',
   auth: {
-    username: 'your_username',
-    password: 'your_password',
+    username: process.env.RRELAYER_AUTH_USERNAME!,
+    password: process.env.RRELAYER_AUTH_PASSWORD!,
   },
 });
 

@@ -42,13 +42,23 @@ use rrelayer::{
     SignTextResult, TransactionSpeed,
 };
 use std::str::FromStr;
+use dotenvy::dotenv;
+use std::env;
 
 async fn get_relayer_client() -> Result<AdminRelayerClient> {
+    dotenv().ok();
+
+    let username = env::var("RRELAYER_AUTH_USERNAME")
+        .expect("RRELAYER_AUTH_USERNAME must be set");
+
+    let password = env::var("RRELAYER_AUTH_PASSWORD")
+        .expect("RRELAYER_AUTH_PASSWORD must be set");
+
     let client = create_client(CreateClientConfig {
         server_url: "http://localhost:8000".to_string(),
         auth: CreateClientAuth {
-            username: "your_username".to_string(),
-            password: "your_password".to_string(),
+            username,
+            password,
         },
     });
 
@@ -158,13 +168,23 @@ use rrelayer::{
     RelayerId, SignedTextHistory, TransactionSpeed, create_client,
 };
 use std::str::FromStr;
+use dotenvy::dotenv;
+use std::env;
 
 async fn get_relayer_client() -> Result<AdminRelayerClient> {
+    dotenv().ok();
+
+    let username = env::var("RRELAYER_AUTH_USERNAME")
+        .expect("RRELAYER_AUTH_USERNAME must be set");
+
+    let password = env::var("RRELAYER_AUTH_PASSWORD")
+        .expect("RRELAYER_AUTH_PASSWORD must be set");
+
     let client = create_client(CreateClientConfig {
         server_url: "http://localhost:8000".to_string(),
         auth: CreateClientAuth {
-            username: "your_username".to_string(),
-            password: "your_password".to_string(),
+            username,
+            password,
         },
     });
 
@@ -258,13 +278,23 @@ use rrelayer::{
     SignTypedDataResult, TransactionSpeed, TypedData, create_client,
 };
 use std::str::FromStr;
+use dotenvy::dotenv;
+use std::env;
 
 async fn get_relayer_client() -> Result<AdminRelayerClient> {
+    dotenv().ok();
+
+    let username = env::var("RRELAYER_AUTH_USERNAME")
+        .expect("RRELAYER_AUTH_USERNAME must be set");
+
+    let password = env::var("RRELAYER_AUTH_PASSWORD")
+        .expect("RRELAYER_AUTH_PASSWORD must be set");
+
     let client = create_client(CreateClientConfig {
         server_url: "http://localhost:8000".to_string(),
         auth: CreateClientAuth {
-            username: "your_username".to_string(),
-            password: "your_password".to_string(),
+            username,
+            password,
         },
     });
 
@@ -461,13 +491,23 @@ use rrelayer::{
     RelayerId, SignedTypedDataHistory, TransactionSpeed, create_client,
 };
 use std::str::FromStr;
+use dotenvy::dotenv;
+use std::env;
 
 async fn get_relayer_client() -> Result<AdminRelayerClient> {
+    dotenv().ok();
+
+    let username = env::var("RRELAYER_AUTH_USERNAME")
+        .expect("RRELAYER_AUTH_USERNAME must be set");
+
+    let password = env::var("RRELAYER_AUTH_PASSWORD")
+        .expect("RRELAYER_AUTH_PASSWORD must be set");
+
     let client = create_client(CreateClientConfig {
         server_url: "http://localhost:8000".to_string(),
         auth: CreateClientAuth {
-            username: "your_username".to_string(),
-            password: "your_password".to_string(),
+            username,
+            password,
         },
     });
 
