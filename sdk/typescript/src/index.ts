@@ -3,5 +3,6 @@ export { PagingContext, PagingResult } from './api/types';
 export * from './clients';
 export {
     Address,
-    TransactionReceipt
+    TransactionReceipt,
+    parseEther,
 } from 'viem';

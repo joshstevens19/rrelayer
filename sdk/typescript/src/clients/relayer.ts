@@ -22,7 +22,12 @@ import {
   getTransactions,
   replaceTransaction,
   sendTransaction,
-  TransactionSpeed, SignedTextHistory, getSignedTextHistory, SignedTypedDataHistory, getSignedTypedDataHistory,
+  TransactionSpeed,
+  SignedTextHistory,
+  getSignedTextHistory,
+  SignedTypedDataHistory,
+  getSignedTypedDataHistory,
+  CancelTransactionResult, ReplaceTransactionResult,
 } from '../api';
 import {
   ApiBaseConfig,
@@ -216,13 +221,13 @@ export class RelayerClient {
        * @param transactionId The transaction id
        * @param replacementTransaction The replacement transaction
        * @param rateLimitKey The rate limit key if you want rate limit feature on
-       * @returns transactionId
+       * @returns ReplaceTransactionResult - the replace transaction result
        */
       replace: (
         transactionId: string,
         replacementTransaction: TransactionToSend,
         rateLimitKey?: string | undefined
-      ): Promise<TransactionSent> => {
+      ): Promise<ReplaceTransactionResult> => {
         return replaceTransaction(
           transactionId,
           replacementTransaction,
@@ -234,12 +239,12 @@ export class RelayerClient {
        * cancel a transaction
        * @param transactionId The transaction id
        * @param rateLimitKey The rate limit key if you want rate limit feature on
-       * @returns TransactionSent - The cancel transaction details
+       * @returns CancelTransactionResult - The cancel transaction result
        */
       cancel: (
         transactionId: string,
         rateLimitKey?: string | undefined
-      ): Promise<TransactionSent> => {
+      ): Promise<CancelTransactionResult> => {
         return cancelTransaction(
           transactionId,
           rateLimitKey,

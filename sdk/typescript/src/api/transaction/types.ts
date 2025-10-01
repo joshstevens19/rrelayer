@@ -50,7 +50,7 @@ export interface Transaction {
 
 export interface TransactionToSend {
   to: string;
-  value?: string | null;
+  value?: string | bigint | null;
   data?: string | null;
   speed?: TransactionSpeed | null;
   blobs?: `0x${string}`[];

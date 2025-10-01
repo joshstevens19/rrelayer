@@ -1,14 +1,20 @@
 import { putApi } from '../axios-wrapper';
 import { ApiBaseConfig } from '../types';
-import { TransactionSent, TransactionToSend } from './types';
+import { TransactionToSend } from './types';
 import { RATE_LIMIT_HEADER_NAME } from '../index';
+
+export interface ReplaceTransactionResult {
+  success: boolean;
+  replaceTransactionId?: string;
+  replaceTransactionHash?: `0x${string}`
+}
 
 export const replaceTransaction = async (
   transactionId: string,
   replacementTransaction: TransactionToSend,
   rateLimitKey: string | undefined,
   baseConfig: ApiBaseConfig
-): Promise<TransactionSent> => {
+): Promise<ReplaceTransactionResult> => {
   try {
     const config: any = {};
     if (rateLimitKey) {
@@ -17,7 +23,7 @@ export const replaceTransaction = async (
       };
     }
 
-    const response = await putApi<TransactionSent>(
+    const response = await putApi<ReplaceTransactionResult>(
       baseConfig,
       `transactions/replace/${transactionId}`,
       {

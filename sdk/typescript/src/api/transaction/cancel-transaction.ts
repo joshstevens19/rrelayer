@@ -1,13 +1,17 @@
 import { putApi } from '../axios-wrapper';
 import { ApiBaseConfig } from '../types';
 import { RATE_LIMIT_HEADER_NAME } from '../index';
-import { TransactionSent } from './types';
+
+export interface CancelTransactionResult {
+  success: boolean;
+  cancelTransactionId?: string;
+}
 
 export const cancelTransaction = async (
   transactionId: string,
   rateLimitKey: string | undefined,
   baseConfig: ApiBaseConfig
-): Promise<TransactionSent> => {
+): Promise<CancelTransactionResult> => {
   try {
     const config: any = {};
     if (rateLimitKey) {
@@ -16,7 +20,7 @@ export const cancelTransaction = async (
       };
     }
 
-    const response = await putApi<TransactionSent>(
+    const response = await putApi<CancelTransactionResult>(
       baseConfig,
       `transactions/cancel/${transactionId}`,
       {},
