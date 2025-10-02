@@ -3,13 +3,13 @@
 Note rrelayer is brand new and actively underdevelopment, things will change and bugs will exist—if you find any bugs or have any
 feature requests, please open an issue on [github](https://github.com/joshstevens19/rrelayer/issues).
 
-rrelayer is an opensource powerful, high-performance blockchain transaction relay service built in Rust, designed for seamless 
-integration with any EVM-compatible network. This tool transforms complex blockchain interactions into simple REST API calls, 
-eliminating the need for applications to manage wallets, transaction queuing, or nonce management. For rrelayer 
-supports advanced wallet infrastructure supporting multiple signing providers including AWS KMS hardware security modules, 
-Turnkey self-custody solutions, Privy managed wallets, AWS Secrets Manager, GCP Secret Manager, and raw mnemonic development setups. 
-It's highly scalable and production-ready, enabling you to build robust Web3 applications with reliability and focus exclusively on 
-your business logic. rrelayer has some super cool out-of-the-box features, like automatic top-ups (with safe support), permissions 
+rrelayer is an opensource powerful, high-performance blockchain transaction relay service built in Rust, designed for seamless
+integration with any EVM-compatible network. This tool transforms complex blockchain interactions into simple REST API calls,
+eliminating the need for applications to manage wallets, transaction queuing, or nonce management. For rrelayer
+supports advanced wallet infrastructure supporting multiple signing providers including AWS KMS hardware security modules,
+Turnkey self-custody solutions, Privy managed wallets, AWS Secrets Manager, GCP Secret Manager, and raw mnemonic development setups.
+It's highly scalable and production-ready, enabling you to build robust Web3 applications with reliability and focus exclusively on
+your business logic. rrelayer has some super cool out-of-the-box features, like automatic top-ups (with safe support), permissions
 config including allowlists, API keys with restricted access, webhooks, rate limiting, and the ability to configure the gas bump blocks.
 
 You can get to the full rrelayer documentation [here](https://rrelayer.xyz/).
@@ -36,9 +36,9 @@ rrelayer --help
 
 ```bash
 Blazing fast EVM relayer tool built in rust
- 
+
 Usage: rrelayer [COMMAND]
- 
+
 Commands:
   new        Create a new rrelayer project
   clone      Clone an existing relayer private key to another network
@@ -53,7 +53,7 @@ Commands:
   sign       Sign messages and typed data alongside get history of signing
   tx         Send, manage and monitor transactions
   help       Print this message or the help of the given subcommand(s)
- 
+
 Options:
   -h, --help     Print help
   -V, --version  Print version
@@ -105,7 +105,33 @@ rrelayer and all the commands available to you.
 
 ## Docker
 
-Coming soon.
+## Docker
+
+A pre-built Docker image is available at `ghcr.io/joshstevens19/rrelayer`.
+
+### Usage
+
+To use rrelayer with Docker, you can run the CLI commands by mounting your project directory:
+
+```bash
+docker run -it -v $PWD:/app/project ghcr.io/joshstevens19/rrelayer --help
+```
+
+### Creating a new project
+
+```bash
+docker run -it -v $PWD:/app/project ghcr.io/joshstevens19/rrelayer new
+```
+
+### Running with existing project
+
+```bash
+export PROJECT_PATH=/path/to/your/project
+
+docker run -it -v $PROJECT_PATH:/app/project ghcr.io/joshstevens19/rrelayer start
+```
+
+Docker is recommended for containerized deployments or when deploying rrelayer in cloud environments.
 
 ## Helm Chart
 

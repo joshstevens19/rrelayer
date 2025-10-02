@@ -78,3 +78,33 @@ To uninstall rrelayer, you can run the following command:
 ```bash
 rrelayerdown
 ```
+
+## Docker
+
+A pre-built Docker image is available for rrelayer, hosted on GitHub Container Registry at `ghcr.io/joshstevens19/rrelayer`.
+
+### Usage
+
+To use rrelayer with Docker, you can run the CLI commands by mounting your project directory:
+
+```bash
+docker run -it -v $PWD:/app/project ghcr.io/joshstevens19/rrelayer --help
+```
+
+### Example: Creating a new project
+
+```bash
+docker run -it -v $PWD:/app/project ghcr.io/joshstevens19/rrelayer new
+```
+
+### Running with existing project
+
+```bash
+export PROJECT_PATH=/path/to/your/project
+
+docker run -it -v $PROJECT_PATH:/app/project ghcr.io/joshstevens19/rrelayer start
+```
+
+:::info
+Docker is recommended for containerized deployments or when deploying rrelayer in cloud environments.
+:::
