@@ -175,7 +175,7 @@ The boilerplate template uses a free rpc node which may get rate limited. We rec
 :::code-group
 
 ```bash [curl]
-curl -X POST http://localhost:8000/api/relayers/11155111/new \
+curl -X POST http://localhost:8000/relayers/11155111/new \
   -u "username:password" \
   -H "Content-Type: application/json" \
   -d '{"name": "my-first-relayer"}'
