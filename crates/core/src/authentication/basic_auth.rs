@@ -10,6 +10,7 @@ use axum::{
     http::{request::Parts, HeaderMap, StatusCode},
 };
 use base64::{engine::general_purpose, Engine as _};
+use subtle::ConstantTimeEq;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -70,7 +71,11 @@ impl BasicAuthCredentials {
         let server_password = env::var("RRELAYER_AUTH_PASSWORD")
             .map_err(|_| BasicAuthError::MissingServerCredentials)?;
 
-        if self.username == server_username && self.password == server_password {
+        // to avoid the Timing Attack Vulnerability
+        let username_match = self.username.as_bytes().ct_eq(server_username.as_bytes());
+        let password_match = self.password.as_bytes().ct_eq(server_password.as_bytes());
+
+        if username_match.into() && password_match.into() {
             Ok(())
         } else {
             Err(BasicAuthError::InvalidCredentials)

@@ -59,3 +59,4 @@ hmac = "0.12"
 sha2 = "0.10"
 p256 = { version = "0.13", features = ["ecdsa"] }
 tower = "0.5.2"
+subtle = "2.6.1"
