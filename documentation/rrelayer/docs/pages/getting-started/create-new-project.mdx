@@ -267,7 +267,7 @@ async fn example() -> Result<()> {
 :::code-group
 
 ```bash [curl]
-curl -X POST https://your-rrelayer.com/api/signing/INSERT_RELAYER_ID/message \
+curl -X POST https://your-rrelayer.com/signing/INSERT_RELAYER_ID/message \
   -u "username:password" \
   -H "Content-Type: application/json" \
   -d '{
@@ -380,7 +380,7 @@ async fn example() -> Result<()> {
 :::code-group
 
 ```bash [curl]
-curl -X POST https://your-rrelayer.com/api/transactions/relayers/YOUR_RELAYER_ID/send \
+curl -X POST https://your-rrelayer.com/transactions/relayers/YOUR_RELAYER_ID/send \
   -u "username:password" \
   -H "Content-Type: application/json" \
   -d '{
