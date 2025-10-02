@@ -105,8 +105,6 @@ rrelayer and all the commands available to you.
 
 ## Docker
 
-## Docker
-
 A pre-built Docker image is available at `ghcr.io/joshstevens19/rrelayer`.
 
 ### Usage
