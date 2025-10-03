@@ -16,8 +16,7 @@ use axum::{
     extract::{Path, State},
     Json,
 };
-use google_secretmanager1::client::serde_with::serde_derive::Serialize;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 #[derive(Debug, Serialize, Deserialize)]
