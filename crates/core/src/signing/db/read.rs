@@ -6,7 +6,7 @@ use crate::{
     shared::common_types::{PagingContext, PagingResult},
 };
 use chrono::{DateTime, Utc};
-use google_secretmanager1::client::serde_with::serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SignedTextHistory {
