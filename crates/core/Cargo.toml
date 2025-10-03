@@ -1,6 +1,6 @@
 [package]
 name = "rrelayer_core"
-version = "0.1.4"
+version = "1.0.5"
 resolver = "2"
 edition = "2021"
 authors = ["joshstevens19@hotmail.co.uk"]

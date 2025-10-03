@@ -106,8 +106,12 @@ impl TestRunner {
             .sent_with_max_priority_fee_per_gas
             .context("transaction_after did not have sent_with_max_priority_fee_per_gas")?;
 
-        if max_fee_per_gas_before == max_fee_per_gas_after && sent_with_max_priority_before == sent_with_max_priority_after {
-            return Err(anyhow::anyhow!("Gas price did not bump max_fee or sent_with_max_priority one must be bumped"));
+        if max_fee_per_gas_before == max_fee_per_gas_after
+            && sent_with_max_priority_before == sent_with_max_priority_after
+        {
+            return Err(anyhow::anyhow!(
+                "Gas price did not bump max_fee or sent_with_max_priority one must be bumped"
+            ));
         }
 
         let transaction_status = relayer
