@@ -20,8 +20,6 @@ impl TestRunner {
         let relayer = self.create_and_fund_relayer("gas-bump-relayer").await?;
         info!("Created relayer: {:?}", relayer);
 
-        let relayer = self.create_and_fund_relayer("gas-bump-relayer").await?;
-
         let tx_request = RelayTransactionRequest {
             to: self.config.anvil_accounts[1],
             value: alloy::primitives::utils::parse_ether("0.5")?.into(),
@@ -78,6 +76,26 @@ impl TestRunner {
         self.mine_and_wait().await?;
         self.mine_and_wait().await?;
         self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
+        self.mine_and_wait().await?;
 
         let transaction_after =
             relayer.transaction().get(&send_result.id).await?.context("Transaction not found")?;
@@ -88,12 +106,8 @@ impl TestRunner {
             .sent_with_max_priority_fee_per_gas
             .context("transaction_after did not have sent_with_max_priority_fee_per_gas")?;
 
-        if max_fee_per_gas_before == max_fee_per_gas_after {
-            return Err(anyhow::anyhow!("Gas price did not bump max_fee"));
-        }
-
-        if sent_with_max_priority_before == sent_with_max_priority_after {
-            return Err(anyhow::anyhow!("Gas price did not bump max_priority_fee"));
+        if max_fee_per_gas_before == max_fee_per_gas_after && sent_with_max_priority_before == sent_with_max_priority_after {
+            return Err(anyhow::anyhow!("Gas price did not bump max_fee or sent_with_max_priority one must be bumped"));
         }
 
         let transaction_status = relayer

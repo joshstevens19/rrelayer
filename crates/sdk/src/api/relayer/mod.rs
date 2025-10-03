@@ -1,16 +1,17 @@
 mod allowlist;
 
-pub use allowlist::RelayerAllowlist;
-use rrelayer_core::{
-    common_types::{PagingContext, PagingResult},
-    relayer::{CreateRelayerResult, GetRelayerResult, Relayer, RelayerId},
-};
-use std::sync::Arc;
-
 use crate::api::{
     http::HttpClient,
     types::{ApiResult, ApiSdkError},
 };
+pub use allowlist::RelayerAllowlist;
+use rrelayer_core::relayer::{CloneRelayerRequest, CreateRelayerRequest};
+use rrelayer_core::{
+    common_types::{PagingContext, PagingResult},
+    network::ChainId,
+    relayer::{CreateRelayerResult, GetRelayerResult, Relayer, RelayerId},
+};
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct RelayerApi {
@@ -54,7 +55,10 @@ impl RelayerApi {
 
     pub async fn create(&self, chain_id: u64, name: &str) -> ApiResult<CreateRelayerResult> {
         self.client
-            .post(&format!("relayers/{}/new", chain_id), &serde_json::json!({ "name": name }))
+            .post(
+                &format!("relayers/{}/new", chain_id),
+                &CreateRelayerRequest { name: name.to_string() },
+            )
             .await
     }
 
@@ -67,7 +71,10 @@ impl RelayerApi {
         self.client
             .post(
                 &format!("relayers/{}/clone", id),
-                &serde_json::json!({ "new_relayer_name": name, "chain_id": chain_id }),
+                &CloneRelayerRequest {
+                    new_relayer_name: name.to_string(),
+                    chain_id: ChainId::new(chain_id),
+                },
             )
             .await
     }

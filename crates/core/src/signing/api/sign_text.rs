@@ -17,7 +17,7 @@ use google_secretmanager1::client::serde_with::serde_derive::Serialize;
 use serde::Deserialize;
 use std::sync::Arc;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct SignTextRequest {
     pub text: String,
 }

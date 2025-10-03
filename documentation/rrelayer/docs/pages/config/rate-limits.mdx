@@ -134,7 +134,7 @@ user_limits:
 Users can provide custom rate limit keys via the `x-rrelayer-rate-limit-key` header:
 
 ```bash
-curl -X POST https://your-rrelayer.com/api/transactions \
+curl -X POST https://your-rrelayer.com/transactions \
   -H "x-rrelayer-rate-limit-key: user-12345" \
   -H "Content-Type: application/json" \
   -d '{"to": "0x...", "data": "0x..."}'

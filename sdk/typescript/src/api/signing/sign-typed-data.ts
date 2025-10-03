@@ -23,7 +23,7 @@ export const signTypedData = async (
 
     const response = await postApi<SignTypedDataResult>(
       baseConfig,
-      `signing/${relayerId}/typed-data`,
+      `signing/relayers/${relayerId}/typed-data`,
       typedData,
       config
     );

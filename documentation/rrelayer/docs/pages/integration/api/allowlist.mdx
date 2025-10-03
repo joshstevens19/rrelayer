@@ -22,7 +22,7 @@ Get the list of allowed recipient addresses for a specific relayer.
 ### Endpoint
 
 ```
-GET /api/relayers/{relayer_id}/allowlists
+GET /relayers/{relayer_id}/allowlists
 ```
 
 ### Response
@@ -38,7 +38,7 @@ GET /api/relayers/{relayer_id}/allowlists
 ### Example
 
 ```bash
-curl https://your-rrelayer.com/api/relayers/550e8400-e29b-41d4-a716-446655440000/allowlists \
+curl https://your-rrelayer.com/relayers/550e8400-e29b-41d4-a716-446655440000/allowlists \
   -u "username:password"
 ```
 
@@ -199,11 +199,11 @@ Test your allowlist setup:
 
 ```bash
 # Check current allowlist
-curl https://your-rrelayer.com/api/relayers/550e8400-e29b-41d4-a716-446655440000/allowlists \
+curl https://your-rrelayer.com/relayers/550e8400-e29b-41d4-a716-446655440000/allowlists \
   -u "username:password"
 
 # Test allowed transaction
-curl -X POST https://your-rrelayer.com/api/transactions/relayers/550e8400-e29b-41d4-a716-446655440000/send \
+curl -X POST https://your-rrelayer.com/transactions/relayers/550e8400-e29b-41d4-a716-446655440000/send \
   -u "username:password" \
   -H "Content-Type: application/json" \
   -d '{
@@ -212,7 +212,7 @@ curl -X POST https://your-rrelayer.com/api/transactions/relayers/550e8400-e29b-4
   }'
 
 # Test blocked transaction (should fail)
-curl -X POST https://your-rrelayer.com/api/transactions/relayers/550e8400-e29b-41d4-a716-446655440000/send \
+curl -X POST https://your-rrelayer.com/transactions/relayers/550e8400-e29b-41d4-a716-446655440000/send \
   -u "username:password" \
   -H "Content-Type: application/json" \
   -d '{
@@ -244,32 +244,3 @@ echo "0x1234567890abcdef1234567890abcdef12345678" | grep -E "^0x[a-fA-F0-9]{40}$
 | 403    | `FORBIDDEN`       | Address not in allowlist   |
 | 404    | `NOT_FOUND`       | Relayer not found          |
 | 500    | `INTERNAL_ERROR`  | Server error               |
-
-### Error Response Format
-
-```json
-{
-  "error": "Recipient address not in allowlist",
-  "code": "FORBIDDEN",
-  "details": {
-    "recipient": "0xunauthorized1234567890abcdef1234567890abcdef",
-    "allowlistEnabled": true,
-    "allowed_addresses_count": 3
-  }
-}
-```
-
-## Performance Considerations
-
-### Allowlist Size
-
-- **Small lists** (< 100 addresses) - No performance impact
-- **Medium lists** (100-1000 addresses) - Minimal impact
-- **Large lists** (> 1000 addresses) - Consider optimization
-
-### Optimization Tips
-
-1. **Use wildcards** sparingly - "\*" disables security checks
-2. **Regular cleanup** - Remove unused addresses
-3. **Monitor performance** - Track transaction validation times
-4. **Consider alternatives** - For very large lists, consider contract-based checks

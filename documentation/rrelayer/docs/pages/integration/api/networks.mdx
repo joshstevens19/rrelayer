@@ -13,7 +13,7 @@ Get a list of all supported blockchain networks.
 ### Endpoint
 
 ```
-GET /api/networks
+GET /networks
 ```
 
 ### Response
@@ -39,7 +39,7 @@ GET /api/networks
 ### Example
 
 ```bash
-curl https://your-rrelayer.com/api/networks \
+curl https://your-rrelayer.com/networks \
   -u "username:password"
 ```
 
@@ -50,7 +50,7 @@ Get details for a specific network.
 ### Endpoint
 
 ```
-GET /api/networks/{chain_id}
+GET /networks/{chain_id}
 ```
 
 ### Response
@@ -66,7 +66,7 @@ GET /api/networks/{chain_id}
 ### Example
 
 ```bash
-curl https://your-rrelayer.com/api/networks/11155111 \
+curl https://your-rrelayer.com/networks/11155111 \
   -u "username:password"
 ```
 
@@ -77,7 +77,7 @@ Get current gas price estimates for a specific network.
 ### Endpoint
 
 ```
-GET /api/networks/gas/price/{chain_id}
+GET /networks/gas/price/{chain_id}
 ```
 
 ### Response
@@ -123,7 +123,7 @@ GET /api/networks/gas/price/{chain_id}
 ### Example
 
 ```bash
-curl https://your-rrelayer.com/api/networks/gas/price/11155111 \
+curl https://your-rrelayer.com/networks/gas/price/11155111 \
   -u "username:password"
 ```
 
@@ -139,76 +139,9 @@ curl https://your-rrelayer.com/api/networks/gas/price/11155111 \
 | 500    | `INTERNAL_ERROR`      | Server error               |
 | 503    | `SERVICE_UNAVAILABLE` | Gas provider unavailable   |
 
-### Error Response Format
-
-```json
-{
-  "error": "Network not found",
-  "code": "NOT_FOUND"
-}
-```
-
 ## Gas Price Providers
 
-rrelayer supports multiple gas price providers configured per network in the rrelayer configuration:
-
-- **TENDERLY** - Tenderly Gas Station
-- **INFURA** - Infura Gas API
-- **CUSTOM** - Custom gas provider
-- **FALLBACK** - Fallback gas estimation
+rrelayer supports multiple gas price providers configured per network in the rrelayer configuration, which you can
+read more about [here](http://localhost:5174/config/networks/gas-provider)
 
 The API returns gas prices from the configured provider for the requested network.
-
-## Use Cases
-
-### Transaction Fee Estimation
-
-Get gas prices to estimate transaction costs:
-
-```bash
-# Get current gas prices
-curl https://your-rrelayer.com/api/networks/gas/price/1 \
-  -u "username:password"
-
-# Use the response to estimate costs
-# Example: MEDIUM speed transaction
-# Estimated cost = gas_limit * max_fee_per_gas
-# Example: 21000 * 4.0 gwei = 84,000 gwei = 0.000084 ETH
-```
-
-### Speed Selection
-
-Choose appropriate transaction speed based on urgency:
-
-```javascript
-// Get gas prices
-const response = await fetch('/api/networks/gas/price/1');
-const data = await response.json();
-
-// Select speed based on requirements
-let speed;
-if (urgent) {
-  speed = 'SUPER';
-} else if (normal) {
-  speed = 'MEDIUM';
-} else {
-  speed = 'SLOW';
-}
-
-// Use selected speed for transaction
-const transaction = {
-  to: '0x...',
-  value: '1000000000000000000',
-  speed: speed,
-};
-```
-
-### Network Validation
-
-Verify network support before sending transactions:
-
-```bash
-# Check if network is supported
-curl https://your-rrelayer.com/api/networks \
-  -u "username:password" | jq '.[] | select(.chainId == 1)'
-```

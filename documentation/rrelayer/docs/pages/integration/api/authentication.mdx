@@ -8,7 +8,7 @@ Use HTTP Basic Authentication with username and password:
 
 ```bash
 # curl automatically encodes credentials with -u flag
-curl https://your-rrelayer.com/api/relayers \
+curl https://your-rrelayer.com/relayers \
   -u "username:password"
 ```
 
@@ -34,7 +34,7 @@ you can read more about that [here](/config/api-config)
 Use API keys in the x-rrelayer-api-key header:
 
 ```bash
-curl https://your-rrelayer.com/api/relayers \
+curl https://your-rrelayer.com/relayers \
   -H "x-rrelayer-api-key: your-api-key"
 ```
 
@@ -67,7 +67,7 @@ Check if the API server is running and accessible.
 ### Endpoint
 
 ```
-GET /api/auth/status
+GET /auth/status
 ```
 
 ### Response
@@ -101,14 +101,14 @@ OR
 #### Basic Auth
 
 ```bash
-curl https://your-rrelayer.com/api/auth/status \
+curl https://your-rrelayer.com/auth/status \
   -u "username:password"
 ```
 
 #### API Key Auth
 
 ```bash
-curl https://your-rrelayer.com/api/auth/status \
+curl https://your-rrelayer.com/auth/status \
   -H "x-rrelayer-api-key: your-api-key"
 ```
 
@@ -149,7 +149,7 @@ x-rrelayer-rate-limit-key: <rate-limit-key>
 Example:
 
 ```bash
-curl https://your-rrelayer.com/api/transactions/relayers/0x.../send \
+curl https://your-rrelayer.com/transactions/relayers/0x.../send \
   -H "x-rrelayer-rate-limit-key: user-12345" \
   -u "username:password" \
   -H "Content-Type: application/json" \

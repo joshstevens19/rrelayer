@@ -17,7 +17,7 @@ export const getSignedTextHistory = async (
   try {
     const response = await getApi<PagingResult<SignedTextHistory>>(
       baseConfig,
-      `relayers/${relayerId}/allowlists`,
+      `signing/relayers/${relayerId}/text-history`,
       { ...pagingContext }
     );
 

@@ -13,7 +13,7 @@ Send a new transaction through a relayer.
 ### Endpoint
 
 ```
-POST /api/transactions/relayers/{relayer_id}/send
+POST /transactions/relayers/{relayer_id}/send
 ```
 
 ### Request Body
@@ -52,7 +52,7 @@ POST /api/transactions/relayers/{relayer_id}/send
 ### Example
 
 ```bash
-curl -X POST https://your-rrelayer.com/api/transactions/relayers/0x742d35.../send \
+curl -X POST https://your-rrelayer.com/transactions/relayers/0x742d35.../send \
   -u "username:password" \
   -H "Content-Type: application/json" \
   -d '{
@@ -70,7 +70,7 @@ Get transaction details by ID.
 ### Endpoint
 
 ```
-GET /api/transactions/{transaction_id}
+GET /transactions/{transaction_id}
 ```
 
 ### Response
@@ -116,7 +116,7 @@ For transactions with status `CANCELLED`, additional fields are included:
 ### Example
 
 ```bash
-curl https://your-rrelayer.com/api/transactions/550e8400-e29b-41d4-a716-446655440000 \
+curl https://your-rrelayer.com/transactions/550e8400-e29b-41d4-a716-446655440000 \
   -u "username:password"
 ```
 
@@ -127,7 +127,7 @@ Get the current status and receipt information for a transaction.
 ### Endpoint
 
 ```
-GET /api/transactions/status/{transaction_id}
+GET /transactions/status/{transaction_id}
 ```
 
 ### Response
@@ -164,7 +164,7 @@ GET /api/transactions/status/{transaction_id}
 ### Example
 
 ```bash
-curl https://your-rrelayer.com/api/transactions/status/550e8400-e29b-41d4-a716-446655440000 \
+curl https://your-rrelayer.com/transactions/status/550e8400-e29b-41d4-a716-446655440000 \
   -u "username:password"
 ```
 
@@ -175,7 +175,7 @@ Replace a pending or in-mempool transaction with new transaction parameters.
 ### Endpoint
 
 ```
-PUT /api/transactions/replace/{transaction_id}
+PUT /transactions/replace/{transaction_id}
 ```
 
 ### Request Body
@@ -219,7 +219,7 @@ PUT /api/transactions/replace/{transaction_id}
 ### Example
 
 ```bash
-curl -X PUT https://your-rrelayer.com/api/transactions/replace/550e8400-e29b-41d4-a716-446655440000 \
+curl -X PUT https://your-rrelayer.com/transactions/replace/550e8400-e29b-41d4-a716-446655440000 \
   -u "username:password" \
   -H "Content-Type: application/json" \
   -d '{
@@ -236,7 +236,7 @@ Cancel a pending or in-mempool transaction.
 ### Endpoint
 
 ```
-PUT /api/transactions/cancel/{transaction_id}
+PUT /transactions/cancel/{transaction_id}
 ```
 
 ### Behavior
@@ -267,7 +267,7 @@ PUT /api/transactions/cancel/{transaction_id}
 ### Example
 
 ```bash
-curl -X PUT https://your-rrelayer.com/api/transactions/cancel/550e8400-e29b-41d4-a716-446655440000 \
+curl -X PUT https://your-rrelayer.com/transactions/cancel/550e8400-e29b-41d4-a716-446655440000 \
   -u "username:password"
 ```
 
@@ -278,7 +278,7 @@ Get all transactions for a specific relayer.
 ### Endpoint
 
 ```
-GET /api/transactions/relayers/{relayer_id}
+GET /transactions/relayers/{relayer_id}
 ```
 
 ### Query Parameters
@@ -326,7 +326,7 @@ GET /api/transactions/relayers/{relayer_id}
 ### Example
 
 ```bash
-curl "https://your-rrelayer.com/api/transactions/relayers/0x742d35...?limit=10&offset=0" \
+curl "https://your-rrelayer.com/transactions/relayers/0x742d35...?limit=10&offset=0" \
   -u "username:password"
 ```
 
@@ -337,13 +337,13 @@ Get pending and in-mempool transaction counts for a relayer.
 ### Pending Count
 
 ```
-GET /api/transactions/relayers/{relayer_id}/pending/count
+GET /transactions/relayers/{relayer_id}/pending/count
 ```
 
 ### In-Mempool Count
 
 ```
-GET /api/transactions/relayers/{relayer_id}/inmempool/count
+GET /transactions/relayers/{relayer_id}/inmempool/count
 ```
 
 ### Response
@@ -357,7 +357,7 @@ GET /api/transactions/relayers/{relayer_id}/inmempool/count
 ### Example
 
 ```bash
-curl https://your-rrelayer.com/api/transactions/relayers/0x742d35.../pending/count \
+curl https://your-rrelayer.com/transactions/relayers/0x742d35.../pending/count \
   -u "username:password"
 ```
 
@@ -373,15 +373,6 @@ curl https://your-rrelayer.com/api/transactions/relayers/0x742d35.../pending/cou
 | 404    | `NOT_FOUND`           | Transaction or relayer not found |
 | 429    | `RATE_LIMIT_EXCEEDED` | Rate limit exceeded              |
 | 500    | `INTERNAL_ERROR`      | Server error                     |
-
-### Error Response Format
-
-```json
-{
-  "error": "Transaction not found",
-  "code": "NOT_FOUND"
-}
-```
 
 ## Transaction Competition and Race Conditions
 
@@ -413,21 +404,21 @@ You can monitor the outcome by:
 
 ```bash
 # 1. Send a transaction
-POST /api/transactions/relayers/{relayer_id}/send
+POST /transactions/relayers/{relayer_id}/send
 # Response: {"id": "550e8400-e29b-41d4-a716-446655440000", "hash": "0x..."}
 
 # 2. Cancel the transaction (while INMEMPOOL)
-PUT /api/transactions/cancel/550e8400-e29b-41d4-a716-446655440000
+PUT /transactions/cancel/550e8400-e29b-41d4-a716-446655440000
 # Response: {"success": true, "cancelTransactionId": "550e8400-e29b-41d4-a716-446655440001"}
 
 # 3. Monitor the original transaction status
-GET /api/transactions/status/550e8400-e29b-41d4-a716-446655440000
+GET /transactions/status/550e8400-e29b-41d4-a716-446655440000
 # Possible outcomes:
 # - "status": "CANCELLED" (cancel won)
 # - "status": "MINED" (original won)
 
 # 4. If cancelled, check the relationship
-GET /api/transactions/550e8400-e29b-41d4-a716-446655440000
+GET /transactions/550e8400-e29b-41d4-a716-446655440000
 # Response includes: "cancelledByTransactionId": "550e8400-e29b-41d4-a716-446655440001"
 ```
 
@@ -438,7 +429,7 @@ Transaction endpoints are subject to rate limiting. See [Rate Limits](/config/ra
 Use the `x-rrelayer-rate-limit-key` header to specify a custom rate limit key:
 
 ```bash
-curl -X POST https://your-rrelayer.com/api/transactions/relayers/0x742d35.../send \
+curl -X POST https://your-rrelayer.com/transactions/relayers/0x742d35.../send \
   -H "x-rrelayer-rate-limit-key: user-12345" \
   -u "username:password" \
   -H "Content-Type: application/json" \

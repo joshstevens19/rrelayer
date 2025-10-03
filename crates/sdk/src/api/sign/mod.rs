@@ -3,7 +3,7 @@ use reqwest::header::{HeaderMap, HeaderValue};
 use rrelayer_core::RATE_LIMIT_HEADER_NAME;
 use rrelayer_core::common_types::{PagingContext, PagingResult};
 use rrelayer_core::relayer::RelayerId;
-use rrelayer_core::signing::{SignTextResult, SignTypedDataResult};
+use rrelayer_core::signing::{SignTextRequest, SignTextResult, SignTypedDataResult};
 use rrelayer_core::signing::{SignedTextHistory, SignedTypedDataHistory};
 use std::sync::Arc;
 
@@ -33,8 +33,8 @@ impl SignApi {
 
         self.client
             .post_with_headers(
-                &format!("signing/{}/message", relayer_id),
-                &serde_json::json!({ "text": text }),
+                &format!("signing/relayers/{}/message", relayer_id),
+                &SignTextRequest { text: text.to_string() },
                 headers,
             )
             .await
@@ -55,7 +55,11 @@ impl SignApi {
         }
 
         self.client
-            .post_with_headers(&format!("signing/{}/typed-data", relayer_id), typed_data, headers)
+            .post_with_headers(
+                &format!("signing/relayers/{}/typed-data", relayer_id),
+                typed_data,
+                headers,
+            )
             .await
     }
 
@@ -74,7 +78,7 @@ impl SignApi {
         paging_context: &PagingContext,
     ) -> ApiResult<PagingResult<SignedTextHistory>> {
         let url = format!(
-            "signing/{}/text-history?limit={}&offset={}",
+            "signing/relayers/{}/text-history?limit={}&offset={}",
             relayer_id, paging_context.limit, paging_context.offset
         );
         self.client.get(&url).await
@@ -95,7 +99,7 @@ impl SignApi {
         paging_context: &PagingContext,
     ) -> ApiResult<PagingResult<SignedTypedDataHistory>> {
         let url = format!(
-            "signing/{}/typed-data-history?limit={}&offset={}",
+            "signing/relayers/{}/typed-data-history?limit={}&offset={}",
             relayer_id, paging_context.limit, paging_context.offset
         );
         self.client.get(&url).await

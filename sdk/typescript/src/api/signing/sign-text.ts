@@ -24,7 +24,7 @@ export const signText = async (
 
     const response = await postApi<SignTextResult>(
       baseConfig,
-      `signing/${relayerId}/message`,
+      `signing/relayers/${relayerId}/message`,
       { text },
       config
     );

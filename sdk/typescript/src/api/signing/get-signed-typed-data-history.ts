@@ -19,7 +19,7 @@ export const getSignedTypedDataHistory = async (
   try {
     const response = await getApi<PagingResult<SignedTypedDataHistory>>(
       baseConfig,
-      `relayers/${relayerId}/typed-data-history`,
+      `signing/relayers/${relayerId}/typed-data-history`,
       { ...pagingContext }
     );
 

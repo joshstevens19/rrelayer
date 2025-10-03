@@ -13,7 +13,7 @@ Sign a plain text message using a relayer's private key.
 ### Endpoint
 
 ```
-POST /api/signing/{relayer_id}/message
+POST /signing/relayers/{relayer_id}/message
 ```
 
 ### Request Body
@@ -47,7 +47,7 @@ POST /api/signing/{relayer_id}/message
 ### Example
 
 ```bash
-curl -X POST https://your-rrelayer.com/api/signing/6ba7b810-9dad-11d1-80b4-00c04fd430c8/message \
+curl -X POST https://your-rrelayer.com/signing/relayers/6ba7b810-9dad-11d1-80b4-00c04fd430c8/message \
   -u "username:password" \
   -H "Content-Type: application/json" \
   -d '{
@@ -62,7 +62,7 @@ Sign structured data according to the EIP-712 standard.
 ### Endpoint
 
 ```
-POST /api/signing/{relayer_id}/typed-data
+POST /signing/relayers/{relayer_id}/typed-data
 ```
 
 ### Request Body
@@ -119,7 +119,7 @@ POST /api/signing/{relayer_id}/typed-data
 ### Example
 
 ```bash
-curl -X POST https://your-rrelayer.com/api/signing/6ba7b810-9dad-11d1-80b4-00c04fd430c8/typed-data \
+curl -X POST https://your-rrelayer.com/signing/relayers/6ba7b810-9dad-11d1-80b4-00c04fd430c8/typed-data \
   -u "username:password" \
   -H "Content-Type: application/json" \
   -d '{
@@ -156,7 +156,7 @@ Get the history of text messages signed by a relayer.
 ### Endpoint
 
 ```
-GET /api/signing/{relayer_id}/text-history
+GET /signing/relayers/{relayer_id}/text-history
 ```
 
 ### Query Parameters
@@ -194,7 +194,7 @@ GET /api/signing/{relayer_id}/text-history
 ### Example
 
 ```bash
-curl "https://your-rrelayer.com/api/signing/6ba7b810-9dad-11d1-80b4-00c04fd430c8/text-history?limit=10" \
+curl "https://your-rrelayer.com/signing/relayers/6ba7b810-9dad-11d1-80b4-00c04fd430c8/text-history?limit=10" \
   -u "username:password"
 ```
 
@@ -205,7 +205,7 @@ Get the history of typed data signed by a relayer.
 ### Endpoint
 
 ```
-GET /api/signing/{relayer_id}/typed-data-history
+GET /signing/relayers/{relayer_id}/typed-data-history
 ```
 
 ### Query Parameters
@@ -253,7 +253,7 @@ GET /api/signing/{relayer_id}/typed-data-history
 ### Example
 
 ```bash
-curl "https://your-rrelayer.com/api/signing/6ba7b810-9dad-11d1-80b4-00c04fd430c8/typed-data-history?limit=10" \
+curl "https://your-rrelayer.com/signing/relayers/6ba7b810-9dad-11d1-80b4-00c04fd430c8/typed-data-history?limit=10" \
   -u "username:password"
 ```
 
@@ -327,7 +327,7 @@ The EIP-712 domain should include these standard fields:
 Sign a message to prove ownership of an address:
 
 ```bash
-curl -X POST https://your-rrelayer.com/api/signing/6ba7b810-9dad-11d1-80b4-00c04fd430c8/message \
+curl -X POST https://your-rrelayer.com/signing/relayers/6ba7b810-9dad-11d1-80b4-00c04fd430c8/message \
   -u "username:password" \
   -H "Content-Type: application/json" \
   -d '{
@@ -340,7 +340,7 @@ curl -X POST https://your-rrelayer.com/api/signing/6ba7b810-9dad-11d1-80b4-00c04
 Sign structured data for permission grants:
 
 ```bash
-curl -X POST https://your-rrelayer.com/api/signing/6ba7b810-9dad-11d1-80b4-00c04fd430c8/typed-data \
+curl -X POST https://your-rrelayer.com/signing/relayers/6ba7b810-9dad-11d1-80b4-00c04fd430c8/typed-data \
   -u "username:password" \
   -H "Content-Type: application/json" \
   -d '{
@@ -371,7 +371,7 @@ curl -X POST https://your-rrelayer.com/api/signing/6ba7b810-9dad-11d1-80b4-00c04
 Sign transaction data for gasless execution:
 
 ```bash
-curl -X POST https://your-rrelayer.com/api/signing/6ba7b810-9dad-11d1-80b4-00c04fd430c8/typed-data \
+curl -X POST https://your-rrelayer.com/signing/relayers/6ba7b810-9dad-11d1-80b4-00c04fd430c8/typed-data \
   -u "username:password" \
   -H "Content-Type: application/json" \
   -d '{
@@ -414,15 +414,6 @@ curl -X POST https://your-rrelayer.com/api/signing/6ba7b810-9dad-11d1-80b4-00c04
 | 429    | `RATE_LIMIT_EXCEEDED` | Rate limit exceeded        |
 | 500    | `INTERNAL_ERROR`      | Server error               |
 
-### Error Response Format
-
-```json
-{
-  "error": "Invalid EIP-712 typed data",
-  "code": "INVALID_REQUEST"
-}
-```
-
 ## Rate Limiting
 
 Signing endpoints are subject to rate limiting. See [Rate Limits](/config/rate-limits) for configuration details.
@@ -430,7 +421,7 @@ Signing endpoints are subject to rate limiting. See [Rate Limits](/config/rate-l
 Use the `x-rrelayer-rate-limit-key` header to specify a custom rate limit key:
 
 ```bash
-curl -X POST https://your-rrelayer.com/api/signing/6ba7b810-9dad-11d1-80b4-00c04fd430c8/message \
+curl -X POST https://your-rrelayer.com/signing/relayers/6ba7b810-9dad-11d1-80b4-00c04fd430c8/message \
   -H "x-rrelayer-rate-limit-key: user-12345" \
   -u "username:password" \
   -H "Content-Type: application/json" \

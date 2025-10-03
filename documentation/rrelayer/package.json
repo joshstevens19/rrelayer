@@ -9,7 +9,7 @@
     "dev": "vocs dev",
     "build": "vocs build",
     "preview": "vocs preview",
-    "format": "prettier --write \"**/*.{ts,js,json,tsx,mdx}\""
+    "format": "prettier --write \"**/*.{ts,js,json,tsx,mdx}\" --ignore-path .prettierignore"
   },
   "dependencies": {
     "@types/react": "latest",

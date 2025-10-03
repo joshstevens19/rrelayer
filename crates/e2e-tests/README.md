@@ -10,7 +10,7 @@ You can run the e2e tests running:
 
 ### Raw
 ```bash
- RRELAYER_PROVIDERS="raw" make run-tests-debug
+RRELAYER_PROVIDERS="raw" make run-tests-debug
 ```
 
 ### aws_secret_manager

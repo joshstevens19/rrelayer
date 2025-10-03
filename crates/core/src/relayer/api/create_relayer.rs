@@ -18,7 +18,7 @@ use crate::{
     transaction::{queue_system::TransactionsQueueSetup, NonceManager},
 };
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct CreateRelayerRequest {
     pub name: String,
 }

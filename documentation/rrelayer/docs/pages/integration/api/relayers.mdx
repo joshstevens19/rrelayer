@@ -13,7 +13,7 @@ Create a new relayer for a specific blockchain network.
 ### Endpoint
 
 ```
-POST /api/relayers/{chain_id}/new
+POST /relayers/{chain_id}/new
 ```
 
 ### Request Body
@@ -42,7 +42,7 @@ POST /api/relayers/{chain_id}/new
 ### Example
 
 ```bash
-curl -X POST https://your-rrelayer.com/api/relayers/11155111/new \
+curl -X POST https://your-rrelayer.com/relayers/11155111/new \
   -u "username:password" \
   -H "Content-Type: application/json" \
   -d '{"name": "my-app-relayer"}'
@@ -55,7 +55,7 @@ Get a list of all relayers.
 ### Endpoint
 
 ```
-GET /api/relayers
+GET /relayers
 ```
 
 ### Query Parameters
@@ -95,7 +95,7 @@ GET /api/relayers
 ### Example
 
 ```bash
-curl "https://your-rrelayer.com/api/relayers?limit=10&chain_id=11155111" \
+curl "https://your-rrelayer.com/relayers?limit=10&chain_id=11155111" \
   -u "username:password"
 ```
 
@@ -106,7 +106,7 @@ Get details for a specific relayer.
 ### Endpoint
 
 ```
-GET /api/relayers/{relayer_id}
+GET /relayers/{relayer_id}
 ```
 
 ### Response
@@ -142,7 +142,7 @@ GET /api/relayers/{relayer_id}
 ### Example
 
 ```bash
-curl https://your-rrelayer.com/api/relayers/6ba7b810-9dad-11d1-80b4-00c04fd430c8 \
+curl https://your-rrelayer.com/relayers/6ba7b810-9dad-11d1-80b4-00c04fd430c8 \
   -u "username:password"
 ```
 
@@ -153,7 +153,7 @@ Create a copy of an existing relayer with the same configuration.
 ### Endpoint
 
 ```
-POST /api/relayers/{relayer_id}/clone
+POST /relayers/{relayer_id}/clone
 ```
 
 ### Request Body
@@ -184,7 +184,7 @@ POST /api/relayers/{relayer_id}/clone
 ### Example
 
 ```bash
-curl -X POST https://your-rrelayer.com/api/relayers/6ba7b810-9dad-11d1-80b4-00c04fd430c8/clone \
+curl -X POST https://your-rrelayer.com/relayers/6ba7b810-9dad-11d1-80b4-00c04fd430c8/clone \
   -u "username:password" \
   -H "Content-Type: application/json" \
   -d '{"newRelayerName": "cloned-relayer", "chainId": 1}'
@@ -197,7 +197,7 @@ Pause a relayer to stop it from sending new transactions.
 ### Endpoint
 
 ```
-PUT /api/relayers/{relayer_id}/pause
+PUT /relayers/{relayer_id}/pause
 ```
 
 ### Response
@@ -211,7 +211,7 @@ PUT /api/relayers/{relayer_id}/pause
 ### Example
 
 ```bash
-curl -X PUT https://your-rrelayer.com/api/relayers/6ba7b810-9dad-11d1-80b4-00c04fd430c8/pause \
+curl -X PUT https://your-rrelayer.com/relayers/6ba7b810-9dad-11d1-80b4-00c04fd430c8/pause \
   -u "username:password"
 ```
 
@@ -222,7 +222,7 @@ Resume a paused relayer.
 ### Endpoint
 
 ```
-PUT /api/relayers/{relayer_id}/unpause
+PUT /relayers/{relayer_id}/unpause
 ```
 
 ### Response
@@ -236,7 +236,7 @@ PUT /api/relayers/{relayer_id}/unpause
 ### Example
 
 ```bash
-curl -X PUT https://your-rrelayer.com/api/relayers/6ba7b810-9dad-11d1-80b4-00c04fd430c8/unpause \
+curl -X PUT https://your-rrelayer.com/relayers/6ba7b810-9dad-11d1-80b4-00c04fd430c8/unpause \
   -u "username:password"
 ```
 
@@ -247,7 +247,7 @@ Set the maximum gas price a relayer will use for transactions.
 ### Endpoint
 
 ```
-PUT /api/relayers/{relayer_id}/gas/max/{gas_price_cap}
+PUT /relayers/{relayer_id}/gas/max/{gas_price_cap}
 ```
 
 ### Path Parameters
@@ -267,7 +267,7 @@ PUT /api/relayers/{relayer_id}/gas/max/{gas_price_cap}
 ### Example
 
 ```bash
-curl -X PUT https://your-rrelayer.com/api/relayers/6ba7b810-9dad-11d1-80b4-00c04fd430c8/gas/max/50000000000 \
+curl -X PUT https://your-rrelayer.com/relayers/6ba7b810-9dad-11d1-80b4-00c04fd430c8/gas/max/50000000000 \
   -u "username:password"
 ```
 
@@ -278,7 +278,7 @@ Enable or disable EIP-1559 transaction types for a relayer.
 ### Endpoint
 
 ```
-PUT /api/relayers/{relayer_id}/gas/eip1559/{enabled}
+PUT /relayers/{relayer_id}/gas/eip1559/{enabled}
 ```
 
 ### Path Parameters
@@ -298,7 +298,7 @@ PUT /api/relayers/{relayer_id}/gas/eip1559/{enabled}
 ### Example
 
 ```bash
-curl -X PUT https://your-rrelayer.com/api/relayers/6ba7b810-9dad-11d1-80b4-00c04fd430c8/gas/eip1559/true \
+curl -X PUT https://your-rrelayer.com/relayers/6ba7b810-9dad-11d1-80b4-00c04fd430c8/gas/eip1559/true \
   -u "username:password"
 ```
 
@@ -309,7 +309,7 @@ Get the list of allowed recipient addresses for a relayer.
 ### Endpoint
 
 ```
-GET /api/relayers/{relayer_id}/allowlists
+GET /relayers/{relayer_id}/allowlists
 ```
 
 ### Response
@@ -324,7 +324,7 @@ GET /api/relayers/{relayer_id}/allowlists
 ### Example
 
 ```bash
-curl https://your-rrelayer.com/api/relayers/6ba7b810-9dad-11d1-80b4-00c04fd430c8/allowlists \
+curl https://your-rrelayer.com/relayers/6ba7b810-9dad-11d1-80b4-00c04fd430c8/allowlists \
   -u "username:password"
 ```
 
@@ -335,7 +335,7 @@ Delete a relayer permanently.
 ### Endpoint
 
 ```
-DELETE /api/relayers/{relayer_id}
+DELETE /relayers/{relayer_id}
 ```
 
 ### Response
@@ -349,7 +349,7 @@ DELETE /api/relayers/{relayer_id}
 ### Example
 
 ```bash
-curl -X DELETE https://your-rrelayer.com/api/relayers/0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b \
+curl -X DELETE https://your-rrelayer.com/relayers/0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b \
   -u "username:password"
 ```
 
@@ -366,30 +366,13 @@ curl -X DELETE https://your-rrelayer.com/api/relayers/0x742d35cc6466c4b0de3e3e8c
 | 409    | `CONFLICT`        | Relayer name already exists |
 | 500    | `INTERNAL_ERROR`  | Server error                |
 
-### Error Response Format
-
-```json
-{
-  "error": "Relayer not found",
-  "code": "NOT_FOUND"
-}
-```
-
 ## Best Practices
 
 ### Relayer Management
 
 1. **Use descriptive names** - Choose meaningful names for easy identification
-2. **Monitor balances** - Keep relayer accounts funded for transaction fees
-3. **Set appropriate gas limits** - Configure max gas prices to control costs
-4. **Use allowlists** - Restrict transaction recipients for security
-
-### Security Considerations
-
-1. **Access control** - Limit API access to authorized systems only
-2. **Rate limiting** - Monitor and control transaction volumes
-3. **Balance monitoring** - Set up alerts for low balances
-4. **Regular audits** - Review relayer activity and configurations
+2. **Set appropriate gas limits** - Configure max gas prices to control costs
+3. **Use allowlists** - Restrict transaction recipients for security
 
 ### Performance Optimization
 
