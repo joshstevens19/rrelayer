@@ -87,6 +87,10 @@ export default defineConfig({
               text: 'Private Keys',
               link: '/config/signing-providers/private-keys',
             },
+            {
+              text: 'PKCS#11 - BETA',
+              link: '/config/signing-providers/pkcs11',
+            },
           ],
         },
         {

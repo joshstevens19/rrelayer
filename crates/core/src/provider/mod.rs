@@ -66,6 +66,7 @@ pub async fn load_providers(
         let has_main_signing_provider = signing_key.privy.is_some()
             || signing_key.aws_kms.is_some()
             || signing_key.turnkey.is_some()
+            || signing_key.pkcs11.is_some()
             || signing_key.raw.is_some();
 
         // If we only have private keys and no main signing provider, use private key manager only
@@ -144,6 +145,25 @@ pub async fn load_providers(
                 EvmProvider::new_with_turnkey(
                     config,
                     turnkey.clone(),
+                    get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                )
+                .await?
+            }
+        } else if let Some(pkcs11) = &signing_key.pkcs11 {
+            if private_key_strings.is_some() {
+                let pkcs11_manager =
+                    std::sync::Arc::new(crate::wallet::Pkcs11WalletManager::new(pkcs11.clone())?);
+                EvmProvider::new_with_composite(
+                    config,
+                    pkcs11_manager,
+                    private_key_strings,
+                    get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                )
+                .await?
+            } else {
+                EvmProvider::new_with_pkcs11(
+                    config,
+                    pkcs11.clone(),
                     get_gas_estimator(&config.provider_urls, setup_config, config).await?,
                 )
                 .await?

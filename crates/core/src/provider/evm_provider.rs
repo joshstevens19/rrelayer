@@ -1,10 +1,13 @@
 use crate::gas::BLOB_GAS_PER_BLOB;
 use crate::provider::layer_extensions::RpcLoggingLayer;
 use crate::wallet::{
-    AwsKmsWalletManager, CompositeWalletManager, MnemonicWalletManager, PrivateKeyWalletManager,
-    PrivyWalletManager, TurnkeyWalletManager, WalletError, WalletManagerTrait,
+    AwsKmsWalletManager, CompositeWalletManager, MnemonicWalletManager, Pkcs11WalletManager,
+    PrivateKeyWalletManager, PrivyWalletManager, TurnkeyWalletManager, WalletError,
+    WalletManagerTrait,
 };
-use crate::yaml::{AwsKmsSigningProviderConfig, TurnkeySigningProviderConfig};
+use crate::yaml::{
+    AwsKmsSigningProviderConfig, Pkcs11SigningProviderConfig, TurnkeySigningProviderConfig,
+};
 use crate::{
     gas::{
         BaseGasFeeEstimator, BlobGasEstimatorResult, BlobGasPriceResult, GasEstimatorError,
@@ -197,6 +200,15 @@ impl EvmProvider {
         gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
     ) -> Result<Self, EvmProviderNewError> {
         let wallet_manager = Arc::new(PrivateKeyWalletManager::new(private_keys));
+        Self::new_internal(network_setup_config, wallet_manager, gas_estimator).await
+    }
+
+    pub async fn new_with_pkcs11(
+        network_setup_config: &NetworkSetupConfig,
+        pkcs11_config: Pkcs11SigningProviderConfig,
+        gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
+    ) -> Result<Self, EvmProviderNewError> {
+        let wallet_manager = Arc::new(Pkcs11WalletManager::new(pkcs11_config)?);
         Self::new_internal(network_setup_config, wallet_manager, gas_estimator).await
     }
 
