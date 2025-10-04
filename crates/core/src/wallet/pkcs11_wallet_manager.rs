@@ -253,7 +253,7 @@ impl Pkcs11WalletManager {
             return Err(WalletError::GenericSignerError(format!(
                 "Unsupported EC point format: len={}, first_byte=0x{:02x}",
                 point_bytes.len(),
-                point_bytes.get(0).unwrap_or(&0)
+                point_bytes.first().unwrap_or(&0)
             )));
         };
 
