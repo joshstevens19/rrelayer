@@ -59,15 +59,15 @@ impl Pkcs11WalletManager {
             .get_slots_with_token()
             .map_err(|e| WalletError::GenericSignerError(format!("Failed to get slots: {}", e)))?;
 
-        let slot = if let Some(slot_id) = config.slot_id {
+        let slot = if let Some(target_slot_id) = config.slot_id {
             slots
                 .into_iter()
                 .find(|s| {
-                    let id: u64 = (*s).into();
-                    id == slot_id
+                    // Use slot ID() method for cross-platform compatibility
+                    s.id() == target_slot_id
                 })
                 .ok_or_else(|| WalletError::ConfigurationError {
-                    message: format!("Slot {} not found", slot_id),
+                    message: format!("Slot {} not found", target_slot_id),
                 })?
         } else {
             slots.into_iter().next().ok_or_else(|| WalletError::ConfigurationError {
@@ -75,7 +75,7 @@ impl Pkcs11WalletManager {
             })?
         };
 
-        let slot_id: u64 = slot.into();
+        let slot_id = slot.id();
         info!("Initialized PKCS#11 wallet manager on slot {}", slot_id);
 
         Ok(Self { config, ctx, slot, wallet_cache: Mutex::new(HashMap::new()) })
@@ -319,7 +319,6 @@ impl Pkcs11WalletManager {
             hex::encode(expected_address.as_slice())
         );
 
-        // Generate ECDSA signature
         let signature_bytes = session
             .sign(&Mechanism::Ecdsa, *private_key, hash.as_slice())
             .map_err(|e| WalletError::GenericSignerError(format!("HSM signing failed: {}", e)))?;
