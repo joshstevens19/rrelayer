@@ -58,6 +58,17 @@ pub struct TurnkeySigningProviderConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Pkcs11SigningProviderConfig {
+    pub library_path: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub pin: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub slot_id: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub test_mode: Option<bool>, // DEVELOPMENT ONLY - Returns mock signatures for testing
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PrivateKeyConfig {
     pub raw: String,
 }
@@ -81,6 +92,9 @@ pub struct SigningProvider {
 
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub turnkey: Option<TurnkeySigningProviderConfig>,
+
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub pkcs11: Option<Pkcs11SigningProviderConfig>,
 
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub private_keys: Option<Vec<PrivateKeyConfig>>,
@@ -147,6 +161,7 @@ impl SigningProvider {
             privy: None,
             aws_kms: None,
             turnkey: None,
+            pkcs11: None,
             private_keys: None,
         }
     }
@@ -159,6 +174,7 @@ impl SigningProvider {
             privy: None,
             aws_kms: Some(aws_kms),
             turnkey: None,
+            pkcs11: None,
             private_keys: None,
         }
     }
@@ -171,6 +187,20 @@ impl SigningProvider {
             privy: None,
             aws_kms: None,
             turnkey: Some(turnkey),
+            pkcs11: None,
+            private_keys: None,
+        }
+    }
+
+    pub fn from_pkcs11(pkcs11: Pkcs11SigningProviderConfig) -> Self {
+        Self {
+            raw: None,
+            aws_secret_manager: None,
+            gcp_secret_manager: None,
+            privy: None,
+            aws_kms: None,
+            turnkey: None,
+            pkcs11: Some(pkcs11),
             private_keys: None,
         }
     }
@@ -185,6 +215,7 @@ impl SigningProvider {
             self.privy.is_some(),
             self.aws_kms.is_some(),
             self.turnkey.is_some(),
+            self.pkcs11.is_some(),
             self.private_keys.is_some(),
         ]
         .iter()

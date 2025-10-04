@@ -24,6 +24,9 @@ pub use turnkey_wallet_manager::TurnkeyWalletManager;
 mod private_key_wallet_manager;
 pub use private_key_wallet_manager::PrivateKeyWalletManager;
 
+mod pkcs11_wallet_manager;
+pub use pkcs11_wallet_manager::Pkcs11WalletManager;
+
 mod composite_wallet_manager;
 pub use composite_wallet_manager::CompositeWalletManager;
 

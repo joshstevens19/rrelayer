@@ -189,6 +189,7 @@ async fn start_api(
                 && signing_provider.privy.is_none()
                 && signing_provider.aws_kms.is_none()
                 && signing_provider.turnkey.is_none()
+                && signing_provider.pkcs11.is_none()
             {
                 Some(network_config.chain_id)
             } else {

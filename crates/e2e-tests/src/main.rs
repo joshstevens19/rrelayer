@@ -21,6 +21,7 @@ pub enum SigningProvider {
     GcpSecretManager,
     Privy,
     Turnkey,
+    PKCS11,
 }
 
 impl SigningProvider {
@@ -32,6 +33,7 @@ impl SigningProvider {
             SigningProvider::GcpSecretManager => "gcp_secret_manager",
             SigningProvider::Privy => "privy",
             SigningProvider::Turnkey => "turnkey",
+            SigningProvider::PKCS11 => "pkcs11",
         }
     }
 
@@ -44,6 +46,7 @@ impl SigningProvider {
             SigningProvider::Privy,
             // Due to API limits we cant do it
             // SigningProvider::Turnkey,
+            SigningProvider::PKCS11,
         ]
     }
 
@@ -55,6 +58,7 @@ impl SigningProvider {
             "gcp_secret_manager" => Some(SigningProvider::GcpSecretManager),
             "privy" => Some(SigningProvider::Privy),
             "turnkey" => Some(SigningProvider::Turnkey),
+            "pkcs11" => Some(SigningProvider::PKCS11),
             _ => None,
         }
     }

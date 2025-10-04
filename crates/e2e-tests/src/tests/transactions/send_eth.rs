@@ -11,6 +11,7 @@ impl TestRunner {
     /// RRELAYER_PROVIDERS="aws_kms" make run-test-debug TEST=transaction_send_eth
     /// RRELAYER_PROVIDERS="gcp_secret_manager" make run-test-debug TEST=transaction_send_eth
     /// RRELAYER_PROVIDERS="turnkey" make run-test-debug TEST=transaction_send_eth
+    /// RRELAYER_PROVIDERS="pkcs11" make run-test-debug TEST=transaction_send_eth
     pub async fn transaction_send_eth(&self) -> anyhow::Result<()> {
         info!("Testing simple eth transfer...");
 
