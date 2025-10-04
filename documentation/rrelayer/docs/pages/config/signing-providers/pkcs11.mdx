@@ -24,19 +24,28 @@ While the implementation supports production HSMs, it has not been extensively b
 This feature should be considered beta and thoroughly tested in your specific environment before production use.
 :::
 
-## Requirements
+**Requirements**
 
 Your HSM must support:
+
 - PKCS#11 interface
 - secp256k1 elliptic curve (required for Ethereum)
 - ECDSA signature generation
 
-Compatible devices include:
+**Verified Compatible Devices:**
+
 - AWS CloudHSM
-- Ledger hardware wallets (with PKCS#11 support)
-- YubiKey HSM (models that support secp256k1)
-- Thales/SafeNet HSMs
-- Utimaco HSMs
+- Nitrokey HSM 2
+
+**Compatible with Configuration:**
+
+- Thales/SafeNet Luna HSMs (requires custom firmware/configuration)
+- Utimaco HSMs (requires custom configuration)
+- Ledger hardware wallets (requires unofficial PKCS#11 module)
+
+:::warning
+Many enterprise HSMs only support FIPS-certified NIST curves (P-256, P-384, P-521) by default. Verify secp256k1 support with your HSM vendor before deployment.
+:::
 
 ## Usage
 
@@ -65,6 +74,7 @@ signing_provider: // [!code focus]
 ```
 
 Common library paths:
+
 - **SoftHSM**: `/usr/lib/softhsm/libsofthsm2.so` or `/opt/homebrew/lib/softhsm/libsofthsm2.so`
 - **OpenSC**: `/usr/lib/pkcs11/opensc-pkcs11.so`
 - **Ledger**: Platform-specific Ledger PKCS#11 library
@@ -132,37 +142,39 @@ signing_provider: // [!code focus]
 ```
 
 **Use cases for test_mode:**
+
 - Development environment testing
-- CI/CD pipeline integration tests  
+- CI/CD pipeline integration tests
 - Configuration validation
 - RRelayer integration testing
 
 **What test_mode does NOT test:**
+
 - Real HSM compatibility
 - Actual PKCS#11 library functionality
 - Hardware-specific behaviors
 - Production signature generation
 
-
 ## Complete Configuration Example
 
 ```yaml [rrelayer.yaml]
 name: production-rrelayer
-description: "Production rrelayer with HSM"
+description: 'Production rrelayer with HSM'
 api_config:
   port: 3000
   authentication_username: ${RRELAYER_AUTH_USERNAME}
   authentication_password: ${RRELAYER_AUTH_PASSWORD}
 signing_provider: # [!code focus]
   pkcs11: # [!code focus]
-    library_path: "/usr/lib/pkcs11/cloudhsm-pkcs11.so" # [!code focus]
-    pin: "${HSM_PIN}" # [!code focus]
+    library_path: '/usr/lib/pkcs11/cloudhsm-pkcs11.so' # [!code focus]
+    pin: '${HSM_PIN}' # [!code focus]
     slot_id: 1 # [!code focus]
 ```
 
 ## Key Management
 
 The PKCS#11 provider automatically:
+
 - Generates secp256k1 key pairs on the HSM for each wallet index
 - Derives Ethereum addresses using Keccak256 hashing
 - Tags keys with wallet index labels for easy retrieval
@@ -213,10 +225,10 @@ For development and testing environments, you can use the test_mode configuratio
 ```yaml [test-config.yaml]
 signing_provider:
   pkcs11:
-    library_path: "/opt/homebrew/lib/softhsm/libsofthsm2.so"
-    pin: "1234"
+    library_path: '/opt/homebrew/lib/softhsm/libsofthsm2.so'
+    pin: '1234'
     slot_id: 82907649
-    test_mode: true  # [!code focus] Returns mock signatures for testing
+    test_mode: true # [!code focus] Returns mock signatures for testing
 ```
 
 :::warning
