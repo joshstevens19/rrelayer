@@ -29,6 +29,9 @@ pub enum CreateRelayerError {
 
     #[error("Cannot clone private key relayer '{0}' - private key relayers are automatically imported on all networks")]
     CannotClonePrivateKeyRelayer(String),
+
+    #[error("Cannot clone relayer '{0}' - provider type does not support cloning")]
+    CannotCloneProviderRelayer(String),
 }
 
 impl From<CreateRelayerError> for HttpError {
@@ -38,6 +41,9 @@ impl From<CreateRelayerError> for HttpError {
                 not_found("Could not find relayer".to_string())
             }
             CreateRelayerError::CannotClonePrivateKeyRelayer(_) => {
+                crate::shared::bad_request(value.to_string())
+            }
+            CreateRelayerError::CannotCloneProviderRelayer(_) => {
                 crate::shared::bad_request(value.to_string())
             }
             _ => internal_server_error(Some(value.to_string())),
@@ -80,6 +86,13 @@ impl PostgresClient {
                 // Prevent cloning private key relayers since they are auto-imported on all networks
                 if source_relayer.is_private_key {
                     return Err(CreateRelayerError::CannotClonePrivateKeyRelayer(
+                        source_relayer.name.clone(),
+                    ));
+                }
+
+                // Prevent cloning providers that don't support cloning (e.g., Fireblocks)
+                if !evm_provider.can_clone() {
+                    return Err(CreateRelayerError::CannotCloneProviderRelayer(
                         source_relayer.name.clone(),
                     ));
                 }

@@ -1,0 +1,262 @@
+# Fireblocks
+
+Fireblocks is an enterprise-grade digital asset infrastructure platform that provides secure custody, transfer, and settlement of digital assets. It offers institutional-grade security through its proprietary Multi-Party Computation (MPC) technology, which eliminates single points of failure by distributing cryptographic operations across multiple parties. The platform provides comprehensive wallet management, transaction orchestration, and compliance tools designed for institutional users, including banks, exchanges, and fintech companies. Fireblocks integrates with hundreds of exchanges, DeFi protocols, and market makers, offering a unified interface for managing digital asset operations across multiple blockchains.
+
+You can read more about Fireblocks [here](https://www.fireblocks.com/platforms/).
+
+:::info
+This guide will just talk about how you configure the signing provider and not go into depth of the setup on the Fireblocks console.
+:::
+
+:::warning
+We recommend creating dedicated vault accounts for RRelayer usage and not mixing them with other applications. This ensures proper isolation and easier management of your relayer operations.
+:::
+
+## API Credentials Setup
+
+Before configuring RRelayer, you need to set up API credentials in your Fireblocks workspace:
+
+1. **Create API User**: In the Fireblocks console, create a new API user with appropriate permissions
+2. **Generate API Key**: Download your API key and private key file
+3. **Set Permissions**: Ensure the API user has permissions to:
+   - Create and manage vault accounts
+   - Create assets within vault accounts
+   - Initiate and sign raw signature operations
+   - View transaction status and details
+
+## Usage
+
+To enable Fireblocks you need to add the `api_key`, `private_key_path`, `identity`, and optionally `sandbox` in the YAML under the `fireblocks` key:
+
+### Fields
+
+#### api_key
+
+Your Fireblocks API key obtained from the Fireblocks console.
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider: // [!code focus]
+  fireblocks: // [!code focus]
+    api_key: "${FIREBLOCKS_API_KEY}" // [!code focus]
+```
+
+#### private_key_path
+
+The absolute path to your Fireblocks private key file. This file is downloaded when you create your API credentials.
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider: // [!code focus]
+  fireblocks: // [!code focus]
+    api_key: "${FIREBLOCKS_API_KEY}"
+    private_key_path: "./fireblocks_secret.key"  // [!code focus]
+```
+
+#### identity (required)
+
+A unique identifier for this rrelayer instance. This identity is used to namespace vault account names, allowing multiple rrelayer instances to use the same Fireblocks workspace without conflicts.
+
+The identity is combined with chain ID and wallet index to create unique vault account names like `rrelayer-{identity}-wallet-{chain_id}-{wallet_index}`.
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider: // [!code focus]
+  fireblocks: // [!code focus]
+    api_key: "${FIREBLOCKS_API_KEY}"
+    private_key_path: "./fireblocks_secret.key"
+    identity: "prod-relay-01" // [!code focus]
+```
+
+#### sandbox (optional)
+
+Whether to use the Fireblocks sandbox environment for testing. Defaults to `false` (production). Set to `true` for sandbox testing.
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider: // [!code focus]
+  fireblocks: // [!code focus]
+    api_key: "${FIREBLOCKS_SANDBOX_API_KEY}"
+    private_key_path: "./fireblocks_secret.key"
+    identity: "sandbox-test"
+    sandbox: true # [!code focus]
+```
+
+#### hidden_on_ui (optional)
+
+Whether to hide the created vault accounts from the Fireblocks console UI. Defaults to `true` to reduce UI clutter as well as
+they are programmatic so you do not want others to use/edit them.
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider: // [!code focus]
+  fireblocks: // [!code focus]
+    api_key: "${FIREBLOCKS_API_KEY}"
+    private_key_path: "./fireblocks_secret.key"
+    identity: "prod-relay-01"
+    hidden_on_ui: false # [!code focus]
+```
+
+## Complete Configuration Example
+
+```yaml [rrelayer.yaml]
+name: production-rrelayer
+description: 'Production rrelayer with Fireblocks'
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider: # [!code focus]
+  fireblocks: # [!code focus]
+    api_key: '${FIREBLOCKS_API_KEY}' # [!code focus]
+    private_key_path: "./fireblocks_secret.key" # [!code focus]
+    identity: 'prod-relay-01' # [!code focus]
+    sandbox: false # [!code focus]
+    hidden_on_ui: true # [!code focus]
+```
+
+You then need to add the Fireblocks credentials to your `.env` file:
+
+```bash
+FIREBLOCKS_API_KEY=YOUR_FIREBLOCKS_API_KEY
+# For sandbox testing
+FIREBLOCKS_SANDBOX_API_KEY=YOUR_FIREBLOCKS_SANDBOX_API_KEY
+```
+
+:::warning
+Store sensitive credentials in environment variables rather than hardcoding them in the configuration file. Ensure your private key file has appropriate file permissions (600) and is not accessible to unauthorized users.
+:::
+
+## Supported Networks
+
+Fireblocks supports a wide range of blockchain networks. RRelayer automatically maps chain IDs to Fireblocks asset IDs:
+
+### Ethereum Networks
+
+- **Ethereum Mainnet** (Chain ID: 1) � `ETH`
+- **Sepolia Testnet** (Chain ID: 11155111) � `ETH_TEST5`
+- **Holesky Testnet** (Chain ID: 17000) � `ETH_TEST5`
+
+### Layer 2 & Sidechains
+
+- **Polygon Mainnet** (Chain ID: 137) � `MATIC_POLYGON`
+- **Polygon Amoy Testnet** (Chain ID: 80002) � `MATIC_POLYGON`
+- **Arbitrum One** (Chain ID: 42161) � `ETH-AETH`
+- **Arbitrum Sepolia** (Chain ID: 421614) � `ETH_TEST5`
+- **Optimism Mainnet** (Chain ID: 10) � `ETH-OPT`
+- **Optimism Sepolia** (Chain ID: 11155420) � `ETH_TEST5`
+- **Base Mainnet** (Chain ID: 8453) � `BASECHAIN_ETH`
+- **Base Sepolia** (Chain ID: 84532) � `ETH_TEST5`
+
+### Other Networks
+
+- **BSC Mainnet** (Chain ID: 56) → `BNB_BSC`
+- **BSC Testnet** (Chain ID: 97) → `BNB_BSC`
+- **Avalanche C-Chain** (Chain ID: 43114) → `AVAX`
+- **Avalanche Fuji Testnet** (Chain ID: 43113) → `AVAX`
+- **Fantom Opera** (Chain ID: 250) → `FYM`
+- **Gnosis Chain** (Chain ID: 100) → `xDAI`
+- **Celo Mainnet** (Chain ID: 42220) → `CELO`
+- **Linea Mainnet** (Chain ID: 59144) → `LINEA`
+- **Moonbeam** (Chain ID: 1284) → `GLMR_GLMR`
+- **Moonriver** (Chain ID: 1285) → `MOVR_MOVR`
+- **Aurora** (Chain ID: 1313161554) → `AURORA_DEV`
+- **Astar** (Chain ID: 592) → `ASTR_ASTR`
+- **Chiliz Chain** (Chain ID: 88888) → `CHZ_CHZ2`
+- **Evmos** (Chain ID: 9001) → `EVMOS`
+- **Kava EVM** (Chain ID: 2222) → `KAVA`
+- **Oasys** (Chain ID: 248) → `OAS`
+- **RSK** (Chain ID: 30) → `RBTC`
+- **Velas EVM** (Chain ID: 106) → `VLX_VLX`
+- **XDC Network** (Chain ID: 50) → `XDC`
+- **XDC Testnet** (Chain ID: 51) → `XDC`
+- **Songbird** (Chain ID: 19) → `SGB`
+- **Canto** (Chain ID: 7700) → `CANTO`
+- **Huobi ECO Chain** (Chain ID: 128) → `HT_CHAIN`
+- **Shimmer EVM** (Chain ID: 148) → `SMR_SMR`
+- **Smart Bitcoin Cash** (Chain ID: 10000) → `SMARTBCH`
+
+:::info
+For a complete list of supported networks, check the chain asset mapping in the implementation. If you need support for additional networks, please contact your Fireblocks representative or submit a feature request.
+:::
+
+## Vault Account Management
+
+The Fireblocks provider automatically:
+
+- Creates dedicated vault accounts for each wallet index and chain ID combination
+- Names vault accounts using the pattern `rrelayer-{identity}-wallet-{chain_id}-{wallet_index}`
+- Creates appropriate assets within vault accounts for each supported blockchain
+- Maintains a cache mapping between wallet indices, chain IDs, and vault account details
+- Ensures vault accounts are unique per chain and wallet combination to prevent cross-chain operations
+
+Vault accounts are created on-demand when first accessed and remain available for subsequent use. The identity field ensures multiple rrelayer instances can safely share the same Fireblocks workspace without vault account conflicts.
+
+## Security Considerations
+
+:::warning
+Ensure your Fireblocks workspace is properly configured with appropriate access controls, transaction policies, and approval workflows. The security of your funds depends on the proper configuration of your Fireblocks workspace and API permissions.
+:::
+
+- All private key operations are performed within Fireblocks' secure infrastructure
+- Multi-Party Computation (MPC) eliminates single points of failure
+- Transaction policies can enforce additional approval requirements (this enhancement may break rrelayer usage)
+- Comprehensive audit logging is available through the Fireblocks console
+- API access can be restricted by IP address and time-based rules
+
+## Troubleshooting
+
+### Common Issues
+
+**API authentication failed**: Verify your API key and private key file are correct and the API user has appropriate permissions.
+
+**Unsupported chain ID**: Confirm the blockchain network you're trying to use is supported by both RRelayer and Fireblocks.
+
+**Vault account creation failed**: Check that your API user has permissions to create vault accounts and assets.
+
+**Transaction signing timeout**: Large transaction volumes or network congestion may cause signing operations to take longer. The implementation waits up to 15 seconds for signature completion.
+
+**Asset not found**: Ensure the chain ID maps to a valid Fireblocks asset ID and that your workspace supports the required asset.
+
+### Testing with Sandbox
+
+For development and testing purposes, you can use the Fireblocks sandbox environment:
+
+```yaml [sandbox-config.yaml]
+signing_provider:
+  fireblocks:
+    api_key: '${FIREBLOCKS_SANDBOX_API_KEY}'
+    private_key_path: './fireblocks_sandbox_secret.key'
+    identity: 'sandbox-test'
+    sandbox: true
+    hidden_on_ui: false
+```
+
+:::warning
+Always test your configuration in the sandbox environment before deploying to production. Sandbox and production environments have separate API credentials and vault accounts.
+:::

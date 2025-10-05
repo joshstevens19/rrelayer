@@ -80,18 +80,24 @@ impl WalletManagerTrait for CompositeWalletManager {
         manager.sign_transaction(wallet_index, transaction, chain_id).await
     }
 
-    async fn sign_text(&self, wallet_index: u32, text: &str) -> Result<Signature, WalletError> {
+    async fn sign_text(
+        &self,
+        wallet_index: u32,
+        text: &str,
+        chain_id: &ChainId,
+    ) -> Result<Signature, WalletError> {
         let manager = self.get_manager_for_index(wallet_index)?;
-        manager.sign_text(wallet_index, text).await
+        manager.sign_text(wallet_index, text, chain_id).await
     }
 
     async fn sign_typed_data(
         &self,
         wallet_index: u32,
         typed_data: &TypedData,
+        chain_id: &ChainId,
     ) -> Result<Signature, WalletError> {
         let manager = self.get_manager_for_index(wallet_index)?;
-        manager.sign_typed_data(wallet_index, typed_data).await
+        manager.sign_typed_data(wallet_index, typed_data, chain_id).await
     }
 
     fn supports_blobs(&self) -> bool {

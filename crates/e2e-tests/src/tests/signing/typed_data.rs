@@ -13,6 +13,7 @@ impl TestRunner {
     /// RRELAYER_PROVIDERS="gcp_secret_manager" make run-test-debug TEST=signing_typed_data
     /// RRELAYER_PROVIDERS="turnkey" make run-test-debug TEST=signing_typed_data
     /// RRELAYER_PROVIDERS="pkcs11" make run-test-debug TEST=signing_typed_data
+    /// RRELAYER_PROVIDERS="fireblocks" make run-test-debug TEST=signing_text
     pub async fn signing_typed_data(&self) -> anyhow::Result<()> {
         info!("Testing typed data signing...");
 

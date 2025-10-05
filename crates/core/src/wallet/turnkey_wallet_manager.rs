@@ -584,7 +584,12 @@ impl WalletManagerTrait for TurnkeyWalletManager {
         Ok(signature)
     }
 
-    async fn sign_text(&self, wallet_index: u32, text: &str) -> Result<Signature, WalletError> {
+    async fn sign_text(
+        &self,
+        wallet_index: u32,
+        text: &str,
+        _chain_id: &ChainId,
+    ) -> Result<Signature, WalletError> {
         info!("Turnkey sign_text called - wallet_index: {}, text: '{}'", wallet_index, text);
 
         let accounts = self.accounts.lock().await;
@@ -716,6 +721,7 @@ impl WalletManagerTrait for TurnkeyWalletManager {
         &self,
         wallet_index: u32,
         typed_data: &TypedData,
+        _chain_id: &ChainId,
     ) -> Result<Signature, WalletError> {
         let accounts = self.accounts.lock().await;
         let _ = accounts

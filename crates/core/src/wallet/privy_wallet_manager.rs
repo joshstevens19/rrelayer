@@ -266,7 +266,12 @@ impl WalletManagerTrait for PrivyWalletManager {
         Ok(signature)
     }
 
-    async fn sign_text(&self, wallet_index: u32, text: &str) -> Result<Signature, WalletError> {
+    async fn sign_text(
+        &self,
+        wallet_index: u32,
+        text: &str,
+        _chain_id: &ChainId,
+    ) -> Result<Signature, WalletError> {
         let wallets = self.wallets.lock().await;
         let wallet = wallets
             .get(&wallet_index)
@@ -315,6 +320,7 @@ impl WalletManagerTrait for PrivyWalletManager {
         &self,
         wallet_index: u32,
         typed_data: &TypedData,
+        _chain_id: &ChainId,
     ) -> Result<Signature, WalletError> {
         let wallets = self.wallets.lock().await;
         let wallet = wallets

@@ -3,14 +3,13 @@
 Note rrelayer is brand new and actively underdevelopment, things will change and bugs will exist—if you find any bugs or have any
 feature requests, please open an issue on [github](https://github.com/joshstevens19/rrelayer/issues). 
 
-rrelayer is an opensource powerful, high-performance blockchain transaction relay service built in Rust, designed for seamless
-integration with any EVM-compatible network. This tool transforms complex blockchain interactions into simple REST API calls,
-eliminating the need for applications to manage wallets, transaction queuing, or nonce management. For rrelayer
-supports advanced wallet infrastructure supporting multiple signing providers including AWS KMS hardware security modules,
-Turnkey self-custody solutions, Privy managed wallets, AWS Secrets Manager, GCP Secret Manager, and raw mnemonic development setups.
-It's highly scalable and production-ready, enabling you to build robust Web3 applications with reliability and focus exclusively on
-your business logic. rrelayer has some super cool out-of-the-box features, like automatic top-ups (with safe support), permissions
-config including allowlists, API keys with restricted access, webhooks, rate limiting, and the ability to configure the gas bump blocks.
+rrelayer is an opensource powerful, high-performance blockchain transaction relay service built in Rust, designed for seamless integration with any EVM-compatible network.
+This tool transforms complex blockchain interactions into simple REST API calls, eliminating the need for applications to manage wallets, transaction queuing, or nonce management.
+For rrelayer supports advanced wallet infrastructure supporting multiple signing providers including AWS KMS hardware security modules,
+Turnkey self-custody solutions, Fireblocks enterprise MPC custody, Privy managed wallets, AWS Secrets Manager, GCP Secret Manager, PKCS#11 hardware security modules, and raw mnemonic development setups.
+It's highly scalable and production-ready, enabling you to build robust Web3 applications with reliability and focus exclusively on your business logic.
+rrelayer has some super cool out-of-the-box features, like automatic top-ups (with safe support), permissions config including allowlists, API keys with restricted access,
+webhooks, rate limiting, and the ability to configure the gas bump blocks.
 
 You can get to the full rrelayer documentation [here](https://rrelayer.xyz/).
 

@@ -110,8 +110,13 @@ impl WalletManagerTrait for MnemonicWalletManager {
         Ok(signature)
     }
 
-    async fn sign_text(&self, wallet_index: u32, text: &str) -> Result<Signature, WalletError> {
-        let wallet = self.get_wallet(wallet_index, &ChainId::default()).await?;
+    async fn sign_text(
+        &self,
+        wallet_index: u32,
+        text: &str,
+        chain_id: &ChainId,
+    ) -> Result<Signature, WalletError> {
+        let wallet = self.get_wallet(wallet_index, chain_id).await?;
         let signature = wallet.sign_message(text.as_bytes()).await?;
         Ok(signature)
     }
@@ -120,8 +125,9 @@ impl WalletManagerTrait for MnemonicWalletManager {
         &self,
         wallet_index: u32,
         typed_data: &TypedData,
+        chain_id: &ChainId,
     ) -> Result<Signature, WalletError> {
-        let wallet = self.get_wallet(wallet_index, &ChainId::default()).await?;
+        let wallet = self.get_wallet(wallet_index, chain_id).await?;
         let signature = wallet.sign_dynamic_typed_data(typed_data).await?;
         Ok(signature)
     }

@@ -84,6 +84,10 @@ export default defineConfig({
             { text: 'Privy', link: '/config/signing-providers/privy' },
             { text: 'Turnkey', link: '/config/signing-providers/turnkey' },
             {
+              text: 'Fireblocks',
+              link: '/config/signing-providers/fireblocks',
+            },
+            {
               text: 'Private Keys',
               link: '/config/signing-providers/private-keys',
             },

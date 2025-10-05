@@ -60,12 +60,27 @@ pub struct TurnkeySigningProviderConfig {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Pkcs11SigningProviderConfig {
     pub library_path: String,
+    // Required unique identifier for key naming (e.g., "production", "staging", "dev-team-a")
+    pub identity: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub pin: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub slot_id: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub test_mode: Option<bool>, // DEVELOPMENT ONLY - Returns mock signatures for testing
+    // DEVELOPMENT ONLY - Returns mock signatures for testing
+    pub test_mode: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FireblocksSigningProviderConfig {
+    pub api_key: String,
+    pub private_key_path: String,
+    // Required unique identifier for vault naming (e.g., "production", "staging", "dev-team-a")
+    pub identity: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub sandbox: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub hidden_on_ui: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -95,6 +110,9 @@ pub struct SigningProvider {
 
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub pkcs11: Option<Pkcs11SigningProviderConfig>,
+
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub fireblocks: Option<FireblocksSigningProviderConfig>,
 
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub private_keys: Option<Vec<PrivateKeyConfig>>,
@@ -152,6 +170,107 @@ impl TurnkeySigningProviderConfig {
     }
 }
 
+impl FireblocksSigningProviderConfig {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.api_key.is_empty() {
+            return Err("Fireblocks API key cannot be empty".to_string());
+        }
+
+        if self.private_key_path.is_empty() {
+            return Err("Fireblocks private key path cannot be empty".to_string());
+        }
+
+        if self.identity.is_empty() {
+            return Err("Fireblocks identity cannot be empty".to_string());
+        }
+
+        // Validate identity format - only allow alphanumeric, hyphens, and underscores
+        if !self.identity.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
+            return Err("Fireblocks identity must contain only alphanumeric characters, hyphens, and underscores".to_string());
+        }
+
+        // Limit identity length for practical vault naming
+        if self.identity.len() > 32 {
+            return Err("Fireblocks identity must be 32 characters or less".to_string());
+        }
+
+        // Check if private key file exists and is readable
+        if !std::path::Path::new(&self.private_key_path).exists() {
+            return Err(format!(
+                "Fireblocks private key file not found: {}",
+                self.private_key_path
+            ));
+        }
+
+        // Try to read the file to validate it's accessible
+        match std::fs::read_to_string(&self.private_key_path) {
+            Ok(content) => {
+                // Basic PEM format validation
+                if !content.contains("BEGIN") || !content.contains("END") {
+                    return Err(
+                        "Fireblocks private key file must contain a valid PEM key".to_string()
+                    );
+                }
+            }
+            Err(e) => {
+                return Err(format!(
+                    "Cannot read Fireblocks private key file {}: {}",
+                    self.private_key_path, e
+                ));
+            }
+        }
+
+        Ok(())
+    }
+}
+
+impl Pkcs11SigningProviderConfig {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.library_path.is_empty() {
+            return Err("PKCS#11 library path cannot be empty".to_string());
+        }
+
+        if self.identity.is_empty() {
+            return Err("PKCS#11 identity cannot be empty".to_string());
+        }
+
+        // Validate identity format - only allow alphanumeric, hyphens, and underscores
+        if !self.identity.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
+            return Err("PKCS#11 identity must contain only alphanumeric characters, hyphens, and underscores".to_string());
+        }
+
+        // Limit identity length for practical key naming
+        if self.identity.len() > 32 {
+            return Err("PKCS#11 identity must be 32 characters or less".to_string());
+        }
+
+        // Check if library path exists and is readable
+        if !std::path::Path::new(&self.library_path).exists() {
+            return Err(format!("PKCS#11 library not found: {}", self.library_path));
+        }
+
+        Ok(())
+    }
+}
+
+impl FireblocksSigningProviderConfig {
+    /// Returns the appropriate base URL based on sandbox setting
+    pub fn get_base_url(&self) -> String {
+        if self.sandbox.unwrap_or(false) {
+            // Use sandbox environment
+            "https://sandbox-api.fireblocks.io".to_string()
+        } else {
+            // Use production environment (default)
+            "https://api.fireblocks.io".to_string()
+        }
+    }
+
+    /// Returns true if running in sandbox mode
+    pub fn is_sandbox(&self) -> bool {
+        self.sandbox.unwrap_or(false)
+    }
+}
+
 impl SigningProvider {
     pub fn from_raw(raw: RawSigningProviderConfig) -> Self {
         Self {
@@ -162,6 +281,7 @@ impl SigningProvider {
             aws_kms: None,
             turnkey: None,
             pkcs11: None,
+            fireblocks: None,
             private_keys: None,
         }
     }
@@ -175,6 +295,7 @@ impl SigningProvider {
             aws_kms: Some(aws_kms),
             turnkey: None,
             pkcs11: None,
+            fireblocks: None,
             private_keys: None,
         }
     }
@@ -188,6 +309,7 @@ impl SigningProvider {
             aws_kms: None,
             turnkey: Some(turnkey),
             pkcs11: None,
+            fireblocks: None,
             private_keys: None,
         }
     }
@@ -201,6 +323,21 @@ impl SigningProvider {
             aws_kms: None,
             turnkey: None,
             pkcs11: Some(pkcs11),
+            fireblocks: None,
+            private_keys: None,
+        }
+    }
+
+    pub fn from_fireblocks(fireblocks: FireblocksSigningProviderConfig) -> Self {
+        Self {
+            raw: None,
+            aws_secret_manager: None,
+            gcp_secret_manager: None,
+            privy: None,
+            aws_kms: None,
+            turnkey: None,
+            pkcs11: None,
+            fireblocks: Some(fireblocks),
             private_keys: None,
         }
     }
@@ -216,6 +353,7 @@ impl SigningProvider {
             self.aws_kms.is_some(),
             self.turnkey.is_some(),
             self.pkcs11.is_some(),
+            self.fireblocks.is_some(),
             self.private_keys.is_some(),
         ]
         .iter()
@@ -873,6 +1011,14 @@ pub fn read(file_path: &PathBuf, raw_yaml: bool) -> Result<SetupConfig, ReadYaml
 
         if let Some(turnkey) = &signing_key.turnkey {
             turnkey.validate().map_err(ReadYamlError::SigningProviderYamlError)?;
+        }
+
+        if let Some(fireblocks) = &signing_key.fireblocks {
+            fireblocks.validate().map_err(ReadYamlError::SigningProviderYamlError)?;
+        }
+
+        if let Some(pkcs11) = &signing_key.pkcs11 {
+            pkcs11.validate().map_err(ReadYamlError::SigningProviderYamlError)?;
         }
     }
 

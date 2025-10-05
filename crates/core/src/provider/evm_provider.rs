@@ -1,12 +1,13 @@
 use crate::gas::BLOB_GAS_PER_BLOB;
 use crate::provider::layer_extensions::RpcLoggingLayer;
 use crate::wallet::{
-    AwsKmsWalletManager, CompositeWalletManager, MnemonicWalletManager, Pkcs11WalletManager,
-    PrivateKeyWalletManager, PrivyWalletManager, TurnkeyWalletManager, WalletError,
-    WalletManagerTrait,
+    AwsKmsWalletManager, CompositeWalletManager, FireblocksWalletManager, MnemonicWalletManager,
+    Pkcs11WalletManager, PrivateKeyWalletManager, PrivyWalletManager, TurnkeyWalletManager,
+    WalletError, WalletManagerTrait,
 };
 use crate::yaml::{
-    AwsKmsSigningProviderConfig, Pkcs11SigningProviderConfig, TurnkeySigningProviderConfig,
+    AwsKmsSigningProviderConfig, FireblocksSigningProviderConfig, Pkcs11SigningProviderConfig,
+    TurnkeySigningProviderConfig,
 };
 use crate::{
     gas::{
@@ -59,6 +60,8 @@ pub struct EvmProvider {
     /// this is in milliseconds (min 250ms)
     pub blocks_every: u64,
     pub confirmations: u64,
+    /// Whether this provider type supports cloning (for clone prevention logic)
+    can_clone: bool,
 }
 
 async fn calculate_block_time_difference(
@@ -161,7 +164,7 @@ impl EvmProvider {
         gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
     ) -> Result<Self, EvmProviderNewError> {
         let wallet_manager = Arc::new(MnemonicWalletManager::new(mnemonic));
-        Self::new_internal(network_setup_config, wallet_manager, gas_estimator).await
+        Self::new_internal(network_setup_config, wallet_manager, gas_estimator, true).await
     }
 
     pub async fn new_with_privy(
@@ -172,7 +175,7 @@ impl EvmProvider {
     ) -> Result<Self, EvmProviderNewError> {
         let privy_manager = PrivyWalletManager::new(app_id, app_secret).await?;
         let wallet_manager = Arc::new(privy_manager);
-        Self::new_internal(network_setup_config, wallet_manager, gas_estimator).await
+        Self::new_internal(network_setup_config, wallet_manager, gas_estimator, true).await
     }
 
     pub async fn new_with_aws_kms(
@@ -181,7 +184,7 @@ impl EvmProvider {
         gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
     ) -> Result<Self, EvmProviderNewError> {
         let wallet_manager = Arc::new(AwsKmsWalletManager::new(aws_kms_config));
-        Self::new_internal(network_setup_config, wallet_manager, gas_estimator).await
+        Self::new_internal(network_setup_config, wallet_manager, gas_estimator, true).await
     }
 
     pub async fn new_with_turnkey(
@@ -191,7 +194,7 @@ impl EvmProvider {
     ) -> Result<Self, EvmProviderNewError> {
         let turnkey_manager = TurnkeyWalletManager::new(turnkey_config).await?;
         let wallet_manager = Arc::new(turnkey_manager);
-        Self::new_internal(network_setup_config, wallet_manager, gas_estimator).await
+        Self::new_internal(network_setup_config, wallet_manager, gas_estimator, true).await
     }
 
     pub async fn new_with_private_keys(
@@ -200,7 +203,7 @@ impl EvmProvider {
         gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
     ) -> Result<Self, EvmProviderNewError> {
         let wallet_manager = Arc::new(PrivateKeyWalletManager::new(private_keys));
-        Self::new_internal(network_setup_config, wallet_manager, gas_estimator).await
+        Self::new_internal(network_setup_config, wallet_manager, gas_estimator, false).await
     }
 
     pub async fn new_with_pkcs11(
@@ -209,7 +212,17 @@ impl EvmProvider {
         gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
     ) -> Result<Self, EvmProviderNewError> {
         let wallet_manager = Arc::new(Pkcs11WalletManager::new(pkcs11_config)?);
-        Self::new_internal(network_setup_config, wallet_manager, gas_estimator).await
+        Self::new_internal(network_setup_config, wallet_manager, gas_estimator, true).await
+    }
+
+    pub async fn new_with_fireblocks(
+        network_setup_config: &NetworkSetupConfig,
+        fireblocks_config: FireblocksSigningProviderConfig,
+        gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
+    ) -> Result<Self, EvmProviderNewError> {
+        let fireblocks_manager = FireblocksWalletManager::new(fireblocks_config).await?;
+        let wallet_manager = Arc::new(fireblocks_manager);
+        Self::new_internal(network_setup_config, wallet_manager, gas_estimator, false).await
     }
 
     pub async fn new_with_composite(
@@ -224,13 +237,14 @@ impl EvmProvider {
 
         let wallet_manager =
             Arc::new(CompositeWalletManager::new(primary_manager, private_key_manager));
-        Self::new_internal(network_setup_config, wallet_manager, gas_estimator).await
+        Self::new_internal(network_setup_config, wallet_manager, gas_estimator, true).await
     }
 
     async fn new_internal(
         network_setup_config: &NetworkSetupConfig,
         wallet_manager: Arc<dyn WalletManagerTrait>,
         gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
+        can_clone: bool,
     ) -> Result<Self, EvmProviderNewError> {
         let provider =
             create_retry_client(&network_setup_config.provider_urls[0]).await.map_err(|e| {
@@ -262,6 +276,7 @@ impl EvmProvider {
             name: network_setup_config.name.to_string(),
             provider_urls: network_setup_config.provider_urls.to_owned(),
             confirmations: network_setup_config.confirmations.unwrap_or(12),
+            can_clone,
         })
     }
 
@@ -277,6 +292,10 @@ impl EvmProvider {
 
     pub async fn get_address(&self, wallet_index: u32) -> Result<EvmAddress, WalletError> {
         self.wallet_manager.get_address(wallet_index, &self.chain_id).await
+    }
+
+    pub fn can_clone(&self) -> bool {
+        self.can_clone
     }
 
     pub async fn get_receipt(
@@ -361,7 +380,7 @@ impl EvmProvider {
         wallet_index: &u32,
         text: &str,
     ) -> Result<Signature, WalletError> {
-        self.wallet_manager.sign_text(*wallet_index, text).await
+        self.wallet_manager.sign_text(*wallet_index, text, &self.chain_id).await
     }
 
     pub async fn sign_typed_data(
@@ -369,7 +388,7 @@ impl EvmProvider {
         wallet_index: &u32,
         typed_data: &TypedData,
     ) -> Result<Signature, WalletError> {
-        self.wallet_manager.sign_typed_data(*wallet_index, typed_data).await
+        self.wallet_manager.sign_typed_data(*wallet_index, typed_data, &self.chain_id).await
     }
 
     pub async fn estimate_gas(

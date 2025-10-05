@@ -118,6 +118,26 @@ signing_provider: // [!code focus]
     slot_id: 82907649 # [!code focus]
 ```
 
+#### identity (required)
+
+A unique identifier for this rrelayer instance. This identity is used to namespace key labels in the HSM, allowing multiple rrelayer instances to use the same HSM device without key conflicts.
+
+The identity is combined with chain ID and wallet index to create unique labels like `rrelayer-{identity}-wallet-{chain_id}-{wallet_index}`.
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider: // [!code focus]
+  pkcs11: // [!code focus]
+    library_path: "/usr/lib/pkcs11/opensc-pkcs11.so"
+    pin: "${HSM_PIN}"
+    identity: "prod-relay-01" // [!code focus]
+```
+
 #### test_mode (optional)
 
 :::danger
@@ -138,6 +158,7 @@ signing_provider: // [!code focus]
     library_path: "/opt/homebrew/lib/softhsm/libsofthsm2.so"
     pin: "1234"
     slot_id: 82907649
+    identity: "dev-test" // [!code focus]
     test_mode: true # [!code focus]
 ```
 
@@ -169,18 +190,20 @@ signing_provider: # [!code focus]
     library_path: '/usr/lib/pkcs11/cloudhsm-pkcs11.so' # [!code focus]
     pin: '${HSM_PIN}' # [!code focus]
     slot_id: 1 # [!code focus]
+    identity: 'prod-relay-01' # [!code focus]
 ```
 
 ## Key Management
 
 The PKCS#11 provider automatically:
 
-- Generates secp256k1 key pairs on the HSM for each wallet index
+- Generates secp256k1 key pairs on the HSM for each wallet index and chain ID combination
 - Derives Ethereum addresses using Keccak256 hashing
-- Tags keys with wallet index labels for easy retrieval
-- Maintains a mapping between wallet indices and HSM key handles
+- Tags keys with unique labels combining identity, chain ID, and wallet index (`rrelayer-{identity}-wallet-{chain_id}-{wallet_index}`)
+- Maintains a cache mapping between wallet indices, chain IDs, and HSM key handles
+- Ensures keys are unique per chain and wallet combination to prevent cross-chain replay attacks
 
-Keys are generated on-demand when first accessed and remain on the HSM for subsequent use.
+Keys are generated on-demand when first accessed and remain on the HSM for subsequent use. The identity field ensures multiple rrelayer instances can safely share the same HSM device without key conflicts.
 
 ## Security Considerations
 
@@ -205,8 +228,7 @@ proper configuration and physical security of your HSM device.
 
 **secp256k1 not supported**: Confirm your HSM supports the secp256k1 curve required for Ethereum.
 
-**Signature recovery failures**: Some HSMs generate deterministic signatures that may require multiple attempts for Ethereum compatibility.
-This is handled automatically by the implementation.
+**Signature recovery failures**: Some HSMs generate deterministic signatures (RFC 6979) that may be incompatible with Ethereum's signature recovery mechanism. The implementation attempts multiple recovery IDs to find a compatible signature. If no compatible signature is found, an error is returned with guidance to use an HSM with random nonce generation or one specifically designed for Ethereum.
 
 ### Testing
 
@@ -228,6 +250,7 @@ signing_provider:
     library_path: '/opt/homebrew/lib/softhsm/libsofthsm2.so'
     pin: '1234'
     slot_id: 82907649
+    identity: 'test-relay'
     test_mode: true # [!code focus] Returns mock signatures for testing
 ```
 

@@ -417,10 +417,13 @@ impl WalletManagerTrait for AwsKmsWalletManager {
         Ok(signature)
     }
 
-    async fn sign_text(&self, wallet_index: u32, text: &str) -> Result<Signature, WalletError> {
-        // For text signing, we use chain ID 1 as default since it's not chain-specific
-        let default_chain_id = ChainId::new(1);
-        let signer = self.get_or_initialize_signer(wallet_index, &default_chain_id).await?;
+    async fn sign_text(
+        &self,
+        wallet_index: u32,
+        text: &str,
+        chain_id: &ChainId,
+    ) -> Result<Signature, WalletError> {
+        let signer = self.get_or_initialize_signer(wallet_index, chain_id).await?;
         let signature = signer.sign_message(text.as_bytes()).await?;
         Ok(signature)
     }
@@ -429,11 +432,9 @@ impl WalletManagerTrait for AwsKmsWalletManager {
         &self,
         wallet_index: u32,
         typed_data: &TypedData,
+        chain_id: &ChainId,
     ) -> Result<Signature, WalletError> {
-        // For typed data signing, we use chain ID from the typed data or default to 1
-        let chain_id_u64 = typed_data.domain().chain_id.map(|id| id.to::<u64>()).unwrap_or(1);
-        let chain_id = ChainId::new(chain_id_u64);
-        let signer = self.get_or_initialize_signer(wallet_index, &chain_id).await?;
+        let signer = self.get_or_initialize_signer(wallet_index, chain_id).await?;
 
         let hash = typed_data.eip712_signing_hash()?;
         let signature = signer.sign_hash(&hash).await?;

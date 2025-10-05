@@ -24,7 +24,7 @@ pub struct Pkcs11WalletManager {
     config: Pkcs11SigningProviderConfig,
     ctx: Pkcs11,
     slot: Slot,
-    wallet_cache: Mutex<HashMap<u32, (ObjectHandle, Address)>>,
+    wallet_cache: Mutex<HashMap<(u32, u64), (ObjectHandle, Address)>>, // (wallet_index, chain_id) -> (handle, address)
 }
 
 impl Pkcs11WalletManager {
@@ -109,13 +109,16 @@ impl Pkcs11WalletManager {
     async fn get_or_create_wallet(
         &self,
         wallet_index: u32,
+        chain_id: &ChainId,
     ) -> Result<(ObjectHandle, Address), WalletError> {
+        let cache_key = (wallet_index, chain_id.u64());
         {
             let cache = self.wallet_cache.lock().await;
-            if let Some(&(handle, address)) = cache.get(&wallet_index) {
+            if let Some(&(handle, address)) = cache.get(&cache_key) {
                 debug!(
-                    "Using cached wallet {} at address 0x{}",
+                    "Using cached wallet {}-{} at address 0x{}",
                     wallet_index,
+                    chain_id.u64(),
                     hex::encode(address.as_slice())
                 );
                 return Ok((handle, address));
@@ -123,7 +126,8 @@ impl Pkcs11WalletManager {
         }
 
         let session = self.get_session()?;
-        let label = format!("rrelayer-wallet-{}", wallet_index);
+        let label =
+            format!("rrelayer-{}-wallet-{}-{}", self.config.identity, chain_id.u64(), wallet_index);
 
         let template = vec![
             Attribute::Class(ObjectClass::PRIVATE_KEY),
@@ -135,22 +139,32 @@ impl Pkcs11WalletManager {
         })?;
 
         let private_key_handle = if let Some(key_handle) = objects.first() {
-            debug!("Found existing key for wallet {}", wallet_index);
+            debug!("Found existing key for wallet {}-{}", wallet_index, chain_id.u64());
             *key_handle
         } else {
-            info!("Creating new secp256k1 key pair for wallet {}", wallet_index);
-            self.create_key_pair(&session, wallet_index)?
+            info!("Creating new secp256k1 key pair for wallet {}-{}", wallet_index, chain_id.u64());
+            self.create_key_pair(&session, wallet_index, chain_id)?
         };
 
-        let address = self.derive_address_from_key(&session, wallet_index)?;
+        let address = self.derive_address_from_key(&session, wallet_index, chain_id)?;
 
         {
             let mut cache = self.wallet_cache.lock().await;
-            cache.insert(wallet_index, (private_key_handle, address));
-            debug!("Cached wallet {} -> 0x{}", wallet_index, hex::encode(address.as_slice()));
+            cache.insert(cache_key, (private_key_handle, address));
+            debug!(
+                "Cached wallet {}-{} -> 0x{}",
+                wallet_index,
+                chain_id.u64(),
+                hex::encode(address.as_slice())
+            );
         }
 
-        info!("Wallet {} ready at address 0x{}", wallet_index, hex::encode(address.as_slice()));
+        info!(
+            "Wallet {}-{} ready at address 0x{}",
+            wallet_index,
+            chain_id.u64(),
+            hex::encode(address.as_slice())
+        );
         Ok((private_key_handle, address))
     }
 
@@ -159,9 +173,13 @@ impl Pkcs11WalletManager {
         &self,
         session: &Session,
         wallet_index: u32,
+        chain_id: &ChainId,
     ) -> Result<ObjectHandle, WalletError> {
-        let label = format!("rrelayer-wallet-{}", wallet_index);
-        let id = wallet_index.to_be_bytes().to_vec();
+        let label =
+            format!("rrelayer-{}-wallet-{}-{}", self.config.identity, chain_id.u64(), wallet_index);
+        // Create unique ID combining chain_id and wallet_index to prevent collisions
+        let unique_id = (chain_id.u64()) << 32 | (wallet_index as u64);
+        let id = unique_id.to_be_bytes().to_vec();
 
         // secp256k1 curve OID (1.3.132.0.10)
         let secp256k1_oid = vec![0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x0a];
@@ -204,8 +222,12 @@ impl Pkcs11WalletManager {
         Ok(private_key)
     }
 
-    async fn get_public_key(&self, wallet_index: u32) -> Result<Address, WalletError> {
-        let (_handle, address) = self.get_or_create_wallet(wallet_index).await?;
+    async fn get_public_key(
+        &self,
+        wallet_index: u32,
+        chain_id: &ChainId,
+    ) -> Result<Address, WalletError> {
+        let (_handle, address) = self.get_or_create_wallet(wallet_index, chain_id).await?;
         Ok(address)
     }
 
@@ -213,8 +235,10 @@ impl Pkcs11WalletManager {
         &self,
         session: &Session,
         wallet_index: u32,
+        chain_id: &ChainId,
     ) -> Result<Address, WalletError> {
-        let label = format!("rrelayer-wallet-{}", wallet_index);
+        let label =
+            format!("rrelayer-{}-wallet-{}-{}", self.config.identity, chain_id.u64(), wallet_index);
         let template = vec![
             Attribute::Class(ObjectClass::PUBLIC_KEY),
             Attribute::Label(label.as_bytes().to_vec()),
@@ -280,12 +304,19 @@ impl Pkcs11WalletManager {
 
     /// Signs a hash using the HSM private key for the given wallet index.
     /// Attempts multiple signing rounds to find a signature compatible with Ethereum's recovery mechanism.
-    async fn sign_hash(&self, wallet_index: u32, hash: &B256) -> Result<Signature, WalletError> {
+    async fn sign_hash(
+        &self,
+        wallet_index: u32,
+        hash: &B256,
+        chain_id: &ChainId,
+    ) -> Result<Signature, WalletError> {
         let session = self.get_session()?;
 
-        let (_cached_handle, expected_address) = self.get_or_create_wallet(wallet_index).await?;
+        let (_cached_handle, expected_address) =
+            self.get_or_create_wallet(wallet_index, chain_id).await?;
 
-        let label = format!("rrelayer-wallet-{}", wallet_index);
+        let label =
+            format!("rrelayer-{}-wallet-{}-{}", self.config.identity, chain_id.u64(), wallet_index);
         let template = vec![
             Attribute::Class(ObjectClass::PRIVATE_KEY),
             Attribute::Label(label.as_bytes().to_vec()),
@@ -302,20 +333,22 @@ impl Pkcs11WalletManager {
             ))
         })?;
 
-        let actual_address = self.derive_address_from_key(&session, wallet_index)?;
+        let actual_address = self.derive_address_from_key(&session, wallet_index, chain_id)?;
         if actual_address != expected_address {
             return Err(WalletError::GenericSignerError(format!(
-                "Address mismatch for wallet {}: expected 0x{}, got 0x{}",
+                "Address mismatch for wallet {}-{}: expected 0x{}, got 0x{}",
                 wallet_index,
+                chain_id.u64(),
                 hex::encode(expected_address.as_slice()),
                 hex::encode(actual_address.as_slice())
             )));
         }
 
         debug!(
-            "Signing hash 0x{} with wallet {} (address 0x{})",
+            "Signing hash 0x{} with wallet {}-{} (address 0x{})",
             hex::encode(hash.as_slice()),
             wallet_index,
+            chain_id.u64(),
             hex::encode(expected_address.as_slice())
         );
 
@@ -374,18 +407,18 @@ impl WalletManagerTrait for Pkcs11WalletManager {
     async fn create_wallet(
         &self,
         wallet_index: u32,
-        _chain_id: &ChainId,
+        chain_id: &ChainId,
     ) -> Result<EvmAddress, WalletError> {
-        let address = self.get_public_key(wallet_index).await?;
+        let address = self.get_public_key(wallet_index, chain_id).await?;
         Ok(EvmAddress::from(address))
     }
 
     async fn get_address(
         &self,
         wallet_index: u32,
-        _chain_id: &ChainId,
+        chain_id: &ChainId,
     ) -> Result<EvmAddress, WalletError> {
-        let address = self.get_public_key(wallet_index).await?;
+        let address = self.get_public_key(wallet_index, chain_id).await?;
         Ok(EvmAddress::from(address))
     }
 
@@ -393,26 +426,32 @@ impl WalletManagerTrait for Pkcs11WalletManager {
         &self,
         wallet_index: u32,
         transaction: &TypedTransaction,
-        _chain_id: &ChainId,
+        chain_id: &ChainId,
     ) -> Result<Signature, WalletError> {
         let tx_hash = transaction.signature_hash();
-        self.sign_hash(wallet_index, &tx_hash).await
+        self.sign_hash(wallet_index, &tx_hash, chain_id).await
     }
 
-    async fn sign_text(&self, wallet_index: u32, text: &str) -> Result<Signature, WalletError> {
+    async fn sign_text(
+        &self,
+        wallet_index: u32,
+        text: &str,
+        chain_id: &ChainId,
+    ) -> Result<Signature, WalletError> {
         let message = format!("\x19Ethereum Signed Message:\n{}{}", text.len(), text);
         let hash = keccak256(message.as_bytes());
 
-        self.sign_hash(wallet_index, &hash).await
+        self.sign_hash(wallet_index, &hash, chain_id).await
     }
 
     async fn sign_typed_data(
         &self,
         wallet_index: u32,
         typed_data: &TypedData,
+        chain_id: &ChainId,
     ) -> Result<Signature, WalletError> {
         let hash = typed_data.eip712_signing_hash()?;
-        self.sign_hash(wallet_index, &hash).await
+        self.sign_hash(wallet_index, &hash, chain_id).await
     }
 
     fn supports_blobs(&self) -> bool {

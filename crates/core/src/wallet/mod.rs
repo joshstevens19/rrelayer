@@ -27,6 +27,9 @@ pub use private_key_wallet_manager::PrivateKeyWalletManager;
 mod pkcs11_wallet_manager;
 pub use pkcs11_wallet_manager::Pkcs11WalletManager;
 
+mod fireblocks_wallet_manager;
+pub use fireblocks_wallet_manager::FireblocksWalletManager;
+
 mod composite_wallet_manager;
 pub use composite_wallet_manager::CompositeWalletManager;
 
@@ -137,12 +140,18 @@ pub trait WalletManagerTrait: Send + Sync {
         chain_id: &ChainId,
     ) -> Result<Signature, WalletError>;
 
-    async fn sign_text(&self, wallet_index: u32, text: &str) -> Result<Signature, WalletError>;
+    async fn sign_text(
+        &self,
+        wallet_index: u32,
+        text: &str,
+        chain_id: &ChainId,
+    ) -> Result<Signature, WalletError>;
 
     async fn sign_typed_data(
         &self,
         wallet_index: u32,
         typed_data: &TypedData,
+        chain_id: &ChainId,
     ) -> Result<Signature, WalletError>;
 
     /// Returns whether this wallet manager supports EIP-4844 blob transactions

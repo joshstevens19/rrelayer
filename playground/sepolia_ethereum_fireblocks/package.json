@@ -1,5 +1,5 @@
 {
-  "name": "base",
+  "name": "sepolia_ethereum_fireblocks",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
@@ -8,11 +8,9 @@
     "relayer::get::all": "ts-node src/relayer/get-relayers.ts",
     "transaction::send": "ts-node src/transaction/send-transaction.ts",
     "transaction::cancel::tx": "ts-node src/transaction/cancel-transaction.ts",
-    "transaction::send::to::pk": "ts-node src/transaction/send-transaction-to-pk.ts",
-    "transaction::send::from::pk": "ts-node src/transaction/send-transaction-from-pk.ts",
     "transaction::send-blob": "ts-node src/transaction/send-blob-transaction.ts",
-    "gas::price": "ts-node src/network/get-gas-price.ts",
-    "signing::sign-text": "ts-node src/signing/sign-text.ts"
+    "signing::sign-text": "ts-node src/signing/sign-text.ts",
+    "signing::sign-typed-data": "ts-node src/signing/sign-typed-data.ts"
   },
   "author": "",
   "license": "ISC",

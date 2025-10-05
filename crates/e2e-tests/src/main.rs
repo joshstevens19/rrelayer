@@ -22,6 +22,7 @@ pub enum SigningProvider {
     Privy,
     Turnkey,
     PKCS11,
+    Fireblocks,
 }
 
 impl SigningProvider {
@@ -34,6 +35,7 @@ impl SigningProvider {
             SigningProvider::Privy => "privy",
             SigningProvider::Turnkey => "turnkey",
             SigningProvider::PKCS11 => "pkcs11",
+            SigningProvider::Fireblocks => "fireblocks",
         }
     }
 
@@ -47,6 +49,7 @@ impl SigningProvider {
             // Due to API limits we cant do it
             // SigningProvider::Turnkey,
             SigningProvider::PKCS11,
+            SigningProvider::Fireblocks,
         ]
     }
 
@@ -59,6 +62,7 @@ impl SigningProvider {
             "privy" => Some(SigningProvider::Privy),
             "turnkey" => Some(SigningProvider::Turnkey),
             "pkcs11" => Some(SigningProvider::PKCS11),
+            "fireblocks" => Some(SigningProvider::Fireblocks),
             _ => None,
         }
     }

@@ -67,7 +67,10 @@ pub async fn load_providers(
             || signing_key.aws_kms.is_some()
             || signing_key.turnkey.is_some()
             || signing_key.pkcs11.is_some()
-            || signing_key.raw.is_some();
+            || signing_key.fireblocks.is_some()
+            || signing_key.raw.is_some()
+            || signing_key.aws_secret_manager.is_some()
+            || signing_key.gcp_secret_manager.is_some();
 
         // If we only have private keys and no main signing provider, use private key manager only
         if private_key_strings.is_some() && !has_main_signing_provider {
@@ -164,6 +167,26 @@ pub async fn load_providers(
                 EvmProvider::new_with_pkcs11(
                     config,
                     pkcs11.clone(),
+                    get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                )
+                .await?
+            }
+        } else if let Some(fireblocks) = &signing_key.fireblocks {
+            if private_key_strings.is_some() {
+                let fireblocks_manager = std::sync::Arc::new(
+                    crate::wallet::FireblocksWalletManager::new(fireblocks.clone()).await?,
+                );
+                EvmProvider::new_with_composite(
+                    config,
+                    fireblocks_manager,
+                    private_key_strings,
+                    get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                )
+                .await?
+            } else {
+                EvmProvider::new_with_fireblocks(
+                    config,
+                    fireblocks.clone(),
                     get_gas_estimator(&config.provider_urls, setup_config, config).await?,
                 )
                 .await?
