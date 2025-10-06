@@ -17,7 +17,7 @@ use std::sync::Arc;
 ///
 /// This endpoint selects a random available (non-paused, non-internal) relayer
 /// and forwards the transaction request to it.
-pub async fn send_random_transaction(
+pub async fn send_transaction_random(
     State(state): State<Arc<AppState>>,
     Path(chain_id): Path<ChainId>,
     headers: HeaderMap,

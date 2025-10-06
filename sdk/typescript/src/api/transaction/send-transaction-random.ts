@@ -19,7 +19,7 @@ export const sendTransactionRandom = async (
 
     const response = await postApi<TransactionSent>(
       baseConfig,
-      `transactions/relayers/${chainId}/send_random`,
+      `transactions/relayers/${chainId}/send-random`,
       {
         ...transactionToSend,
       },

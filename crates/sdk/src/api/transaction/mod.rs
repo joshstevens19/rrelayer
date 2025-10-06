@@ -73,7 +73,7 @@ impl TransactionApi {
         }
         self.client
             .post_with_headers(
-                &format!("transactions/relayers/{}/send_random", chain_id),
+                &format!("transactions/relayers/{}/send-random", chain_id),
                 transaction,
                 headers,
             )

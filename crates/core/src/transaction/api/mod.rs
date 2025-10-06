@@ -29,8 +29,8 @@ pub fn create_transactions_routes() -> Router<Arc<AppState>> {
         .route("/status/:id", get(get_transaction_status::get_transaction_status))
         .route("/relayers/:relayer_id/send", post(send_transaction::handle_send_transaction))
         .route(
-            "/relayers/:chain_id/send_random",
-            post(send_random_transaction::send_random_transaction),
+            "/relayers/:chain_id/send-random",
+            post(send_random_transaction::send_transaction_random),
         )
         .route("/replace/:transaction_id", put(replace_transaction::replace_transaction))
         .route("/cancel/:transaction_id", put(cancel_transaction::cancel_transaction))
