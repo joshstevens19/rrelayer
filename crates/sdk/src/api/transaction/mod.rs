@@ -1,5 +1,6 @@
 use crate::api::{http::HttpClient, types::ApiResult};
 use reqwest::header::{HeaderMap, HeaderValue};
+use rrelayer_core::network::ChainId;
 use rrelayer_core::transaction::api::{CancelTransactionResponse, RelayTransactionStatusResult};
 use rrelayer_core::transaction::api::{RelayTransactionRequest, SendTransactionResult};
 use rrelayer_core::transaction::queue_system::ReplaceTransactionResult;
@@ -51,6 +52,28 @@ impl TransactionApi {
         self.client
             .post_with_headers(
                 &format!("transactions/relayers/{}/send", relayer_id),
+                transaction,
+                headers,
+            )
+            .await
+    }
+
+    pub async fn send_random(
+        &self,
+        chain_id: &ChainId,
+        transaction: &RelayTransactionRequest,
+        rate_limit_key: Option<String>,
+    ) -> ApiResult<SendTransactionResult> {
+        let mut headers = HeaderMap::new();
+        if let Some(rate_limit_key) = rate_limit_key.as_ref() {
+            headers.insert(
+                RATE_LIMIT_HEADER_NAME,
+                HeaderValue::from_str(rate_limit_key).expect("Invalid rate limit key"),
+            );
+        }
+        self.client
+            .post_with_headers(
+                &format!("transactions/relayers/{}/send_random", chain_id),
                 transaction,
                 headers,
             )
