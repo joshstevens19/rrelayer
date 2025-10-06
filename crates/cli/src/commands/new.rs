@@ -77,6 +77,7 @@ pub async fn handle_init(path: &Path) -> Result<(), InitError> {
         }],
         gas_providers: None,
         api_config: ApiConfig {
+            host: None,
             port: 8000,
             allowed_origins: None,
             authentication_username: "${RRELAYER_AUTH_USERNAME}".to_string(),
