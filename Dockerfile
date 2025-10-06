@@ -25,4 +25,6 @@ RUN apt-get update && apt-get install -y \
 COPY --from=builder /app/target/release/rrelayer_cli /app/rrelayer
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
+WORKDIR /app/project
+
 ENTRYPOINT ["/app/rrelayer"]
