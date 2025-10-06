@@ -75,7 +75,7 @@ pub async fn send_transaction(
     state: &Arc<AppState>,
     headers: &HeaderMap,
 ) -> Result<SendTransactionResult, HttpError> {
-    state.validate_auth_basic_or_api_key(&headers, &relayer.address, &relayer.chain_id)?;
+    state.validate_auth_basic_or_api_key(headers, &relayer.address, &relayer.chain_id)?;
 
     if state.relayer_internal_only.restricted(&relayer.address, &relayer.chain_id) {
         return Err(unauthorized(Some("Relayer can only be used internally".to_string())));
@@ -105,7 +105,7 @@ pub async fn send_transaction(
 
     let rate_limit_reservation = RateLimiter::check_and_reserve_rate_limit(
         state,
-        &headers,
+        headers,
         &relayer.id,
         RateLimitOperation::Transaction,
     )
