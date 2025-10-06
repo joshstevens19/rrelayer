@@ -47,6 +47,17 @@ impl AwsKmsWalletManager {
         format!("alias/{}-wallet-{}-{}", self.alias, wallet_index, chain_id)
     }
 
+    async fn build_aws_config(&self) -> aws_config::SdkConfig {
+        let mut config_loader = aws_config::defaults(BehaviorVersion::latest())
+            .region(Region::new(self.config.region.clone()));
+
+        if let Some(endpoint_url) = &self.config.endpoint_url {
+            config_loader = config_loader.endpoint_url(endpoint_url);
+        }
+
+        config_loader.load().await
+    }
+
     async fn get_or_create_key_id(
         &self,
         wallet_index: u32,
@@ -69,10 +80,7 @@ impl AwsKmsWalletManager {
     }
 
     async fn validate_aws_config(&self) -> Result<(), WalletError> {
-        let aws_config = aws_config::defaults(BehaviorVersion::latest())
-            .region(Region::new(self.config.region.clone()))
-            .load()
-            .await;
+        let aws_config = self.build_aws_config().await;
 
         let sts = StsClient::new(&aws_config);
         match sts.get_caller_identity().send().await {
@@ -94,10 +102,7 @@ impl AwsKmsWalletManager {
         wallet_index: u32,
         chain_id: &ChainId,
     ) -> Result<String, WalletError> {
-        let aws_config = aws_config::defaults(BehaviorVersion::latest())
-            .region(Region::new(self.config.region.clone()))
-            .load()
-            .await;
+        let aws_config = self.build_aws_config().await;
 
         let kms = Client::new(&aws_config);
         let expected_alias = self.build_alias(wallet_index, chain_id);
@@ -182,10 +187,7 @@ impl AwsKmsWalletManager {
         key_id: &str,
         chain_id: Option<u64>,
     ) -> Result<AwsSigner, WalletError> {
-        let aws_config = aws_config::defaults(BehaviorVersion::latest())
-            .region(Region::new(self.config.region.clone()))
-            .load()
-            .await;
+        let aws_config = self.build_aws_config().await;
 
         let client = Client::new(&aws_config);
 
@@ -235,10 +237,7 @@ impl AwsKmsWalletManager {
     }
 
     pub async fn create_keys(&self, plans: Vec<KeyPlan>) -> Result<Vec<String>, WalletError> {
-        let aws_config = aws_config::defaults(BehaviorVersion::latest())
-            .region(Region::new(self.config.region.clone()))
-            .load()
-            .await;
+        let aws_config = self.build_aws_config().await;
 
         let sts = StsClient::new(&aws_config);
         let who = sts.get_caller_identity().send().await.map_err(|e| WalletError::ApiError {
@@ -304,10 +303,7 @@ impl AwsKmsWalletManager {
     }
 
     pub async fn list_keys(&self) -> Result<Vec<(String, String)>, WalletError> {
-        let aws_config = aws_config::defaults(BehaviorVersion::latest())
-            .region(Region::new(self.config.region.clone()))
-            .load()
-            .await;
+        let aws_config = self.build_aws_config().await;
 
         let kms = Client::new(&aws_config);
 
@@ -335,10 +331,7 @@ impl AwsKmsWalletManager {
     }
 
     pub async fn list_aliases(&self) -> Result<Vec<(String, String)>, WalletError> {
-        let aws_config = aws_config::defaults(BehaviorVersion::latest())
-            .region(Region::new(self.config.region.clone()))
-            .load()
-            .await;
+        let aws_config = self.build_aws_config().await;
 
         let kms = Client::new(&aws_config);
 
