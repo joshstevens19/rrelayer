@@ -9,6 +9,7 @@ networks:
   - https://sepolia.gateway.tenderly.co
   block_explorer_url: https://sepolia.etherscan.io
 api_config:
+  host: "0.0.0.0"
   port: 8000
   authentication_username: ${RRELAYER_AUTH_USERNAME}
   authentication_password: ${RRELAYER_AUTH_PASSWORD}

@@ -7,6 +7,7 @@
 ### Features
 
 - feat: allow custom `endpoint_url` for AWS KMS signers (for use with [LocalStack](https://localstack.cloud/))
+- feat: allow overriding the host in the API config for deployments
 
 ---
 
@@ -23,6 +24,20 @@
 ---
 
 all release branches are deployed through `release/VERSION_NUMBER` branches
+
+## 0.3.1 - 6th October 2025
+-------------------------------------------------
+
+github branch - https://github.com/joshstevens19/rrelayer/tree/release/0.3.1
+
+- linux binary - https://github.com/joshstevens19/rrelayer/releases/download/v0.3.1/rrelayer_linux-amd64.tar.gz
+- mac apple silicon binary - https://github.com/joshstevens19/rrelayer/releases/download/v0.3.1/rrelayer-arm64.tar.gz
+- mac apple intel binary - https://github.com/joshstevens19/rrelayer/releases/download/v0.3.1/rrelayer-amd64.tar.gz
+- windows binary - https://github.com/joshstevens19/rrelayer/releases/download/v0.3.1/rrelayer-amd64.zip
+
+### Bug fixes
+
+- fix: cli start should honour existing db connections and only check docker when it can not connect
 
 ## 0.3.0 - 5th October 2025
 -------------------------------------------------

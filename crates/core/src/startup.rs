@@ -253,7 +253,8 @@ async fn start_api(
         .with_state(app_state)
         .into_make_service_with_connect_info::<SocketAddr>();
 
-    let address = format!("localhost:{}", api_config.port);
+    let address =
+        format!("{}:{}", api_config.host.unwrap_or("localhost".to_string()), api_config.port);
 
     let listener = tokio::net::TcpListener::bind(&address).await?;
     info!("rrelayer is up on http://{}", address);

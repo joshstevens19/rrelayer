@@ -33,6 +33,10 @@ impl ProjectLocation {
 
     pub fn get_api_url(&self) -> Result<String, ProjectLocationError> {
         let setup_config = self.setup_config(false)?;
-        Ok(format!("http://localhost:{}", setup_config.api_config.port))
+        Ok(format!(
+            "http://{}:{}",
+            setup_config.api_config.host.unwrap_or("localhost".to_string()),
+            setup_config.api_config.port
+        ))
     }
 }

@@ -4,6 +4,17 @@ This holds the port the API will be exposed on alongside basic authentication de
 
 ## Fields
 
+### host - optional defaults to localhost
+
+The host the API will try to start up from, you may need to override it if you want to expose the api to a wider network
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: 'my first rrelayer'
+api_config:
+  host: "0.0.0.0"
+```
+
 ### port
 
 The port the API will try to start up from

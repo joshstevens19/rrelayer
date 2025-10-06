@@ -498,6 +498,8 @@ pub struct GasProviders {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ApiConfig {
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub host: Option<String>,
     pub port: u32,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub allowed_origins: Option<Vec<String>>,
