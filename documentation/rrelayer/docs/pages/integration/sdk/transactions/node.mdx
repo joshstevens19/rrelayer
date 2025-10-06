@@ -221,6 +221,49 @@ let relayTransactionResult = await relayerClient.transaction.waitForTransactionR
 );
 ```
 
+### Sending Transaction to a Random Relayer
+
+You can send contract transactions to a random relayer using the below:
+
+#### Basic Auth
+
+```ts
+// config.ts
+import { createClient, TransactionSpeed } from 'rrelayer';
+import * as dotenv from "dotenv";
+dotenv.config();
+
+const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: process.env.RRELAYER_AUTH_USERNAME!,
+    password: process.env.RRELAYER_AUTH_PASSWORD!,
+  },
+});
+
+...
+
+// send-random-contract-transaction.ts
+import { client } from './config';
+import { TransactionToSend } from 'rrelayer';
+
+const chainId = 1; // Ethereum mainnet
+
+// Using a framework like viem and ethers is recommended here. Look under framework guides > TypeScript for them.
+const txRequest: TransactionToSend = {
+    to: '0xFBA3912Ca04dd458c843e2EE08967fC04f3579c2', // the contract address
+    data: '0x0111111' // the encoding of the contract call
+};
+
+// Send to a random relayer on the specified chain
+let response = await client.network.sendTransactionRandom(chainId, txRequest);
+
+// returns a TransactionReceipt - import { TransactionReceipt } from 'rrelayer';
+let relayTransactionResult = await client.transaction.waitForTransactionReceiptById(
+    response.id
+);
+```
+
 ### Blob Transaction
 
 :::warning
