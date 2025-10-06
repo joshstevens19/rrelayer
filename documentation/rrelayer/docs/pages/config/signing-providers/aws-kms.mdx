@@ -67,6 +67,7 @@ api_config:
 signing_provider: // [!code focus]
   aws_kms: // [!code focus]
     region: "eu-west-1" // [!code focus]
+    endpoint_url: "http://localhost:4566" # Optional: for LocalStack // [!code focus]
 ```
 
 You then need to add the AWS variables to the `.env`
@@ -79,4 +80,26 @@ AWS_SECRET_ACCESS_KEY=YOUR_AWS_SECRET_ACCESS_KEY
 :::warning
 Your user must have the required roles assigned in AWS to this user which we state above else it will not work and
 rrelayer will throw errors to tell you this.
+:::
+
+## LocalStack Support
+
+The optional `endpoint_url` field allows you to point AWS KMS requests to a custom endpoint, which is particularly useful for local development and testing with [LocalStack](https://localstack.cloud/).
+
+**Example LocalStack configuration:**
+
+```yaml [rrelayer.yaml]
+signing_provider:
+  aws_kms:
+    region: "us-east-1"
+    endpoint_url: "http://localhost:4566"
+```
+
+When using LocalStack:
+- The region can be any valid AWS region name (LocalStack doesn't enforce region-specific behavior)
+- Ensure LocalStack is running with both **KMS** and **STS** services enabled
+- You still need to set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` environment variables
+
+:::info
+When `endpoint_url` is omitted, rrelayer will use the standard AWS KMS endpoints in production.
 :::
