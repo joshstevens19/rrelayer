@@ -16,22 +16,26 @@ pub async fn handle_start(project_path: &PathBuf) -> Result<(), ProjectStartupEr
 
     rrelayer_info!("Starting relayer...");
 
-    let docker_compose_path = project_path.join("docker-compose.yml");
-    if !docker_compose_path.exists() {
-        return Err(ProjectStartupError::DockerComposeNotFound);
-    }
-
-    match start_docker_compose(project_path) {
-        Ok(_) => {
-            rrelayer_info!("Docker postgres containers started up successfully");
+    // check connection of the database as they may have it connected already (prod releases etc)
+    let connection_alive = PostgresClient::new().await;
+    if connection_alive.is_err() {
+        let docker_compose_path = project_path.join("docker-compose.yml");
+        if !docker_compose_path.exists() {
+            return Err(ProjectStartupError::DockerComposeNotFound);
         }
-        Err(e) => {
-            return Err(e);
-        }
-    }
 
-    // check connection of the database
-    let _ = PostgresClient::new().await?;
+        match start_docker_compose(project_path) {
+            Ok(_) => {
+                rrelayer_info!("Docker postgres containers started up successfully");
+            }
+            Err(e) => {
+                return Err(e);
+            }
+        }
+
+        // check connection of the database now with docker up
+        let _ = PostgresClient::new().await?;
+    }
 
     start(project_path).await?;
 
