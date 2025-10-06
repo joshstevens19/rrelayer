@@ -74,6 +74,7 @@ pub async fn handle_init(path: &Path) -> Result<(), InitError> {
             enable_sending_blobs: Some(true),
             gas_bump_blocks_every: Default::default(),
             max_gas_price_multiplier: 4,
+            allowed_random_relayers: None,
         }],
         gas_providers: None,
         api_config: ApiConfig {

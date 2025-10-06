@@ -110,6 +110,7 @@ async fn handle_add(project_path: &ProjectLocation) -> Result<(), NetworkError> 
         enable_sending_blobs: Some(true),
         gas_bump_blocks_every: Default::default(),
         max_gas_price_multiplier: 4,
+        allowed_random_relayers: None,
     });
 
     project_path.overwrite_setup_config(setup_config)?;

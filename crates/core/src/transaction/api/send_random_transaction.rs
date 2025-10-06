@@ -45,11 +45,15 @@ async fn select_random_relayer(
     let mut rng = rand::thread_rng();
     let available_relayers: Vec<_> = relayers
         .into_iter()
-        .filter(|r| !r.paused && !state.relayer_internal_only.restricted(&r.address, &r.chain_id))
+        .filter(|r| {
+            !r.paused
+                && !state.relayer_internal_only.restricted(&r.address, &r.chain_id)
+                && state.relayers_allowed_for_random.is_allowed(&r.address, &r.chain_id)
+        })
         .collect();
     available_relayers.choose(&mut rng).cloned().ok_or_else(|| {
         bad_request(format!(
-            "No available relayers for chain {} (all relayers are paused or internal-only)",
+            "No available relayers for chain {} (all relayers are paused, internal-only, or not allowed for random selection)",
             chain_id
         ))
     })
