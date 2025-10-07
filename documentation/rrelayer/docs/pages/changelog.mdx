@@ -6,8 +6,6 @@
 
 ### Features
 
-- feat: allow automatic top up to handle an array
-
 ---
 
 ### Bug fixes
@@ -34,6 +32,14 @@ github branch - https://github.com/joshstevens19/rrelayer/tree/release/0.5.0
 - mac apple intel binary - https://github.com/joshstevens19/rrelayer/releases/download/v0.5.0/rrelayer-amd64.tar.gz
 - windows binary - https://github.com/joshstevens19/rrelayer/releases/download/v0.5.0/rrelayer-amd64.zip
 
+### Features
+
+- feat: allow automatic top up to handle an array
+
+### Breaking changes
+
+- in the YAML changed from `automatic_top_up: Option<NetworkAutomaticTopUpConfig>` to `automatic_top_up: Option<Vec<NetworkAutomaticTopUpConfig>>`
+
 ## 0.4.1 - 7th October 2025
 -------------------------------------------------
 
@@ -44,13 +50,9 @@ github branch - https://github.com/joshstevens19/rrelayer/tree/release/0.4.1
 - mac apple intel binary - https://github.com/joshstevens19/rrelayer/releases/download/v0.4.1/rrelayer-amd64.tar.gz
 - windows binary - https://github.com/joshstevens19/rrelayer/releases/download/v0.4.1/rrelayer-amd64.zip
 
-### Features
+### Bug fixes
 
-- feat: allow automatic top up to handle an array
-
-### Breaking changes
-
-- in the YAML changed from automatic_top_up: Option<NetworkAutomaticTopUpConfig> to automatic_top_up: Option<Vec<NetworkAutomaticTopUpConfig>>,
+fix: filter out deleted on the relayers API call
 
 ## 0.4.0 - 6th October 2025
 -------------------------------------------------
