@@ -176,11 +176,15 @@ networks: // [!code focus]
       relayers: "*" // [!code focus]
 ```
 
-### native - optional (you should have this OR erc20_tokens)
+### native - optional (you should have this OR/AND erc20_tokens)
 
 This is the mapping of how much you top up each time and also the trigger points of the min balance to send it.
 This should be in formatted style so if you want to send 2 ETH it should be "2", rrelayer will handle the formatting
 from decimals to send it.
+
+:::info
+native and erc20 top-ups can be configured together
+:::
 
 ```yaml [rrelayer.yaml]
 name: first-rrelayer
@@ -249,10 +253,14 @@ networks: // [!code focus]
         decimals: 6 # [!code focus]
 ```
 
-### erc20 tokens - optional (you should have this OR native)
+### erc20 tokens - optional (you should have this OR/AND native)
 
 You can also map top up tokens say if you were using these relayers to send ERC20 tokens somewhere. It accepts an array
 of `erc20_tokens`.
+
+:::info
+native and erc20 top-ups can be configured together
+:::
 
 ```yaml [rrelayer.yaml]
 name: first-rrelayer
