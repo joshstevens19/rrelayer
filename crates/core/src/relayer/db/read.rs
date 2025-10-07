@@ -16,6 +16,7 @@ impl PostgresClient {
                 "
                     SELECT *
                     FROM relayer.record
+                    WHERE deleted = FALSE
                     LIMIT $1
                     OFFSET $2;
                 ",
