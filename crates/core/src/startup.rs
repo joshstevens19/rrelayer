@@ -351,17 +351,19 @@ pub async fn start(project_path: &Path) -> Result<(), StartError> {
     for network_config in &config.networks {
         api_keys
             .push((network_config.chain_id, network_config.api_keys.clone().unwrap_or_default()));
-        if let Some(automatic_top_up) = &network_config.automatic_top_up {
-            if let Some(safe_address) = &automatic_top_up.from.safe {
-                safe_configs.push(SafeProxyConfig {
-                    address: *safe_address,
-                    relayers: vec![automatic_top_up.from.relayer.address],
-                    chain_id: network_config.chain_id,
-                })
-            }
-            if automatic_top_up.from.relayer.internal_only.unwrap_or(true) {
-                relayer_internal_only
-                    .push((network_config.chain_id, automatic_top_up.from.relayer.address))
+        if let Some(automatic_top_up_configs) = &network_config.automatic_top_up {
+            for automatic_top_up in automatic_top_up_configs {
+                if let Some(safe_address) = &automatic_top_up.from.safe {
+                    safe_configs.push(SafeProxyConfig {
+                        address: *safe_address,
+                        relayers: vec![automatic_top_up.from.relayer.address],
+                        chain_id: network_config.chain_id,
+                    })
+                }
+                if automatic_top_up.from.relayer.internal_only.unwrap_or(true) {
+                    relayer_internal_only
+                        .push((network_config.chain_id, automatic_top_up.from.relayer.address))
+                }
             }
         }
 

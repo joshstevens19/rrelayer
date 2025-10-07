@@ -400,7 +400,7 @@ impl EmbeddedRRelayerServer {
             let pids = String::from_utf8_lossy(&output.stdout);
             for pid in pids.lines() {
                 if let Ok(pid_num) = pid.trim().parse::<u32>() {
-                    info!("🔫 Force killing process {} on port {}", pid_num, port);
+                    info!("Force killing process {} on port {}", pid_num, port);
                     let _ = Command::new("kill").args(["-9", &pid_num.to_string()]).output();
                 }
             }

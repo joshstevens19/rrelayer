@@ -82,18 +82,20 @@ impl AutomaticTopUpTask {
     /// Refreshes the internal cache of relayers for all configured networks.
     async fn refresh_relayer_cache(&mut self) {
         for network_config in &self.config.networks {
-            if let Some(_automatic_top_up) = &network_config.automatic_top_up {
-                info!("Refreshing relayer cache for {}", network_config.name);
+            if let Some(automatic_top_up_configs) = &network_config.automatic_top_up {
+                if !automatic_top_up_configs.is_empty() {
+                    info!("Refreshing relayer cache for {}", network_config.name);
 
-                match self.get_all_relayers_for_chain(&network_config.chain_id).await {
-                    Ok(relayers) => {
-                        self.relayer_cache.insert(network_config.chain_id, relayers);
-                    }
-                    Err(e) => {
-                        error!(
-                            "Failed to refresh relayer cache for chain {}: {}",
-                            network_config.chain_id, e
-                        );
+                    match self.get_all_relayers_for_chain(&network_config.chain_id).await {
+                        Ok(relayers) => {
+                            self.relayer_cache.insert(network_config.chain_id, relayers);
+                        }
+                        Err(e) => {
+                            error!(
+                                "Failed to refresh relayer cache for chain {}: {}",
+                                network_config.chain_id, e
+                            );
+                        }
                     }
                 }
             }
@@ -113,8 +115,16 @@ impl AutomaticTopUpTask {
     /// Checks all configured addresses and performs top-ups where needed.
     async fn check_and_top_up_addresses(&self) {
         for network_config in &self.config.networks {
-            if let Some(automatic_top_up) = &network_config.automatic_top_up {
-                info!("Checking addresses for top-up on {}", network_config.name);
+            if let Some(automatic_top_up_configs) = &network_config.automatic_top_up {
+                if automatic_top_up_configs.is_empty() {
+                    continue;
+                }
+
+                info!(
+                    "Checking addresses for top-up on {} with {} configurations",
+                    network_config.name,
+                    automatic_top_up_configs.len()
+                );
 
                 let provider = match self.get_provider_for_chain(&network_config.chain_id) {
                     Some(p) => p,
@@ -127,8 +137,20 @@ impl AutomaticTopUpTask {
                     }
                 };
 
-                self.process_top_up_config(&network_config.chain_id, provider, automatic_top_up)
+                for (index, automatic_top_up) in automatic_top_up_configs.iter().enumerate() {
+                    info!(
+                        "Processing top-up configuration {}/{} for network {}",
+                        index + 1,
+                        automatic_top_up_configs.len(),
+                        network_config.name
+                    );
+                    self.process_top_up_config(
+                        &network_config.chain_id,
+                        provider,
+                        automatic_top_up,
+                    )
                     .await;
+                }
             }
         }
     }

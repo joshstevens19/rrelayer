@@ -461,7 +461,7 @@ pub struct NetworkSetupConfig {
     )]
     pub gas_provider: Option<GasProvider>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub automatic_top_up: Option<NetworkAutomaticTopUpConfig>,
+    pub automatic_top_up: Option<Vec<NetworkAutomaticTopUpConfig>>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub permissions: Option<Vec<NetworkPermissionsConfig>>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
