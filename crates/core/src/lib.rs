@@ -3,6 +3,8 @@ pub mod authentication;
 pub mod gas;
 mod logger;
 pub use logger::setup_info_logger;
+mod shutdown;
+pub use shutdown::{enter_critical_operation, is_shutdown_in_progress, request_graceful_shutdown};
 mod middleware;
 pub mod network;
 mod postgres;

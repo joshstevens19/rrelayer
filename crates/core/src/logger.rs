@@ -13,6 +13,8 @@ use tracing_subscriber::{
     EnvFilter,
 };
 
+use crate::shutdown::is_shutdown_in_progress;
+
 static SHUTDOWN_IN_PROGRESS: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(false));
 
 struct ShutdownAwareWriter {
@@ -27,8 +29,7 @@ impl ShutdownAwareWriter {
 
 impl Write for ShutdownAwareWriter {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        if SHUTDOWN_IN_PROGRESS.load(Ordering::Relaxed) {
-            // During shutdown, write directly to stdout
+        if SHUTDOWN_IN_PROGRESS.load(Ordering::Relaxed) || is_shutdown_in_progress() {
             let stdout = std::io::stdout();
             let mut handle = stdout.lock();
             handle.write(buf)
@@ -38,7 +39,7 @@ impl Write for ShutdownAwareWriter {
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
-        if SHUTDOWN_IN_PROGRESS.load(Ordering::Relaxed) {
+        if SHUTDOWN_IN_PROGRESS.load(Ordering::Relaxed) || is_shutdown_in_progress() {
             let stdout = std::io::stdout();
             let mut handle = stdout.lock();
             handle.flush()
@@ -62,7 +63,7 @@ struct CustomTimer;
 
 impl tracing_subscriber::fmt::time::FormatTime for CustomTimer {
     fn format_time(&self, writer: &mut Writer<'_>) -> std::fmt::Result {
-        if SHUTDOWN_IN_PROGRESS.load(Ordering::Relaxed) {
+        if SHUTDOWN_IN_PROGRESS.load(Ordering::Relaxed) || is_shutdown_in_progress() {
             let now = chrono::Local::now();
             write!(writer, "{}", now.format("%H:%M:%S"))
         } else {
@@ -91,11 +92,6 @@ pub fn setup_logger(log_level: LevelFilter) {
 
 pub fn setup_info_logger() {
     setup_logger(LevelFilter::INFO);
-}
-
-#[allow(dead_code)]
-pub fn mark_shutdown_started() {
-    SHUTDOWN_IN_PROGRESS.store(true, Ordering::Relaxed);
 }
 
 #[allow(dead_code)]

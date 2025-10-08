@@ -21,10 +21,10 @@ use crate::{
         common_types::{PagingContext, WalletOrProviderError},
         utils::sleep_ms,
     },
+    shutdown::subscribe_to_shutdown,
     transaction::types::{Transaction, TransactionStatus},
 };
 
-/// Spawns processing tasks for a single relayer.
 pub async fn spawn_processing_tasks_for_relayer(
     transaction_queue: Arc<Mutex<TransactionsQueues>>,
     relayer_id: &RelayerId,
@@ -72,29 +72,37 @@ async fn continuously_process_pending_transactions(
     queue: Arc<Mutex<TransactionsQueues>>,
     relayer_id: &RelayerId,
 ) {
-    loop {
-        let result = {
-            let mut tq = queue.lock().await;
-            tq.process_single_pending(relayer_id).await
-        };
+    let mut shutdown_rx = subscribe_to_shutdown();
 
-        match result {
-            Ok(result) => {
-                // info!("PENDING: {:?}", result);
-                processes_next_break(&result.process_again_after).await;
+    loop {
+        tokio::select! {
+            _ = shutdown_rx.recv() => {
+                info!("Shutdown signal received, stopping pending queue for relayer {}", relayer_id);
+                break;
             }
-            Err(e) => {
-                match e {
-                    ProcessPendingTransactionError::RelayerTransactionsQueueNotFound(_) => {
-                        // the queue has been deleted so kill out the loop
-                        info!(
-                            "Relayer id {} has been deleted stopping the pending queue for it",
-                            relayer_id
-                        );
-                        break;
+            result = async {
+                let mut tq = queue.lock().await;
+                tq.process_single_pending(relayer_id).await
+            } => {
+                match result {
+                    Ok(result) => {
+                        // info!("PENDING: {:?}", result);
+                        processes_next_break(&result.process_again_after).await;
                     }
-                    _ => {
-                        error!("PENDING QUEUE ERROR: {}", e)
+                    Err(e) => {
+                        match e {
+                            ProcessPendingTransactionError::RelayerTransactionsQueueNotFound(_) => {
+                                // the queue has been deleted so kill out the loop
+                                info!(
+                                    "Relayer id {} has been deleted stopping the pending queue for it",
+                                    relayer_id
+                                );
+                                break;
+                            }
+                            _ => {
+                                error!("PENDING QUEUE ERROR: {}", e)
+                            }
+                        }
                     }
                 }
             }
@@ -110,29 +118,37 @@ async fn continuously_process_inmempool_transactions(
     queue: Arc<Mutex<TransactionsQueues>>,
     relayer_id: &RelayerId,
 ) {
-    loop {
-        let result = {
-            let mut tq = queue.lock().await;
-            tq.process_single_inmempool(relayer_id).await
-        };
+    let mut shutdown_rx = subscribe_to_shutdown();
 
-        match result {
-            Ok(result) => {
-                // info!("INMEMPOOL: {:?}", result);
-                processes_next_break(&result.process_again_after).await;
+    loop {
+        tokio::select! {
+            _ = shutdown_rx.recv() => {
+                info!("Shutdown signal received, stopping inmempool queue for relayer {}", relayer_id);
+                break;
             }
-            Err(e) => {
-                match e {
-                    ProcessInmempoolTransactionError::RelayerTransactionsQueueNotFound(_) => {
-                        // the queue has been deleted so kill out the loop
-                        info!(
-                            "Relayer id {} has been deleted stopping the inmempool queue for it",
-                            relayer_id
-                        );
-                        break;
+            result = async {
+                let mut tq = queue.lock().await;
+                tq.process_single_inmempool(relayer_id).await
+            } => {
+                match result {
+                    Ok(result) => {
+                        // info!("INMEMPOOL: {:?}", result);
+                        processes_next_break(&result.process_again_after).await;
                     }
-                    _ => {
-                        error!("INMEMPOOL ERROR: {}", e)
+                    Err(e) => {
+                        match e {
+                            ProcessInmempoolTransactionError::RelayerTransactionsQueueNotFound(_) => {
+                                // the queue has been deleted so kill out the loop
+                                info!(
+                                    "Relayer id {} has been deleted stopping the inmempool queue for it",
+                                    relayer_id
+                                );
+                                break;
+                            }
+                            _ => {
+                                error!("INMEMPOOL ERROR: {}", e)
+                            }
+                        }
                     }
                 }
             }
@@ -148,29 +164,37 @@ async fn continuously_process_mined_transactions(
     queue: Arc<Mutex<TransactionsQueues>>,
     relayer_id: &RelayerId,
 ) {
-    loop {
-        let result = {
-            let mut tq = queue.lock().await;
-            tq.process_single_mined(relayer_id).await
-        };
+    let mut shutdown_rx = subscribe_to_shutdown();
 
-        match result {
-            Ok(result) => {
-                // info!("MINED: {:?}", result);
-                processes_next_break(&result.process_again_after).await;
+    loop {
+        tokio::select! {
+            _ = shutdown_rx.recv() => {
+                info!("Shutdown signal received, stopping mined queue for relayer {}", relayer_id);
+                break;
             }
-            Err(e) => {
-                match e {
-                    ProcessMinedTransactionError::RelayerTransactionsQueueNotFound(_) => {
-                        // the queue has been deleted so kill out the loop
-                        info!(
-                            "Relayer id {} has been deleted stopping the mined queue for it",
-                            relayer_id
-                        );
-                        break;
+            result = async {
+                let mut tq = queue.lock().await;
+                tq.process_single_mined(relayer_id).await
+            } => {
+                match result {
+                    Ok(result) => {
+                        // info!("MINED: {:?}", result);
+                        processes_next_break(&result.process_again_after).await;
                     }
-                    _ => {
-                        error!("MINED ERROR: {}", e)
+                    Err(e) => {
+                        match e {
+                            ProcessMinedTransactionError::RelayerTransactionsQueueNotFound(_) => {
+                                // the queue has been deleted so kill out the loop
+                                info!(
+                                    "Relayer id {} has been deleted stopping the mined queue for it",
+                                    relayer_id
+                                );
+                                break;
+                            }
+                            _ => {
+                                error!("MINED ERROR: {}", e)
+                            }
+                        }
                     }
                 }
             }
