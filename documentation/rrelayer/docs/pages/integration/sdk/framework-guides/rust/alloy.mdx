@@ -19,7 +19,7 @@ Add both `rrelayer` and `alloy` to your `Cargo.toml`:
 ```toml [Cargo.toml]
 [dependencies]
 rrelayer = "0.1.0"
-alloy = { version = "0.7", features = ["full", "signer-mnemonic", "eips", "eip712"] }
+alloy = { version = "1.0.36", features = ["full", "signer-mnemonic", "signer-keystore", "eips", "eip712"] }
 tokio = { version = "1", features = ["full"] }
 eyre = "0.6"
 ```
@@ -42,8 +42,10 @@ use rrelayer::{
     AdminRelayerClient, AdminRelayerClientConfig, AdminRelayerClientAuth,
     RelayerSigner, TransactionSpeed, RelayerId
 };
+use alloy::primitives::Address;
 use dotenvy::dotenv;
 use std::env;
+use std::str::FromStr;
 
 pub async fn create_relayer_signer() -> Result<RelayerSigner> {
     dotenv().ok();
@@ -58,7 +60,7 @@ pub async fn create_relayer_signer() -> Result<RelayerSigner> {
         server_url: "http://localhost:8000".to_string(),
         provider_url: "https://eth.llamarpc.com".to_string(),
         relayer_id: RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
-        auth: CreateClientAuth {
+        auth: AdminRelayerClientAuth {
             username,
             password,
         },
@@ -69,11 +71,13 @@ pub async fn create_relayer_signer() -> Result<RelayerSigner> {
 
     let client = Arc::new(AdminRelayerClient::new(config));
 
-    // Auto-fetch address from relayer
-    let signer = RelayerSigner::from_admin_client_auto_address(
+    // Specify the address explicitly (fetched from your relayer or known)
+    let address = Address::from_str("0x742d35cc6634c0532925a3b8d67e8000c942b1b5")?;
+    let signer = RelayerSigner::from_admin_client(
         client,
+        address,
         Some(1), // mainnet chain ID
-    ).await?;
+    );
 
     Ok(signer)
 }
@@ -86,6 +90,8 @@ use rrelayer::{
     RelayerClient, RelayerClientConfig, RelayerClientAuth, RelayerId,
     RelayerSigner, TransactionSpeed
 };
+use alloy::primitives::Address;
+use std::str::FromStr;
 
 pub async fn create_relayer_signer() -> Result<RelayerSigner> {
     let relayer_id = RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?;
@@ -103,11 +109,13 @@ pub async fn create_relayer_signer() -> Result<RelayerSigner> {
 
     let client = Arc::new(RelayerClient::new(config));
 
-    // Auto-fetch address from relayer
-    let signer = RelayerSigner::from_relayer_client_auto_address(
+    // Specify the address explicitly (fetched from your relayer or known)
+    let address = Address::from_str("0x742d35cc6634c0532925a3b8d67e8000c942b1b5")?;
+    let signer = RelayerSigner::from_relayer_client(
         client,
+        address,
         Some(1), // mainnet chain ID
-    ).await?;
+    );
 
     Ok(signer)
 }
