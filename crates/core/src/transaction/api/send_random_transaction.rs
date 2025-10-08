@@ -45,6 +45,7 @@ async fn select_random_relayer(
     }
 
     let mut rng = rand::thread_rng();
+    // TODO: it should be smart enough to also only pick the one with enough native funds to send the tx
     let available_relayers: Vec<_> = relayers
         .into_iter()
         .filter(|r| {
