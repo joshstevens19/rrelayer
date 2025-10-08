@@ -256,7 +256,7 @@ const txRequest: TransactionToSend = {
 };
 
 // Send to a random relayer on the specified chain
-let response = await client.network.sendTransactionRandom(chainId, txRequest);
+let response = await client.network.sendRandom(chainId, txRequest);
 
 // returns a TransactionReceipt - import { TransactionReceipt } from 'rrelayer';
 let relayTransactionResult = await client.transaction.waitForTransactionReceiptById(

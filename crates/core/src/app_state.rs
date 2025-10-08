@@ -49,8 +49,8 @@ impl RelayersAllowedForRandom {
             // If the list is empty, it means all relayers are allowed (equivalent to "*")
             allowed_relayers.is_empty() || allowed_relayers.contains(relayer)
         } else {
-            // If no configuration exists for this chain, all relayers are allowed by default
-            true
+            // If no configuration exists for this chain, the feature is disabled
+            false
         }
     }
 }
