@@ -1,7 +1,7 @@
 use alloy::{
     dyn_abi::TypedData,
     network::TransactionBuilder,
-    primitives::{Address, B256, ChainId, Signature, U256},
+    primitives::{Address, B256, ChainId, Signature, TxKind, U256},
     rpc::types::TransactionRequest,
     signers::Signer,
 };
@@ -308,18 +308,13 @@ impl<P> RelayerProvider<P> {
 
         // Extract to address - for now require it to be specified
         let to = match &tx_request.to {
-            Some(to_addr) => {
-                #[allow(irrefutable_let_patterns)]
-                if let Ok(addr_str) = format!("{:?}", to_addr)
-                    .strip_prefix("0x")
-                    .unwrap_or(&format!("{:?}", to_addr))
-                    .parse::<String>()
-                {
-                    EvmAddress::from_str(&addr_str)
-                        .map_err(|_| RelayerSignerError::AddressConversion)?
-                } else {
-                    return Err(RelayerSignerError::AddressConversion);
-                }
+            Some(TxKind::Call(to_addr)) => {
+                let addr_str = format!("{:#x}", to_addr);
+                EvmAddress::from_str(&addr_str)
+                    .map_err(|_| RelayerSignerError::AddressConversion)?
+            }
+            Some(TxKind::Create) => {
+                return Err(RelayerSignerError::InvalidSignature);
             }
             None => return Err(RelayerSignerError::InvalidSignature),
         };
