@@ -18,6 +18,7 @@ use crate::{
     schema::apply_schema,
     setup_info_logger,
     shared::cache::Cache,
+    shutdown,
     signing::create_signing_routes,
     transaction::{
         api::create_transactions_routes,
@@ -309,8 +310,7 @@ async fn start_api(
         _ = shutdown_signal => {
             info!("Starting graceful shutdown...");
 
-            // Request graceful shutdown with 30 second timeout
-            let shutdown_successful = crate::shutdown::request_graceful_shutdown(Duration::from_secs(30)).await;
+            let shutdown_successful = shutdown::request_graceful_shutdown(Duration::from_secs(30)).await;
 
             if shutdown_successful {
                 info!("Graceful shutdown completed successfully");

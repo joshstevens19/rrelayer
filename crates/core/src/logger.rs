@@ -3,6 +3,7 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
+use crate::is_shutdown_in_progress;
 use once_cell::sync::Lazy;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::{
@@ -12,8 +13,6 @@ use tracing_subscriber::{
     },
     EnvFilter,
 };
-
-use crate::shutdown::is_shutdown_in_progress;
 
 static SHUTDOWN_IN_PROGRESS: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(false));
 
