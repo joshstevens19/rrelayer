@@ -773,3 +773,13 @@ jobs:
               fi
             done
           done
+
+  docker:
+    name: Build and Publish Docker Image
+    needs: release
+    if: |
+      github.actor != 'github-actions[bot]' &&
+      github.ref == 'refs/heads/master' &&
+      github.event_name == 'push'
+    uses: ./.github/workflows/docker.yml
+    secrets: inherit
