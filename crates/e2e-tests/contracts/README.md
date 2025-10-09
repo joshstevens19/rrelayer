@@ -15,6 +15,12 @@ https://book.getfoundry.sh/
 
 ## Usage
 
+### Installing
+
+```shell
+$ forge init --force
+```
+
 ### Build
 
 ```shell

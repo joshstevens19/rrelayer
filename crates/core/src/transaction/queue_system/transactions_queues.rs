@@ -42,6 +42,7 @@ use crate::{
     relayer::RelayerId,
     safe_proxy::SafeProxyManager,
     shared::{cache::Cache, common_types::WalletOrProviderError},
+    shutdown::enter_critical_operation,
     transaction::{
         cache::invalidate_transaction_no_state_cache,
         nonce_manager::NonceManager,
@@ -489,6 +490,14 @@ impl TransactionsQueues {
             if let Some(mut result) =
                 transactions_queue.get_editable_transaction_by_id(&transaction.id).await
             {
+                let _guard = enter_critical_operation().ok_or_else(|| {
+                    info!(
+                        "cancel_transaction: refusing to start during shutdown for transaction {}",
+                        transaction.id
+                    );
+                    CancelTransactionError::RelayerIsPaused(transaction.relayer_id)
+                })?;
+
                 match result.type_name {
                     EditableTransactionType::Pending => {
                         info!("cancel_transaction: removing pending transaction from queue and marking as cancelled");
@@ -683,6 +692,14 @@ impl TransactionsQueues {
             if let Some(mut result) =
                 transactions_queue.get_editable_transaction_by_id(&transaction.id).await
             {
+                let _guard = enter_critical_operation().ok_or_else(|| {
+                    info!(
+                        "replace_transaction: refusing to start during shutdown for transaction {}",
+                        transaction.id
+                    );
+                    ReplaceTransactionError::RelayerIsPaused(transaction.relayer_id)
+                })?;
+
                 match result.type_name {
                     EditableTransactionType::Pending => {
                         let original_transaction = result.transaction.clone();
@@ -909,6 +926,13 @@ impl TransactionsQueues {
             }
 
             if let Some(mut transaction) = transactions_queue.get_next_pending_transaction().await {
+                let _guard = enter_critical_operation().ok_or_else(|| {
+                    info!(
+                        "process_single_pending: refusing to start during shutdown for relayer {}",
+                        relayer_id
+                    );
+                    ProcessPendingTransactionError::RelayerTransactionsQueueNotFound(*relayer_id)
+                })?;
                 if self.has_expired(&transaction) {
                     self.transaction_to_noop(&mut transactions_queue, &mut transaction);
                 }
@@ -1081,6 +1105,13 @@ impl TransactionsQueues {
 
             if let Some(mut transaction) = transactions_queue.get_next_inmempool_transaction().await
             {
+                let _guard = enter_critical_operation().ok_or_else(|| {
+                    info!(
+                        "process_single_inmempool: refusing to start during shutdown for relayer {}",
+                        relayer_id
+                    );
+                    ProcessInmempoolTransactionError::RelayerTransactionsQueueNotFound(*relayer_id)
+                })?;
                 if let Some(known_transaction_hash) = transaction.known_transaction_hash {
                     match transactions_queue.get_receipt(&known_transaction_hash).await {
                         Ok(Some(receipt)) => {
@@ -1277,6 +1308,14 @@ impl TransactionsQueues {
             let mut transactions_queue = queue_arc.lock().await;
 
             if let Some(transaction) = transactions_queue.get_next_mined_transaction().await {
+                let _guard = enter_critical_operation().ok_or_else(|| {
+                    info!(
+                        "process_single_mined: refusing to start during shutdown for relayer {}",
+                        relayer_id
+                    );
+                    ProcessMinedTransactionError::RelayerTransactionsQueueNotFound(*relayer_id)
+                })?;
+
                 if let Some(mined_at) = transaction.mined_at {
                     let elapsed = Utc::now() - mined_at;
                     if transactions_queue.in_confirmed_range(elapsed.num_milliseconds() as u64) {

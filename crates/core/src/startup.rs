@@ -18,6 +18,7 @@ use crate::{
     schema::apply_schema,
     setup_info_logger,
     shared::cache::Cache,
+    shutdown,
     signing::create_signing_routes,
     transaction::{
         api::create_transactions_routes,
@@ -38,11 +39,15 @@ use axum::{
 };
 use dotenv::dotenv;
 use std::path::Path;
-use std::{net::SocketAddr, sync::Arc, time::Instant};
+use std::{
+    net::SocketAddr,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use thiserror::Error;
 use tokio::sync::Mutex;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 #[derive(Error, Debug)]
 #[allow(clippy::enum_variant_names)]
@@ -258,7 +263,62 @@ async fn start_api(
 
     let listener = tokio::net::TcpListener::bind(&address).await?;
     info!("rrelayer is up on http://{}", address);
-    axum::serve(listener, app).await.map_err(StartApiError::ApiStartupError)?;
+
+    let shutdown_signal = async {
+        let ctrl_c = async {
+            tokio::signal::ctrl_c().await.expect("failed to install Ctrl+C handler");
+        };
+
+        #[cfg(unix)]
+        let terminate = async {
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+                .expect("failed to install signal handler")
+                .recv()
+                .await;
+        };
+
+        #[cfg(windows)]
+        let terminate = async {
+            tokio::signal::windows::ctrl_break()
+                .expect("failed to install Ctrl+Break handler")
+                .recv()
+                .await;
+        };
+
+        #[cfg(not(any(unix, windows)))]
+        let terminate = std::future::pending::<()>();
+
+        tokio::select! {
+            _ = ctrl_c => {
+                info!("Received Ctrl+C, initiating graceful shutdown");
+            },
+            _ = terminate => {
+                #[cfg(unix)]
+                info!("Received SIGTERM, initiating graceful shutdown");
+                #[cfg(windows)]
+                info!("Received Ctrl+Break, initiating graceful shutdown");
+                #[cfg(not(any(unix, windows)))]
+                info!("Received terminate signal, initiating graceful shutdown");
+            },
+        }
+    };
+
+    tokio::select! {
+        result = axum::serve(listener, app) => {
+            result.map_err(StartApiError::ApiStartupError)?;
+        }
+        _ = shutdown_signal => {
+            info!("Starting graceful shutdown...");
+
+            let shutdown_successful = shutdown::request_graceful_shutdown(Duration::from_secs(30)).await;
+
+            if shutdown_successful {
+                info!("Graceful shutdown completed successfully");
+            } else {
+                warn!("Some operations did not complete within shutdown timeout");
+            }
+        }
+    }
 
     Ok(())
 }
