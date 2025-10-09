@@ -30,6 +30,7 @@ pub enum ProcessPendingStatus {
     RelayerPaused,
     NoPendingTransactions,
     GasPriceTooHigh,
+    NonceSynchronized,
 }
 
 impl ProcessResultSuccess for ProcessPendingStatus {
@@ -44,6 +45,7 @@ pub enum ProcessInmempoolStatus {
     StillInmempool,
     NoInmempoolTransactions,
     GasIncreased,
+    NonceSynchronized,
 }
 
 impl ProcessResultSuccess for ProcessInmempoolStatus {

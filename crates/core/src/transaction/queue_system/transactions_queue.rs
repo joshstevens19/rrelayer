@@ -1398,4 +1398,30 @@ impl TransactionsQueue {
         let address = self.relay_address();
         self.evm_provider.get_balance(&address).await
     }
+
+    pub async fn update_pending_transaction_nonce(
+        &self,
+        transaction_id: &TransactionId,
+        new_nonce: TransactionNonce,
+    ) {
+        let mut pending = self.pending_transactions.lock().await;
+        if let Some(transaction) = pending.iter_mut().find(|tx| tx.id == *transaction_id) {
+            transaction.nonce = new_nonce;
+        }
+    }
+
+    pub async fn update_inmempool_transaction_nonce(
+        &self,
+        transaction_id: &TransactionId,
+        new_nonce: TransactionNonce,
+    ) {
+        let mut inmempool = self.inmempool_transactions.lock().await;
+        if let Some(competitive_tx) =
+            inmempool.iter_mut().find(|ctx| ctx.get_transaction_by_id(transaction_id).is_some())
+        {
+            if let Some(transaction) = competitive_tx.get_transaction_by_id_mut(transaction_id) {
+                transaction.nonce = new_nonce;
+            }
+        }
+    }
 }

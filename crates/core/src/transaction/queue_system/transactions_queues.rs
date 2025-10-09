@@ -10,7 +10,7 @@ use alloy::{
 use chrono::{DateTime, Utc};
 use thiserror::Error;
 use tokio::sync::Mutex;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 /// Error types for transaction queues operations.
 #[derive(Error, Debug)]
@@ -83,6 +83,55 @@ impl TransactionsQueues {
             let current_nonce =
                 setup.evm_provider.get_nonce(&setup.relayer.wallet_index_type().index()).await?;
 
+            let pending_nonces: Vec<u64> =
+                setup.pending_transactions.iter().map(|tx| tx.nonce.into_inner()).collect();
+
+            let current_nonce_u64 = current_nonce.into_inner();
+            let mut filtered_pending_transactions = setup.pending_transactions;
+
+            if !pending_nonces.is_empty() {
+                let min_pending_nonce = *pending_nonces.iter().min().unwrap();
+                let max_pending_nonce = *pending_nonces.iter().max().unwrap();
+
+                if min_pending_nonce < current_nonce_u64 {
+                    warn!(
+                        "Startup nonce validation for relayer {} ({}): found pending transactions with nonce's {} to {} but on-chain nonce is {}. This indicates transactions were mined outside of rrelayer.",
+                        setup.relayer.name, setup.relayer.id, min_pending_nonce, max_pending_nonce, current_nonce_u64
+                    );
+
+                    let original_count = filtered_pending_transactions.len();
+                    filtered_pending_transactions.retain(|tx| tx.nonce.into_inner() >= current_nonce_u64);
+
+                    let filtered_count = original_count - filtered_pending_transactions.len();
+                    if filtered_count > 0 {
+                        warn!(
+                            "Startup nonce validation for relayer {} ({}): filtered out {} transactions with stale nonces",
+                            setup.relayer.name, setup.relayer.id, filtered_count
+                        );
+                    }
+
+                    info!(
+                        "Startup nonce validation for relayer {} ({}): synchronized nonce manager to on-chain nonce {}",
+                        setup.relayer.name, setup.relayer.id, current_nonce_u64
+                    );
+                } else if min_pending_nonce > current_nonce_u64 {
+                    warn!(
+                        "Startup nonce validation for relayer {} ({}): gap detected between on-chain nonce {} and minimum pending nonce {}. This may indicate missed transactions.",
+                        setup.relayer.name, setup.relayer.id, current_nonce_u64, min_pending_nonce
+                    );
+                } else {
+                    info!(
+                        "Startup nonce validation for relayer {} ({}): pending transactions nonce range {} to {} is valid with on-chain nonce {}",
+                        setup.relayer.name, setup.relayer.id, min_pending_nonce, max_pending_nonce, current_nonce_u64
+                    );
+                }
+            } else {
+                info!(
+                    "Startup nonce validation for relayer {} ({}): no pending transactions, using on-chain nonce {}",
+                    setup.relayer.name, setup.relayer.id, current_nonce.into_inner()
+                );
+            }
+
             relayer_block_times_ms.insert(setup.relayer.id, setup.evm_provider.blocks_every);
 
             queues.insert(
@@ -92,7 +141,7 @@ impl TransactionsQueues {
                         setup.relayer,
                         setup.evm_provider,
                         NonceManager::new(current_nonce),
-                        setup.pending_transactions,
+                        filtered_pending_transactions,
                         setup.inmempool_transactions,
                         setup.mined_transactions,
                         safe_proxy_manager.clone(),
@@ -600,10 +649,50 @@ impl TransactionsQueues {
                         cancel_transaction.sent_with_gas = Some(gas_price);
                         cancel_transaction.sent_with_blob_gas = blob_gas_price;
 
-                        let transaction_sent = transactions_queue
+                        let transaction_sent = match transactions_queue
                             .send_transaction(&mut self.db, &mut cancel_transaction)
                             .await
-                            .map_err(CancelTransactionError::SendTransactionError)?;
+                        {
+                            Ok(tx_sent) => tx_sent,
+                            Err(TransactionQueueSendTransactionError::TransactionSendError(
+                                error,
+                            )) => {
+                                let error_msg = error.to_string().to_lowercase();
+                                if error_msg.contains("nonce too low")
+                                    || error_msg.contains("nonce is too low")
+                                    || error_msg.contains("invalid nonce")
+                                    || error_msg.contains("nonce has already been used")
+                                    || error_msg.contains("already known")
+                                {
+                                    warn!("cancel_transaction: nonce synchronization issue detected for relayer {}: {}", transaction.relayer_id, error);
+
+                                    // Try to recover by syncing with on-chain nonce
+                                    if let Err(sync_error) = self
+                                        .recover_nonce_synchronization(
+                                            &transaction.relayer_id,
+                                            &mut transactions_queue,
+                                        )
+                                        .await
+                                    {
+                                        error!("Failed to recover nonce synchronization for relayer {}: {}", transaction.relayer_id, sync_error);
+                                        return Err(CancelTransactionError::SendTransactionError(
+                                            TransactionQueueSendTransactionError::TransactionSendError(error)
+                                        ));
+                                    }
+
+                                    info!("Nonce synchronization recovered for relayer {}, cancel transaction will be retried", transaction.relayer_id);
+                                    return Err(
+                                        CancelTransactionError::NonceSynchronizationRecovered,
+                                    );
+                                }
+                                return Err(CancelTransactionError::SendTransactionError(
+                                    TransactionQueueSendTransactionError::TransactionSendError(
+                                        error,
+                                    ),
+                                ));
+                            }
+                            Err(e) => return Err(CancelTransactionError::SendTransactionError(e)),
+                        };
 
                         // DON'T mark original as CANCELLED yet - that's premature!
                         // We have a race condition: both transactions will compete with same nonce
@@ -834,10 +923,49 @@ impl TransactionsQueues {
                         replace_transaction.sent_with_gas = Some(gas_price);
                         replace_transaction.sent_with_blob_gas = blob_gas_price;
 
-                        let transaction_sent = transactions_queue
+                        let transaction_sent = match transactions_queue
                             .send_transaction(&mut self.db, &mut replace_transaction)
                             .await
-                            .map_err(ReplaceTransactionError::SendTransactionError)?;
+                        {
+                            Ok(tx_sent) => tx_sent,
+                            Err(TransactionQueueSendTransactionError::TransactionSendError(
+                                error,
+                            )) => {
+                                let error_msg = error.to_string().to_lowercase();
+                                if error_msg.contains("nonce too low")
+                                    || error_msg.contains("nonce is too low")
+                                    || error_msg.contains("invalid nonce")
+                                    || error_msg.contains("nonce has already been used")
+                                    || error_msg.contains("already known")
+                                {
+                                    warn!("replace_transaction: nonce synchronization issue detected for relayer {}: {}", transaction.relayer_id, error);
+
+                                    if let Err(sync_error) = self
+                                        .recover_nonce_synchronization(
+                                            &transaction.relayer_id,
+                                            &mut transactions_queue,
+                                        )
+                                        .await
+                                    {
+                                        error!("Failed to recover nonce synchronization for relayer {}: {}", transaction.relayer_id, sync_error);
+                                        return Err(ReplaceTransactionError::SendTransactionError(
+                                            TransactionQueueSendTransactionError::TransactionSendError(error)
+                                        ));
+                                    }
+
+                                    info!("Nonce synchronization recovered for relayer {}, replacement transaction will be retried", transaction.relayer_id);
+                                    return Err(
+                                        ReplaceTransactionError::NonceSynchronizationRecovered,
+                                    );
+                                }
+                                return Err(ReplaceTransactionError::SendTransactionError(
+                                    TransactionQueueSendTransactionError::TransactionSendError(
+                                        error,
+                                    ),
+                                ));
+                            }
+                            Err(e) => return Err(ReplaceTransactionError::SendTransactionError(e)),
+                        };
 
                         replace_transaction.status = TransactionStatus::INMEMPOOL;
                         replace_transaction.known_transaction_hash = Some(transaction_sent.hash);
@@ -910,7 +1038,37 @@ impl TransactionsQueues {
         }
     }
 
-    /// Processes a single pending transaction for the specified relayer.
+    async fn recover_nonce_synchronization(
+        &mut self,
+        relayer_id: &RelayerId,
+        transactions_queue: &mut TransactionsQueue,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        info!("Attempting nonce recovery for relayer {}", relayer_id);
+
+        let current_onchain_nonce = transactions_queue
+            .get_nonce()
+            .await
+            .map_err(|e| format!("Failed to get on-chain nonce: {}", e))?;
+
+        let current_internal_nonce = transactions_queue.nonce_manager.get_current_nonce().await;
+
+        warn!(
+            "Nonce synchronization issue detected for relayer {}: on-chain nonce is {}, internal nonce is {}",
+            relayer_id, current_onchain_nonce.into_inner(), current_internal_nonce.into_inner()
+        );
+
+        transactions_queue.nonce_manager.sync_with_onchain_nonce(current_onchain_nonce).await;
+
+        let updated_nonce = transactions_queue.nonce_manager.get_current_nonce().await;
+        info!(
+            "Nonce recovery completed for relayer {}: updated internal nonce to {}",
+            relayer_id,
+            updated_nonce.into_inner()
+        );
+
+        Ok(())
+    }
+
     pub async fn process_single_pending(
         &mut self,
         relayer_id: &RelayerId,
@@ -1011,6 +1169,52 @@ impl TransactionsQueues {
                                         TransactionQueueSendTransactionError::TransactionSendError(
                                             error,
                                         ),
+                                    ))
+                                } else if error_msg.contains("nonce too low")
+                                    || error_msg.contains("nonce is too low")
+                                    || error_msg.contains("invalid nonce")
+                                    || error_msg.contains("nonce has already been used")
+                                    || error_msg.contains("already known")
+                                {
+                                    warn!("process_single_pending: nonce synchronization issue detected for relayer {}: {}", relayer_id, error);
+
+                                    if let Err(sync_error) = self
+                                        .recover_nonce_synchronization(
+                                            relayer_id,
+                                            &mut transactions_queue,
+                                        )
+                                        .await
+                                    {
+                                        error!("Failed to recover nonce synchronization for relayer {}: {}", relayer_id, sync_error);
+                                        return Err(ProcessPendingTransactionError::SendTransactionError(
+                                            TransactionQueueSendTransactionError::TransactionSendError(error),
+                                        ));
+                                    }
+
+                                    let new_nonce =
+                                        transactions_queue.nonce_manager.get_and_increment().await;
+                                    transaction.nonce = new_nonce;
+
+                                    transactions_queue
+                                        .update_pending_transaction_nonce(
+                                            &transaction.id,
+                                            new_nonce,
+                                        )
+                                        .await;
+
+                                    if let Err(db_error) = self
+                                        .db
+                                        .transaction_update_nonce(&transaction.id, &new_nonce)
+                                        .await
+                                    {
+                                        error!("Failed to persist nonce update to database for transaction {}: {}", transaction.id, db_error);
+                                    }
+
+                                    info!("Nonce synchronization recovered for relayer {}, updated pending transaction nonce to {} in queue and database", relayer_id, new_nonce.into_inner());
+
+                                    Ok(ProcessResult::<ProcessPendingStatus>::other(
+                                        ProcessPendingStatus::NonceSynchronized,
+                                        Some(&100),
                                     ))
                                 } else {
                                     // For other send errors (RPC down, etc), keep as temp issue
@@ -1237,9 +1441,50 @@ impl TransactionsQueues {
                                     elapsed.num_milliseconds() as u64,
                                     &transaction.speed,
                                 ) {
-                                    let transaction_sent = transactions_queue
+                                    let transaction_sent = match transactions_queue
                                         .send_transaction(&mut self.db, &mut transaction)
-                                        .await?;
+                                        .await
+                                    {
+                                        Ok(tx_sent) => tx_sent,
+                                        Err(TransactionQueueSendTransactionError::TransactionSendError(error)) => {
+                                            let error_msg = error.to_string().to_lowercase();
+                                            if error_msg.contains("nonce too low") 
+                                                || error_msg.contains("nonce is too low")
+                                                || error_msg.contains("invalid nonce")
+                                                || error_msg.contains("nonce has already been used")
+                                                || error_msg.contains("already known")
+                                            {
+                                                warn!("process_single_inmempool: nonce synchronization issue detected for relayer {} during gas bump: {}", relayer_id, error);
+
+                                                if let Err(sync_error) = self.recover_nonce_synchronization(relayer_id, &mut transactions_queue).await {
+                                                    error!("Failed to recover nonce synchronization for relayer {}: {}", relayer_id, sync_error);
+                                                    return Err(ProcessInmempoolTransactionError::SendTransactionError(
+                                                        TransactionQueueSendTransactionError::TransactionSendError(error)
+                                                    ));
+                                                }
+
+                                                let new_nonce = transactions_queue.nonce_manager.get_and_increment().await;
+                                                transaction.nonce = new_nonce;
+
+                                                transactions_queue.update_inmempool_transaction_nonce(&transaction.id, new_nonce).await;
+
+                                                if let Err(db_error) = self.db.transaction_update_nonce(&transaction.id, &new_nonce).await {
+                                                    error!("Failed to persist nonce update to database for transaction {}: {}", transaction.id, db_error);
+                                                }
+
+                                                info!("Nonce synchronization recovered for relayer {}, updated gas bump transaction nonce {} in queue and database", relayer_id, new_nonce.into_inner());
+
+                                                return Ok(ProcessResult::<ProcessInmempoolStatus>::other(
+                                                    ProcessInmempoolStatus::NonceSynchronized,
+                                                    Some(&100),
+                                                ));
+                                            }
+                                            return Err(ProcessInmempoolTransactionError::SendTransactionError(
+                                                TransactionQueueSendTransactionError::TransactionSendError(error)
+                                            ));
+                                        }
+                                        Err(e) => return Err(ProcessInmempoolTransactionError::SendTransactionError(e)),
+                                    };
 
                                     // Update the actual transaction in the inmempool queue
                                     transactions_queue

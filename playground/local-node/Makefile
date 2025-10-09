@@ -11,6 +11,21 @@ start-anvil:
 	   --block-time 1 --gas-limit 30000000 --hardfork cancun & echo $$! > anvil.pid
 	@sleep 2
 	@echo "Anvil started (PID: $$(cat anvil.pid))"
+	@echo "Funding address 0x1C09DF15FB12656420033EB58067EC9406EF0E26..."
+	@cast send --rpc-url http://localhost:8545 \
+	   --private-key $$ANVIL_PRIVATE_KEY \
+	   --value 100ether \
+	   0x1C09DF15FB12656420033EB58067EC9406EF0E26
+	@echo "Funded with 100 ETH"
+	@echo "Sending 5 test transactions..."
+	@for i in 1 2 3 4 5; do \
+	   cast send --rpc-url http://localhost:8545 \
+	      --private-key $$TEST_PRIVATE_KEY \
+	      --value 0.1ether \
+	      0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 > /dev/null && \
+	   echo "  Transaction $$i sent"; \
+	done
+	@echo "All 5 transactions completed"
 	@$(MAKE) generate-gas-activity
 	@echo "Anvil ready with realistic gas price history!"
 

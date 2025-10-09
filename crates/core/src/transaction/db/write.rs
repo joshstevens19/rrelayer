@@ -8,8 +8,8 @@ use crate::{
         utils::option_if,
     },
     transaction::types::{
-        Transaction, TransactionData, TransactionHash, TransactionId, TransactionStatus,
-        TransactionValue,
+        Transaction, TransactionData, TransactionHash, TransactionId, TransactionNonce,
+        TransactionStatus, TransactionValue,
     },
 };
 use alloy::network::AnyTransactionReceipt;
@@ -419,6 +419,47 @@ impl PostgresClient {
                     WHERE id = $1;
                 ",
                 &[&transaction_id, &TransactionStatus::CONFIRMED],
+            )
+            .await?;
+
+        trans.commit().await?;
+
+        Ok(())
+    }
+
+    pub async fn transaction_update_nonce(
+        &mut self,
+        transaction_id: &TransactionId,
+        nonce: &TransactionNonce,
+    ) -> Result<(), PostgresError> {
+        let mut conn = self.pool.get().await?;
+        let trans = conn.transaction().await.map_err(PostgresError::PgError)?;
+
+        trans
+            .execute(
+                "UPDATE relayer.transaction SET nonce = $2 WHERE id = $1",
+                &[&transaction_id, &(nonce.into_inner() as i64)],
+            )
+            .await?;
+
+        trans
+            .execute(
+                "
+                    INSERT INTO relayer.transaction_audit_log (
+                        id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
+                        speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
+                        failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
+                        sent_max_fee_per_gas, gas_price, block_hash, block_number, external_id
+                    )
+                    SELECT 
+                        id, relayer_id, \"to\", \"from\", $2, chain_id, data, value, blobs, gas_limit,
+                        speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
+                        failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
+                        sent_max_fee_per_gas, gas_price, block_hash, block_number, external_id
+                    FROM relayer.transaction
+                    WHERE id = $1;
+                ",
+                &[&transaction_id, &(nonce.into_inner() as i64)],
             )
             .await?;
 

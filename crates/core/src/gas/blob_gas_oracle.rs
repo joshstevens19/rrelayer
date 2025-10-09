@@ -1,6 +1,9 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::{network::ChainId, provider::EvmProvider, transaction::types::TransactionSpeed, shutdown::subscribe_to_shutdown};
+use crate::{
+    network::ChainId, provider::EvmProvider, shutdown::subscribe_to_shutdown,
+    transaction::types::TransactionSpeed,
+};
 use serde::{Deserialize, Serialize};
 use tokio::{
     sync::Mutex,

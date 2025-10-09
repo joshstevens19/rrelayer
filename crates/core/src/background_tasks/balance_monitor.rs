@@ -6,7 +6,8 @@ use tracing::{error, info, warn};
 
 use crate::common_types::EvmAddress;
 use crate::{
-    network::ChainId, postgres::PostgresClient, provider::EvmProvider, shutdown::subscribe_to_shutdown, webhooks::WebhookManager,
+    network::ChainId, postgres::PostgresClient, provider::EvmProvider,
+    shutdown::subscribe_to_shutdown, webhooks::WebhookManager,
 };
 
 fn get_minimum_balance_threshold(chain_id: &ChainId) -> u128 {

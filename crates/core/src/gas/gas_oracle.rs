@@ -1,7 +1,10 @@
 use std::{collections::HashMap, sync::Arc};
 
 use super::fee_estimator::{GasEstimatorResult, GasPriceResult};
-use crate::{network::ChainId, provider::EvmProvider, transaction::types::TransactionSpeed, shutdown::subscribe_to_shutdown};
+use crate::{
+    network::ChainId, provider::EvmProvider, shutdown::subscribe_to_shutdown,
+    transaction::types::TransactionSpeed,
+};
 use tokio::{
     sync::Mutex,
     time::{self, Duration},
