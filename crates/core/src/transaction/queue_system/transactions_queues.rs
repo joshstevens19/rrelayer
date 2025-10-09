@@ -83,54 +83,10 @@ impl TransactionsQueues {
             let current_nonce =
                 setup.evm_provider.get_nonce(&setup.relayer.wallet_index_type().index()).await?;
 
-            let pending_nonces: Vec<u64> =
-                setup.pending_transactions.iter().map(|tx| tx.nonce.into_inner()).collect();
-
-            let current_nonce_u64 = current_nonce.into_inner();
-            let mut filtered_pending_transactions = setup.pending_transactions;
-
-            if !pending_nonces.is_empty() {
-                let min_pending_nonce = *pending_nonces.iter().min().unwrap();
-                let max_pending_nonce = *pending_nonces.iter().max().unwrap();
-
-                if min_pending_nonce < current_nonce_u64 {
-                    warn!(
-                        "Startup nonce validation for relayer {} ({}): found pending transactions with nonce's {} to {} but on-chain nonce is {}. This indicates transactions were mined outside of rrelayer.",
-                        setup.relayer.name, setup.relayer.id, min_pending_nonce, max_pending_nonce, current_nonce_u64
-                    );
-
-                    let original_count = filtered_pending_transactions.len();
-                    filtered_pending_transactions.retain(|tx| tx.nonce.into_inner() >= current_nonce_u64);
-
-                    let filtered_count = original_count - filtered_pending_transactions.len();
-                    if filtered_count > 0 {
-                        warn!(
-                            "Startup nonce validation for relayer {} ({}): filtered out {} transactions with stale nonces",
-                            setup.relayer.name, setup.relayer.id, filtered_count
-                        );
-                    }
-
-                    info!(
-                        "Startup nonce validation for relayer {} ({}): synchronized nonce manager to on-chain nonce {}",
-                        setup.relayer.name, setup.relayer.id, current_nonce_u64
-                    );
-                } else if min_pending_nonce > current_nonce_u64 {
-                    warn!(
-                        "Startup nonce validation for relayer {} ({}): gap detected between on-chain nonce {} and minimum pending nonce {}. This may indicate missed transactions.",
-                        setup.relayer.name, setup.relayer.id, current_nonce_u64, min_pending_nonce
-                    );
-                } else {
-                    info!(
-                        "Startup nonce validation for relayer {} ({}): pending transactions nonce range {} to {} is valid with on-chain nonce {}",
-                        setup.relayer.name, setup.relayer.id, min_pending_nonce, max_pending_nonce, current_nonce_u64
-                    );
-                }
-            } else {
-                info!(
-                    "Startup nonce validation for relayer {} ({}): no pending transactions, using on-chain nonce {}",
-                    setup.relayer.name, setup.relayer.id, current_nonce.into_inner()
-                );
-            }
+            info!(
+                "Startup nonce synchronization for relayer {} ({}): synchronizing nonce manager with on-chain nonce {}",
+                setup.relayer.name, setup.relayer.id, current_nonce.into_inner()
+            );
 
             relayer_block_times_ms.insert(setup.relayer.id, setup.evm_provider.blocks_every);
 
@@ -141,7 +97,7 @@ impl TransactionsQueues {
                         setup.relayer,
                         setup.evm_provider,
                         NonceManager::new(current_nonce),
-                        filtered_pending_transactions,
+                        setup.pending_transactions,
                         setup.inmempool_transactions,
                         setup.mined_transactions,
                         safe_proxy_manager.clone(),
@@ -666,7 +622,6 @@ impl TransactionsQueues {
                                 {
                                     warn!("cancel_transaction: nonce synchronization issue detected for relayer {}: {}", transaction.relayer_id, error);
 
-                                    // Try to recover by syncing with on-chain nonce
                                     if let Err(sync_error) = self
                                         .recover_nonce_synchronization(
                                             &transaction.relayer_id,
