@@ -291,10 +291,10 @@ impl<P> RelayerProvider<P> {
     pub async fn send_transaction_via_relayer(
         &self,
         to: Address,
-        value: u64,
+        value: U256,
     ) -> Result<String, RelayerSignerError> {
         // Convert to TransactionRequest and use the main method
-        let tx_request = TransactionRequest::default().with_to(to).with_value(U256::from(value));
+        let tx_request = TransactionRequest::default().with_to(to).with_value(value);
 
         self.send_transaction(&tx_request).await
     }
