@@ -221,11 +221,26 @@ impl AwsKmsWalletManager {
                     "Sid": "AllowRootAccountAccess",
                     "Effect": "Allow",
                     "Principal": { "AWS": format!("arn:aws:iam::{}:root", account_id) },
-                    "Action": "kms:*",
+                    "Action": [
+                        "kms:DescribeKey",
+                        "kms:ListAliases",
+                        "kms:ListKeyPolicies",
+                        "kms:GetKeyPolicy",
+                        "kms:CreateAlias",
+                        "kms:DeleteAlias",
+                        "kms:ScheduleKeyDeletion",
+                        "kms:CancelKeyDeletion",
+                        "kms:EnableKey",
+                        "kms:DisableKey",
+                        "kms:EnableKeyRotation",
+                        "kms:DisableKeyRotation",
+                        "kms:RevokeGrant",
+                        "kms:RetireGrant"
+                      ],
                     "Resource": "*"
                 },
                 {
-                    "Sid": "AllowAdminPrincipalSelf",
+                    "Sid": "AllowRelayerFullControl",
                     "Effect": "Allow",
                     "Principal": { "AWS": admin_principal_arn },
                     "Action": "kms:*",
