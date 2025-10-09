@@ -86,6 +86,7 @@ rrelayer and all the commands available to you.
 
 ## What can I use rrelayer for?
 
+- Session key relayers: Assign session keys to your backend to do stuff on behalf of users
 - DApp backends: Handle user transactions without wallet management complexity
 - NFT platforms: Automated minting, transfers, and marketplace operations with reliable execution
 - DeFi protocols: Yield farming automation, liquidation bots, and cross-chain operations
