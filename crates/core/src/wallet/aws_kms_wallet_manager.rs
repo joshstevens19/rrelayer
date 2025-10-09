@@ -240,7 +240,7 @@ impl AwsKmsWalletManager {
                     "Resource": "*"
                 },
                 {
-                    "Sid": "AllowAdminPrincipalSelf",
+                    "Sid": "AllowRelayerFullControl",
                     "Effect": "Allow",
                     "Principal": { "AWS": admin_principal_arn },
                     "Action": "kms:*",
