@@ -354,6 +354,87 @@ async fn example() -> Result<()> {
 }
 ```
 
+### Sending Transaction to a Random Relayer
+
+You can send transactions to a random relayer using the below:
+
+#### Basic Auth
+
+```rust
+use alloy::sol;
+use alloy::sol_types::SolCall;
+use anyhow::Result;
+use rrelayer::{
+    AdminClient, CreateClientAuth, CreateClientConfig, EvmAddress, RelayTransactionRequest,
+    SendTransactionResult, TransactionData, TransactionSpeed, TransactionValue,
+    create_client, ChainId,
+};
+use std::str::FromStr;
+use dotenvy::dotenv;
+use std::env;
+
+async fn get_admin_client() -> Result<AdminClient> {
+    dotenv().ok();
+
+    let username = env::var("RRELAYER_AUTH_USERNAME")
+        .expect("RRELAYER_AUTH_USERNAME must be set");
+
+    let password = env::var("RRELAYER_AUTH_PASSWORD")
+        .expect("RRELAYER_AUTH_PASSWORD must be set");
+
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username,
+            password,
+        },
+    });
+
+    Ok(client)
+}
+
+sol! {
+    interface IERC20 {
+        function transfer(address to, uint256 amount) external returns (bool);
+    }
+}
+
+async fn example() -> Result<()> {
+    let admin_client = get_admin_client().await?;
+    
+    let chain_id = ChainId::from(1); // Ethereum mainnet
+
+    let transfer_call = IERC20::transferCall {
+        to: EvmAddress::from_str("0x742d35Cc82C8c6c0dA18Affe2b08BF36C4b0E5Dc")?.into_address(),
+        amount: TransactionValue::from_str("1000000000000000000")
+            .map_err(|e| anyhow::anyhow!("Invalid value: {}", e))?
+            .into_inner(),
+    };
+
+    let encoded_data = transfer_call.abi_encode();
+
+    let request = RelayTransactionRequest {
+        to: EvmAddress::from_str("0x5FCD072a0BD58B6fa413031582E450FE724dba6D")?, // ERC20 contract address
+        value: TransactionValue::zero(),
+        data: TransactionData::from(encoded_data),
+        speed: Some(TransactionSpeed::FAST),
+        external_id: None,
+        blobs: None,
+    };
+
+    // Send to a random relayer on the specified chain
+    let result: SendTransactionResult = admin_client.network()
+        .send_random(&chain_id, &request, None).await?;
+    println!("Contract transaction sent via random relayer: {:?}", result);
+
+    let relay_transaction_result = admin_client.transaction()
+        .wait_for_transaction_receipt_by_id(&result.id).await?;
+    println!("Transaction confirmed: {:?}", relay_transaction_result);
+
+    Ok(())
+}
+```
+
 ### Blob Transaction
 
 :::warning

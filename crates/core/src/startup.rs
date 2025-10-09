@@ -1,4 +1,4 @@
-use crate::app_state::RelayersInternalOnly;
+use crate::app_state::{RelayersAllowedForRandom, RelayersInternalOnly};
 use crate::authentication::{create_basic_auth_routes, inject_basic_auth_status};
 use crate::background_tasks::run_background_tasks;
 use crate::common_types::EvmAddress;
@@ -6,7 +6,7 @@ use crate::gas::{BlobGasOracleCache, GasOracleCache};
 use crate::network::{create_network_routes, ChainId};
 use crate::shared::HttpError;
 use crate::webhooks::WebhookManager;
-use crate::yaml::{ApiKey, NetworkPermissionsConfig, ReadYamlError};
+use crate::yaml::{AllOrOneOrManyAddresses, ApiKey, NetworkPermissionsConfig, ReadYamlError};
 use crate::{
     app_state::AppState,
     postgres::{PostgresClient, PostgresConnectionError, PostgresError},
@@ -38,6 +38,7 @@ use axum::{
     Json, Router,
 };
 use dotenv::dotenv;
+use std::collections::HashMap;
 use std::path::Path;
 use std::{
     net::SocketAddr,
@@ -170,6 +171,7 @@ async fn start_api(
     db: Arc<PostgresClient>,
     safe_proxy_manager: Arc<SafeProxyManager>,
     relayer_internal_only: RelayersInternalOnly,
+    relayers_allowed_for_random: RelayersAllowedForRandom,
     config: &SetupConfig,
 ) -> Result<(), StartApiError> {
     // Calculate which networks are configured with only private keys
@@ -217,6 +219,7 @@ async fn start_api(
         relayer_creation_mutex: Arc::new(Mutex::new(())),
         safe_proxy_manager,
         relayer_internal_only: Arc::new(relayer_internal_only),
+        relayers_allowed_for_random: Arc::new(relayers_allowed_for_random),
         network_permissions: Arc::new(network_permissions),
         api_keys: Arc::new(api_keys),
         network_configs: Arc::new(config.networks.clone()),
@@ -406,11 +409,27 @@ pub async fn start(project_path: &Path) -> Result<(), StartError> {
 
     let mut safe_configs: Vec<SafeProxyConfig> = vec![];
     let mut relayer_internal_only: Vec<(ChainId, EvmAddress)> = vec![];
+    let mut relayers_allowed_for_random: HashMap<ChainId, Vec<EvmAddress>> = HashMap::new();
     let mut network_permissions: Vec<(ChainId, Vec<NetworkPermissionsConfig>)> = vec![];
     let mut api_keys: Vec<(ChainId, Vec<ApiKey>)> = vec![];
     for network_config in &config.networks {
         api_keys
             .push((network_config.chain_id, network_config.api_keys.clone().unwrap_or_default()));
+
+        if let Some(allowed_random) = &network_config.allowed_random_relayers {
+            let allowed_addresses = match allowed_random {
+                AllOrOneOrManyAddresses::All => {
+                    // Empty vector means all relayers are allowed
+                    vec![]
+                }
+                AllOrOneOrManyAddresses::One(address) => {
+                    vec![*address]
+                }
+                AllOrOneOrManyAddresses::Many(addresses) => addresses.clone(),
+            };
+            relayers_allowed_for_random.insert(network_config.chain_id, allowed_addresses);
+        }
+
         if let Some(automatic_top_up_configs) = &network_config.automatic_top_up {
             for automatic_top_up in automatic_top_up_configs {
                 if let Some(safe_address) = &automatic_top_up.from.safe {
@@ -434,6 +453,7 @@ pub async fn start(project_path: &Path) -> Result<(), StartError> {
 
     let safe_proxy_manager = Arc::new(SafeProxyManager::new(safe_configs));
     let relayer_internal_only = RelayersInternalOnly::new(relayer_internal_only);
+    let relayers_allowed_for_random = RelayersAllowedForRandom::new(relayers_allowed_for_random);
 
     let transaction_queue = startup_transactions_queues(
         gas_oracle_cache.clone(),
@@ -485,6 +505,7 @@ pub async fn start(project_path: &Path) -> Result<(), StartError> {
         postgres_client,
         safe_proxy_manager,
         relayer_internal_only,
+        relayers_allowed_for_random,
         &config,
     )
     .await?;

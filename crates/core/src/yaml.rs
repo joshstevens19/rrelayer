@@ -474,6 +474,8 @@ pub struct NetworkSetupConfig {
     pub gas_bump_blocks_every: GasBumpBlockConfig,
     #[serde(default = "default_max_gas_price_multiplier")]
     pub max_gas_price_multiplier: u64,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub allowed_random_relayers: Option<AllOrOneOrManyAddresses>,
 }
 
 impl From<NetworkSetupConfig> for Network {

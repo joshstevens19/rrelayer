@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use tokio::sync::Mutex;
@@ -34,6 +35,26 @@ impl RelayersInternalOnly {
     }
 }
 
+pub struct RelayersAllowedForRandom {
+    values: HashMap<ChainId, Vec<EvmAddress>>,
+}
+
+impl RelayersAllowedForRandom {
+    pub fn new(values: HashMap<ChainId, Vec<EvmAddress>>) -> Self {
+        Self { values }
+    }
+
+    pub fn is_allowed(&self, relayer: &EvmAddress, chain_id: &ChainId) -> bool {
+        if let Some(allowed_relayers) = self.values.get(chain_id) {
+            // If the list is empty, it means all relayers are allowed (equivalent to "*")
+            allowed_relayers.is_empty() || allowed_relayers.contains(relayer)
+        } else {
+            // If no configuration exists for this chain, the feature is disabled
+            false
+        }
+    }
+}
+
 pub struct AppState {
     /// Database client with connection pooling
     pub db: Arc<PostgresClient>,
@@ -59,6 +80,8 @@ pub struct AppState {
     pub safe_proxy_manager: Arc<SafeProxyManager>,
     /// Any relayers which can only be called by internal logic
     pub relayer_internal_only: Arc<RelayersInternalOnly>,
+    /// Relayers allowed for random selection per network
+    pub relayers_allowed_for_random: Arc<RelayersAllowedForRandom>,
     /// Hold all networks permissions
     pub network_permissions: Arc<Vec<(ChainId, Vec<NetworkPermissionsConfig>)>>,
     /// The API keys mapped to be able to be used
