@@ -1,4 +1,4 @@
-use crate::{provider::EvmProvider, webhooks::WebhookManager};
+use crate::{provider::EvmProvider, shutdown::subscribe_to_shutdown, webhooks::WebhookManager};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::info;
@@ -34,6 +34,8 @@ async fn run_webhook_background_tasks(webhook_manager: Arc<Mutex<WebhookManager>
 
     info!("Starting webhook background processing loops");
 
+    let mut shutdown_rx = subscribe_to_shutdown();
+
     loop {
         tokio::select! {
             _ = retry_interval.tick() => {
@@ -67,6 +69,10 @@ async fn run_webhook_background_tasks(webhook_manager: Arc<Mutex<WebhookManager>
             }
             _ = database_cleanup_interval.tick() => {
                 cleanup_webhook_database_history(webhook_manager.clone()).await;
+            }
+            _ = shutdown_rx.recv() => {
+                info!("Shutdown signal received, stopping webhook manager");
+                break;
             }
         }
     }

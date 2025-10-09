@@ -1,6 +1,9 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::{network::ChainId, provider::EvmProvider, transaction::types::TransactionSpeed};
+use crate::{
+    network::ChainId, provider::EvmProvider, shutdown::subscribe_to_shutdown,
+    transaction::types::TransactionSpeed,
+};
 use serde::{Deserialize, Serialize};
 use tokio::{
     sync::Mutex,
@@ -130,16 +133,24 @@ pub async fn blob_gas_oracle(
 
         tokio::spawn(async move {
             let mut interval = time::interval(Duration::from_secs(5));
-            loop {
-                interval.tick().await;
+            let mut shutdown_rx = subscribe_to_shutdown();
 
-                let blob_gas_price_result = provider.calculate_ethereum_blob_gas_price().await;
-                if let Ok(blob_gas_price) = blob_gas_price_result {
-                    cache
-                        .lock()
-                        .await
-                        .update_blob_gas_price(provider.chain_id, blob_gas_price)
-                        .await;
+            loop {
+                tokio::select! {
+                    _ = interval.tick() => {
+                        let blob_gas_price_result = provider.calculate_ethereum_blob_gas_price().await;
+                        if let Ok(blob_gas_price) = blob_gas_price_result {
+                            cache
+                                .lock()
+                                .await
+                                .update_blob_gas_price(provider.chain_id, blob_gas_price)
+                                .await;
+                        }
+                    }
+                    _ = shutdown_rx.recv() => {
+                        info!("Shutdown signal received, stopping blob gas oracle for provider: {}", provider.name);
+                        break;
+                    }
                 }
             }
         });

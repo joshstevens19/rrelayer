@@ -11,6 +11,7 @@ use crate::{
     relayer::Relayer,
     safe_proxy::SafeProxyManager,
     shared::common_types::EvmAddress,
+    shutdown::subscribe_to_shutdown,
     transaction::queue_system::TransactionsQueues,
     yaml::{AllOrAddresses, Erc20TokenConfig, NativeTokenConfig, NetworkAutomaticTopUpConfig},
     SetupConfig,
@@ -66,6 +67,7 @@ impl AutomaticTopUpTask {
         info!("Starting automatic top-up background task");
 
         self.refresh_relayer_cache().await;
+        let mut shutdown_rx = subscribe_to_shutdown();
 
         loop {
             tokio::select! {
@@ -74,6 +76,10 @@ impl AutomaticTopUpTask {
                 }
                 _ = self.top_up_check_interval.tick() => {
                     self.check_and_top_up_addresses().await;
+                }
+                _ = shutdown_rx.recv() => {
+                    info!("Shutdown signal received, stopping automatic top-up task");
+                    break;
                 }
             }
         }

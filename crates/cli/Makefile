@@ -16,8 +16,10 @@ start_base:
 	RUST_BACKTRACE=1 cargo run -- start --path $(CURDIR)/../../playground/base
 start_sepolia:
 	RUST_BACKTRACE=1 cargo run -- start --path $(CURDIR)/../../playground/sepolia
-sepolia_ethereum_fireblocks:
+start_sepolia_ethereum_fireblocks:
 	RUST_BACKTRACE=1 cargo run -- start --path $(CURDIR)/../../playground/sepolia_ethereum_fireblocks
+start_e2e:
+	RUST_BACKTRACE=1 cargo run -- start --path $(CURDIR)/../e2e-tests
 
 auth_login:
 	cargo run -- auth login

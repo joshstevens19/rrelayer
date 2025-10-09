@@ -1,7 +1,10 @@
 use std::{collections::HashMap, sync::Arc};
 
 use super::fee_estimator::{GasEstimatorResult, GasPriceResult};
-use crate::{network::ChainId, provider::EvmProvider, transaction::types::TransactionSpeed};
+use crate::{
+    network::ChainId, provider::EvmProvider, shutdown::subscribe_to_shutdown,
+    transaction::types::TransactionSpeed,
+};
 use tokio::{
     sync::Mutex,
     time::{self, Duration},
@@ -91,16 +94,24 @@ pub async fn gas_oracle(
 
         tokio::spawn(async move {
             let mut interval = time::interval(Duration::from_secs(5));
-            loop {
-                interval.tick().await;
+            let mut shutdown_rx = subscribe_to_shutdown();
 
-                let gas_price_result = provider.calculate_gas_price().await;
-                match gas_price_result {
-                    Ok(gas_price) => {
-                        cache.lock().await.update_gas_price(provider.chain_id, gas_price).await;
+            loop {
+                tokio::select! {
+                    _ = interval.tick() => {
+                        let gas_price_result = provider.calculate_gas_price().await;
+                        match gas_price_result {
+                            Ok(gas_price) => {
+                                cache.lock().await.update_gas_price(provider.chain_id, gas_price).await;
+                            }
+                            Err(err) => {
+                                error!("Failed to get gas price for provider: {} - error {} - try again in 10s", provider.name, err);
+                            }
+                        }
                     }
-                    Err(err) => {
-                        error!("Failed to get gas price for provider: {} - error {} - try again in 10s", provider.name, err);
+                    _ = shutdown_rx.recv() => {
+                        info!("Shutdown signal received, stopping gas oracle for provider: {}", provider.name);
+                        break;
                     }
                 }
             }

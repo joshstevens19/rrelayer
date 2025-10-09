@@ -6,7 +6,8 @@ use tracing::{error, info, warn};
 
 use crate::common_types::EvmAddress;
 use crate::{
-    network::ChainId, postgres::PostgresClient, provider::EvmProvider, webhooks::WebhookManager,
+    network::ChainId, postgres::PostgresClient, provider::EvmProvider,
+    shutdown::subscribe_to_shutdown, webhooks::WebhookManager,
 };
 
 fn get_minimum_balance_threshold(chain_id: &ChainId) -> u128 {
@@ -28,19 +29,26 @@ pub async fn balance_monitor(
 
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(600));
+        let mut shutdown_rx = subscribe_to_shutdown();
 
         loop {
-            interval.tick().await;
+            tokio::select! {
+                _ = interval.tick() => {
+                    info!("Starting balance monitoring check");
 
-            info!("Starting balance monitoring check");
+                    for provider in providers.iter() {
+                        if let Err(e) = check_balances_for_chain(provider, &db, &webhook_manager).await {
+                            error!("Failed to check balances for chain {}: {}", provider.chain_id, e);
+                        }
+                    }
 
-            for provider in providers.iter() {
-                if let Err(e) = check_balances_for_chain(provider, &db, &webhook_manager).await {
-                    error!("Failed to check balances for chain {}: {}", provider.chain_id, e);
+                    info!("Completed balance monitoring check");
+                }
+                _ = shutdown_rx.recv() => {
+                    info!("Shutdown signal received, stopping balance monitor");
+                    break;
                 }
             }
-
-            info!("Completed balance monitoring check");
         }
     });
 

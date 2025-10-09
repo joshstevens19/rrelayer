@@ -31,6 +31,9 @@ pub enum ReplaceTransactionError {
 
     #[error("Relayer could not update the transaction in the db {0}")]
     CouldNotUpdateTransactionInDb(#[from] PostgresError),
+
+    #[error("Nonce synchronization recovered, replacement transaction should be retried")]
+    NonceSynchronizationRecovered,
 }
 
 impl From<ReplaceTransactionError> for HttpError {
@@ -111,6 +114,9 @@ pub enum CancelTransactionError {
 
     #[error("Relayer {0} is paused")]
     RelayerIsPaused(RelayerId),
+
+    #[error("Nonce synchronization recovered, cancel transaction should be retried")]
+    NonceSynchronizationRecovered,
 }
 
 impl From<CancelTransactionError> for HttpError {
