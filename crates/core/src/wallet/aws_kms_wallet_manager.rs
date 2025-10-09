@@ -226,7 +226,6 @@ impl AwsKmsWalletManager {
                         "kms:ListAliases",
                         "kms:ListKeyPolicies",
                         "kms:GetKeyPolicy",
-                        "kms:PutKeyPolicy",
                         "kms:CreateAlias",
                         "kms:DeleteAlias",
                         "kms:ScheduleKeyDeletion",
