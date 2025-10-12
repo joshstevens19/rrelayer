@@ -22,7 +22,6 @@ import {
   getTransactions,
   replaceTransaction,
   sendTransaction,
-  sendTransactionRandom,
   TransactionSpeed,
   SignedTextHistory,
   getSignedTextHistory,
@@ -272,23 +271,6 @@ export class RelayerClient {
         rateLimitKey?: string | undefined
       ): Promise<TransactionSent> => {
         return sendTransaction(
-          this.id,
-          transaction,
-          rateLimitKey,
-          this._apiBaseConfig
-        );
-      },
-      /**
-       * Send a transaction to a random relayer
-       * @param transaction The transaction to send
-       * @param rateLimitKey The rate limit key if you want rate limit feature on
-       * @returns transactionId
-       */
-      sendRandom: (
-        transaction: TransactionToSend,
-        rateLimitKey?: string | undefined
-      ): Promise<TransactionSent> => {
-        return sendTransactionRandom(
           this.id,
           transaction,
           rateLimitKey,

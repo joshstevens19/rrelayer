@@ -4,7 +4,7 @@ import { TransactionSent, TransactionToSend } from './types';
 import { RATE_LIMIT_HEADER_NAME } from '../index';
 
 export const sendTransactionRandom = async (
-  chainId: string,
+  chainId: number,
   transactionToSend: TransactionToSend,
   rateLimitKey: string | undefined,
   baseConfig: ApiBaseConfig

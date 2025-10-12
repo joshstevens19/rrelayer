@@ -1,9 +1,10 @@
+use crate::ApiSdkError;
 use crate::api::{http::HttpClient, types::ApiResult};
 use reqwest::header::{HeaderMap, HeaderValue};
-use rrelayer_core::network::ChainId;
 use rrelayer_core::transaction::api::{CancelTransactionResponse, RelayTransactionStatusResult};
 use rrelayer_core::transaction::api::{RelayTransactionRequest, SendTransactionResult};
 use rrelayer_core::transaction::queue_system::ReplaceTransactionResult;
+use rrelayer_core::transaction::types::TransactionStatus;
 use rrelayer_core::{
     RATE_LIMIT_HEADER_NAME,
     common_types::{PagingContext, PagingResult},
@@ -60,7 +61,7 @@ impl TransactionApi {
 
     pub async fn send_random(
         &self,
-        chain_id: &ChainId,
+        chain_id: u64,
         transaction: &RelayTransactionRequest,
         rate_limit_key: Option<String>,
     ) -> ApiResult<SendTransactionResult> {
@@ -134,5 +135,47 @@ impl TransactionApi {
 
     pub async fn get_pending_count(&self, relayer_id: &RelayerId) -> ApiResult<u32> {
         self.client.get(&format!("transactions/relayers/{}/pending/count", relayer_id)).await
+    }
+
+    pub async fn wait_for_transaction_receipt_by_id(
+        &self,
+        transaction_id: &TransactionId,
+    ) -> ApiResult<RelayTransactionStatusResult> {
+        loop {
+            let result = self.get_status(transaction_id).await?;
+            if let Some(status_result) = result {
+                match status_result.status {
+                    TransactionStatus::PENDING | TransactionStatus::INMEMPOOL => {
+                        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                        continue;
+                    }
+                    TransactionStatus::MINED
+                    | TransactionStatus::CONFIRMED
+                    | TransactionStatus::FAILED => {
+                        return Ok(status_result);
+                    }
+                    TransactionStatus::EXPIRED => {
+                        return Err(ApiSdkError::ConfigError("Transaction expired".to_string()));
+                    }
+                    TransactionStatus::CANCELLED => {
+                        return Err(ApiSdkError::ConfigError(
+                            "Transaction was cancelled".to_string(),
+                        ));
+                    }
+                    TransactionStatus::REPLACED => {
+                        return Err(ApiSdkError::ConfigError(
+                            "Transaction was replaced".to_string(),
+                        ));
+                    }
+                    TransactionStatus::DROPPED => {
+                        return Err(ApiSdkError::ConfigError(
+                            "Transaction was dropped from mempool".to_string(),
+                        ));
+                    }
+                }
+            } else {
+                return Err(ApiSdkError::ConfigError("Transaction not found".to_string()));
+            }
+        }
     }
 }

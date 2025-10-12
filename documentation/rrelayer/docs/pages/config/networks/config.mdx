@@ -185,6 +185,7 @@ Controls which relayers are eligible for selection when using the random relayer
 **If not specified, the random relayer feature is disabled for this network.**
 
 **Options:**
+
 - `"*"` - Allow all relayers for random selection
 - Single address - Only allow one specific relayer for random selection
 - Array of addresses - Allow only the specified relayers for random selection
@@ -212,18 +213,21 @@ networks: // [!code focus]
 **Examples:**
 
 Enable for all relayers:
+
 ```yaml
-allowed_random_relayers: "*"
+allowed_random_relayers: '*'
 ```
 
 Allow only specific relayers:
+
 ```yaml
 allowed_random_relayers:
-  - "0x742f0677b50b0F1C2151865Dcb98BF32FeaF65c9"
-  - "0x8ba1f109551bD432803012645Hac136c6d3A60E7"
+  - '0x742f0677b50b0F1C2151865Dcb98BF32FeaF65c9'
+  - '0x8ba1f109551bD432803012645Hac136c6d3A60E7'
 ```
 
 Allow single relayer:
+
 ```yaml
-allowed_random_relayers: "0x742f0677b50b0F1C2151865Dcb98BF32FeaF65c9"
+allowed_random_relayers: '0x742f0677b50b0F1C2151865Dcb98BF32FeaF65c9'
 ```

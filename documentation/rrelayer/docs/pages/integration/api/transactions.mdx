@@ -79,9 +79,9 @@ POST /transactions/relayers/{chain_id}/send-random
 
 #### Path Parameters
 
-| Parameter  | Type     | Required | Description                                    |
-| ---------- | -------- | -------- | ---------------------------------------------- |
-| `chain_id` | `number` | Yes      | The chain ID to select a random relayer from  |
+| Parameter  | Type     | Required | Description                                  |
+| ---------- | -------- | -------- | -------------------------------------------- |
+| `chain_id` | `number` | Yes      | The chain ID to select a random relayer from |
 
 ### Request Body
 
@@ -122,11 +122,11 @@ Same format as regular send transaction:
 
 ### Error Responses
 
-| Status Code | Description                                                         |
-| ----------- | ------------------------------------------------------------------- |
-| `400`       | No available relayers for the chain (all paused or internal-only)  |
-| `404`       | No relayers found for the specified chain                          |
-| `401`       | Authentication required (Basic auth only)                          |
+| Status Code | Description                                                       |
+| ----------- | ----------------------------------------------------------------- |
+| `400`       | No available relayers for the chain (all paused or internal-only) |
+| `404`       | No relayers found for the specified chain                         |
+| `401`       | Authentication required (Basic auth only)                         |
 
 ### Example
 
