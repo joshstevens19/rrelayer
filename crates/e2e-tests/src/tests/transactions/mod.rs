@@ -12,6 +12,7 @@ mod send_blob;
 mod send_contract_interaction;
 mod send_eth;
 mod send_eth_legacy;
+mod send_random_fails;
 mod status;
 mod validation;
 
@@ -139,6 +140,11 @@ impl TestModule for TransactionTests {
                 "transaction_validation_balance_edge_cases",
                 "Transaction validation - balance edge cases",
                 |runner| Box::pin(runner.transaction_validation_balance_edge_cases()),
+            ),
+            TestDefinition::new(
+                "send_random_fails",
+                "Transaction should not send random when not enabled - send random fails",
+                |runner| Box::pin(runner.send_random_fails()),
             ),
         ]
     }

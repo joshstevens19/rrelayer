@@ -178,3 +178,56 @@ the documentation in the signer provider pages:
 - [Fireblocks](/config/signing-providers/fireblocks)
 - [Private Keys](/config/signing-providers/private-keys)
 - [PKCS11 Beta](/config/signing-providers/pkcs11)
+
+### allowed_random_relayers - optional
+
+Controls which relayers are eligible for selection when using the random relayer endpoint.
+**If not specified, the random relayer feature is disabled for this network.**
+
+**Options:**
+
+- `"*"` - Allow all relayers for random selection
+- Single address - Only allow one specific relayer for random selection
+- Array of addresses - Allow only the specified relayers for random selection
+- Not specified - Random relayer feature disabled
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+networks: // [!code focus]
+- name: "sepolia_ethereum"
+  chain_id: 11155111
+  provider_urls:
+  - "https://sepolia.gateway.tenderly.co"
+  block_explorer_url: "https://sepolia.etherscan.io"
+  allowed_random_relayers: ["0x742f0677b50b0F1C2151865Dcb98BF32FeaF65c9"] # [!code focus]
+```
+
+**Examples:**
+
+Enable for all relayers:
+
+```yaml
+allowed_random_relayers: '*'
+```
+
+Allow only specific relayers:
+
+```yaml
+allowed_random_relayers:
+  - '0x742f0677b50b0F1C2151865Dcb98BF32FeaF65c9'
+  - '0x8ba1f109551bD432803012645Hac136c6d3A60E7'
+```
+
+Allow single relayer:
+
+```yaml
+allowed_random_relayers: '0x742f0677b50b0F1C2151865Dcb98BF32FeaF65c9'
+```

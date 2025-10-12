@@ -11,7 +11,7 @@ use rrelayer_core::signing::{SignedTextHistory, SignedTypedDataHistory};
 use rrelayer_core::transaction::api::{
     CancelTransactionResponse, RelayTransactionRequest, SendTransactionResult,
 };
-use rrelayer_core::transaction::types::{TransactionSpeed, TransactionStatus};
+use rrelayer_core::transaction::types::TransactionSpeed;
 use rrelayer_core::{
     common_types::{EvmAddress, PagingContext, PagingResult},
     gas::GasEstimatorResult,
@@ -205,6 +205,22 @@ impl<'a> ClientTransactionApi<'a> {
     ) -> ApiResult<Option<RelayTransactionStatusResult>> {
         self.transaction_api.get_status(transaction_id).await
     }
+
+    pub async fn send_random(
+        &self,
+        chain_id: u64,
+        transaction: &RelayTransactionRequest,
+        rate_limit_key: Option<String>,
+    ) -> ApiResult<SendTransactionResult> {
+        self.transaction_api.send_random(chain_id, transaction, rate_limit_key).await
+    }
+
+    pub async fn wait_for_transaction_receipt_by_id(
+        &self,
+        transaction_id: &TransactionId,
+    ) -> ApiResult<RelayTransactionStatusResult> {
+        self.transaction_api.wait_for_transaction_receipt_by_id(transaction_id).await
+    }
 }
 
 pub struct ClientAllowlistApi<'a> {
@@ -386,42 +402,7 @@ impl<'a> AdminRelayerClientTransactionApi<'a> {
         &self,
         transaction_id: &TransactionId,
     ) -> ApiResult<RelayTransactionStatusResult> {
-        loop {
-            let result = self.transaction_api.get_status(transaction_id).await?;
-            if let Some(status_result) = result {
-                match status_result.status {
-                    TransactionStatus::PENDING | TransactionStatus::INMEMPOOL => {
-                        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-                        continue;
-                    }
-                    TransactionStatus::MINED
-                    | TransactionStatus::CONFIRMED
-                    | TransactionStatus::FAILED => {
-                        return Ok(status_result);
-                    }
-                    TransactionStatus::EXPIRED => {
-                        return Err(ApiSdkError::ConfigError("Transaction expired".to_string()));
-                    }
-                    TransactionStatus::CANCELLED => {
-                        return Err(ApiSdkError::ConfigError(
-                            "Transaction was cancelled".to_string(),
-                        ));
-                    }
-                    TransactionStatus::REPLACED => {
-                        return Err(ApiSdkError::ConfigError(
-                            "Transaction was replaced".to_string(),
-                        ));
-                    }
-                    TransactionStatus::DROPPED => {
-                        return Err(ApiSdkError::ConfigError(
-                            "Transaction was dropped from mempool".to_string(),
-                        ));
-                    }
-                }
-            } else {
-                return Err(ApiSdkError::ConfigError("Transaction not found".to_string()));
-            }
-        }
+        self.transaction_api.wait_for_transaction_receipt_by_id(transaction_id).await
     }
 
     pub async fn get_count(&self, transaction_count_type: TransactionCountType) -> ApiResult<u32> {
@@ -625,43 +606,7 @@ impl<'a> RelayerClientTransactionApi<'a> {
         &self,
         transaction_id: &TransactionId,
     ) -> ApiResult<RelayTransactionStatusResult> {
-        loop {
-            let result = self.transaction_api.get_status(transaction_id).await?;
-            if let Some(status_result) = result {
-                use rrelayer_core::transaction::types::TransactionStatus;
-                match status_result.status {
-                    TransactionStatus::PENDING | TransactionStatus::INMEMPOOL => {
-                        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-                        continue;
-                    }
-                    TransactionStatus::MINED
-                    | TransactionStatus::CONFIRMED
-                    | TransactionStatus::FAILED => {
-                        return Ok(status_result);
-                    }
-                    TransactionStatus::EXPIRED => {
-                        return Err(ApiSdkError::ConfigError("Transaction expired".to_string()));
-                    }
-                    TransactionStatus::CANCELLED => {
-                        return Err(ApiSdkError::ConfigError(
-                            "Transaction was cancelled".to_string(),
-                        ));
-                    }
-                    TransactionStatus::REPLACED => {
-                        return Err(ApiSdkError::ConfigError(
-                            "Transaction was replaced".to_string(),
-                        ));
-                    }
-                    TransactionStatus::DROPPED => {
-                        return Err(ApiSdkError::ConfigError(
-                            "Transaction was dropped from mempool".to_string(),
-                        ));
-                    }
-                }
-            } else {
-                return Err(ApiSdkError::ConfigError("Transaction not found".to_string()));
-            }
-        }
+        self.transaction_api.wait_for_transaction_receipt_by_id(transaction_id).await
     }
 
     pub async fn get_count(&self, transaction_count_type: TransactionCountType) -> ApiResult<u32> {

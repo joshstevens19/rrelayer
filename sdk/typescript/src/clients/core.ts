@@ -18,6 +18,9 @@ import {
   TransactionSpeed,
   cloneRelayer,
   getNetwork,
+  TransactionToSend,
+  sendTransactionRandom,
+  TransactionSent,
 } from '../api';
 import { RelayerClient } from './relayer';
 import {
@@ -159,6 +162,25 @@ export class Client {
         transactionId: string
       ): Promise<TransactionStatusResult | null> => {
         return getTransactionStatus(transactionId, this._apiBaseConfig);
+      },
+      /**
+       * Send a transaction to a random relayer
+       * @param chainId The chain id
+       * @param transaction The transaction to send
+       * @param rateLimitKey The rate limit key if you want rate limit feature on
+       * @returns transactionId
+       */
+      sendRandom: (
+        chainId: number,
+        transaction: TransactionToSend,
+        rateLimitKey?: string | undefined
+      ): Promise<TransactionSent> => {
+        return sendTransactionRandom(
+          chainId,
+          transaction,
+          rateLimitKey,
+          this._apiBaseConfig
+        );
       },
     };
   }
