@@ -1,0 +1,201 @@
+# GCP
+
+## Prerequisites
+
+Ensure that you have the following installed and configured:
+
+- **[Google Cloud SDK](https://cloud.google.com/sdk/docs/install)**: Installed and configured with necessary permissions.
+- **[kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/)**: Installed and configured.
+- **[Helm](https://helm.sh/docs/intro/install/)**: Installed.
+
+## 1. Create a GKE Cluster
+
+This command creates a new GKE cluster. Adjust the --zone, --machine-type, and node count options as needed.
+
+```bash
+gcloud container clusters create my-cluster --zone us-west1-a --machine-type n1-standard-1 --num-nodes=1 --enable-autoscaling --min-nodes=1 --max-nodes=3
+```
+
+Output:
+
+```bash
+Creating cluster my-cluster in us-west1-a... Cluster is being created.
+Created [https://container.googleapis.com/v1/projects/my-project/zones/us-west1-a/clusters/my-cluster].
+To inspect the contents of your cluster, go to: https://console.cloud.google.com/kubernetes/workload_/gcloud/us-west1-a/my-cluster?project=my-project
+kubeconfig entry generated for my-cluster.
+NAME        LOCATION    MASTER_VERSION    MASTER_IP     MACHINE_TYPE   NODE_VERSION      NUM_NODES  STATUS
+my-cluster  us-west1-a  v1.30.2-gke.100  35.233.164.24 n1-standard-1  v1.30.2-gke.100  1          RUNNING
+```
+
+`gcloud` automatically configures your `kubeconfig` file. To check your nodes:
+
+```bash
+kubectl get nodes
+```
+
+Output:
+
+```bash
+NAME                                          STATUS   ROLES    AGE     VERSION
+gke-my-cluster-default-pool-1a2b3c4d-e123     Ready    <none>   6m33s   v1.30.2-gke.100
+```
+
+## 2. Deploy the Helm Chart
+
+### 2.1. Download the rrelayer repository
+
+```bash
+git clone https://github.com/joshstevens19/rrelayer.git
+```
+
+### 2.2. Configure the `values.yaml` File
+
+Customize the `values.yaml` for your deployment:
+
+```yaml
+replicaCount: 2
+
+image:
+  repository: ghcr.io/joshstevens19/rrelayer
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 3000
+
+ingress:
+  enabled: false
+
+postgresql:
+  enabled: false
+```
+
+### 2.3. Install the Helm Chart
+
+```bash
+helm install rrelayer ./helm/rrelayer -f helm/rrelayer/values.yaml
+```
+
+Output:
+
+```bash
+NAME: rrelayer
+LAST DEPLOYED: Tue Aug 21 18:23:34 2024
+NAMESPACE: default
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+NOTES:
+1. Get the application URL by running these commands:
+  export POD_NAME=$(kubectl get pods --namespace default -l "app.kubernetes.io/name=rrelayer,app.kubernetes.io/instance=rrelayer" -o jsonpath="{.items[0].metadata.name}")
+  export CONTAINER_PORT=$(kubectl get pod --namespace default $POD_NAME -o jsonpath="{.spec.containers[0].ports[0].containerPort}")
+  echo "Visit http://127.0.0.1:8080 to use your application"
+  kubectl --namespace default port-forward $POD_NAME 8080:$CONTAINER_PORT
+```
+
+### 2.4. Verify the Deployment
+
+```bash
+kubectl get pods
+```
+
+Output:
+
+```bash
+NAME                                READY   STATUS    RESTARTS     AGE
+rrelayer-rrelayer-35bb35619-t9r2l   1/1     Running   1 (7s ago)   17s
+```
+
+## 3. Monitor and Manage the Deployment
+
+### 3.1. Health Monitoring
+
+rrelayer exposes a simple health endpoint so that you can confirm the service is ready.
+
+#### 3.1.1. Accessing the Health Endpoint
+
+- `GET /health` — Returns a JSON payload describing the current status.
+
+Example response:
+
+```json
+{
+  "status": "healthy"
+}
+```
+
+#### 3.1.2. Health Status Types
+
+rrelayer currently reports a single status field:
+
+- `healthy` — The API is running and responding
+- `unhealthy` — Returned via non-200 responses when initialisation fails
+
+#### 3.1.3. Monitoring in Production
+
+1. **Configure load balancer checks** to hit `/health`
+2. **Set up alerts** for non-200 responses from the health endpoint
+3. **Integrate with Cloud Monitoring** for dashboards and alerting policies
+4. **Automate remediation** when health probes fail repeatedly
+
+#### 3.1.4. Custom Health Port
+
+The health endpoint listens on the same port as the API. Adjust the port by updating `rrelayer.yaml`:
+
+```yaml
+api_config:
+  port: 3000
+```
+
+### 3.2. View Logs
+
+```bash
+kubectl logs -l app.kubernetes.io/name=rrelayer
+```
+
+Output:
+
+```bash
+2024-08-21T17:32:17.710908Z  INFO rrelayer is up on http://localhost:3000
+2024-08-21T17:32:17.779423Z  INFO Applied database schema
+```
+
+### 3.3. Upgrade the Helm Chart
+
+```bash
+helm upgrade rrelayer ./helm/rrelayer -f helm/rrelayer/values.yaml
+```
+
+## 4. Clean Up
+
+### 4.1. Uninstall the Helm Chart
+
+```bash
+helm uninstall rrelayer
+```
+
+Output:
+
+```bash
+release "rrelayer" uninstalled
+```
+
+### 4.2. Delete the GKE cluster
+
+```bash
+gcloud container clusters delete my-cluster --zone us-west1-a
+```
+
+Output:
+
+```bash
+The following clusters will be deleted.
+ - [my-cluster] in [us-west1-a]
+
+Do you want to continue (Y/n)?  Y
+Deleting cluster my-cluster...done.
+Deleted [https://container.googleapis.com/v1/projects/my-project/zones/us-west1-a/clusters/my-cluster].
+```
+
+This guide provides the necessary steps to deploy the rrelayer Helm chart on Google Kubernetes Engine (GKE) using gcloud and kubectl.

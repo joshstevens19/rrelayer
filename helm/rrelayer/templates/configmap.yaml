@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "rrelayer.fullname" . }}-config
+  labels:
+    {{- include "rrelayer.labels" . | nindent 4 }}
+data:
+  rrelayer.yaml: |
+{{ tpl .Values.rrelayerConfig . | indent 4 }}
