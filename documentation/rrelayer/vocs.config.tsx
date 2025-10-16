@@ -727,9 +727,9 @@ export default defineConfig({
     {
       text: 'Deploying',
       items: [
-        { text: 'Railway - coming soon', link: '' },
-        { text: 'AWS - coming soon', link: '' },
-        { text: 'GCP - coming soon', link: '' },
+        { text: 'Railway', link: '/deploying/railway' },
+        { text: 'AWS', link: '/deploying/aws' },
+        { text: 'GCP', link: '/deploying/gcp' },
       ],
     },
     {

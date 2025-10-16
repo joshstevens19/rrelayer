@@ -1,0 +1,24 @@
+name: railway-example
+signing_provider:
+  raw:
+    mnemonic: ${RAW_DANGEROUS_MNEMONIC}
+networks:
+  - name: sepolia_ethereum
+    chain_id: 11155111
+    provider_urls:
+      - https://sepolia.gateway.tenderly.co
+    block_explorer_url: https://sepolia.etherscan.io
+    gas_bump_blocks_every:
+      slow: 10
+      medium: 5
+      fast: 3
+      super_fast: 1
+api_config:
+  host: "0.0.0.0"
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+rate_limits:
+  default:
+    interval_secs: 60
+    max_requests: 30

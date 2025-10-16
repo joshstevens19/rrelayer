@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "rrelayer.fullname" . }}
+  labels:
+    {{- include "rrelayer.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "rrelayer.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "rrelayer.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- if .Values.securityContext.enabled }}
+      securityContext:
+        runAsUser: {{ .Values.securityContext.runAsUser }}
+        runAsGroup: {{ .Values.securityContext.runAsGroup }}
+        fsGroup: {{ .Values.securityContext.fsGroup }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          workingDir: {{ .Values.projectPath }}
+          args:
+            - "start"
+            - "--path"
+            - "{{ .Values.projectPath }}"
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          env:
+            - name: PROJECT_PATH
+              value: {{ .Values.projectPath }}
+            {{- range $name, $value := .Values.env }}
+            - name: {{ $name }}
+              {{- if $.Values.externalSecret }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.externalSecret }}
+                  key: {{ $name }}
+              {{- else if $value }}
+              value: {{ $value | quote }}
+              {{- else }}
+              value: ""
+              {{- end }}
+            {{- end }}
+            {{- range .Values.extraEnv }}
+            - name: {{ .name }}
+              {{- if hasKey . "value" }}
+              value: {{ .value | quote }}
+              {{- end }}
+              {{- if hasKey . "valueFrom" }}
+              valueFrom:
+{{ toYaml .valueFrom | indent 16 }}
+              {{- end }}
+            {{- end }}
+          volumeMounts:
+            - name: rrelayer-config
+              mountPath: {{ .Values.projectPath }}/rrelayer.yaml
+              subPath: rrelayer.yaml
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: rrelayer-config
+          configMap:
+            name: {{ include "rrelayer.fullname" . }}-config
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,68 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/joshstevens19/rrelayer
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 3000
+
+ingress:
+  enabled: false
+  annotations: {}
+  hosts:
+    - host: rrelayer.local
+      paths: []
+  tls: []
+
+resources:
+  limits:
+    cpu: 250m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+projectPath: "/app/project"
+
+rrelayerConfig: |
+  name: sepolia-relayer
+  signing_provider:
+    raw:
+      mnemonic: ${RAW_DANGEROUS_MNEMONIC}
+  networks:
+    - name: sepolia_ethereum
+      chain_id: 11155111
+      provider_urls:
+        - https://sepolia.gateway.tenderly.co
+      block_explorer_url: https://sepolia.etherscan.io
+  api_config:
+    host: "0.0.0.0"
+    port: 3000
+    authentication_username: ${RRELAYER_AUTH_USERNAME}
+    authentication_password: ${RRELAYER_AUTH_PASSWORD}
+
+env:
+  RAW_DANGEROUS_MNEMONIC: ""
+  DATABASE_URL: ""
+  POSTGRES_PASSWORD: ""
+  RRELAYER_AUTH_USERNAME: ""
+  RRELAYER_AUTH_PASSWORD: ""
+externalSecret: ""
+extraEnv: []
+
+securityContext:
+  enabled: true
+  runAsUser: 1000
+  runAsGroup: 3000
+  fsGroup: 2000
+  allowPrivilegeEscalation: false
+  runAsNonRoot: true
+  dropCapabilities:
+    - ALL
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
