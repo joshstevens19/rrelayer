@@ -29,6 +29,10 @@ pub use rrelayer_core::{
             SendTransactionResult,
         },
         queue_system::ReplaceTransactionResult,
-        types::{Transaction, TransactionData, TransactionId, TransactionSpeed, TransactionValue},
+        types::{
+            Transaction, TransactionBlob, TransactionConversionError, TransactionData,
+            TransactionHash, TransactionId, TransactionNonce, TransactionSpeed, TransactionStatus,
+            TransactionValue,
+        },
     },
 };
