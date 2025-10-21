@@ -1,6 +1,6 @@
 use super::types::TransactionSpeed;
 use crate::rate_limiting::RateLimiter;
-use crate::relayer::get_relayer;
+use crate::relayer::{get_relayer, Relayer};
 use crate::shared::utils::convert_blob_strings_to_blobs;
 use crate::shared::{internal_server_error, not_found, unauthorized, HttpError};
 use crate::{
@@ -52,7 +52,7 @@ pub struct SendTransactionResult {
 }
 
 /// API endpoint to send a new transaction through a relayer.
-pub async fn send_transaction(
+pub async fn handle_send_transaction(
     State(state): State<Arc<AppState>>,
     Path(relayer_id): Path<RelayerId>,
     headers: HeaderMap,
@@ -64,7 +64,18 @@ pub async fn send_transaction(
         .await?
         .ok_or(not_found("Relayer does not exist".to_string()))?;
 
-    state.validate_auth_basic_or_api_key(&headers, &relayer.address, &relayer.chain_id)?;
+    let result = send_transaction(relayer, transaction, &state, &headers).await?;
+
+    Ok(Json(result))
+}
+
+pub async fn send_transaction(
+    relayer: Relayer,
+    transaction: RelayTransactionRequest,
+    state: &Arc<AppState>,
+    headers: &HeaderMap,
+) -> Result<SendTransactionResult, HttpError> {
+    state.validate_auth_basic_or_api_key(headers, &relayer.address, &relayer.chain_id)?;
 
     if state.relayer_internal_only.restricted(&relayer.address, &relayer.chain_id) {
         return Err(unauthorized(Some("Relayer can only be used internally".to_string())));
@@ -93,9 +104,9 @@ pub async fn send_transaction(
     }
 
     let rate_limit_reservation = RateLimiter::check_and_reserve_rate_limit(
-        &state,
-        &headers,
-        &relayer_id,
+        state,
+        headers,
+        &relayer.id,
         RateLimitOperation::Transaction,
     )
     .await?;
@@ -113,7 +124,7 @@ pub async fn send_transaction(
         .transactions_queues
         .lock()
         .await
-        .add_transaction(&relayer_id, &transaction_to_send)
+        .add_transaction(&relayer.id, &transaction_to_send)
         .await?;
 
     let result = SendTransactionResult {
@@ -127,5 +138,5 @@ pub async fn send_transaction(
         reservation.commit();
     }
 
-    Ok(Json(result))
+    Ok(result)
 }

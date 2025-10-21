@@ -63,6 +63,94 @@ curl -X POST https://your-rrelayer.com/transactions/relayers/0x742d35.../send \
   }'
 ```
 
+## Send Transaction to a Random Relayer
+
+Send a new transaction through a randomly selected relayer on the specified chain.
+
+:::info
+This endpoint randomly selects an available (non-paused, non-internal) relayer on the specified chain and forwards the transaction to it.
+:::
+
+### Endpoint
+
+```
+POST /transactions/relayers/{chain_id}/send-random
+```
+
+#### Path Parameters
+
+| Parameter  | Type     | Required | Description                                  |
+| ---------- | -------- | -------- | -------------------------------------------- |
+| `chain_id` | `number` | Yes      | The chain ID to select a random relayer from |
+
+### Request Body
+
+Same format as regular send transaction:
+
+```json
+{
+  "to": "0x1234567890abcdef1234567890abcdef12345678",
+  "value": "1000000000000000000",
+  "data": "0xa9059cbb000000000000000000000000...",
+  "speed": "MEDIUM",
+  "externalId": "order_12345",
+  "blobs": ["0x01234567..."]
+}
+```
+
+#### Parameters
+
+| Field        | Type       | Required | Description                                                  |
+| ------------ | ---------- | -------- | ------------------------------------------------------------ |
+| `to`         | `string`   | Yes      | Recipient address                                            |
+| `value`      | `string`   | No       | Transaction value in wei (default: "0")                      |
+| `data`       | `string`   | No       | Transaction data/input (default: "0x")                       |
+| `speed`      | `string`   | No       | Transaction speed: `"SLOW"`, `"MEDIUM"`, `"FAST"`, `"SUPER"` |
+| `externalId` | `string`   | No       | Custom external ID for tracking                              |
+| `blobs`      | `string[]` | No       | Blob data for EIP-4844 transactions                          |
+
+### Response
+
+Same format as regular send transaction:
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "hash": "0xabcdef123456789abcdef123456789abcdef123456789abcdef123456789abcdef"
+}
+```
+
+### Error Responses
+
+| Status Code | Description                                                       |
+| ----------- | ----------------------------------------------------------------- |
+| `400`       | No available relayers for the chain (all paused or internal-only) |
+| `404`       | No relayers found for the specified chain                         |
+| `401`       | Authentication required (Basic auth only)                         |
+
+### Example
+
+```bash
+curl -X POST https://your-rrelayer.com/transactions/relayers/1/send-random \
+  -u "username:password" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": "0x1234567890abcdef1234567890abcdef12345678",
+    "value": "1000000000000000000",
+    "speed": "MEDIUM",
+    "externalId": "order_12345"
+  }'
+```
+
+#### Example Response
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "hash": "0xabcdef123456789abcdef123456789abcdef123456789abcdef123456789abcdef"
+}
+```
+
 ## Get Transaction
 
 Get transaction details by ID.
