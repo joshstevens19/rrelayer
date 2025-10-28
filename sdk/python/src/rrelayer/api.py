@@ -1,6 +1,8 @@
+from typing import Any
 import aiohttp
 import asyncio
 from pydantic import BaseModel, ConfigDict, PrivateAttr
+from base64 import b64encode
 
 
 class API(BaseModel):
@@ -18,33 +20,74 @@ class API(BaseModel):
                 asyncio.run(self._session.close())
         print("Destroyed API Session")
 
+    def build_headers(self, baseConfig: dict[str, str]) -> dict[str, str]:
+        headers = {
+            "Content-Type": "application/json",
+        }
+
+        if "apiKey" in baseConfig:
+            headers["x-api-key"] = baseConfig["apiKey"]
+
+        elif "username" in baseConfig and "password" in baseConfig:
+            credentials = f"{baseConfig['username']}:{baseConfig['password']}"
+
+            headers["Authorization"] = (
+                f"Basic {b64encode(credentials.encode()).decode()}"
+            )
+        else:
+            raise ValueError("API::Invalid authentication credentials")
+
+        return headers
+
     async def _get_session(self):
         if self._session is None or self._session.closed:
             self._session = aiohttp.ClientSession()
         return self._session
 
-    async def getApi(self, url: str) -> dict:
+    async def getApi(self, baseConfig: dict[str, str], endpoint: str) -> dict[str, Any]:
         session = await self._get_session()
-        async with session.get(url) as response:
-            print(response.content_type)
+
+        headers = self.build_headers(baseConfig)
+
+        async with session.get(
+            f"{baseConfig['serverURL']}/{endpoint}", headers=headers
+        ) as response:
             return await response.json()
 
-    async def postApi(self, url: str, headers, body) -> dict:
+    async def postApi(
+        self, baseConfig: dict[str, str], endpoint: str, body: dict[str, Any]
+    ) -> dict[str, Any]:
         session = await self._get_session()
 
-        async with session.post(url) as response:
+        headers = self.build_headers(baseConfig)
+
+        async with session.post(
+            f"{baseConfig['serverURL']}/{endpoint}", headers=headers, json=body
+        ) as response:
             return await response.json()
 
-    async def putApi(self, url: str, headers, body) -> dict:
+    async def putApi(
+        self, baseConfig: dict[str, str], endpoint: str, body: dict[str, Any]
+    ) -> dict[str, Any]:
         session = await self._get_session()
 
-        async with session.put(url) as response:
+        headers = self.build_headers(baseConfig)
+
+        async with session.put(
+            f"{baseConfig['serverURL']}/{endpoint}", headers=headers, json=body
+        ) as response:
             return await response.json()
 
-    async def deleteApi(self, url: str, headers, body) -> dict:
+    async def deleteApi(
+        self, baseConfig: dict[str, str], endpoint: str, body: dict = {}
+    ) -> dict[str, Any]:
         session = await self._get_session()
 
-        async with session.delete(url) as response:
+        headers = self.build_headers(baseConfig)
+
+        async with session.delete(
+            f"{baseConfig['serverURL']}/{endpoint}", headers=headers, json=body
+        ) as response:
             return await response.json()
 
     async def close(self):
