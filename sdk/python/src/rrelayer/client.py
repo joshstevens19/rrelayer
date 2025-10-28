@@ -1,14 +1,14 @@
+from typing import Any
 from pydantic import BaseModel, validate_call, ConfigDict, PrivateAttr
 from rrelayer.api import API
 
 
 class Client(BaseModel):
-    _serverURL: str = PrivateAttr()
-    _auth_username: str = PrivateAttr()
-    _auth_password: str = PrivateAttr()
+    _apiBaseConfig: dict[str, str] = PrivateAttr()
+
     _api: API = PrivateAttr()
 
-    relayer: "Client.Relayer" = None
+    relayer: "Client.Relayer | None" = None
     network: "Client.Network | None" = None
     transaction: "Client.Transaction | None" = None
     allowlist: "Client.AllowList | None" = None
@@ -18,9 +18,11 @@ class Client(BaseModel):
     def __init__(self, serverURL: str, auth_username: str, auth_password: str, **data):
         super().__init__(**data)
 
-        self._serverURL = serverURL
-        self._auth_username = auth_username
-        self._auth_password = auth_password
+        self._apiBaseConfig = {
+            "serverURL": serverURL,
+            "username": auth_username,
+            "password": auth_password,
+        }
 
         self._api = API()
 
@@ -35,27 +37,34 @@ class Client(BaseModel):
 
         @validate_call
         async def create(self, chainId: int, name: str):
-            pass
+            return await self._client._api.postApi(
+                self._client._apiBaseConfig, f"relayers/{chainId}/new", {"name": name}
+            )
 
         @validate_call
         async def clone(self, relayerId: str, chainId: int, name: str):
-            pass
+            return await self._client._api.postApi(
+                self._client._apiBaseConfig,
+                f"relayers/{relayerId}/clone",
+                {"newRelayerName": name, "chainId": chainId},
+            )
 
         @validate_call
         async def delete(self, id: str):
-            pass
+            _ = await self._client._api.deleteApi(
+                self._client._apiBaseConfig, f"relayers/{id}"
+            )
 
         @validate_call
-        async def get(self, id: str):
-            pass
+        async def get(self, id: str) -> dict[str, Any]:
+            return await self._client._api.getApi(
+                self._client._apiBaseConfig,
+                f"relayers/{id}",
+            )
 
         @validate_call
         async def getAll(self):
             pass
-
-        def printValues(self):
-            print("Print Values")
-            print(self._client._auth_username)
 
     class Network:
         def __init__(self, client: "Client"):

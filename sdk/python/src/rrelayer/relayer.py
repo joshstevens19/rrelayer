@@ -1,15 +1,14 @@
 from pydantic import BaseModel, ConfigDict, PrivateAttr
-from asyncinit import asyncinit
 from web3 import AsyncWeb3
 
 
-@asyncinit
 class Relayer(BaseModel):
     _id: str = PrivateAttr()
 
-    _apiBaseConfig: dict = PrivateAttr()
+    _apiBaseConfig: dict[str, str] = PrivateAttr()
+    _ethereumProvider: AsyncWeb3 | None = PrivateAttr(None)
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
-    _ethereumProvider: AsyncWeb3 | None = None
 
     def __init__(
         self,
@@ -23,9 +22,7 @@ class Relayer(BaseModel):
 
         self._id = relayerId
 
-        self._ethereumProvider = await AsyncWeb3(
-            AsyncWeb3.AsyncHTTPProvider(providerUrl)
-        )
+        self._ethereumProvider = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider(providerUrl))
 
         if "apiKey" in auth:
             self._apiBaseConfig = {"apiKey": auth["apiKey"], "serverURL": serverURL}
