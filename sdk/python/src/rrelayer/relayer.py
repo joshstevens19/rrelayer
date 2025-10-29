@@ -6,7 +6,7 @@ class Relayer(BaseModel):
     _id: str = PrivateAttr()
 
     _apiBaseConfig: dict[str, str] = PrivateAttr()
-    _ethereumProvider: AsyncWeb3 | None = PrivateAttr(None)
+    _ethereumProvider: AsyncWeb3 = PrivateAttr()
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 

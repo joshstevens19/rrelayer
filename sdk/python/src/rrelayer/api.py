@@ -44,13 +44,15 @@ class API(BaseModel):
             self._session = aiohttp.ClientSession()
         return self._session
 
-    async def getApi(self, baseConfig: dict[str, str], endpoint: str) -> dict[str, Any]:
+    async def getApi(
+        self, baseConfig: dict[str, str], endpoint: str, params: dict[str, Any] = {}
+    ) -> dict[str, Any]:
         session = await self._get_session()
 
         headers = self.build_headers(baseConfig)
 
         async with session.get(
-            f"{baseConfig['serverURL']}/{endpoint}", headers=headers
+            f"{baseConfig['serverURL']}/{endpoint}", headers=headers, params=params
         ) as response:
             return await response.json()
 

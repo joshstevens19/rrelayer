@@ -1,6 +1,7 @@
 from typing import Any
 from pydantic import BaseModel, validate_call, ConfigDict, PrivateAttr
 from rrelayer.api import API
+from rrelayer.types import PagingContext, defaultPagingContext
 
 
 class Client(BaseModel):
@@ -31,25 +32,79 @@ class Client(BaseModel):
         @validate_call
         async def get(self, id: str) -> dict[str, Any]:
             return await self._client._api.getApi(
-                self._client._apiBaseConfig,
-                f"relayers/{id}",
+                self._client._apiBaseConfig, f"relayers/{id}"
             )
 
         @validate_call
-        async def getAll(self):
-            pass
+        async def getAll(
+            self,
+            pagingContext: PagingContext = defaultPagingContext,
+            onlyForChainId: int | None = None,
+        ):
+            params = pagingContext.model_dump()
+
+            if onlyForChainId:
+                params["chainId"] = onlyForChainId
+
+            return await self._client._api.getApi(
+                self._client._apiBaseConfig, "relayers", params
+            )
 
     class Network:
         def __init__(self, client: "Client"):
             self._client: "Client" = client
 
+        @validate_call
+        async def get(self, chainId: int):
+            return await self._client._api.getApi(
+                self._client._apiBaseConfig, f"networks/{chainId}"
+            )
+
+        @validate_call
+        async def getAll(self):
+            return await self._client._api.getApi(
+                self._client._apiBaseConfig, "networks"
+            )
+
+        @validate_call
+        async def getGasPrices(self, chainId: int):
+            return await self._client._api.getApi(
+                self._client._apiBaseConfig, f"networks/gas/price/{chainId}"
+            )
+
     class Transaction:
         def __init__(self, client: "Client"):
             self._client: "Client" = client
 
+        @validate_call
+        async def get(self, transactionId: str):
+            return await self._client._api.getApi(
+                self._client._apiBaseConfig, f"transactions/{transactionId}"
+            )
+
+        @validate_call
+        async def getStatus(self, transactionId: str):
+            return await self._client._api.getApi(
+                self._client._apiBaseConfig, f"transactions/status/{transactionId}"
+            )
+
+        @validate_call
+        async def sendRandom(self):
+            pass
+
     class AllowList:
         def __init__(self, client: "Client"):
             self._client: "Client" = client
+
+        @validate_call
+        async def get(
+            self, relayerId: str, pagingContext: PagingContext = defaultPagingContext
+        ):
+            params = pagingContext.model_dump()
+
+            return await self._client._api.getApi(
+                self._client._apiBaseConfig, f"relayers/{relayerId}/allowlists", params
+            )
 
     _apiBaseConfig: dict[str, str] = PrivateAttr()
 
