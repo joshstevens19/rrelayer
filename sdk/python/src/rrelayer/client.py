@@ -4,33 +4,6 @@ from rrelayer.api import API
 
 
 class Client(BaseModel):
-    _apiBaseConfig: dict[str, str] = PrivateAttr()
-
-    _api: API = PrivateAttr()
-
-    relayer: "Client.Relayer | None" = None
-    network: "Client.Network | None" = None
-    transaction: "Client.Transaction | None" = None
-    allowlist: "Client.AllowList | None" = None
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    def __init__(self, serverURL: str, auth_username: str, auth_password: str, **data):
-        super().__init__(**data)
-
-        self._apiBaseConfig = {
-            "serverURL": serverURL,
-            "username": auth_username,
-            "password": auth_password,
-        }
-
-        self._api = API()
-
-        self.relayer = self.Relayer(self)
-        self.network = self.Network(self)
-        self.transaction = self.Transaction(self)
-        self.allowlist = self.AllowList(self)
-
     class Relayer:
         def __init__(self, client: "Client"):
             self._client: "Client" = client
@@ -77,6 +50,55 @@ class Client(BaseModel):
     class AllowList:
         def __init__(self, client: "Client"):
             self._client: "Client" = client
+
+    _apiBaseConfig: dict[str, str] = PrivateAttr()
+
+    _api: API = PrivateAttr()
+
+    _allowlist: AllowList = PrivateAttr()
+    _network: Network = PrivateAttr()
+    _relayer: Relayer = PrivateAttr()
+    _transaction: Transaction = PrivateAttr()
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    def __init__(self, serverURL: str, auth_username: str, auth_password: str, **data):
+        super().__init__(**data)
+
+        self._apiBaseConfig = {
+            "serverURL": serverURL,
+            "username": auth_username,
+            "password": auth_password,
+        }
+
+        self._api = API()
+
+        self._allowlist = self.AllowList(self)
+        self._network = self.Network(self)
+        self._relayer = self.Relayer(self)
+        self._transaction = self.Transaction(self)
+
+    @property
+    def allowlist(self) -> AllowList:
+        return self._allowlist
+
+    @property
+    def network(self) -> Network:
+        return self._network
+
+    @property
+    def relayer(self) -> Relayer:
+        return self._relayer
+
+    @property
+    def transaction(self) -> Transaction:
+        return self._transaction
+
+    @validate_call
+    async def getRelayerClient(
+        self, relayerId: str, providerURL: str, defaultSpeed: None = None
+    ):
+        relayer = await self._relayer.get(relayerId)
 
 
 @validate_call
