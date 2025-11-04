@@ -100,7 +100,7 @@ class RelayerClient(BaseModel):
 
     async def address(self) -> str | None:
         response = await self.getInfo()
-        return response["address"] if response else None
+        return Web3.to_checksum_address(response["address"]) if response else None
 
     async def getInfo(self):
         response = await self._api.getApi(self._apiBaseConfig, f"relayers/{self._id}")

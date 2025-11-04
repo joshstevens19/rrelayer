@@ -2,6 +2,7 @@ from typing import Any
 from pydantic import BaseModel, validate_call, ConfigDict, PrivateAttr
 from rrelayer.api import API
 from rrelayer.types import PagingContext, defaultPagingContext
+from rrelayer.relayer import RelayerClient
 
 
 class Client(BaseModel):
@@ -152,8 +153,19 @@ class Client(BaseModel):
     @validate_call
     async def getRelayerClient(
         self, relayerId: str, providerURL: str, defaultSpeed: None = None
-    ):
+    ) -> RelayerClient:
         relayer = await self._relayer.get(relayerId)
+        if relayer:
+            pass
+
+        auth = {
+            "username": self._apiBaseConfig["username"],
+            "password": self._apiBaseConfig["password"],
+        }
+
+        return RelayerClient(
+            self._apiBaseConfig["serverURL"], providerURL, relayerId, auth
+        )
 
 
 @validate_call
@@ -163,3 +175,17 @@ def createClient(serverURL: str, auth_username: str, auth_password: str) -> Clie
         auth_username=auth_username,
         auth_password=auth_password,
     )
+
+
+@validate_call
+def createRelayerClient(
+    serverURL: str,
+    providerURL: str,
+    relayerId: str,
+    apiKey: str,
+) -> RelayerClient:
+    auth = {
+        "apiKey": apiKey,
+    }
+
+    return RelayerClient(serverURL, providerURL, relayerId, auth)
