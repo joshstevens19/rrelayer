@@ -41,10 +41,7 @@ impl HttpClient {
             }
             AuthConfig::ApiKey { api_key } => {
                 let header_name = HeaderName::from_static("x-rrelayer-api-key");
-                headers.insert(
-                    header_name,
-                    HeaderValue::from_str(api_key).unwrap(),
-                );
+                headers.insert(header_name, HeaderValue::from_str(api_key).unwrap());
             }
         }
 
