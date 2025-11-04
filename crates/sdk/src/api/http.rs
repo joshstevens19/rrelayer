@@ -1,7 +1,7 @@
 use base64::{Engine as _, engine::general_purpose};
 use reqwest::{
     Client,
-    header::{AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderValue},
+    header::{AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderName, HeaderValue},
 };
 use serde::{Serialize, de::DeserializeOwned};
 
@@ -40,9 +40,10 @@ impl HttpClient {
                 );
             }
             AuthConfig::ApiKey { api_key } => {
+                let header_name = HeaderName::from_static("x-rrelayer-api-key");
                 headers.insert(
-                    AUTHORIZATION,
-                    HeaderValue::from_str(&format!("Bearer {}", api_key)).unwrap(),
+                    header_name,
+                    HeaderValue::from_str(api_key).unwrap(),
                 );
             }
         }
