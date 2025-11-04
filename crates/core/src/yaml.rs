@@ -13,9 +13,9 @@ use crate::gas::{
     TenderlyGasProviderSetupConfig,
 };
 use crate::network::{ChainId, Network};
+use crate::shared::utils::format_token_amount;
 use crate::transaction::types::TransactionSpeed;
 use crate::{rrelayer_error, shared::common_types::EvmAddress};
-use crate::shared::utils::format_token_amount;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GcpSecretManagerProviderConfig {
