@@ -694,7 +694,7 @@ impl AutomaticTopUpTask {
 
         if balance < min_required_balance {
             warn!(
-                "From address {} balance ({} ETH) is insufficient for top-up transaction. Required: {} ETH (top-up: {} ETH + gas: {} ETH) - total_relayers_to_top_up {}",
+                "From address {} balance ({} ETH) is insufficient for top-up transaction. Required: {} ETH (top-up: {} ETH + gas: {} ETH) for {} ETH transfers",
                 from_address,
                 format_wei_to_eth(&balance),
                 format_wei_to_eth(&min_required_balance),
@@ -809,10 +809,10 @@ impl AutomaticTopUpTask {
         token_config: &Erc20TokenConfig,
         total_relayers_to_top_up: usize,
     ) -> Result<bool, String> {
-        let token_balance =
-            self.get_erc20_balance(provider, &token_config.address, from_address)
-                .await
-                .map_err(|e| format!("Failed to get from_address ERC-20 token balance: {}", e))?;
+        let token_balance = self
+            .get_erc20_balance(provider, &token_config.address, from_address)
+            .await
+            .map_err(|e| format!("Failed to get from_address ERC-20 token balance: {}", e))?;
 
         info!(
             "From address {} has ERC-20 token balance: {} for token {}",
@@ -821,11 +821,10 @@ impl AutomaticTopUpTask {
             token_config.address
         );
 
-        let native_balance = provider
-            .rpc_client()
-            .get_balance((*from_address).into())
-            .await
-            .map_err(|e| format!("Failed to get from_address native balance for gas check: {}", e))?;
+        let native_balance =
+            provider.rpc_client().get_balance((*from_address).into()).await.map_err(|e| {
+                format!("Failed to get from_address native balance for gas check: {}", e)
+            })?;
 
         info!(
             "From address {} has native balance: {} ETH for gas",
@@ -842,7 +841,8 @@ impl AutomaticTopUpTask {
 
         let total_gas_required = estimated_gas_cost * U256::from(total_relayers_to_top_up);
 
-        let total_tokens_required = token_config.top_up_amount * U256::from(total_relayers_to_top_up);
+        let total_tokens_required =
+            token_config.top_up_amount * U256::from(total_relayers_to_top_up);
 
         info!(
             "From address {} requires {} ETH for gas and {} tokens for {} top-ups",
@@ -865,7 +865,7 @@ impl AutomaticTopUpTask {
 
         if token_balance < total_tokens_required {
             warn!(
-                "From address {} token balance ({}) is insufficient for top-up transactions. Required: {} for token {} - total_relayers_to_top_up {}",
+                "From address {} token balance ({}) is insufficient for top-up transactions. Required: {} for token {} for {} ERC-20 transactions",
                 from_address,
                 format_token_amount(&token_balance, token_config.decimals),
                 format_token_amount(&total_tokens_required, token_config.decimals),
