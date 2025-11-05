@@ -100,7 +100,7 @@ async fn continuously_process_pending_transactions(
                                 break;
                             }
                             _ => {
-                                error!("PENDING QUEUE ERROR: {}", e)
+                                error!("Relayer id {} - PENDING QUEUE ERROR: {}", relayer_id, e)
                             }
                         }
                     }
@@ -146,7 +146,7 @@ async fn continuously_process_inmempool_transactions(
                                 break;
                             }
                             _ => {
-                                error!("INMEMPOOL ERROR: {}", e)
+                                error!("Relayer id {} - INMEMPOOL QUEUE ERROR: {}", relayer_id, e)
                             }
                         }
                     }
@@ -192,7 +192,7 @@ async fn continuously_process_mined_transactions(
                                 break;
                             }
                             _ => {
-                                error!("MINED ERROR: {}", e)
+                                error!("Relayer id {} - MINED QUEUE ERROR: {}", relayer_id, e)
                             }
                         }
                     }
