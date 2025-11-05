@@ -278,7 +278,15 @@ impl AutomaticTopUpTask {
             chain_id
         );
 
-        match self.check_native_from_address_balance(provider, from_address, native_config).await {
+        match self
+            .check_native_from_address_balance(
+                provider,
+                from_address,
+                native_config,
+                addresses_needing_top_up.len(),
+            )
+            .await
+        {
             Ok(sufficient) => {
                 if !sufficient {
                     warn!(
@@ -376,7 +384,15 @@ impl AutomaticTopUpTask {
             chain_id
         );
 
-        match self.check_erc20_from_address_balance(provider, from_address, token_config).await {
+        match self
+            .check_erc20_from_address_balance(
+                provider,
+                from_address,
+                token_config,
+                addresses_needing_top_up.len(),
+            )
+            .await
+        {
             Ok(sufficient) => {
                 if !sufficient {
                     warn!(
@@ -649,6 +665,7 @@ impl AutomaticTopUpTask {
         provider: &EvmProvider,
         from_address: &EvmAddress,
         native_config: &NativeTokenConfig,
+        total_relayers_to_top_up: usize,
     ) -> Result<bool, String> {
         let balance = provider
             .rpc_client()
@@ -659,12 +676,13 @@ impl AutomaticTopUpTask {
         info!("From address {} has balance: {} ETH", from_address, format_wei_to_eth(&balance));
 
         let estimated_gas_cost =
-            self.estimate_transaction_cost(provider).await.unwrap_or_else(|e| {
+            self.estimate_native_transaction_cost(provider).await.unwrap_or_else(|e| {
                 warn!("Failed to estimate gas cost: {}. Using default estimate.", e);
                 U256::from(21000u64) * U256::from(20_000_000_000u64)
             });
 
-        let min_required_balance = native_config.top_up_amount + estimated_gas_cost;
+        let min_required_balance = (native_config.top_up_amount + estimated_gas_cost)
+            * U256::from(total_relayers_to_top_up);
 
         info!(
             "From address {} requires {} ETH (top-up: {} ETH + gas: {} ETH)",
@@ -676,12 +694,13 @@ impl AutomaticTopUpTask {
 
         if balance < min_required_balance {
             warn!(
-                "From address {} balance ({} ETH) is insufficient for top-up transaction. Required: {} ETH (top-up: {} ETH + gas: {} ETH)",
+                "From address {} balance ({} ETH) is insufficient for top-up transaction. Required: {} ETH (top-up: {} ETH + gas: {} ETH) - total_relayers_to_top_up {}",
                 from_address,
                 format_wei_to_eth(&balance),
                 format_wei_to_eth(&min_required_balance),
                 format_wei_to_eth(&native_config.top_up_amount),
-                format_wei_to_eth(&estimated_gas_cost)
+                format_wei_to_eth(&estimated_gas_cost),
+                 total_relayers_to_top_up
             );
             return Ok(false);
         }
@@ -690,7 +709,10 @@ impl AutomaticTopUpTask {
     }
 
     /// Estimates the gas cost for a standard transfer transaction.
-    async fn estimate_transaction_cost(&self, provider: &EvmProvider) -> Result<U256, String> {
+    async fn estimate_native_transaction_cost(
+        &self,
+        provider: &EvmProvider,
+    ) -> Result<U256, String> {
         let gas_price = provider
             .rpc_client()
             .get_gas_price()
@@ -702,6 +724,31 @@ impl AutomaticTopUpTask {
 
         info!(
             "Estimated transaction cost: {} ETH (gas price: {} gwei, limit: {})",
+            format_wei_to_eth(&total_cost),
+            U256::from(gas_price) / U256::from(GWEI_TO_WEI),
+            gas_limit
+        );
+
+        Ok(total_cost)
+    }
+
+    /// Estimates the gas cost for an ERC-20 transfer transaction.
+    async fn estimate_erc20_transaction_cost(
+        &self,
+        provider: &EvmProvider,
+    ) -> Result<U256, String> {
+        let gas_price = provider
+            .rpc_client()
+            .get_gas_price()
+            .await
+            .map_err(|e| format!("Failed to get gas price: {}", e))?;
+
+        // ERC-20 transfers typically use around 65,000 gas
+        let gas_limit = U256::from(65000u64);
+        let total_cost = U256::from(gas_price) * gas_limit;
+
+        info!(
+            "Estimated ERC-20 transaction cost: {} ETH (gas price: {} gwei, limit: {})",
             format_wei_to_eth(&total_cost),
             U256::from(gas_price) / U256::from(GWEI_TO_WEI),
             gas_limit
@@ -760,8 +807,9 @@ impl AutomaticTopUpTask {
         provider: &EvmProvider,
         from_address: &EvmAddress,
         token_config: &Erc20TokenConfig,
+        total_relayers_to_top_up: usize,
     ) -> Result<bool, String> {
-        let balance =
+        let token_balance =
             self.get_erc20_balance(provider, &token_config.address, from_address)
                 .await
                 .map_err(|e| format!("Failed to get from_address ERC-20 token balance: {}", e))?;
@@ -769,28 +817,60 @@ impl AutomaticTopUpTask {
         info!(
             "From address {} has ERC-20 token balance: {} for token {}",
             from_address,
-            format_token_amount(&balance, token_config.decimals),
+            format_token_amount(&token_balance, token_config.decimals),
             token_config.address
         );
 
-        // For ERC-20 tokens, we don't need gas estimation as gas is paid in native tokens
-        // We just need to ensure sufficient token balance for the top-up amount
-        let min_required_balance = token_config.top_up_amount;
+        let native_balance = provider
+            .rpc_client()
+            .get_balance((*from_address).into())
+            .await
+            .map_err(|e| format!("Failed to get from_address native balance for gas check: {}", e))?;
 
         info!(
-            "From address {} requires {} tokens for token {}",
+            "From address {} has native balance: {} ETH for gas",
             from_address,
-            format_token_amount(&min_required_balance, token_config.decimals),
-            token_config.address
+            format_wei_to_eth(&native_balance)
         );
 
-        if balance < min_required_balance {
+        let estimated_gas_cost =
+            self.estimate_erc20_transaction_cost(provider).await.unwrap_or_else(|e| {
+                warn!("Failed to estimate ERC-20 gas cost: {}. Using default estimate.", e);
+                // ERC-20 transfer typically uses 65,000 gas
+                U256::from(65000u64) * U256::from(20_000_000_000u64)
+            });
+
+        let total_gas_required = estimated_gas_cost * U256::from(total_relayers_to_top_up);
+
+        let total_tokens_required = token_config.top_up_amount * U256::from(total_relayers_to_top_up);
+
+        info!(
+            "From address {} requires {} ETH for gas and {} tokens for {} top-ups",
+            from_address,
+            format_wei_to_eth(&total_gas_required),
+            format_token_amount(&total_tokens_required, token_config.decimals),
+            total_relayers_to_top_up
+        );
+
+        if native_balance < total_gas_required {
             warn!(
-                "From address {} token balance ({}) is insufficient for top-up transaction. Required: {} for token {}",
+                "From address {} native balance ({} ETH) is insufficient for gas costs. Required: {} ETH for {} ERC-20 transactions",
                 from_address,
-                format_token_amount(&balance, token_config.decimals),
-                format_token_amount(&min_required_balance, token_config.decimals),
-                token_config.address
+                format_wei_to_eth(&native_balance),
+                format_wei_to_eth(&total_gas_required),
+                total_relayers_to_top_up
+            );
+            return Ok(false);
+        }
+
+        if token_balance < total_tokens_required {
+            warn!(
+                "From address {} token balance ({}) is insufficient for top-up transactions. Required: {} for token {} - total_relayers_to_top_up {}",
+                from_address,
+                format_token_amount(&token_balance, token_config.decimals),
+                format_token_amount(&total_tokens_required, token_config.decimals),
+                token_config.address,
+                total_relayers_to_top_up
             );
             return Ok(false);
         }
