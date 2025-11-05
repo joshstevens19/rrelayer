@@ -13,6 +13,7 @@ use crate::gas::{
     TenderlyGasProviderSetupConfig,
 };
 use crate::network::{ChainId, Network};
+use crate::shared::utils::format_token_amount;
 use crate::transaction::types::TransactionSpeed;
 use crate::{rrelayer_error, shared::common_types::EvmAddress};
 
@@ -692,11 +693,11 @@ impl Serialize for NativeTokenConfig {
         let mut state = serializer.serialize_struct("NativeTokenConfig", 4)?;
         state.serialize_field(
             "min_balance",
-            &serialize_amount_with_decimals(&self.min_balance, self.decimals),
+            &format_token_amount(&self.min_balance, self.decimals),
         )?;
         state.serialize_field(
             "top_up_amount",
-            &serialize_amount_with_decimals(&self.top_up_amount, self.decimals),
+            &format_token_amount(&self.top_up_amount, self.decimals),
         )?;
         state.serialize_field("decimals", &self.decimals)?;
         state.end()
@@ -747,11 +748,11 @@ impl Serialize for Erc20TokenConfig {
         state.serialize_field("address", &self.address)?;
         state.serialize_field(
             "min_balance",
-            &serialize_amount_with_decimals(&self.min_balance, self.decimals),
+            &format_token_amount(&self.min_balance, self.decimals),
         )?;
         state.serialize_field(
             "top_up_amount",
-            &serialize_amount_with_decimals(&self.top_up_amount, self.decimals),
+            &format_token_amount(&self.top_up_amount, self.decimals),
         )?;
         state.serialize_field("decimals", &self.decimals)?;
         state.end()
@@ -821,20 +822,6 @@ impl NetworkAutomaticTopUpConfig {
 
 fn default_decimals() -> u8 {
     18
-}
-
-fn serialize_amount_with_decimals(amount: &U256, decimals: u8) -> String {
-    let divisor = U256::from(10u64.pow(decimals as u32));
-    let whole_part = amount / divisor;
-    let remainder = amount % divisor;
-
-    if remainder.is_zero() {
-        format!("{}", whole_part)
-    } else {
-        let decimal_str = format!("{:0width$}", remainder, width = decimals as usize);
-        let decimal_trimmed = decimal_str.trim_end_matches('0');
-        format!("{}.{}", whole_part, decimal_trimmed)
-    }
 }
 
 #[derive(Debug, Clone)]

@@ -340,10 +340,10 @@ impl AutomaticTopUpTask {
                 Ok(balance) => {
                     if balance < token_config.min_balance {
                         info!(
-                            "Address {} ERC-20 balance ({}) is below minimum ({}) for token {}, needs top-up",
+                            "Relayer {} ERC-20 balance ({}) is below minimum ({}) for token {}, needs top-up",
                             address,
-                            format_token_amount(&balance),
-                            format_token_amount(&token_config.min_balance),
+                            format_token_amount(&balance, token_config.decimals),
+                            format_token_amount(&token_config.min_balance, token_config.decimals),
                             token_config.address
                         );
                         addresses_needing_top_up.push(*address);
@@ -410,7 +410,7 @@ impl AutomaticTopUpTask {
                     info!(
                         "Topped up address {} with {} tokens ({}). Transaction: {}",
                         address,
-                        format_token_amount(&token_config.top_up_amount),
+                        format_token_amount(&token_config.top_up_amount, token_config.decimals),
                         token_config.address,
                         tx_hash
                     );
@@ -769,7 +769,7 @@ impl AutomaticTopUpTask {
         info!(
             "From address {} has ERC-20 token balance: {} for token {}",
             from_address,
-            format_token_amount(&balance),
+            format_token_amount(&balance, token_config.decimals),
             token_config.address
         );
 
@@ -780,7 +780,7 @@ impl AutomaticTopUpTask {
         info!(
             "From address {} requires {} tokens for token {}",
             from_address,
-            format_token_amount(&min_required_balance),
+            format_token_amount(&min_required_balance, token_config.decimals),
             token_config.address
         );
 
@@ -788,8 +788,8 @@ impl AutomaticTopUpTask {
             warn!(
                 "From address {} token balance ({}) is insufficient for top-up transaction. Required: {} for token {}",
                 from_address,
-                format_token_amount(&balance),
-                format_token_amount(&min_required_balance),
+                format_token_amount(&balance, token_config.decimals),
+                format_token_amount(&min_required_balance, token_config.decimals),
                 token_config.address
             );
             return Ok(false);
@@ -838,7 +838,7 @@ impl AutomaticTopUpTask {
             "Sending ERC-20 top-up transaction: {} -> {} ({} tokens of {}){}",
             from_address,
             relayer_address,
-            format_token_amount(&token_config.top_up_amount),
+            format_token_amount(&token_config.top_up_amount, token_config.decimals),
             token_config.address,
             if config.via_safe() { " via Safe" } else { "" }
         );

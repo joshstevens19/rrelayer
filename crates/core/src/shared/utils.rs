@@ -44,24 +44,22 @@ pub fn convert_blob_strings_to_blobs(
 }
 
 pub fn format_wei_to_eth(wei: &U256) -> String {
-    let eth_divisor = U256::from(10u64.pow(18));
-    let whole_eth = wei / eth_divisor;
-    let remainder = wei % eth_divisor;
-
-    if remainder.is_zero() {
-        format!("{}", whole_eth)
-    } else {
-        let decimal_str = format!("{:018}", remainder);
-        let decimal_trimmed = decimal_str.trim_end_matches('0');
-        format!("{}.{}", whole_eth, decimal_trimmed)
-    }
+    format_token_amount(wei, 18)
 }
 
 /// Formats a token amount to a human-readable string.
-pub fn format_token_amount(amount: &U256) -> String {
-    // For now, use the same formatting as ETH (18 decimals)
-    // This can be enhanced to support different token decimals
-    format_wei_to_eth(amount)
+pub fn format_token_amount(amount: &U256, decimals: u8) -> String {
+    let unit_divisor = U256::from(10u64.pow(decimals.into()));
+    let whole_part = amount / unit_divisor;
+    let remainder = amount % unit_divisor;
+
+    if remainder.is_zero() {
+        format!("{}", whole_part)
+    } else {
+        let decimal_str = format!("{:0width$}", remainder, width = decimals as usize);
+        let decimal_trimmed = decimal_str.trim_end_matches('0');
+        format!("{}.{}", whole_part, decimal_trimmed)
+    }
 }
 
 pub async fn get_chain_id(provider_url: &str) -> Result<ChainId, String> {
