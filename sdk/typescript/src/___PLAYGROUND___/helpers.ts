@@ -402,7 +402,7 @@ export const getAnvilAccounts = (): [
     {
       address: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',
       privateKey:
-        '0x59c6995e998f97ff67aac7c2c20ba75d75cd8d1c6f75d7b2e08f4b2f31b7c527',
+        '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d',
     },
     {
       address: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC',
