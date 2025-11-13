@@ -94,7 +94,7 @@ docker run -it -v $PWD:/app/project ghcr.io/joshstevens19/rrelayer --help
 ### Example: Creating a new project
 
 ```bash
-docker run -it -v $PWD:/app/project ghcr.io/joshstevens19/rrelayer new
+docker run -it -v $PWD:/app/project ghcr.io/joshstevens19/rrelayer new -p /app/project
 ```
 
 ### Running with existing project
@@ -102,7 +102,7 @@ docker run -it -v $PWD:/app/project ghcr.io/joshstevens19/rrelayer new
 ```bash
 export PROJECT_PATH=/path/to/your/project
 
-docker run -it -v $PROJECT_PATH:/app/project ghcr.io/joshstevens19/rrelayer start
+docker run -it -v $PROJECT_PATH:/app/project ghcr.io/joshstevens19/rrelayer start  -p /app/project
 ```
 
 :::info
