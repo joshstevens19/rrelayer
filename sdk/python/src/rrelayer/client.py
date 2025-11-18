@@ -1,8 +1,10 @@
 from typing import Any
-from pydantic import BaseModel, validate_call, ConfigDict, PrivateAttr
+
+from pydantic import BaseModel, ConfigDict, PrivateAttr, validate_call
+
 from rrelayer.api import API
-from rrelayer.types import PagingContext, defaultPagingContext
 from rrelayer.relayer import RelayerClient
+from rrelayer.types import PagingContext, defaultPagingContext
 
 
 class Client(BaseModel):
@@ -12,29 +14,50 @@ class Client(BaseModel):
 
         @validate_call
         async def create(self, chainId: int, name: str):
-            return await self._client._api.postApi(
-                self._client._apiBaseConfig, f"relayers/{chainId}/new", {"name": name}
-            )
+            try:
+                return await self._client._api.postApi(
+                    self._client._apiBaseConfig,
+                    f"relayers/{chainId}/new",
+                    {"name": name},
+                )
+
+            except Exception as error:
+                print("Failed to create relayer", error)
+                raise error
 
         @validate_call
         async def clone(self, relayerId: str, chainId: int, name: str):
-            return await self._client._api.postApi(
-                self._client._apiBaseConfig,
-                f"relayers/{relayerId}/clone",
-                {"newRelayerName": name, "chainId": chainId},
-            )
+            try:
+                return await self._client._api.postApi(
+                    self._client._apiBaseConfig,
+                    f"relayers/{relayerId}/clone",
+                    {"newRelayerName": name, "chainId": chainId},
+                )
+            except Exception as error:
+                print("Failed to clone relayer", error)
+                raise error
 
         @validate_call
         async def delete(self, id: str):
-            _ = await self._client._api.deleteApi(
-                self._client._apiBaseConfig, f"relayers/{id}"
-            )
+            try:
+                await self._client._api.deleteApi(
+                    self._client._apiBaseConfig, f"relayers/{id}"
+                )
+
+            except Exception as error:
+                print("Failed to delete relayer", error)
+                raise error
 
         @validate_call
         async def get(self, id: str) -> dict[str, Any]:
-            return await self._client._api.getApi(
-                self._client._apiBaseConfig, f"relayers/{id}"
-            )
+            try:
+                return await self._client._api.getApi(
+                    self._client._apiBaseConfig, f"relayers/{id}"
+                )
+
+            except Exception as error:
+                print("Failed to fetch getRelayer", error)
+                raise error
 
         @validate_call
         async def getAll(
@@ -42,14 +65,19 @@ class Client(BaseModel):
             pagingContext: PagingContext = defaultPagingContext,
             onlyForChainId: int | None = None,
         ):
-            params = pagingContext.model_dump()
+            try:
+                params = pagingContext.model_dump()
 
-            if onlyForChainId:
-                params["chainId"] = onlyForChainId
+                if onlyForChainId:
+                    params["chainId"] = onlyForChainId
 
-            return await self._client._api.getApi(
-                self._client._apiBaseConfig, "relayers", params
-            )
+                return await self._client._api.getApi(
+                    self._client._apiBaseConfig, "relayers", params
+                )
+
+            except Exception as error:
+                print("Failed to fetch getRelayers", error)
+                raise error
 
     class Network:
         def __init__(self, client: "Client"):
@@ -57,21 +85,34 @@ class Client(BaseModel):
 
         @validate_call
         async def get(self, chainId: int):
-            return await self._client._api.getApi(
-                self._client._apiBaseConfig, f"networks/{chainId}"
-            )
+            try:
+                return await self._client._api.getApi(
+                    self._client._apiBaseConfig, f"networks/{chainId}"
+                )
+
+            except Exception as error:
+                print("Failed to fetch all networks:", error)
+                raise error
 
         @validate_call
         async def getAll(self):
-            return await self._client._api.getApi(
-                self._client._apiBaseConfig, "networks"
-            )
+            try:
+                return await self._client._api.getApi(
+                    self._client._apiBaseConfig, "networks"
+                )
+            except Exception as error:
+                print("Failed to fetch all networks:", error)
+                raise error
 
         @validate_call
         async def getGasPrices(self, chainId: int):
-            return await self._client._api.getApi(
-                self._client._apiBaseConfig, f"networks/gas/price/{chainId}"
-            )
+            try:
+                return await self._client._api.getApi(
+                    self._client._apiBaseConfig, f"networks/gas/price/{chainId}"
+                )
+            except Exception as error:
+                print("Failed to fetch gas prices:", error)
+                raise error
 
     class Transaction:
         def __init__(self, client: "Client"):
@@ -79,15 +120,22 @@ class Client(BaseModel):
 
         @validate_call
         async def get(self, transactionId: str):
-            return await self._client._api.getApi(
-                self._client._apiBaseConfig, f"transactions/{transactionId}"
-            )
+            try:
+                return await self._client._api.getApi(
+                    self._client._apiBaseConfig, f"transactions/{transactionId}"
+                )
+            except Exception as e:
+                print("Failed to fetch getTransaction:", e)
 
         @validate_call
         async def getStatus(self, transactionId: str):
-            return await self._client._api.getApi(
-                self._client._apiBaseConfig, f"transactions/status/{transactionId}"
-            )
+            try:
+                return await self._client._api.getApi(
+                    self._client._apiBaseConfig, f"transactions/status/{transactionId}"
+                )
+            except Exception as error:
+                print("Failed to fetch getTransactionStatus:", error)
+                raise error
 
         @validate_call
         async def sendRandom(self):
@@ -101,11 +149,17 @@ class Client(BaseModel):
         async def get(
             self, relayerId: str, pagingContext: PagingContext = defaultPagingContext
         ):
-            params = pagingContext.model_dump()
+            try:
+                params = pagingContext.model_dump()
 
-            return await self._client._api.getApi(
-                self._client._apiBaseConfig, f"relayers/{relayerId}/allowlists", params
-            )
+                return await self._client._api.getApi(
+                    self._client._apiBaseConfig,
+                    f"relayers/{relayerId}/allowlists",
+                    params,
+                )
+            except Exception as error:
+                print("Failed to getRelayerAllowlistAddress:", error)
+                raise error
 
     _apiBaseConfig: dict[str, str] = PrivateAttr()
 
@@ -156,6 +210,7 @@ class Client(BaseModel):
     ) -> RelayerClient:
         relayer = await self._relayer.get(relayerId)
         if relayer:
+            # TODO
             pass
 
         auth = {

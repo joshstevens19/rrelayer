@@ -1,8 +1,9 @@
-from typing import Any
-import aiohttp
 import asyncio
-from pydantic import BaseModel, ConfigDict, PrivateAttr
 from base64 import b64encode
+from typing import Any
+
+import aiohttp
+from pydantic import BaseModel, ConfigDict, PrivateAttr
 
 
 class API(BaseModel):
@@ -18,7 +19,6 @@ class API(BaseModel):
             except RuntimeError:
                 # No running event loop (e.g., program exit) — close synchronously
                 asyncio.run(self._session.close())
-        print("Destroyed API Session")
 
     def build_headers(self, baseConfig: dict[str, str]) -> dict[str, str]:
         headers = {
@@ -54,6 +54,7 @@ class API(BaseModel):
         async with session.get(
             f"{baseConfig['serverURL']}/{endpoint}", headers=headers, params=params
         ) as response:
+            response.raise_for_status()
             return await response.json()
 
     async def postApi(
@@ -66,6 +67,7 @@ class API(BaseModel):
         async with session.post(
             f"{baseConfig['serverURL']}/{endpoint}", headers=headers, json=body
         ) as response:
+            response.raise_for_status()
             return await response.json()
 
     async def putApi(
@@ -78,6 +80,7 @@ class API(BaseModel):
         async with session.put(
             f"{baseConfig['serverURL']}/{endpoint}", headers=headers, json=body
         ) as response:
+            response.raise_for_status()
             return await response.json()
 
     async def deleteApi(
@@ -90,6 +93,7 @@ class API(BaseModel):
         async with session.delete(
             f"{baseConfig['serverURL']}/{endpoint}", headers=headers, json=body
         ) as response:
+            response.raise_for_status()
             return await response.json()
 
     async def close(self):
