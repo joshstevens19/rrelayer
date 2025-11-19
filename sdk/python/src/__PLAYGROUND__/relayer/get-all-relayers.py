@@ -4,13 +4,19 @@ from __PLAYGROUND__.helper import begin, end
 
 
 async def getAllRelayers():
-    client, _, rrelayer_node = await begin()
+    rrelayer_node = None
 
-    print("Getting all relayers...")
-    relayers = await client.relayer.getAll()
-    print("All relayers:", relayers)
+    try:
+        client, _, _, rrelayer_node = await begin()
 
-    end(rrelayer_node)
+        print("Getting all relayers...")
+        relayers = await client.relayer.getAll()
+        print("All relayers:", relayers)
+    except Exception as e:
+        print("getAllRelayers failed:", e)
+    finally:
+        if rrelayer_node is not None:
+            end(rrelayer_node)
 
 
 if __name__ == "__main__":

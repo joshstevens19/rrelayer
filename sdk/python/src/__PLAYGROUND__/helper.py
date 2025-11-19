@@ -349,7 +349,7 @@ async def begin(
             quiet=quiet,
         )
 
-        print("Relayer Info:", relayerInfo)
+        # print("Relayer Info:", relayerInfo)
 
         relayer = await client.getRelayerClient(
             relayerInfo["id"], config["providerUrl"]

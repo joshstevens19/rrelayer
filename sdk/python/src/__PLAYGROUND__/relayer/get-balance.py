@@ -3,16 +3,22 @@ import asyncio
 from __PLAYGROUND__.helper import begin, end
 
 
-async def pauseUnpause():
-    _, relayer, rrelayer_node = await begin()
+async def getBalance():
+    rrelayer_node = None
 
-    print("Pausing relayer...")
-    await relayer.pause()
-    print("Relayer balance:", balance, "ETH")
+    try:
+        _, relayer, _, rrelayer_node = await begin()
 
-    end(rrelayer_node)
+        print("Getting relayer balance...")
+        balance = await relayer.getBalanceOf()
+        print("Relayer balance:", balance, "ETH")
+    except Exception as e:
+        print("getBalance failed:", e)
+    finally:
+        if rrelayer_node is not None:
+            end(rrelayer_node)
 
 
 if __name__ == "__main__":
-    asyncio.run(pauseUnpause())
-    print("pause-unpause done")
+    asyncio.run(getBalance())
+    print("get-balance done")

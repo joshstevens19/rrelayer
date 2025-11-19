@@ -1,17 +1,22 @@
 import asyncio
-from datetime import datetime
 
 from __PLAYGROUND__.helper import begin, end
 
 
 async def getAddress():
-    _, relayer, rrelayer_node = await begin()
+    rrelayer_node = None
 
-    print("Getting relayer address...")
-    address = await relayer.address()
-    print("Relayer address:", address)
+    try:
+        _, relayer, _, rrelayer_node = await begin()
 
-    end(rrelayer_node)
+        print("Getting relayer address...")
+        address = await relayer.address()
+        print("Relayer address:", address)
+    except Exception as e:
+        print("getAddress failed:", e)
+    finally:
+        if rrelayer_node is not None:
+            end(rrelayer_node)
 
 
 if __name__ == "__main__":
