@@ -333,8 +333,9 @@ async def begin(
             raise Exception("Anvil failed to start")
 
         # Start running rrelayer service
-        if not isServerRunning():
-            rrelayer_node = startLocalNode(quiet)
+        if isServerRunning():
+            raise Exception("rrelayer node is already running")
+        rrelayer_node = startLocalNode(quiet)
 
         waitForServer()
 
@@ -354,7 +355,7 @@ async def begin(
             relayerInfo["id"], config["providerUrl"]
         )
 
-        return client, relayer, rrelayer_node
+        return client, relayer, relayerInfo, rrelayer_node
 
     except Exception as e:
         print(f"Error setting up RRelayer playground: {e}")
