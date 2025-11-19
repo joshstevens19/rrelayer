@@ -1,7 +1,8 @@
-from pydantic import BaseModel, ConfigDict, PrivateAttr
+from pydantic import BaseModel, ConfigDict, PrivateAttr, validate_call
 from web3 import AsyncWeb3, Web3
 from typing import Any
 from rrelayer.api import API
+from rrelayer.types import PagingContext, defaultPagingContext
 
 
 class RelayerClient(BaseModel):
@@ -9,12 +10,29 @@ class RelayerClient(BaseModel):
         def __init__(self, relayerClient: "RelayerClient"):
             self._relayer: "RelayerClient" = relayerClient
 
-        async def get(self):
-            pass
+        @validate_call
+        async def get(self, pagingContext: PagingContext = defaultPagingContext):
+            params = pagingContext.model_dump()
+
+            return await self._relayer._api.getApi(
+                self._relayer._apiBaseConfig,
+                f"relayers/{self._relayer._id}/allowlists",
+                params,
+            )
 
     class Sign:
         def __init__(self, relayerClient: "RelayerClient"):
             self._relayer: "RelayerClient" = relayerClient
+
+        @validate_call
+        async def text(self, message: str, rateLimitKey: str = ""):
+            pass
+
+        @validate_call
+        async def textHistory(
+            self, pagingContext: PagingContext = defaultPagingContext
+        ):
+            pass
 
     class Transaction:
         def __init__(self, relayerClient: "RelayerClient"):

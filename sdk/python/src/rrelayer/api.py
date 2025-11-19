@@ -71,8 +71,12 @@ class API(BaseModel):
             return await response.json()
 
     async def putApi(
-        self, baseConfig: dict[str, str], endpoint: str, body: dict[str, Any]
-    ) -> dict[str, Any]:
+        self,
+        baseConfig: dict[str, str],
+        endpoint: str,
+        body: dict[str, Any],
+        output: bool = False,
+    ):
         session = await self._get_session()
 
         headers = self.build_headers(baseConfig)
@@ -81,7 +85,8 @@ class API(BaseModel):
             f"{baseConfig['serverURL']}/{endpoint}", headers=headers, json=body
         ) as response:
             response.raise_for_status()
-            return await response.json()
+            if output:
+                return await response.json()
 
     async def deleteApi(
         self, baseConfig: dict[str, str], endpoint: str, body: dict = {}
@@ -94,7 +99,6 @@ class API(BaseModel):
             f"{baseConfig['serverURL']}/{endpoint}", headers=headers, json=body
         ) as response:
             response.raise_for_status()
-            return await response.json()
 
     async def close(self):
         if self._session and not self._session.closed:

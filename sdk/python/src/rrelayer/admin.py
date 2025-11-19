@@ -38,8 +38,13 @@ class AdminRelayerClient(RelayerClient):
     @validate_call
     async def updateEIP1559Status(self, status: bool):
         try:
+            statusValue = "false"
+            if status:
+                statusValue = "true"
             await self._api.putApi(
-                self._apiBaseConfig, f"relayers/{self._id}/gas/eip1559/{status}", {}
+                self._apiBaseConfig,
+                f"relayers/{self._id}/gas/eip1559/{statusValue}",
+                {},
             )
         except Exception as error:
             print("Failed to updateRelayerEIP1559Status:", error)
@@ -66,4 +71,12 @@ class AdminRelayerClient(RelayerClient):
 
     @validate_call
     async def clone(self, chainId: int, name: str):
-        pass
+        try:
+            return await self._api.postApi(
+                self._apiBaseConfig,
+                f"relayers/{self._id}/clone",
+                {"newRelayerName": name, "chainId": chainId},
+            )
+        except Exception as error:
+            print("Failed to clone relayer:", error)
+            raise error
