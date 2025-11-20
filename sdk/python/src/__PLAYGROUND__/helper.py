@@ -2,7 +2,7 @@ import subprocess
 from datetime import datetime
 from time import sleep
 
-from rrelayer.client import createClient
+from rrelayer import createClient
 
 config = {
     "serverUrl": "http://localhost:8000",
