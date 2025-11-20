@@ -1,6 +1,8 @@
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, PrivateAttr, validate_call
 from web3 import AsyncWeb3, Web3
-from typing import Any
+
 from rrelayer.api import API
 from rrelayer.types import PagingContext, defaultPagingContext
 
@@ -25,14 +27,68 @@ class RelayerClient(BaseModel):
             self._relayer: "RelayerClient" = relayerClient
 
         @validate_call
-        async def text(self, message: str, rateLimitKey: str = ""):
-            pass
+        async def text(self, text: str, rateLimitKey: str = ""):
+            try:
+                additionalHeaders = {}
+                if rateLimitKey:
+                    additionalHeaders["x-rrelayer-rate-limit-key"] = rateLimitKey
+
+                return await self._relayer._api.postApi(
+                    self._relayer._apiBaseConfig,
+                    f"signing/relayers/{self._relayer._id}/message",
+                    {"text": text},
+                    additionalHeaders,
+                )
+
+            except Exception as error:
+                print("Failed to signText", error)
+                raise error
 
         @validate_call
         async def textHistory(
             self, pagingContext: PagingContext = defaultPagingContext
         ):
-            pass
+            params = pagingContext.model_dump()
+
+            return await self._relayer._api.getApi(
+                self._relayer._apiBaseConfig,
+                f"signing/relayers/{self._relayer._id}/text-history",
+                params,
+            )
+
+        @validate_call
+        async def typedData(self, typedData: dict, rateLimitKey: str = ""):
+            try:
+                additionalHeaders = {}
+                if rateLimitKey:
+                    additionalHeaders["x-rrelayer-rate-limit-key"] = rateLimitKey
+
+                return await self._relayer._api.postApi(
+                    self._relayer._apiBaseConfig,
+                    f"signing/relayers/{self._relayer._id}/typed-data",
+                    typedData,
+                    additionalHeaders,
+                )
+
+            except Exception as error:
+                print("Failed to signText", error)
+                raise error
+
+        @validate_call
+        async def typedDataHistory(
+            self, pagingContext: PagingContext = defaultPagingContext
+        ):
+            try:
+                params = pagingContext.model_dump()
+
+                return await self._relayer._api.getApi(
+                    self._relayer._apiBaseConfig,
+                    f"signing/relayers/{self._relayer._id}/typed-data-history",
+                    params,
+                )
+            except Exception as error:
+                print("Failed to getSignedTypedDataHistory:", error)
+                raise error
 
     class Transaction:
         def __init__(self, relayerClient: "RelayerClient"):

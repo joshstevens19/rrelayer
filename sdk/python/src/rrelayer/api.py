@@ -20,7 +20,9 @@ class API(BaseModel):
                 # No running event loop (e.g., program exit) — close synchronously
                 asyncio.run(self._session.close())
 
-    def build_headers(self, baseConfig: dict[str, str]) -> dict[str, str]:
+    def build_headers(
+        self, baseConfig: dict[str, str], additionalHeaders: dict[str, str] = {}
+    ) -> dict[str, str]:
         headers = {
             "Content-Type": "application/json",
         }
@@ -36,6 +38,8 @@ class API(BaseModel):
             )
         else:
             raise ValueError("API::Invalid authentication credentials")
+
+        headers.update(additionalHeaders)
 
         return headers
 
@@ -58,11 +62,15 @@ class API(BaseModel):
             return await response.json()
 
     async def postApi(
-        self, baseConfig: dict[str, str], endpoint: str, body: dict[str, Any]
+        self,
+        baseConfig: dict[str, str],
+        endpoint: str,
+        body: dict[str, Any],
+        additionalHeaders: dict[str, str] = {},
     ) -> dict[str, Any]:
         session = await self._get_session()
 
-        headers = self.build_headers(baseConfig)
+        headers = self.build_headers(baseConfig, additionalHeaders)
 
         async with session.post(
             f"{baseConfig['serverURL']}/{endpoint}", headers=headers, json=body
