@@ -2,10 +2,10 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, PrivateAttr, validate_call
 
-from rrelayer.admin import AdminRelayerClient
-from rrelayer.api import API
-from rrelayer.relayer import RelayerClient
-from rrelayer.types import PagingContext, defaultPagingContext
+from .admin import AdminRelayerClient
+from .api import API
+from .relayer import RelayerClient
+from .types import PagingContext, defaultPagingContext
 
 
 class Client(BaseModel):

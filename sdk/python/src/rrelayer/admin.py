@@ -1,6 +1,6 @@
 from pydantic import validate_call
 
-from rrelayer.relayer import RelayerClient
+from .relayer import RelayerClient
 
 
 class AdminRelayerClient(RelayerClient):

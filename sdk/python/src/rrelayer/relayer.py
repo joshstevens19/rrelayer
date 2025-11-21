@@ -3,8 +3,8 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, PrivateAttr, validate_call
 from web3 import AsyncWeb3, Web3
 
-from rrelayer.api import API
-from rrelayer.types import PagingContext, defaultPagingContext
+from .api import API
+from .types import PagingContext, TransactionToSend, defaultPagingContext
 
 
 class RelayerClient(BaseModel):
@@ -94,23 +94,108 @@ class RelayerClient(BaseModel):
         def __init__(self, relayerClient: "RelayerClient"):
             self._relayer: "RelayerClient" = relayerClient
 
-        async def get(self):
-            pass
+        @validate_call
+        async def get(self, transactionId: str):
+            try:
+                return await self._relayer._api.getApi(
+                    self._relayer._apiBaseConfig,
+                    f"transactions/{transactionId}",
+                )
+            except Exception as error:
+                print("Failed to fetch getTransaction:", error)
+                raise error
 
-        async def getStatus(self):
-            pass
+        @validate_call
+        async def getStatus(self, transactionId: str):
+            try:
+                return await self._relayer._api.getApi(
+                    self._relayer._apiBaseConfig,
+                    f"transactions/status/{transactionId}",
+                )
+            except Exception as error:
+                print("Failed to fetch getTransactionStatus:", error)
+                raise error
 
-        async def getAll(self):
-            pass
+        @validate_call
+        async def getAll(self, pagingContext: PagingContext = defaultPagingContext):
+            try:
+                params = pagingContext.model_dump()
 
-        async def replace(self):
-            pass
+                return await self._relayer._api.getApi(
+                    self._relayer._apiBaseConfig,
+                    f"transactions/relayers/{self._relayer._id}",
+                    params,
+                )
+            except Exception as error:
+                print("Failed to fetch getTransactions:", error)
+                raise error
 
-        async def cancel(self):
-            pass
+        @validate_call
+        async def replace(
+            self,
+            transactionId: str,
+            replacementTransaction: TransactionToSend,
+            rateLimitKey: str = "",
+        ):
+            try:
+                params = replacementTransaction.model_dump()
+                additionalHeaders = {}
+                if rateLimitKey:
+                    additionalHeaders["x-rrelayer-rate-limit-key"] = rateLimitKey
 
-        async def send(self):
-            pass
+                return await self._relayer._api.putApi(
+                    self._relayer._apiBaseConfig,
+                    f"transactions/replace/{transactionId}",
+                    params,
+                    output=True,
+                    additionalHeaders=additionalHeaders,
+                )
+
+            except Exception as error:
+                print("Failed to sendTransaction", error)
+                raise error
+
+        @validate_call
+        async def cancel(
+            self,
+            transactionId: str,
+            rateLimitKey: str = "",
+        ):
+            try:
+                additionalHeaders = {}
+                if rateLimitKey:
+                    additionalHeaders["x-rrelayer-rate-limit-key"] = rateLimitKey
+
+                return await self._relayer._api.putApi(
+                    self._relayer._apiBaseConfig,
+                    f"transactions/cancel/{transactionId}",
+                    {},
+                    output=True,
+                    additionalHeaders=additionalHeaders,
+                )
+
+            except Exception as error:
+                print("Failed to cancelTransaction", error)
+                raise error
+
+        @validate_call
+        async def send(self, transaction: TransactionToSend, rateLimitKey: str = ""):
+            try:
+                params = transaction.model_dump()
+                additionalHeaders = {}
+                if rateLimitKey:
+                    additionalHeaders["x-rrelayer-rate-limit-key"] = rateLimitKey
+
+                return await self._relayer._api.postApi(
+                    self._relayer._apiBaseConfig,
+                    f"transactions/relayers/{self._relayer._id}/send",
+                    params,
+                    additionalHeaders,
+                )
+
+            except Exception as error:
+                print("Failed to sendTransaction", error)
+                raise error
 
     _id: str = PrivateAttr()
 
