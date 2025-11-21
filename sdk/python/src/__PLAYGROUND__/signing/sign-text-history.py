@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime
 
 from __PLAYGROUND__.helper import begin, end
 
@@ -7,6 +8,11 @@ async def signTextHistory():
     rrelayer_node = None
     try:
         _, relayer, _, rrelayer_node = await begin()
+
+        print("Signing text message...")
+
+        message = f"Hello from SDK test at {datetime.now().isoformat()}"
+        await relayer.sign.text(message)
 
         print("Getting signing text history...")
         result = await relayer.sign.textHistory({"limit": 100, "offset": 0})
