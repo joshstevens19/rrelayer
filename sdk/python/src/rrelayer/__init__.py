@@ -1,6 +1,7 @@
 from .admin import AdminRelayerClient
 from .client import Client, createClient, createRelayerClient
 from .relayer import RelayerClient
+from .types import TransactionSpeed
 
 __all__ = [
     "AdminRelayerClient",
@@ -8,4 +9,5 @@ __all__ = [
     "createClient",
     "createRelayerClient",
     "RelayerClient",
+    "TransactionSpeed",
 ]
