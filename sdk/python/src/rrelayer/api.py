@@ -84,10 +84,11 @@ class API(BaseModel):
         endpoint: str,
         body: dict[str, Any],
         output: bool = False,
+        additionalHeaders: dict[str, str] = {},
     ):
         session = await self._get_session()
 
-        headers = self.build_headers(baseConfig)
+        headers = self.build_headers(baseConfig, additionalHeaders)
 
         async with session.put(
             f"{baseConfig['serverURL']}/{endpoint}", headers=headers, json=body
@@ -98,7 +99,7 @@ class API(BaseModel):
 
     async def deleteApi(
         self, baseConfig: dict[str, str], endpoint: str, body: dict = {}
-    ) -> dict[str, Any]:
+    ):
         session = await self._get_session()
 
         headers = self.build_headers(baseConfig)
