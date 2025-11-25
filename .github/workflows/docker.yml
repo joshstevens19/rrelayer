@@ -246,15 +246,21 @@ jobs:
       - name: Create and push multi-arch manifest
         run: |
           # Extract tags from metadata output
+          # The metadata action outputs full image references, so we need to extract just the tag part
           TAGS="${{ steps.meta.outputs.tags }}"
           
           # Create multi-arch manifest using docker buildx imagetools
           # This combines the amd64 and arm64 images that were already pushed with -amd64 and -arm64 suffixes
           
-          echo "$TAGS" | tr ',' '\n' | while IFS= read -r tag; do
-            tag=$(echo "$tag" | xargs)  # trim whitespace
-            if [ -n "$tag" ]; then
-              echo "Creating multi-arch manifest for $tag"
+          echo "$TAGS" | tr ',' '\n' | while IFS= read -r full_tag; do
+            full_tag=$(echo "$full_tag" | xargs)  # trim whitespace
+            if [ -n "$full_tag" ]; then
+              # Extract just the tag portion (everything after the last colon)
+              tag="${full_tag##*:}"
+              echo "Creating multi-arch manifest for tag: $tag"
+              echo "  Full reference: $full_tag"
+              echo "  AMD64 reference: ${{ env.IMAGE }}:${tag}-amd64"
+              echo "  ARM64 reference: ${{ env.IMAGE }}:${tag}-arm64"
               # Use imagetools to create manifest from existing architecture-specific images
               docker buildx imagetools create -t "${{ env.IMAGE }}:$tag" \
                 "${{ env.IMAGE }}:${tag}-amd64" \
