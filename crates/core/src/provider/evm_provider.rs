@@ -416,6 +416,15 @@ impl EvmProvider {
         address: &EvmAddress,
     ) -> Result<alloy::primitives::U256, RpcError<TransportErrorKind>> {
         let balance = self.rpc_client().get_balance(address.into_address()).await?;
+
+        // Validate balance is within the u128 bounds
+        if balance > alloy::primitives::U256::from(u128::MAX) {
+            return Err(RpcError::Transport(TransportErrorKind::Custom(
+                format!("Invalid balance {} exceeds u128::MAX for address {}", balance, address)
+                    .into(),
+            )));
+        }
+
         Ok(balance)
     }
 

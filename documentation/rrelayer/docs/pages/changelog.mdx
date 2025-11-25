@@ -10,6 +10,7 @@
 
 ### Bug fixes
 
+- fix: prevent panic when RPC returns invalid balance data that exceeds u128::MAX
 - fix: use correct serialization function for ERC20 tokens in topup flow
 - fix: Rust SDK now passes API key in `x-rrelayer-api-key` header instead of `Authorization` header
 - fix: extra checks for the auto top-up background task to make sure they have eth and tokens

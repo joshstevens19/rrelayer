@@ -244,7 +244,7 @@ impl AutomaticTopUpTask {
         let mut addresses_needing_top_up = Vec::new();
 
         for address in relayer_addresses {
-            match provider.rpc_client().get_balance((*address).into()).await {
+            match provider.get_balance(address).await {
                 Ok(balance) => {
                     if balance < native_config.min_balance {
                         info!(
@@ -668,8 +668,7 @@ impl AutomaticTopUpTask {
         total_relayers_to_top_up: usize,
     ) -> Result<bool, String> {
         let balance = provider
-            .rpc_client()
-            .get_balance((*from_address).into())
+            .get_balance(from_address)
             .await
             .map_err(|e| format!("Failed to get from_address balance: {}", e))?;
 
@@ -821,10 +820,9 @@ impl AutomaticTopUpTask {
             token_config.address
         );
 
-        let native_balance =
-            provider.rpc_client().get_balance((*from_address).into()).await.map_err(|e| {
-                format!("Failed to get from_address native balance for gas check: {}", e)
-            })?;
+        let native_balance = provider.get_balance(from_address).await.map_err(|e| {
+            format!("Failed to get from_address native balance for gas check: {}", e)
+        })?;
 
         info!(
             "From address {} has native balance: {} ETH for gas",
