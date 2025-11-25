@@ -1,6 +1,6 @@
-use std::{sync::Arc, time::Duration};
-
 use alloy::primitives::utils::{format_ether, parse_ether};
+use alloy::primitives::U256;
+use std::{sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 use tracing::{error, info, warn};
 
@@ -10,13 +10,11 @@ use crate::{
     shutdown::subscribe_to_shutdown, webhooks::WebhookManager,
 };
 
-fn get_minimum_balance_threshold(chain_id: &ChainId) -> u128 {
+fn get_minimum_balance_threshold(chain_id: &ChainId) -> U256 {
     if chain_id.u64() == 1 {
-        let value = parse_ether("0.005").expect("Failed to parse native token threshold");
-        value.to::<u128>()
+        parse_ether("0.005").expect("Failed to parse native token threshold")
     } else {
-        let value = parse_ether("0.001").expect("Failed to parse native token threshold");
-        value.to::<u128>()
+        parse_ether("0.001").expect("Failed to parse native token threshold")
     }
 }
 
@@ -61,8 +59,8 @@ async fn check_balances_for_chain(
     webhook_manager: &Option<Arc<Mutex<WebhookManager>>>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let chain_id = provider.chain_id;
-    let min_balance_wei = get_minimum_balance_threshold(&chain_id);
-    let min_balance_formatted = format_ether(min_balance_wei);
+    let min_balance = get_minimum_balance_threshold(&chain_id);
+    let min_balance_formatted = format_ether(min_balance);
 
     info!("Checking balances for chain {} (minimum: {} ETH)", chain_id, min_balance_formatted);
 
@@ -70,11 +68,9 @@ async fn check_balances_for_chain(
 
     for relayer in relayers {
         match provider.get_balance(&relayer.address).await {
-            Ok(balance_wei) => {
-                let balance_u128: u128 = balance_wei.to::<u128>();
-
-                if balance_u128 < min_balance_wei {
-                    let balance_formatted = format_ether(balance_wei);
+            Ok(balance) => {
+                if balance < min_balance {
+                    let balance_formatted = format_ether(balance);
 
                     warn!(
                         "Low balance warning: relayer {} (ID: {}) on chain {} has balance {} ETH (minimum recommended: {} ETH)",
@@ -91,15 +87,15 @@ async fn check_balances_for_chain(
                             &relayer.id.to_string(),
                             &relayer.address,
                             &chain_id,
-                            balance_u128,
-                            min_balance_wei,
+                            balance,
+                            min_balance,
                             balance_formatted,
                             min_balance_formatted.clone(),
                         )
                         .await;
                     }
                 } else {
-                    let balance_formatted = format_ether(balance_wei);
+                    let balance_formatted = format_ether(balance);
                     info!(
                         "Balance OK: relayer {} (ID: {}) on chain {} has balance {} ETH",
                         relayer.address, relayer.id, chain_id, balance_formatted
@@ -124,8 +120,8 @@ async fn send_low_balance_webhook(
     relayer_id: &str,
     address: &EvmAddress,
     chain_id: &ChainId,
-    current_balance: u128,
-    minimum_balance: u128,
+    current_balance: U256,
+    minimum_balance: U256,
     current_balance_formatted: String,
     minimum_balance_formatted: String,
 ) {

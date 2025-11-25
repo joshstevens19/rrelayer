@@ -1,3 +1,4 @@
+use alloy::primitives::U256;
 use std::{
     collections::HashMap,
     sync::Arc,
@@ -439,8 +440,8 @@ impl WebhookManager {
         relayer_id: &str,
         address: &crate::common_types::EvmAddress,
         chain_id: ChainId,
-        current_balance: u128,
-        minimum_balance: u128,
+        current_balance: U256,
+        minimum_balance: U256,
         current_balance_formatted: String,
         minimum_balance_formatted: String,
     ) {

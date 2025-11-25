@@ -1,4 +1,5 @@
 use crate::{network::ChainId, shared::common_types::EvmAddress};
+use alloy::primitives::U256;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -51,8 +52,8 @@ impl WebhookLowBalancePayload {
         relayer_id: String,
         address: EvmAddress,
         chain_id: ChainId,
-        current_balance: u128,
-        minimum_balance: u128,
+        current_balance: U256,
+        minimum_balance: U256,
         current_balance_formatted: String,
         minimum_balance_formatted: String,
     ) -> Self {
