@@ -8,25 +8,53 @@ on:
 
 env:
   REGISTRY: ghcr.io
+  IMAGE: ghcr.io/${{ github.repository }}
 
 jobs:
-  build:
+  build-amd64:
+    name: Build AMD64 Docker Image
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-    strategy:
-      matrix:
-        include:
-          - dockerfile: Dockerfile
-            image: ghcr.io/${{ github.repository }}
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Login against a Docker registry
-      # https://github.com/docker/login-action
+      - name: Create docker-binary directory
+        run: mkdir -p docker-binary
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: x86_64-unknown-linux-gnu-docker
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y libssl-dev pkg-config
+
+      - name: Build Rust binary
+        working-directory: crates/cli
+        env:
+          RUSTFLAGS: '-C target-cpu=x86-64-v2'
+        run: |
+          cargo build --release --target x86_64-unknown-linux-gnu --features jemalloc
+
+      - name: Prepare binary for Docker
+        run: |
+          mkdir -p docker-binary
+          cp target/x86_64-unknown-linux-gnu/release/rrelayer_cli docker-binary/rrelayer_cli
+          chmod +x docker-binary/rrelayer_cli
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Log into registry ${{ env.REGISTRY }}
         uses: docker/login-action@v3
         with:
@@ -34,26 +62,208 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Extract metadata (tags, labels) for Docker
-      # https://github.com/docker/metadata-action
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ matrix.image }}
+          images: ${{ env.IMAGE }}
           tags: |
+            type=schedule
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
             type=sha
             type=sha,format=long
-            # set latest tag for default branch
             type=raw,value=latest,enable={{is_default_branch}}
 
-      # Build and push Docker image with Buildx
-      # https://github.com/docker/build-push-action
-      - name: Build and push Docker image
+      - name: Add architecture suffix to tags
+        id: tags
+        run: |
+          TAGS="${{ steps.meta.outputs.tags }}"
+          TAGS_WITH_SUFFIX=""
+          IFS=',' read -ra TAG_ARRAY <<< "$TAGS"
+          for tag in "${TAG_ARRAY[@]}"; do
+            tag=$(echo "$tag" | xargs)  # trim whitespace
+            if [ -n "$tag" ]; then
+              if [ -n "$TAGS_WITH_SUFFIX" ]; then
+                TAGS_WITH_SUFFIX="$TAGS_WITH_SUFFIX,$tag-amd64"
+              else
+                TAGS_WITH_SUFFIX="$tag-amd64"
+              fi
+            fi
+          done
+          echo "tags=$TAGS_WITH_SUFFIX" >> $GITHUB_OUTPUT
+
+      - name: Build and push AMD64 Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ${{ matrix.dockerfile }}
+          file: ./Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ steps.tags.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  build-arm64:
+    name: Build ARM64 Docker Image
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create docker-binary directory
+        run: mkdir -p docker-binary
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-gnu
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: aarch64-unknown-linux-gnu-docker
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y libssl-dev pkg-config
+
+      - name: Build Rust binary
+        working-directory: crates/cli
+        env:
+          RUSTFLAGS: '-C target-cpu=neoverse-n1'
+        run: |
+          cargo build --release --target aarch64-unknown-linux-gnu
+
+      - name: Prepare binary for Docker
+        run: |
+          mkdir -p docker-binary
+          cp target/aarch64-unknown-linux-gnu/release/rrelayer_cli docker-binary/rrelayer_cli
+          chmod +x docker-binary/rrelayer_cli
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log into registry ${{ env.REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=schedule
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha
+            type=sha,format=long
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Add architecture suffix to tags
+        id: tags
+        run: |
+          TAGS="${{ steps.meta.outputs.tags }}"
+          TAGS_WITH_SUFFIX=""
+          IFS=',' read -ra TAG_ARRAY <<< "$TAGS"
+          for tag in "${TAG_ARRAY[@]}"; do
+            tag=$(echo "$tag" | xargs)  # trim whitespace
+            if [ -n "$tag" ]; then
+              if [ -n "$TAGS_WITH_SUFFIX" ]; then
+                TAGS_WITH_SUFFIX="$TAGS_WITH_SUFFIX,$tag-arm64"
+              else
+                TAGS_WITH_SUFFIX="$tag-arm64"
+              fi
+            fi
+          done
+          echo "tags=$TAGS_WITH_SUFFIX" >> $GITHUB_OUTPUT
+
+      - name: Build and push ARM64 Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/arm64
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  create-manifest:
+    name: Create Multi-Arch Manifest
+    runs-on: ubuntu-latest
+    needs: [build-amd64, build-arm64]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log into registry ${{ env.REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=schedule
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha
+            type=sha,format=long
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Create and push multi-arch manifest
+        run: |
+          # Extract tags from metadata output
+          # The metadata action outputs full image references, so we need to extract just the tag part
+          TAGS="${{ steps.meta.outputs.tags }}"
+          
+          # Create multi-arch manifest using docker buildx imagetools
+          # This combines the amd64 and arm64 images that were already pushed with -amd64 and -arm64 suffixes
+          
+          echo "$TAGS" | tr ',' '\n' | while IFS= read -r full_tag; do
+            full_tag=$(echo "$full_tag" | xargs)  # trim whitespace
+            if [ -n "$full_tag" ]; then
+              # Extract just the tag portion (everything after the last colon)
+              tag="${full_tag##*:}"
+              echo "Creating multi-arch manifest for tag: $tag"
+              echo "  Full reference: $full_tag"
+              echo "  AMD64 reference: ${{ env.IMAGE }}:${tag}-amd64"
+              echo "  ARM64 reference: ${{ env.IMAGE }}:${tag}-arm64"
+              # Use imagetools to create manifest from existing architecture-specific images
+              docker buildx imagetools create -t "${{ env.IMAGE }}:$tag" \
+                "${{ env.IMAGE }}:${tag}-amd64" \
+                "${{ env.IMAGE }}:${tag}-arm64" || echo "Failed to create manifest for $tag"
+            fi
+          done
