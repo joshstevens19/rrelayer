@@ -1,6 +1,6 @@
 use crate::common_types::EvmAddress;
 use crate::network::ChainId;
-use crate::wallet::{WalletError, WalletManagerTrait};
+use crate::wallet::{WalletError, WalletManagerChainId, WalletManagerTrait};
 use crate::yaml::Pkcs11SigningProviderConfig;
 use alloy::consensus::{SignableTransaction, TypedTransaction};
 use alloy::dyn_abi::TypedData;
@@ -407,18 +407,18 @@ impl WalletManagerTrait for Pkcs11WalletManager {
     async fn create_wallet(
         &self,
         wallet_index: u32,
-        chain_id: &ChainId,
+        chain_id: WalletManagerChainId,
     ) -> Result<EvmAddress, WalletError> {
-        let address = self.get_public_key(wallet_index, chain_id).await?;
+        let address = self.get_public_key(wallet_index, chain_id.main()).await?;
         Ok(EvmAddress::from(address))
     }
 
     async fn get_address(
         &self,
         wallet_index: u32,
-        chain_id: &ChainId,
+        chain_id: WalletManagerChainId,
     ) -> Result<EvmAddress, WalletError> {
-        let address = self.get_public_key(wallet_index, chain_id).await?;
+        let address = self.get_public_key(wallet_index, chain_id.main()).await?;
         Ok(EvmAddress::from(address))
     }
 
@@ -426,32 +426,32 @@ impl WalletManagerTrait for Pkcs11WalletManager {
         &self,
         wallet_index: u32,
         transaction: &TypedTransaction,
-        chain_id: &ChainId,
+        chain_id: WalletManagerChainId,
     ) -> Result<Signature, WalletError> {
         let tx_hash = transaction.signature_hash();
-        self.sign_hash(wallet_index, &tx_hash, chain_id).await
+        self.sign_hash(wallet_index, &tx_hash, chain_id.main()).await
     }
 
     async fn sign_text(
         &self,
         wallet_index: u32,
         text: &str,
-        chain_id: &ChainId,
+        chain_id: WalletManagerChainId,
     ) -> Result<Signature, WalletError> {
         let message = format!("\x19Ethereum Signed Message:\n{}{}", text.len(), text);
         let hash = keccak256(message.as_bytes());
 
-        self.sign_hash(wallet_index, &hash, chain_id).await
+        self.sign_hash(wallet_index, &hash, chain_id.main()).await
     }
 
     async fn sign_typed_data(
         &self,
         wallet_index: u32,
         typed_data: &TypedData,
-        chain_id: &ChainId,
+        chain_id: WalletManagerChainId,
     ) -> Result<Signature, WalletError> {
         let hash = typed_data.eip712_signing_hash()?;
-        self.sign_hash(wallet_index, &hash, chain_id).await
+        self.sign_hash(wallet_index, &hash, chain_id.main()).await
     }
 
     fn supports_blobs(&self) -> bool {

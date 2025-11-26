@@ -280,36 +280,38 @@ impl SafeProxyManager {
     /// Creates a signature for a Safe transaction.
     pub async fn create_safe_signature(
         &self,
-        provider: &EvmProvider,
-        wallet_index: u32,
-        safe_address: &EvmAddress,
-        safe_tx: &SafeTransaction,
-        chain_id: u64,
+        _provider: &EvmProvider,
+        _wallet_index: u32,
+        _safe_address: &EvmAddress,
+        _safe_tx: &SafeTransaction,
+        _chain_id: u64,
     ) -> Result<Bytes, SafeProxyError> {
-        let tx_hash = self.get_safe_transaction_hash(safe_address, safe_tx, chain_id)?;
+        // let tx_hash = self.get_safe_transaction_hash(safe_address, safe_tx, chain_id)?;
 
-        let hash_hex = format!("0x{}", hex::encode(tx_hash));
+        // let hash_hex = format!("0x{}", hex::encode(tx_hash));
 
         // Sign the hash as text using the provider's text signing capability
-        match provider.sign_text(&wallet_index, &hash_hex).await {
-            Ok(signature) => {
-                // Convert signature to Safe format: r + s + v
-                // Safe expects v = recovery_id + 4 for ECDSA signatures
-                let mut sig_bytes = Vec::new();
-                sig_bytes.extend_from_slice(&signature.r().to_be_bytes::<32>());
-                sig_bytes.extend_from_slice(&signature.s().to_be_bytes::<32>());
+        // match provider.sign_text(&wallet_index, &hash_hex).await {
+        //     Ok(signature) => {
+        //         // Convert signature to Safe format: r + s + v
+        //         // Safe expects v = recovery_id + 4 for ECDSA signatures
+        //         let mut sig_bytes = Vec::new();
+        //         sig_bytes.extend_from_slice(&signature.r().to_be_bytes::<32>());
+        //         sig_bytes.extend_from_slice(&signature.s().to_be_bytes::<32>());
+        //
+        //         // Safe requires v = recovery_id + 4 for ECDSA signatures
+        //         let recovery_id = if signature.v() { 1u8 } else { 0u8 };
+        //         sig_bytes.push(recovery_id + 4);
+        //
+        //         Ok(sig_bytes.into())
+        //     }
+        //     Err(e) => Err(SafeProxyError::SignatureError(format!(
+        //         "Failed to sign Safe transaction: {}",
+        //         e
+        //     ))),
+        // }
 
-                // Safe requires v = recovery_id + 4 for ECDSA signatures
-                let recovery_id = if signature.v() { 1u8 } else { 0u8 };
-                sig_bytes.push(recovery_id + 4);
-
-                Ok(sig_bytes.into())
-            }
-            Err(e) => Err(SafeProxyError::SignatureError(format!(
-                "Failed to sign Safe transaction: {}",
-                e
-            ))),
-        }
+        unimplemented!("Safe signatures are not supported yet.")
     }
 
     /// Creates a Safe transaction with proper nonce and signature, ready for execution.

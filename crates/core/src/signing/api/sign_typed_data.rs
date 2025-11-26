@@ -75,10 +75,7 @@ pub async fn sign_typed_data(
 
         let signature = relayer_provider_context
             .provider
-            .sign_typed_data(
-                &relayer_provider_context.relayer.wallet_index_type().index(),
-                &typed_data,
-            )
+            .sign_typed_data(&relayer_provider_context.relayer, &typed_data)
             .await?;
 
         let record_request = RecordSignedTypedDataRequest {

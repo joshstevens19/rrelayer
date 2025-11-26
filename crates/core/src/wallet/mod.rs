@@ -119,39 +119,71 @@ impl From<alloy::dyn_abi::Error> for WalletError {
     }
 }
 
+pub struct WalletManagerCloneChain {
+    pub cloned_from: ChainId,
+    pub cloned_to: ChainId,
+}
+
+pub enum WalletManagerChainId {
+    ChainId(ChainId),
+    Cloned(WalletManagerCloneChain),
+}
+
+impl WalletManagerChainId {
+    pub fn main(&self) -> &ChainId {
+        match self {
+            WalletManagerChainId::ChainId(chain_id) => chain_id,
+            WalletManagerChainId::Cloned(chain) => &chain.cloned_to,
+        }
+    }
+
+    pub fn cloned_from_chain_id_or_default(&self) -> &ChainId {
+        match self {
+            WalletManagerChainId::ChainId(chain_id) => chain_id,
+            WalletManagerChainId::Cloned(chain) => &chain.cloned_from,
+        }
+    }
+}
+
+impl From<ChainId> for WalletManagerChainId {
+    fn from(chain_id: ChainId) -> Self {
+        WalletManagerChainId::ChainId(chain_id)
+    }
+}
+
 #[async_trait]
 pub trait WalletManagerTrait: Send + Sync {
     async fn create_wallet(
         &self,
         wallet_index: u32,
-        chain_id: &ChainId,
+        chain_id: WalletManagerChainId,
     ) -> Result<EvmAddress, WalletError>;
 
     async fn get_address(
         &self,
         wallet_index: u32,
-        chain_id: &ChainId,
+        chain_id: WalletManagerChainId,
     ) -> Result<EvmAddress, WalletError>;
 
     async fn sign_transaction(
         &self,
         wallet_index: u32,
         transaction: &TypedTransaction,
-        chain_id: &ChainId,
+        chain_id: WalletManagerChainId,
     ) -> Result<Signature, WalletError>;
 
     async fn sign_text(
         &self,
         wallet_index: u32,
         text: &str,
-        chain_id: &ChainId,
+        chain_id: WalletManagerChainId,
     ) -> Result<Signature, WalletError>;
 
     async fn sign_typed_data(
         &self,
         wallet_index: u32,
         typed_data: &TypedData,
-        chain_id: &ChainId,
+        chain_id: WalletManagerChainId,
     ) -> Result<Signature, WalletError>;
 
     /// Returns whether this wallet manager supports EIP-4844 blob transactions

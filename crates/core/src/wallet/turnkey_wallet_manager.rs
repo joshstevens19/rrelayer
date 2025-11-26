@@ -1,6 +1,5 @@
 use crate::common_types::EvmAddress;
-use crate::network::ChainId;
-use crate::wallet::{WalletError, WalletManagerTrait};
+use crate::wallet::{WalletError, WalletManagerChainId, WalletManagerTrait};
 use crate::yaml::TurnkeySigningProviderConfig;
 use alloy::consensus::{TxEnvelope, TypedTransaction};
 use alloy::dyn_abi::TypedData;
@@ -233,7 +232,7 @@ impl WalletManagerTrait for TurnkeyWalletManager {
     async fn create_wallet(
         &self,
         wallet_index: u32,
-        _chain_id: &ChainId,
+        _chain_id: WalletManagerChainId,
     ) -> Result<EvmAddress, WalletError> {
         self.load_accounts().await?;
 
@@ -351,7 +350,7 @@ impl WalletManagerTrait for TurnkeyWalletManager {
     async fn get_address(
         &self,
         wallet_index: u32,
-        chain_id: &ChainId,
+        chain_id: WalletManagerChainId,
     ) -> Result<EvmAddress, WalletError> {
         self.create_wallet(wallet_index, chain_id).await
     }
@@ -360,11 +359,12 @@ impl WalletManagerTrait for TurnkeyWalletManager {
         &self,
         wallet_index: u32,
         transaction: &TypedTransaction,
-        chain_id: &ChainId,
+        chain_id: WalletManagerChainId,
     ) -> Result<Signature, WalletError> {
         info!(
             "Turnkey sign_transaction called - wallet_index: {}, chain_id: {}",
-            wallet_index, chain_id
+            wallet_index,
+            chain_id.main()
         );
 
         let accounts = self.accounts.lock().await;
@@ -588,7 +588,7 @@ impl WalletManagerTrait for TurnkeyWalletManager {
         &self,
         wallet_index: u32,
         text: &str,
-        _chain_id: &ChainId,
+        _chain_id: WalletManagerChainId,
     ) -> Result<Signature, WalletError> {
         info!("Turnkey sign_text called - wallet_index: {}, text: '{}'", wallet_index, text);
 
@@ -721,7 +721,7 @@ impl WalletManagerTrait for TurnkeyWalletManager {
         &self,
         wallet_index: u32,
         typed_data: &TypedData,
-        _chain_id: &ChainId,
+        _chain_id: WalletManagerChainId,
     ) -> Result<Signature, WalletError> {
         let accounts = self.accounts.lock().await;
         let _ = accounts

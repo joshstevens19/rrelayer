@@ -1,6 +1,6 @@
 use crate::common_types::EvmAddress;
 use crate::network::ChainId;
-use crate::wallet::{WalletError, WalletManagerTrait};
+use crate::wallet::{WalletError, WalletManagerChainId, WalletManagerTrait};
 use crate::yaml::AwsKmsSigningProviderConfig;
 use alloy::consensus::TypedTransaction;
 use alloy::dyn_abi::TypedData;
@@ -34,6 +34,21 @@ pub struct AwsKmsWalletManager {
     signers: Arc<RwLock<HashMap<(u32, u64), AwsSigner>>>,
 }
 
+#[derive(Debug)]
+pub enum GetOrCreateKeyId {
+    Created(String),
+    Existing(String),
+}
+
+impl GetOrCreateKeyId {
+    pub fn item(&self) -> &str {
+        match self {
+            Self::Created(key_id) => key_id,
+            Self::Existing(key_id) => key_id,
+        }
+    }
+}
+
 impl AwsKmsWalletManager {
     pub fn new(config: AwsKmsSigningProviderConfig) -> Self {
         Self {
@@ -62,11 +77,11 @@ impl AwsKmsWalletManager {
         &self,
         wallet_index: u32,
         chain_id: &ChainId,
-    ) -> Result<String, WalletError> {
+    ) -> Result<GetOrCreateKeyId, WalletError> {
         self.validate_aws_config().await?;
         match self.find_key_by_alias(wallet_index, chain_id).await {
             Ok(key_id) => {
-                return Ok(key_id);
+                return Ok(GetOrCreateKeyId::Existing(key_id));
             }
             Err(e) => {
                 debug!("AWS KMS: No existing key found: {}", e);
@@ -76,7 +91,7 @@ impl AwsKmsWalletManager {
         info!("AWS KMS: Creating new key for wallet_index {}", wallet_index);
         let key_id = self.create_key_for_wallet_index(wallet_index, chain_id).await?;
         info!("AWS KMS: Successfully created new key: {}", key_id);
-        Ok(key_id)
+        Ok(GetOrCreateKeyId::Created(key_id))
     }
 
     async fn validate_aws_config(&self) -> Result<(), WalletError> {
@@ -159,10 +174,10 @@ impl AwsKmsWalletManager {
     async fn get_or_initialize_signer(
         &self,
         wallet_index: u32,
-        chain_id: &ChainId,
+        chain_id: WalletManagerChainId,
     ) -> Result<AwsSigner, WalletError> {
-        let chain_id_u64 = chain_id.u64();
-        let cache_key = (wallet_index, chain_id_u64);
+        let lookup_chain_id = chain_id.cloned_from_chain_id_or_default();
+        let cache_key = (wallet_index, lookup_chain_id.u64());
 
         {
             let signers = self.signers.read().await;
@@ -171,8 +186,15 @@ impl AwsKmsWalletManager {
             }
         }
 
-        let key_id = self.get_or_create_key_id(wallet_index, chain_id).await?;
-        let signer = self.initialize_aws_kms_signer(&key_id, Some(chain_id_u64)).await?;
+        let key_id = self.get_or_create_key_id(wallet_index, lookup_chain_id).await?;
+        if matches!(chain_id, WalletManagerChainId::Cloned(_))
+            && matches!(key_id, GetOrCreateKeyId::Created(_))
+        {
+            error!("AWS KMS: Cloned wallets should never create new KMS keys and always use the existing something is wrong...");
+        }
+
+        let signer =
+            self.initialize_aws_kms_signer(key_id.item(), Some(chain_id.main().u64())).await?;
 
         {
             let mut signers = self.signers.write().await;
@@ -375,7 +397,7 @@ impl WalletManagerTrait for AwsKmsWalletManager {
     async fn create_wallet(
         &self,
         wallet_index: u32,
-        chain_id: &ChainId,
+        chain_id: WalletManagerChainId,
     ) -> Result<EvmAddress, WalletError> {
         let signer = self.get_or_initialize_signer(wallet_index, chain_id).await?;
         let address = EvmAddress::from(alloy::signers::Signer::address(&signer));
@@ -386,7 +408,7 @@ impl WalletManagerTrait for AwsKmsWalletManager {
     async fn get_address(
         &self,
         wallet_index: u32,
-        chain_id: &ChainId,
+        chain_id: WalletManagerChainId,
     ) -> Result<EvmAddress, WalletError> {
         let signer = self.get_or_initialize_signer(wallet_index, chain_id).await?;
         Ok(EvmAddress::from(alloy::signers::Signer::address(&signer)))
@@ -396,7 +418,7 @@ impl WalletManagerTrait for AwsKmsWalletManager {
         &self,
         wallet_index: u32,
         transaction: &TypedTransaction,
-        chain_id: &ChainId,
+        chain_id: WalletManagerChainId,
     ) -> Result<Signature, WalletError> {
         let signer = self.get_or_initialize_signer(wallet_index, chain_id).await?;
 
@@ -430,7 +452,7 @@ impl WalletManagerTrait for AwsKmsWalletManager {
         &self,
         wallet_index: u32,
         text: &str,
-        chain_id: &ChainId,
+        chain_id: WalletManagerChainId,
     ) -> Result<Signature, WalletError> {
         let signer = self.get_or_initialize_signer(wallet_index, chain_id).await?;
         let signature = signer.sign_message(text.as_bytes()).await?;
@@ -441,7 +463,7 @@ impl WalletManagerTrait for AwsKmsWalletManager {
         &self,
         wallet_index: u32,
         typed_data: &TypedData,
-        chain_id: &ChainId,
+        chain_id: WalletManagerChainId,
     ) -> Result<Signature, WalletError> {
         let signer = self.get_or_initialize_signer(wallet_index, chain_id).await?;
 

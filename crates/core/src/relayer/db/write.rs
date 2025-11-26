@@ -106,8 +106,8 @@ impl PostgresClient {
                     })?;
 
                 self.execute(
-                    "INSERT INTO relayer.record (id, name, chain_id, wallet_index, max_gas_price_cap, paused, eip_1559_enabled, address, is_private_key)
-                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+                    "INSERT INTO relayer.record (id, name, chain_id, wallet_index, max_gas_price_cap, paused, eip_1559_enabled, address, is_private_key, cloned_from_chain_id)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
                     &[
                         &new_relayer_id,
                         &name,
@@ -118,6 +118,7 @@ impl PostgresClient {
                         &source_relayer.eip_1559_enabled,
                         &address,
                         &source_relayer.is_private_key,
+                        &source_relayer.chain_id,
                     ],
                 )
                 .await

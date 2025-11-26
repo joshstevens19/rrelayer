@@ -7,6 +7,7 @@ pub fn build_relayer(row: &Row) -> Relayer {
         id: row.get("id"),
         name: row.get("name"),
         chain_id: row.get("chain_id"),
+        cloned_from_chain_id: row.get("cloned_from_chain_id"),
         address: row.get("address"),
         wallet_index: row.get::<_, i32>("wallet_index"),
         max_gas_price: row.get("max_gas_price_cap"),

@@ -56,7 +56,7 @@ pub async fn create_relayer(
         .await?;
     invalidate_relayer_cache(&state.cache, &relayer.id).await;
 
-    let current_nonce = provider.get_nonce(&relayer.wallet_index_type().index()).await?;
+    let current_nonce = provider.get_nonce(&relayer).await?;
 
     let id = relayer.id;
     let address = relayer.address;
