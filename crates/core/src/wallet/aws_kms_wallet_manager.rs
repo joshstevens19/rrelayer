@@ -235,7 +235,8 @@ impl AwsKmsWalletManager {
                         "kms:EnableKeyRotation",
                         "kms:DisableKeyRotation",
                         "kms:RevokeGrant",
-                        "kms:RetireGrant"
+                        "kms:RetireGrant",
+                        "kms:GetPublicKey"
                       ],
                     "Resource": "*"
                 },
