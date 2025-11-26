@@ -273,6 +273,7 @@ impl TransactionsQueue {
                     self.relayer.name, transaction_sent.id, transaction.id);
                 Err(MovePendingTransactionToInmempoolError::TransactionIdDoesNotMatch(
                     self.relayer.id,
+                    self.relayer.address,
                     transaction_sent.clone(),
                     transaction.clone(),
                 ))
@@ -282,6 +283,7 @@ impl TransactionsQueue {
                 self.relayer.name, transaction_sent.id);
             Err(MovePendingTransactionToInmempoolError::TransactionNotFound(
                 self.relayer.id,
+                self.relayer.address,
                 transaction_sent.clone(),
             ))
         }
@@ -544,6 +546,7 @@ impl TransactionsQueue {
                 } else {
                     return Err(MoveInmempoolTransactionToMinedError::TransactionIdDoesNotMatch(
                         self.relayer.id,
+                        self.relayer.address,
                         *id,
                         comp_tx.original,
                     ));
@@ -587,6 +590,7 @@ impl TransactionsQueue {
                 );
                 Err(MoveInmempoolTransactionToMinedError::TransactionIdDoesNotMatch(
                     self.relayer.id,
+                    self.relayer.address,
                     *id,
                     comp_tx.original,
                 ))
@@ -596,7 +600,11 @@ impl TransactionsQueue {
                 "No inmempool transaction found to move to mined for relayer: {} (transaction: {})",
                 self.relayer.name, id
             );
-            Err(MoveInmempoolTransactionToMinedError::TransactionNotFound(self.relayer.id, *id))
+            Err(MoveInmempoolTransactionToMinedError::TransactionNotFound(
+                self.relayer.id,
+                self.relayer.address,
+                *id,
+            ))
         }
     }
 
