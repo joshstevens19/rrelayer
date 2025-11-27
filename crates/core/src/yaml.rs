@@ -39,6 +39,7 @@ pub struct AwsKmsSigningProviderConfig {
     pub danger_override_alias: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub endpoint_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub multi_region: Option<bool>,
 }
 
