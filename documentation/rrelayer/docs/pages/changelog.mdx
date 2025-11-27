@@ -10,9 +10,6 @@
 
 ### Bug fixes
 
-- fix: use correct serialization function for ERC20 tokens in topup flow
-- fix: Rust SDK now passes API key in `x-rrelayer-api-key` header instead of `Authorization` header
-- fix: extra checks for the auto top-up background task to make sure they have eth and tokens
 - fix: resolve parsing to u128 very large balances will panic
 - fix: expose better logging on the queue errors to be able to debug more
 - fix: resolve kms cloning issues
@@ -24,10 +21,25 @@
 ---
 
 ## Releases
-
 ---
 
 all release branches are deployed through `release/VERSION_NUMBER` branches
+
+## 0.7.1 - 6th November 2025
+-------------------------------------------------
+
+github branch - https://github.com/joshstevens19/rrelayer/tree/release/0.7.1
+
+- linux binary - https://github.com/joshstevens19/rrelayer/releases/download/v0.7.1/rrelayer_linux-amd64.tar.gz
+- mac apple silicon binary - https://github.com/joshstevens19/rrelayer/releases/download/v0.7.1/rrelayer-arm64.tar.gz
+- mac apple intel binary - https://github.com/joshstevens19/rrelayer/releases/download/v0.7.1/rrelayer-amd64.tar.gz
+- windows binary - https://github.com/joshstevens19/rrelayer/releases/download/v0.7.1/rrelayer-amd64.zip
+
+### Bug fixes
+
+- fix: use correct serialization function for ERC20 tokens in topup flow
+- fix: Rust SDK now passes API key in `x-rrelayer-api-key` header instead of `Authorization` header
+- fix: extra checks for the auto top-up background task to make sure they have eth and tokens
 
 ## 0.7.0 - 21st October 2025
 -------------------------------------------------
