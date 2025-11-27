@@ -67,6 +67,7 @@ api_config:
 signing_provider: // [!code focus]
   aws_kms: // [!code focus]
     region: "eu-west-1" // [!code focus]
+    multi_region: true # Optional: create multi-region keys (default: false) // [!code focus]
     endpoint_url: "http://localhost:4566" # Optional: for LocalStack // [!code focus]
 ```
 
@@ -103,4 +104,27 @@ When using LocalStack:
 
 :::info
 When `endpoint_url` is omitted, rrelayer will use the standard AWS KMS endpoints in production.
+:::
+
+## Multi-Region Keys
+
+AWS KMS supports multi-region keys, which are cryptographic keys that can be replicated across multiple AWS regions while maintaining the same key material. This enables you to use the same key across different regions for disaster recovery and global application scenarios.
+
+### Configuration
+
+To enable multi-region key creation, set the `multi_region` field to `true`:
+
+```yaml [rrelayer.yaml]
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+    multi_region: true
+```
+
+:::info
+**Manual Replication Required**
+
+When `multi_region` is enabled, rrelayer will create multi-region primary keys in the specified region. However, **you must manually replicate these keys to other AWS regions** using the AWS Console or AWS CLI if you need the keys to be available in multiple regions.
+
+For more information, see [AWS KMS Multi-Region Keys Documentation](https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html).
 :::

@@ -302,6 +302,7 @@ impl AwsKmsWalletManager {
                 .description(&plan.description)
                 .key_spec(KeySpec::EccSecgP256K1)
                 .key_usage(KeyUsageType::SignVerify)
+                .multi_region(self.config.multi_region.unwrap_or(false))
                 .policy(policy.clone());
 
             for (k, v) in &plan.tags {
