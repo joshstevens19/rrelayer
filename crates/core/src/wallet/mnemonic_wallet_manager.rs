@@ -1,6 +1,6 @@
 use crate::common_types::EvmAddress;
 use crate::network::ChainId;
-use crate::wallet::{WalletError, WalletManagerTrait};
+use crate::wallet::{WalletError, WalletManagerChainId, WalletManagerTrait};
 use alloy::consensus::TypedTransaction;
 use alloy::dyn_abi::TypedData;
 use alloy::network::TxSigner;
@@ -59,20 +59,20 @@ impl WalletManagerTrait for MnemonicWalletManager {
     async fn create_wallet(
         &self,
         wallet_index: u32,
-        chain_id: &ChainId,
+        chain_id: WalletManagerChainId,
     ) -> Result<EvmAddress, WalletError> {
         // For mnemonic wallets, we can always derive any index
         // So creation is the same as getting the address
-        let wallet = self.get_wallet(wallet_index, chain_id).await?;
+        let wallet = self.get_wallet(wallet_index, chain_id.main()).await?;
         Ok(EvmAddress::new(wallet.address()))
     }
 
     async fn get_address(
         &self,
         wallet_index: u32,
-        chain_id: &ChainId,
+        chain_id: WalletManagerChainId,
     ) -> Result<EvmAddress, WalletError> {
-        let wallet = self.get_wallet(wallet_index, chain_id).await?;
+        let wallet = self.get_wallet(wallet_index, chain_id.main()).await?;
         Ok(EvmAddress::new(wallet.address()))
     }
 
@@ -80,9 +80,9 @@ impl WalletManagerTrait for MnemonicWalletManager {
         &self,
         wallet_index: u32,
         transaction: &TypedTransaction,
-        chain_id: &ChainId,
+        chain_id: WalletManagerChainId,
     ) -> Result<Signature, WalletError> {
-        let wallet = self.get_wallet(wallet_index, chain_id).await?;
+        let wallet = self.get_wallet(wallet_index, chain_id.main()).await?;
 
         let signature = match transaction {
             TypedTransaction::Legacy(tx) => {
@@ -114,9 +114,9 @@ impl WalletManagerTrait for MnemonicWalletManager {
         &self,
         wallet_index: u32,
         text: &str,
-        chain_id: &ChainId,
+        chain_id: WalletManagerChainId,
     ) -> Result<Signature, WalletError> {
-        let wallet = self.get_wallet(wallet_index, chain_id).await?;
+        let wallet = self.get_wallet(wallet_index, chain_id.main()).await?;
         let signature = wallet.sign_message(text.as_bytes()).await?;
         Ok(signature)
     }
@@ -125,9 +125,9 @@ impl WalletManagerTrait for MnemonicWalletManager {
         &self,
         wallet_index: u32,
         typed_data: &TypedData,
-        chain_id: &ChainId,
+        chain_id: WalletManagerChainId,
     ) -> Result<Signature, WalletError> {
-        let wallet = self.get_wallet(wallet_index, chain_id).await?;
+        let wallet = self.get_wallet(wallet_index, chain_id.main()).await?;
         let signature = wallet.sign_dynamic_typed_data(typed_data).await?;
         Ok(signature)
     }

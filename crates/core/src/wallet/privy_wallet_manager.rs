@@ -1,6 +1,5 @@
 use crate::common_types::EvmAddress;
-use crate::network::ChainId;
-use crate::wallet::{WalletError, WalletManagerTrait};
+use crate::wallet::{WalletError, WalletManagerChainId, WalletManagerTrait};
 use alloy::consensus::{TxEnvelope, TypedTransaction};
 use alloy::dyn_abi::TypedData;
 use alloy::primitives::Signature;
@@ -88,7 +87,7 @@ impl WalletManagerTrait for PrivyWalletManager {
     async fn create_wallet(
         &self,
         wallet_index: u32,
-        _chain_id: &ChainId,
+        _chain_id: WalletManagerChainId,
     ) -> Result<EvmAddress, WalletError> {
         self.load_wallets().await?;
 
@@ -132,7 +131,7 @@ impl WalletManagerTrait for PrivyWalletManager {
     async fn get_address(
         &self,
         wallet_index: u32,
-        _chain_id: &ChainId,
+        _chain_id: WalletManagerChainId,
     ) -> Result<EvmAddress, WalletError> {
         let wallets = self.wallets.lock().await;
         let wallet = wallets
@@ -145,7 +144,7 @@ impl WalletManagerTrait for PrivyWalletManager {
         &self,
         wallet_index: u32,
         transaction: &TypedTransaction,
-        _chain_id: &ChainId,
+        _chain_id: WalletManagerChainId,
     ) -> Result<Signature, WalletError> {
         let wallets = self.wallets.lock().await;
         let wallet = wallets
@@ -270,7 +269,7 @@ impl WalletManagerTrait for PrivyWalletManager {
         &self,
         wallet_index: u32,
         text: &str,
-        _chain_id: &ChainId,
+        _chain_id: WalletManagerChainId,
     ) -> Result<Signature, WalletError> {
         let wallets = self.wallets.lock().await;
         let wallet = wallets
@@ -320,7 +319,7 @@ impl WalletManagerTrait for PrivyWalletManager {
         &self,
         wallet_index: u32,
         typed_data: &TypedData,
-        _chain_id: &ChainId,
+        _chain_id: WalletManagerChainId,
     ) -> Result<Signature, WalletError> {
         let wallets = self.wallets.lock().await;
         let wallet = wallets

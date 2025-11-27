@@ -1,5 +1,6 @@
 use crate::gas::BLOB_GAS_PER_BLOB;
 use crate::provider::layer_extensions::RpcLoggingLayer;
+use crate::relayer::Relayer;
 use crate::wallet::{
     AwsKmsWalletManager, CompositeWalletManager, FireblocksWalletManager, MnemonicWalletManager,
     Pkcs11WalletManager, PrivateKeyWalletManager, PrivyWalletManager, TurnkeyWalletManager,
@@ -287,11 +288,11 @@ impl EvmProvider {
     }
 
     pub async fn create_wallet(&self, wallet_index: u32) -> Result<EvmAddress, WalletError> {
-        self.wallet_manager.create_wallet(wallet_index, &self.chain_id).await
+        self.wallet_manager.create_wallet(wallet_index, self.chain_id.into()).await
     }
 
     pub async fn get_address(&self, wallet_index: u32) -> Result<EvmAddress, WalletError> {
-        self.wallet_manager.get_address(wallet_index, &self.chain_id).await
+        self.wallet_manager.get_address(wallet_index, self.chain_id.into()).await
     }
 
     pub fn can_clone(&self) -> bool {
@@ -310,10 +311,13 @@ impl EvmProvider {
 
     pub async fn get_nonce(
         &self,
-        wallet_index: &u32,
+        relayer: &Relayer,
     ) -> Result<TransactionNonce, WalletOrProviderError> {
-        let address =
-            self.wallet_manager.get_address(*wallet_index, &self.chain_id).await.map_err(|e| {
+        let address = self
+            .wallet_manager
+            .get_address(relayer.wallet_index(), relayer.wallet_manager_chain_id())
+            .await
+            .map_err(|e| {
                 WalletOrProviderError::InternalError(format!("Failed to get address: {}", e))
             })?;
 
@@ -342,12 +346,16 @@ impl EvmProvider {
 
     pub async fn send_transaction(
         &self,
-        wallet_index: &u32,
+        relayer: &Relayer,
         transaction: TypedTransaction,
     ) -> Result<TransactionHash, SendTransactionError> {
         let signature = self
             .wallet_manager
-            .sign_transaction(*wallet_index, &transaction, &self.chain_id)
+            .sign_transaction(
+                relayer.wallet_index(),
+                &transaction,
+                relayer.wallet_manager_chain_id(),
+            )
             .await
             .map_err(|e| SendTransactionError::InternalError(e.to_string()))?;
 
@@ -369,26 +377,32 @@ impl EvmProvider {
 
     pub async fn sign_transaction(
         &self,
-        wallet_index: &u32,
+        relayer: &Relayer,
         transaction: &TypedTransaction,
     ) -> Result<Signature, WalletError> {
-        self.wallet_manager.sign_transaction(*wallet_index, transaction, &self.chain_id).await
+        self.wallet_manager
+            .sign_transaction(
+                relayer.wallet_index(),
+                transaction,
+                relayer.wallet_manager_chain_id(),
+            )
+            .await
     }
 
-    pub async fn sign_text(
-        &self,
-        wallet_index: &u32,
-        text: &str,
-    ) -> Result<Signature, WalletError> {
-        self.wallet_manager.sign_text(*wallet_index, text, &self.chain_id).await
+    pub async fn sign_text(&self, relayer: &Relayer, text: &str) -> Result<Signature, WalletError> {
+        self.wallet_manager
+            .sign_text(relayer.wallet_index(), text, relayer.wallet_manager_chain_id())
+            .await
     }
 
     pub async fn sign_typed_data(
         &self,
-        wallet_index: &u32,
+        relayer: &Relayer,
         typed_data: &TypedData,
     ) -> Result<Signature, WalletError> {
-        self.wallet_manager.sign_typed_data(*wallet_index, typed_data, &self.chain_id).await
+        self.wallet_manager
+            .sign_typed_data(relayer.wallet_index(), typed_data, relayer.wallet_manager_chain_id())
+            .await
     }
 
     pub async fn estimate_gas(

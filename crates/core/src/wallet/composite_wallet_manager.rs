@@ -4,8 +4,8 @@ use alloy::dyn_abi::TypedData;
 use alloy::{consensus::TypedTransaction, signers::Signature};
 use async_trait::async_trait;
 
+use crate::wallet::WalletManagerChainId;
 use crate::{
-    network::ChainId,
     shared::common_types::EvmAddress,
     wallet::{WalletError, WalletManagerTrait},
 };
@@ -55,7 +55,7 @@ impl WalletManagerTrait for CompositeWalletManager {
     async fn create_wallet(
         &self,
         wallet_index: u32,
-        chain_id: &ChainId,
+        chain_id: WalletManagerChainId,
     ) -> Result<EvmAddress, WalletError> {
         let manager = self.get_manager_for_index(wallet_index)?;
         manager.create_wallet(wallet_index, chain_id).await
@@ -64,7 +64,7 @@ impl WalletManagerTrait for CompositeWalletManager {
     async fn get_address(
         &self,
         wallet_index: u32,
-        chain_id: &ChainId,
+        chain_id: WalletManagerChainId,
     ) -> Result<EvmAddress, WalletError> {
         let manager = self.get_manager_for_index(wallet_index)?;
         manager.get_address(wallet_index, chain_id).await
@@ -74,7 +74,7 @@ impl WalletManagerTrait for CompositeWalletManager {
         &self,
         wallet_index: u32,
         transaction: &TypedTransaction,
-        chain_id: &ChainId,
+        chain_id: WalletManagerChainId,
     ) -> Result<Signature, WalletError> {
         let manager = self.get_manager_for_index(wallet_index)?;
         manager.sign_transaction(wallet_index, transaction, chain_id).await
@@ -84,7 +84,7 @@ impl WalletManagerTrait for CompositeWalletManager {
         &self,
         wallet_index: u32,
         text: &str,
-        chain_id: &ChainId,
+        chain_id: WalletManagerChainId,
     ) -> Result<Signature, WalletError> {
         let manager = self.get_manager_for_index(wallet_index)?;
         manager.sign_text(wallet_index, text, chain_id).await
@@ -94,7 +94,7 @@ impl WalletManagerTrait for CompositeWalletManager {
         &self,
         wallet_index: u32,
         typed_data: &TypedData,
-        chain_id: &ChainId,
+        chain_id: WalletManagerChainId,
     ) -> Result<Signature, WalletError> {
         let manager = self.get_manager_for_index(wallet_index)?;
         manager.sign_typed_data(wallet_index, typed_data, chain_id).await

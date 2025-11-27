@@ -80,8 +80,7 @@ impl TransactionsQueues {
         let mut relayer_block_times_ms = HashMap::new();
 
         for setup in setups {
-            let current_nonce =
-                setup.evm_provider.get_nonce(&setup.relayer.wallet_index_type().index()).await?;
+            let current_nonce = setup.evm_provider.get_nonce(&setup.relayer).await?;
 
             info!(
                 "Startup nonce synchronization for relayer {} ({}): synchronizing nonce manager with on-chain nonce {}",
@@ -177,8 +176,7 @@ impl TransactionsQueues {
         setup: TransactionsQueueSetup,
         queues_arc: Arc<Mutex<TransactionsQueues>>,
     ) -> Result<(), WalletOrProviderError> {
-        let current_nonce =
-            setup.evm_provider.get_nonce(&setup.relayer.wallet_index_type().index()).await?;
+        let current_nonce = setup.evm_provider.get_nonce(&setup.relayer).await?;
         let relayer_id = setup.relayer.id;
 
         self.queues.insert(

@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use super::{RelayerId, WalletIndex};
+use crate::wallet::{WalletManagerChainId, WalletManagerCloneChain};
 use crate::{gas::GasPrice, network::ChainId, shared::common_types::EvmAddress};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -15,6 +16,9 @@ pub struct Relayer {
     /// The chain id the relayer is operating on
     #[serde(rename = "chainId")]
     pub chain_id: ChainId,
+
+    #[serde(rename = "clonedFromChainId", skip_serializing_if = "Option::is_none", default)]
+    pub cloned_from_chain_id: Option<ChainId>,
 
     /// The relayer address
     pub address: EvmAddress,
@@ -50,6 +54,23 @@ impl Relayer {
             WalletIndex::PrivateKey(self.wallet_index)
         } else {
             WalletIndex::Normal(self.wallet_index as u32)
+        }
+    }
+
+    /// Get the wallet index
+    pub fn wallet_index(&self) -> u32 {
+        self.wallet_index_type().index()
+    }
+
+    /// Generate the wallet manager chain id
+    pub fn wallet_manager_chain_id(&self) -> WalletManagerChainId {
+        if let Some(cloned_from_chain_id) = &self.cloned_from_chain_id {
+            WalletManagerChainId::Cloned(WalletManagerCloneChain {
+                cloned_from: *cloned_from_chain_id,
+                cloned_to: self.chain_id,
+            })
+        } else {
+            WalletManagerChainId::ChainId(self.chain_id)
         }
     }
 }

@@ -59,6 +59,8 @@ impl TestRunner {
                     return Err(anyhow::anyhow!("Confirmed transaction should have hash"));
                 }
                 let hash = status.hash.unwrap();
+                info!("Transaction hash: {:?}", hash);
+                info!("Expected hash: {:?}", send_result.hash);
                 if hash != send_result.hash {
                     return Err(anyhow::anyhow!(
                         "Confirmed transaction should match the sent transaction hash"
