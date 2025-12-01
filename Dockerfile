@@ -1,4 +1,4 @@
-FROM rust:1.88.0-bookworm AS builder
+FROM rust:trixie AS builder
 ARG TARGETPLATFORM
 ARG BINARY_PATH
 ENV CARGO_NET_GIT_FETCH_WITH_CLI=true
@@ -35,7 +35,7 @@ RUN if [ -f /tmp/docker-binary/rrelayer_cli ]; then \
         fi; \
     fi
 
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 RUN apt-get update && apt-get install -y \
     libssl3 \
     ca-certificates \
