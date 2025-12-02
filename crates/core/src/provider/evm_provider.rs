@@ -287,6 +287,12 @@ impl EvmProvider {
         self.rpc_clients[index].clone()
     }
 
+    pub async fn clone_wallet(&self, relayer: &Relayer) -> Result<EvmAddress, WalletError> {
+        self.wallet_manager
+            .create_wallet(relayer.wallet_index(), relayer.wallet_manager_chain_id())
+            .await
+    }
+
     pub async fn create_wallet(&self, wallet_index: u32) -> Result<EvmAddress, WalletError> {
         self.wallet_manager.create_wallet(wallet_index, self.chain_id.into()).await
     }

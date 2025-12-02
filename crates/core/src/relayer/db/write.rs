@@ -1,6 +1,4 @@
-use std::error::Error;
-use thiserror::Error;
-
+use crate::common_types::EvmAddress;
 use crate::shared::{internal_server_error, not_found, HttpError};
 use crate::{
     gas::GasPrice,
@@ -9,6 +7,9 @@ use crate::{
     provider::EvmProvider,
     relayer::types::{Relayer, RelayerId},
 };
+use std::error::Error;
+use thiserror::Error;
+use tracing::log::error;
 
 #[derive(Error, Debug)]
 pub enum CreateRelayerError {
@@ -32,6 +33,9 @@ pub enum CreateRelayerError {
 
     #[error("Cannot clone relayer '{0}' - provider type does not support cloning")]
     CannotCloneProviderRelayer(String),
+
+    #[error("Cloned wallet address {0} does not match source wallet address {1}")]
+    CloneReturnedWrongAddress(EvmAddress, EvmAddress),
 }
 
 impl From<CreateRelayerError> for HttpError {
@@ -98,12 +102,20 @@ impl PostgresClient {
                 }
 
                 let wallet_index = source_relayer.wallet_index;
-                let address = evm_provider
-                    .create_wallet(source_relayer.wallet_index_type().index())
-                    .await
-                    .map_err(|e| {
-                        CreateRelayerError::WalletError(name.to_string(), *chain_id, Box::new(e))
-                    })?;
+                let address = evm_provider.clone_wallet(&source_relayer).await.map_err(|e| {
+                    CreateRelayerError::WalletError(name.to_string(), *chain_id, Box::new(e))
+                })?;
+
+                if address != source_relayer.address {
+                    error!(
+                        "Cloned wallet address {} does not match source wallet address {}",
+                        address, source_relayer.address
+                    );
+                    return Err(CreateRelayerError::CloneReturnedWrongAddress(
+                        address,
+                        source_relayer.address,
+                    ));
+                }
 
                 self.execute(
                     "INSERT INTO relayer.record (id, name, chain_id, wallet_index, max_gas_price_cap, paused, eip_1559_enabled, address, is_private_key, cloned_from_chain_id)
