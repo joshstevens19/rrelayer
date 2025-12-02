@@ -2,7 +2,17 @@ name: Build & publish docker image
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 1.2.3) - leave empty for master build'
+        required: false
+        type: string
   workflow_call:
+    inputs:
+      version:
+        description: 'Release version (e.g., 1.2.3)'
+        required: false
+        type: string
   release:
     types: [published]
 
@@ -62,39 +72,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract Docker metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.IMAGE }}
-          tags: |
-            type=schedule
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=sha
-            type=sha,format=long
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: Add architecture suffix to tags
+      - name: Generate SHA-based internal tag
         id: tags
         run: |
-          TAGS="${{ steps.meta.outputs.tags }}"
-          TAGS_WITH_SUFFIX=""
-          IFS=',' read -ra TAG_ARRAY <<< "$TAGS"
-          for tag in "${TAG_ARRAY[@]}"; do
-            tag=$(echo "$tag" | xargs)  # trim whitespace
-            if [ -n "$tag" ]; then
-              if [ -n "$TAGS_WITH_SUFFIX" ]; then
-                TAGS_WITH_SUFFIX="$TAGS_WITH_SUFFIX,$tag-amd64"
-              else
-                TAGS_WITH_SUFFIX="$tag-amd64"
-              fi
-            fi
-          done
-          echo "tags=$TAGS_WITH_SUFFIX" >> $GITHUB_OUTPUT
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          echo "tag=${{ env.IMAGE }}:sha-${SHORT_SHA}-amd64" >> $GITHUB_OUTPUT
 
       - name: Build and push AMD64 Docker image
         uses: docker/build-push-action@v6
@@ -102,8 +84,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ${{ steps.tags.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.tags.outputs.tag }}
           platforms: linux/amd64
           provenance: mode=max
           sbom: true
@@ -161,39 +142,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract Docker metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.IMAGE }}
-          tags: |
-            type=schedule
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=sha
-            type=sha,format=long
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: Add architecture suffix to tags
+      - name: Generate SHA-based internal tag
         id: tags
         run: |
-          TAGS="${{ steps.meta.outputs.tags }}"
-          TAGS_WITH_SUFFIX=""
-          IFS=',' read -ra TAG_ARRAY <<< "$TAGS"
-          for tag in "${TAG_ARRAY[@]}"; do
-            tag=$(echo "$tag" | xargs)  # trim whitespace
-            if [ -n "$tag" ]; then
-              if [ -n "$TAGS_WITH_SUFFIX" ]; then
-                TAGS_WITH_SUFFIX="$TAGS_WITH_SUFFIX,$tag-arm64"
-              else
-                TAGS_WITH_SUFFIX="$tag-arm64"
-              fi
-            fi
-          done
-          echo "tags=$TAGS_WITH_SUFFIX" >> $GITHUB_OUTPUT
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          echo "tag=${{ env.IMAGE }}:sha-${SHORT_SHA}-arm64" >> $GITHUB_OUTPUT
 
       - name: Build and push ARM64 Docker image
         uses: docker/build-push-action@v6
@@ -201,8 +154,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ${{ steps.tags.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.tags.outputs.tag }}
           platforms: linux/arm64
           provenance: mode=max
           sbom: true
@@ -227,43 +179,39 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract Docker metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.IMAGE }}
-          tags: |
-            type=schedule
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=sha
-            type=sha,format=long
-            type=raw,value=latest,enable={{is_default_branch}}
-
       - name: Create and push multi-arch manifest
         run: |
-          # Extract tags from metadata output
-          # The metadata action outputs full image references, so we need to extract just the tag part
-          TAGS="${{ steps.meta.outputs.tags }}"
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          AMD64_IMAGE="${{ env.IMAGE }}:sha-${SHORT_SHA}-amd64"
+          ARM64_IMAGE="${{ env.IMAGE }}:sha-${SHORT_SHA}-arm64"
           
-          # Create multi-arch manifest using docker buildx imagetools
-          # This combines the amd64 and arm64 images that were already pushed with -amd64 and -arm64 suffixes
+          echo "Source images:"
+          echo "  AMD64: $AMD64_IMAGE"
+          echo "  ARM64: $ARM64_IMAGE"
           
-          echo "$TAGS" | tr ',' '\n' | while IFS= read -r full_tag; do
-            full_tag=$(echo "$full_tag" | xargs)  # trim whitespace
-            if [ -n "$full_tag" ]; then
-              # Extract just the tag portion (everything after the last colon)
-              tag="${full_tag##*:}"
-              echo "Creating multi-arch manifest for tag: $tag"
-              echo "  Full reference: $full_tag"
-              echo "  AMD64 reference: ${{ env.IMAGE }}:${tag}-amd64"
-              echo "  ARM64 reference: ${{ env.IMAGE }}:${tag}-arm64"
-              # Use imagetools to create manifest from existing architecture-specific images
-              docker buildx imagetools create -t "${{ env.IMAGE }}:$tag" \
-                "${{ env.IMAGE }}:${tag}-amd64" \
-                "${{ env.IMAGE }}:${tag}-arm64" || echo "Failed to create manifest for $tag"
-            fi
-          done
+          VERSION="${{ inputs.version }}"
+          
+          if [ -n "$VERSION" ]; then
+            # Release build: create version tag and latest tag
+            echo "Creating release manifests for version: $VERSION"
+            
+            # Version tag (e.g., 1.2.3)
+            echo "Creating manifest for tag: $VERSION"
+            docker buildx imagetools create -t "${{ env.IMAGE }}:$VERSION" \
+              "$AMD64_IMAGE" \
+              "$ARM64_IMAGE"
+            
+            # Latest tag
+            echo "Creating manifest for tag: latest"
+            docker buildx imagetools create -t "${{ env.IMAGE }}:latest" \
+              "$AMD64_IMAGE" \
+              "$ARM64_IMAGE"
+          else
+            # Non-release build (master): create master tag only
+            echo "Creating master manifest"
+            docker buildx imagetools create -t "${{ env.IMAGE }}:master" \
+              "$AMD64_IMAGE" \
+              "$ARM64_IMAGE"
+          fi
+          
+          echo "Manifests created successfully"
