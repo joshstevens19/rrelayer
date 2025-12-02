@@ -685,6 +685,9 @@ jobs:
       github.actor != 'github-actions[bot]' && 
       github.ref == 'refs/heads/master' && 
       github.event_name == 'push'
+    outputs:
+      version: ${{ steps.check_release.outputs.version }}
+      is_release: ${{ steps.check_release.outputs.is_release }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -713,10 +716,12 @@ jobs:
           if [[ -n "$VERSION_FROM_RELEASE" ]]; then
             echo "VERSION_NAME=$VERSION_FROM_RELEASE" >> $GITHUB_ENV
             echo "is_release=true" >> $GITHUB_OUTPUT
+            echo "version=$VERSION_FROM_RELEASE" >> $GITHUB_OUTPUT
             echo "Found release from commit title: Release v$VERSION_FROM_RELEASE"
           else
             echo "Not a release commit"
             echo "is_release=false" >> $GITHUB_OUTPUT
+            echo "version=" >> $GITHUB_OUTPUT
           fi
 
       - name: Skip if not a release
@@ -782,4 +787,6 @@ jobs:
       github.ref == 'refs/heads/master' &&
       github.event_name == 'push'
     uses: ./.github/workflows/docker.yml
+    with:
+      version: ${{ needs.release.outputs.version }}
     secrets: inherit
