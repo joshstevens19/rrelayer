@@ -36,6 +36,9 @@ pub enum CreateRelayerError {
 
     #[error("Cloned wallet address {0} does not match source wallet address {1}")]
     CloneReturnedWrongAddress(EvmAddress, EvmAddress),
+
+    #[error("Cannot clone relayer {0} chain {1} on chain {2} - relayer is already cloned on chain {3} with wallet index {4}")]
+    CanNotCloneAClonedRelayer(EvmAddress, ChainId, ChainId, ChainId, i32),
 }
 
 impl From<CreateRelayerError> for HttpError {
@@ -98,6 +101,16 @@ impl PostgresClient {
                 if !evm_provider.can_clone() {
                     return Err(CreateRelayerError::CannotCloneProviderRelayer(
                         source_relayer.name.clone(),
+                    ));
+                }
+
+                if let Some(cloned_from_chain_id) = source_relayer.cloned_from_chain_id {
+                    return Err(CreateRelayerError::CanNotCloneAClonedRelayer(
+                        source_relayer.address,
+                        source_relayer.chain_id,
+                        *chain_id,
+                        cloned_from_chain_id,
+                        source_relayer.wallet_index,
                     ));
                 }
 
