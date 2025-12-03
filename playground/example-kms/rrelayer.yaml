@@ -1,0 +1,56 @@
+name: kms-relayer
+description: "kms rrelayer"
+api_config:
+  host: "0.0.0.0"
+  port: 8000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+    multi_region: true
+networks:
+  - name: "ethereum"
+    chain_id: 1
+    provider_urls:
+      - "${ETHEREUM_RPC_URL}"
+    block_explorer_url: "https://etherscan.io"
+    api_keys:
+      - relayer: "0x17df962a5f307fba88b8e0f56c595a318d8f9347"
+        keys:
+          - "${US_API_KEY}"
+      - relayer: "0xfd1a9a45a244f03fd7f4ddfa0662f0ae6b17a300"
+        keys:
+          - "${IE_API_KEY}"
+      - relayer: "0x20eb9429df8e1bacce4a3747a9e2b428dbd8d78b"
+        keys:
+          - "${GB_API_KEY}"
+  - name: "base"
+    chain_id: 8453
+    provider_urls:
+      - "${BASE_RPC_URL}"
+    block_explorer_url: "https://basescan.org"
+    api_keys:
+      - relayer: "0xeabf19c48ae85e9153ef26baaa4327f5fc5dbb76"
+        keys:
+          - "${US_API_KEY}"
+      - relayer: "0x76aefdff00176083463f7ff8bce1889b028b066f"
+        keys:
+          - "${IE_API_KEY}"
+      - relayer: "0xd5baa1964bb9afd21ddc41bf592a2c0b9037f91d"
+        keys:
+          - "${GB_API_KEY}"
+    automatic_top_up:
+      - from:
+          relayer:
+            address: "0xd672aa962ca18ef4c2c072fb22987b1198e072d5"
+        relayers:
+          - "0xeabf19c48ae85e9153ef26baaa4327f5fc5dbb76"
+        native:
+          min_balance: "0.1"
+          top_up_amount: "0.1"
+        erc20_tokens:
+          - address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+            min_balance: "100"
+            top_up_amount: "500"
+            decimals: 6

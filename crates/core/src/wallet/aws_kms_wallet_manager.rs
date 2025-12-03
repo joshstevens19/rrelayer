@@ -117,29 +117,18 @@ impl AwsKmsWalletManager {
         wallet_index: u32,
         chain_id: &ChainId,
     ) -> Result<String, WalletError> {
-        let aws_config = self.build_aws_config().await;
-
-        let kms = Client::new(&aws_config);
         let expected_alias = self.build_alias(wallet_index, chain_id);
+        info!("AWS KMS: Looking for key with alias: {}", expected_alias);
 
-        let alias_response = kms.list_aliases().send().await.map_err(|e| {
-            WalletError::ApiError { message: format!("Failed to list aliases: {}", e) }
-        })?;
+        let aliases = self.list_aliases().await?;
 
-        let alias_list = alias_response.aliases();
-        for alias in alias_list {
-            if let Some(alias_name) = alias.alias_name() {
-                if alias_name == expected_alias {
-                    if let Some(target_key_id) = alias.target_key_id() {
-                        return Ok(target_key_id.to_string());
-                    }
-                }
-            }
-        }
-
-        Err(WalletError::ApiError {
-            message: format!("No KMS key found for alias: {}", expected_alias),
-        })
+        aliases
+            .into_iter()
+            .find(|(alias_name, _)| alias_name == &expected_alias)
+            .map(|(_, key_id)| key_id)
+            .ok_or_else(|| WalletError::ApiError {
+                message: format!("No KMS key found for alias: {}", expected_alias),
+            })
     }
 
     async fn create_key_for_wallet_index(
@@ -328,7 +317,7 @@ impl AwsKmsWalletManager {
                     }
                     Err(e) => {
                         warn!(
-                            "AWS KMS: Failed to create alias {} for key {}: {}",
+                            "AWS KMS: Failed to create alias {} for key {}: {:?}",
                             alias, key_id, e
                         );
                     }
@@ -343,18 +332,23 @@ impl AwsKmsWalletManager {
 
     pub async fn list_keys(&self) -> Result<Vec<(String, String)>, WalletError> {
         let aws_config = self.build_aws_config().await;
-
         let kms = Client::new(&aws_config);
 
-        let response = kms.list_keys().send().await.map_err(|e| WalletError::ApiError {
-            message: format!("Failed to list KMS keys: {}", e),
-        })?;
+        let all_keys: Vec<_> = kms
+            .list_keys()
+            .into_paginator()
+            .items()
+            .send()
+            .collect::<Result<Vec<_>, _>>()
+            .await
+            .map_err(|e| WalletError::ApiError {
+                message: format!("Failed to list KMS keys: {:?}", e),
+            })?;
 
         let mut keys = Vec::new();
 
-        let key_list = response.keys();
-        for key in key_list {
-            if let (Some(key_id), Some(_key_arn)) = (key.key_id(), key.key_arn()) {
+        for key in all_keys {
+            if let Some(key_id) = key.key_id() {
                 if let Ok(desc) = kms.describe_key().key_id(key_id).send().await {
                     if let Some(metadata) = desc.key_metadata() {
                         if metadata.key_usage() == Some(&KeyUsageType::SignVerify) {
@@ -371,23 +365,26 @@ impl AwsKmsWalletManager {
 
     pub async fn list_aliases(&self) -> Result<Vec<(String, String)>, WalletError> {
         let aws_config = self.build_aws_config().await;
-
         let kms = Client::new(&aws_config);
 
-        let response = kms.list_aliases().send().await.map_err(|e| WalletError::ApiError {
-            message: format!("Failed to list KMS aliases: {}", e),
-        })?;
+        let all_aliases: Vec<_> = kms
+            .list_aliases()
+            .into_paginator()
+            .items()
+            .send()
+            .collect::<Result<Vec<_>, _>>()
+            .await
+            .map_err(|e| WalletError::ApiError {
+                message: format!("Failed to list KMS aliases: {:?}", e),
+            })?;
 
-        let mut aliases = Vec::new();
-
-        let alias_list = response.aliases();
-        for alias in alias_list {
-            if let (Some(alias_name), Some(target_key_id)) =
-                (alias.alias_name(), alias.target_key_id())
-            {
-                aliases.push((alias_name.to_string(), target_key_id.to_string()));
-            }
-        }
+        let aliases = all_aliases
+            .into_iter()
+            .filter_map(|alias| match (alias.alias_name(), alias.target_key_id()) {
+                (Some(name), Some(key_id)) => Some((name.to_string(), key_id.to_string())),
+                _ => None,
+            })
+            .collect();
 
         Ok(aliases)
     }

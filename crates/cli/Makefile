@@ -10,6 +10,8 @@ network_list_local: # using this with auth_login to see if i can get it working
 	cargo run -- network list
 start_example:
 	RUST_BACKTRACE=1 cargo run -- start --path $(CURDIR)/../../playground/example
+start_example_kms:
+	RUST_BACKTRACE=1 cargo run -- start --path $(CURDIR)/../../playground/example-kms
 start_local:
 	RUST_BACKTRACE=1 cargo run -- start --path $(CURDIR)/../../playground/local-node
 start_base:
