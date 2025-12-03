@@ -1,0 +1,279 @@
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, PrivateAttr, validate_call
+from web3 import AsyncWeb3, Web3
+
+from .api import API
+from .types import PagingContext, TransactionToSend, defaultPagingContext
+
+
+class RelayerClient(BaseModel):
+    class AllowList:
+        def __init__(self, relayerClient: "RelayerClient"):
+            self._relayer: "RelayerClient" = relayerClient
+
+        @validate_call
+        async def get(self, pagingContext: PagingContext = defaultPagingContext):
+            params = pagingContext.model_dump()
+
+            return await self._relayer._api.getApi(
+                self._relayer._apiBaseConfig,
+                f"relayers/{self._relayer._id}/allowlists",
+                params,
+            )
+
+    class Sign:
+        def __init__(self, relayerClient: "RelayerClient"):
+            self._relayer: "RelayerClient" = relayerClient
+
+        @validate_call
+        async def text(self, text: str, rateLimitKey: str = ""):
+            try:
+                additionalHeaders = {}
+                if rateLimitKey:
+                    additionalHeaders["x-rrelayer-rate-limit-key"] = rateLimitKey
+
+                return await self._relayer._api.postApi(
+                    self._relayer._apiBaseConfig,
+                    f"signing/relayers/{self._relayer._id}/message",
+                    {"text": text},
+                    additionalHeaders,
+                )
+
+            except Exception as error:
+                print("Failed to signText", error)
+                raise error
+
+        @validate_call
+        async def textHistory(
+            self, pagingContext: PagingContext = defaultPagingContext
+        ):
+            params = pagingContext.model_dump()
+
+            return await self._relayer._api.getApi(
+                self._relayer._apiBaseConfig,
+                f"signing/relayers/{self._relayer._id}/text-history",
+                params,
+            )
+
+        @validate_call
+        async def typedData(self, typedData: dict, rateLimitKey: str = ""):
+            try:
+                additionalHeaders = {}
+                if rateLimitKey:
+                    additionalHeaders["x-rrelayer-rate-limit-key"] = rateLimitKey
+
+                return await self._relayer._api.postApi(
+                    self._relayer._apiBaseConfig,
+                    f"signing/relayers/{self._relayer._id}/typed-data",
+                    typedData,
+                    additionalHeaders,
+                )
+
+            except Exception as error:
+                print("Failed to signText", error)
+                raise error
+
+        @validate_call
+        async def typedDataHistory(
+            self, pagingContext: PagingContext = defaultPagingContext
+        ):
+            try:
+                params = pagingContext.model_dump()
+
+                return await self._relayer._api.getApi(
+                    self._relayer._apiBaseConfig,
+                    f"signing/relayers/{self._relayer._id}/typed-data-history",
+                    params,
+                )
+            except Exception as error:
+                print("Failed to getSignedTypedDataHistory:", error)
+                raise error
+
+    class Transaction:
+        def __init__(self, relayerClient: "RelayerClient"):
+            self._relayer: "RelayerClient" = relayerClient
+
+        @validate_call
+        async def get(self, transactionId: str):
+            try:
+                return await self._relayer._api.getApi(
+                    self._relayer._apiBaseConfig,
+                    f"transactions/{transactionId}",
+                )
+            except Exception as error:
+                print("Failed to fetch getTransaction:", error)
+                raise error
+
+        @validate_call
+        async def getStatus(self, transactionId: str):
+            try:
+                return await self._relayer._api.getApi(
+                    self._relayer._apiBaseConfig,
+                    f"transactions/status/{transactionId}",
+                )
+            except Exception as error:
+                print("Failed to fetch getTransactionStatus:", error)
+                raise error
+
+        @validate_call
+        async def getAll(self, pagingContext: PagingContext = defaultPagingContext):
+            try:
+                params = pagingContext.model_dump()
+
+                return await self._relayer._api.getApi(
+                    self._relayer._apiBaseConfig,
+                    f"transactions/relayers/{self._relayer._id}",
+                    params,
+                )
+            except Exception as error:
+                print("Failed to fetch getTransactions:", error)
+                raise error
+
+        @validate_call
+        async def replace(
+            self,
+            transactionId: str,
+            replacementTransaction: TransactionToSend,
+            rateLimitKey: str = "",
+        ):
+            try:
+                params = replacementTransaction.model_dump()
+                additionalHeaders = {}
+                if rateLimitKey:
+                    additionalHeaders["x-rrelayer-rate-limit-key"] = rateLimitKey
+
+                return await self._relayer._api.putApi(
+                    self._relayer._apiBaseConfig,
+                    f"transactions/replace/{transactionId}",
+                    params,
+                    output=True,
+                    additionalHeaders=additionalHeaders,
+                )
+
+            except Exception as error:
+                print("Failed to sendTransaction", error)
+                raise error
+
+        @validate_call
+        async def cancel(
+            self,
+            transactionId: str,
+            rateLimitKey: str = "",
+        ):
+            try:
+                additionalHeaders = {}
+                if rateLimitKey:
+                    additionalHeaders["x-rrelayer-rate-limit-key"] = rateLimitKey
+
+                return await self._relayer._api.putApi(
+                    self._relayer._apiBaseConfig,
+                    f"transactions/cancel/{transactionId}",
+                    {},
+                    output=True,
+                    additionalHeaders=additionalHeaders,
+                )
+
+            except Exception as error:
+                print("Failed to cancelTransaction", error)
+                raise error
+
+        @validate_call
+        async def send(self, transaction: TransactionToSend, rateLimitKey: str = ""):
+            try:
+                params = transaction.model_dump()
+                additionalHeaders = {}
+                if rateLimitKey:
+                    additionalHeaders["x-rrelayer-rate-limit-key"] = rateLimitKey
+
+                return await self._relayer._api.postApi(
+                    self._relayer._apiBaseConfig,
+                    f"transactions/relayers/{self._relayer._id}/send",
+                    params,
+                    additionalHeaders,
+                )
+
+            except Exception as error:
+                print("Failed to sendTransaction", error)
+                raise error
+
+    _id: str = PrivateAttr()
+
+    _apiBaseConfig: dict[str, str] = PrivateAttr()
+    _ethereumProvider: AsyncWeb3 = PrivateAttr()
+
+    _api: API = PrivateAttr()
+
+    _allowlist: AllowList = PrivateAttr()
+    _sign: Sign = PrivateAttr()
+    _transaction: Transaction = PrivateAttr()
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    def __init__(
+        self,
+        serverURL: str,
+        providerUrl: str,
+        relayerId: str,
+        auth: dict[str, str],
+        **data,
+    ):
+        super().__init__(**data)
+
+        self._id = relayerId
+
+        self._ethereumProvider = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider(providerUrl))
+
+        if "apiKey" in auth:
+            self._apiBaseConfig = {"apiKey": auth["apiKey"], "serverURL": serverURL}
+        elif "username" in auth and "password" in auth:
+            self._apiBaseConfig = {
+                "username": auth["username"],
+                "password": auth["password"],
+                "serverURL": serverURL,
+            }
+        else:
+            raise ValueError("Invalid authentication credentials")
+
+        self._api = API()
+
+        self._allowlist = self.AllowList(self)
+        self._sign = self.Sign(self)
+        self._transaction = self.Transaction(self)
+
+    @property
+    def name(self):
+        return self._id
+
+    @property
+    def allowlist(self) -> AllowList:
+        return self._allowlist
+
+    @property
+    def sign(self) -> Sign:
+        return self._sign
+
+    @property
+    def transaction(self) -> Transaction:
+        return self._transaction
+
+    async def address(self) -> str | None:
+        response = await self.getInfo()
+        return Web3.to_checksum_address(response["address"]) if response else None
+
+    async def getInfo(self):
+        response = await self._api.getApi(self._apiBaseConfig, f"relayers/{self._id}")
+        return response["relayer"] if response else None
+
+    async def getBalanceOf(self):
+        address = await self.address()
+        if address:
+            balance = await self._ethereumProvider.eth.get_balance(
+                Web3.to_checksum_address(address)
+            )
+            return Web3.from_wei(balance, "ether")
+        else:
+            return 0
+
+    def ethereumProvider(self) -> AsyncWeb3[Any]:
+        return self._ethereumProvider
