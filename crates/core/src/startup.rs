@@ -45,6 +45,8 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
+use rustls::crypto::CryptoProvider;
+use rustls::crypto::ring::default_provider;
 use thiserror::Error;
 use tokio::sync::Mutex;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
@@ -385,6 +387,8 @@ pub async fn start(project_path: &Path) -> Result<(), StartError> {
 
     apply_schema(&postgres).await?;
     info!("Applied database schema");
+
+    CryptoProvider::install_default(default_provider()).expect("Could not install default Crypto Provider");
 
     let cache = Arc::new(Cache::new().await);
 
