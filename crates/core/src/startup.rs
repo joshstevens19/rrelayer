@@ -388,7 +388,7 @@ pub async fn start(project_path: &Path) -> Result<(), StartError> {
     apply_schema(&postgres).await?;
     info!("Applied database schema");
 
-    CryptoProvider::install_default(default_provider()).expect("Could not install default Crypto Provider");
+    CryptoProvider::install_default(default_provider()).expect("Could not install default Crypto Provider. Are you already using it?");
 
     let cache = Arc::new(Cache::new().await);
 
