@@ -55,7 +55,6 @@ pub async fn import_relayer(
 ) -> Result<Json<ImportKeyRelayerResult>, HttpError> {
     state.validate_basic_auth_valid(&headers)?;
 
-    // Check if this network is configured with only private keys
     if state.private_key_only_networks.contains(&chain_id) {
         return Err(bad_request(
             "Cannot import keys for networks configured with only private_keys.".to_string(),
@@ -66,7 +65,6 @@ pub async fn import_relayer(
         .await
         .ok_or(not_found("Could not find provider for the chain id".to_string()))?;
 
-    // Check if the provider supports key import
     if !provider.supports_key_import() {
         return Err(bad_request(
             "The signing provider for this network does not support importing existing keys. \
@@ -75,7 +73,6 @@ pub async fn import_relayer(
         ));
     }
 
-    // Check if a relayer with this address already exists for this chain
     if let Some(existing) =
         state.db.get_relayer_by_address(&request.address, &chain_id).await.map_err(|e| {
             internal_server_error(Some(format!("Failed to check for existing relayer: {}", e)))
@@ -90,7 +87,6 @@ pub async fn import_relayer(
     // Acquire mutex to prevent concurrent relayer creation deadlocks
     let _lock = state.relayer_creation_mutex.lock().await;
 
-    // Get the next available wallet_index for this chain
     let wallet_index = state.db.get_next_wallet_index(&chain_id).await.map_err(|e| {
         internal_server_error(Some(format!("Failed to get next wallet index: {}", e)))
     })?;
@@ -107,23 +103,26 @@ pub async fn import_relayer(
         .await
         .map_err(|e| bad_request(format!("Failed to import key: {}", e)))?;
 
-    // Insert the relayer record
     let relayer_id = RelayerId::new();
     state
         .db
-        .insert_imported_relayer(
+        .save_relayer(
             &relayer_id,
             &request.name,
             &chain_id,
             wallet_index,
             &request.address,
+            false,
+            false,
+            true,
+            None,
+            None,
         )
         .await
         .map_err(|e| {
             internal_server_error(Some(format!("Failed to insert relayer record: {}", e)))
         })?;
 
-    // Get the full relayer record
     let relayer = state
         .db
         .get_relayer(&relayer_id)

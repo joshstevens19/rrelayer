@@ -304,22 +304,25 @@ impl PostgresClient {
         Ok(())
     }
 
-    /// Inserts a relayer record for an imported KMS key.
-    /// This is used when importing an existing KMS key that already has an Ethereum address.
-    pub async fn insert_imported_relayer(
+    pub async fn save_relayer(
         &self,
         relayer_id: &RelayerId,
         name: &str,
         chain_id: &ChainId,
         wallet_index: i32,
         address: &EvmAddress,
-    ) -> Result<(), PostgresError> {
+        is_private_key: bool,
+        is_paused: bool,
+        is_eip_1559_enabled: bool,
+        max_gas_price_cap: Option<&GasPrice>,
+        cloned_from_chain_id: Option<&ChainId>,
+    ) -> Result<(), CreateRelayerError> {
         self.execute(
-            "INSERT INTO relayer.record (id, name, chain_id, wallet_index, address, is_private_key, paused, eip_1559_enabled, deleted)
-             VALUES ($1, $2, $3, $4, $5, FALSE, FALSE, TRUE, FALSE)",
-            &[relayer_id, &name, chain_id, &wallet_index, address],
+            "INSERT INTO relayer.record (id, name, chain_id, wallet_index, max_gas_price_cap, paused, eip_1559_enabled, address, is_private_key, cloned_from_chain_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+            &[relayer_id, &name, chain_id, &wallet_index, &max_gas_price_cap, &is_paused, &is_eip_1559_enabled, &address, &is_private_key, &cloned_from_chain_id],
         )
-        .await?;
+        .await.map_err(|e| CreateRelayerError::CouldNotSaveRelayerDb(name.to_string(), *chain_id, e))?;
 
         Ok(())
     }
