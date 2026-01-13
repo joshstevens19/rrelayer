@@ -51,7 +51,7 @@ pub struct ImportKeyRelayerResult {
 /// 4. Creates the required alias/mapping for the key
 /// 5. Inserts the relayer record into the database
 /// 6. Starts the relayer's transaction queue
-pub async fn import_key_relayer(
+pub async fn import_relayer(
     State(state): State<Arc<AppState>>,
     Path(chain_id): Path<ChainId>,
     headers: HeaderMap,
