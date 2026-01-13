@@ -8,12 +8,17 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
-use crate::relayer::{cache::invalidate_relayer_cache, start_relayer_queue, types::RelayerId};
+use crate::relayer::{
+    cache::invalidate_relayer_cache,
+    start_relayer_queue,
+    types::{Relayer, RelayerId},
+};
 use crate::shared::{bad_request, conflict, internal_server_error, not_found, HttpError};
 use crate::{
     app_state::AppState, network::ChainId, provider::find_provider_for_chain_id,
     shared::common_types::EvmAddress,
 };
+use chrono::Utc;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ImportKeyRelayerRequest {
@@ -104,25 +109,25 @@ pub async fn import_relayer(
         .map_err(|e| bad_request(format!("Failed to import key: {}", e)))?;
 
     let relayer_id = RelayerId::new();
-    state
-        .db
-        .save_relayer(
-            &relayer_id,
-            &request.name,
-            &chain_id,
-            wallet_index,
-            &request.address,
-            false,
-            false,
-            true,
-            None,
-            None,
-        )
-        .await
-        .map_err(|e| {
-            internal_server_error(Some(format!("Failed to insert relayer record: {}", e)))
-        })?;
+    let relayer = Relayer {
+        id: relayer_id,
+        name: request.name.clone(),
+        chain_id,
+        cloned_from_chain_id: None,
+        address: request.address,
+        wallet_index,
+        max_gas_price: None,
+        paused: false,
+        eip_1559_enabled: true,
+        created_at: Utc::now(),
+        is_private_key: false,
+    };
 
+    state.db.save_relayer(&relayer).await.map_err(|e| {
+        internal_server_error(Some(format!("Failed to insert relayer record: {}", e)))
+    })?;
+
+    let relayer_id = relayer.id;
     let relayer = state
         .db
         .get_relayer(&relayer_id)
@@ -130,7 +135,7 @@ pub async fn import_relayer(
         .map_err(|e| internal_server_error(Some(format!("Failed to get relayer: {}", e))))?
         .ok_or_else(|| internal_server_error(Some("Relayer not found after insert".to_string())))?;
 
-    invalidate_relayer_cache(&state.cache, &relayer.id).await;
+    invalidate_relayer_cache(&state.cache, &relayer_id).await;
 
     // Start the transaction queue for this relayer
     start_relayer_queue(&state, relayer, provider, &chain_id).await?;

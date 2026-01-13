@@ -304,25 +304,23 @@ impl PostgresClient {
         Ok(())
     }
 
-    pub async fn save_relayer(
-        &self,
-        relayer_id: &RelayerId,
-        name: &str,
-        chain_id: &ChainId,
-        wallet_index: i32,
-        address: &EvmAddress,
-        is_private_key: bool,
-        is_paused: bool,
-        is_eip_1559_enabled: bool,
-        max_gas_price_cap: Option<&GasPrice>,
-        cloned_from_chain_id: Option<&ChainId>,
-    ) -> Result<(), CreateRelayerError> {
+    pub async fn save_relayer(&self, relayer: &Relayer) -> Result<(), CreateRelayerError> {
         self.execute(
-            "INSERT INTO relayer.record (id, name, chain_id, wallet_index, max_gas_price_cap, paused, eip_1559_enabled, address, is_private_key, cloned_from_chain_id)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
-            &[relayer_id, &name, chain_id, &wallet_index, &max_gas_price_cap, &is_paused, &is_eip_1559_enabled, &address, &is_private_key, &cloned_from_chain_id],
+            "INSERT INTO relayer.record (id, name, chain_id, wallet_index, paused, eip_1559_enabled, address, is_private_key)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+            &[
+                &relayer.id,
+                &relayer.name,
+                &relayer.chain_id,
+                &relayer.wallet_index,
+                &relayer.paused,
+                &relayer.eip_1559_enabled,
+                &relayer.address,
+                &relayer.is_private_key,
+            ],
         )
-        .await.map_err(|e| CreateRelayerError::CouldNotSaveRelayerDb(name.to_string(), *chain_id, e))?;
+        .await
+        .map_err(|e| CreateRelayerError::CouldNotSaveRelayerDb(relayer.name.clone(), relayer.chain_id, e))?;
 
         Ok(())
     }
