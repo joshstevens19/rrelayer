@@ -8,15 +8,11 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
-use crate::relayer::cache::invalidate_relayer_cache;
-use crate::relayer::types::RelayerId;
+use crate::relayer::{cache::invalidate_relayer_cache, start_relayer_queue, types::RelayerId};
 use crate::shared::{bad_request, conflict, internal_server_error, not_found, HttpError};
 use crate::{
-    app_state::AppState,
-    network::ChainId,
-    provider::find_provider_for_chain_id,
+    app_state::AppState, network::ChainId, provider::find_provider_for_chain_id,
     shared::common_types::EvmAddress,
-    transaction::{queue_system::TransactionsQueueSetup, NonceManager},
 };
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -137,39 +133,8 @@ pub async fn import_relayer(
 
     invalidate_relayer_cache(&state.cache, &relayer.id).await;
 
-    // Get current nonce from chain
-    let current_nonce = provider.get_nonce(&relayer).await?;
-
-    let network_config = state.network_configs.iter().find(|config| config.chain_id == chain_id);
-
-    let gas_bump_config =
-        network_config.map(|config| config.gas_bump_blocks_every.clone()).unwrap_or_default();
-
-    let max_gas_price_multiplier =
-        network_config.map(|config| config.max_gas_price_multiplier).unwrap_or(2);
-
     // Start the transaction queue for this relayer
-    state
-        .transactions_queues
-        .lock()
-        .await
-        .add_new_relayer(
-            TransactionsQueueSetup::new(
-                relayer.clone(),
-                provider.clone(),
-                NonceManager::new(current_nonce),
-                Default::default(),
-                Default::default(),
-                Default::default(),
-                state.safe_proxy_manager.clone(),
-                gas_bump_config,
-                max_gas_price_multiplier,
-            ),
-            state.transactions_queues.clone(),
-        )
-        .await?;
-
-    invalidate_relayer_cache(&state.cache, &relayer_id).await;
+    start_relayer_queue(&state, relayer, provider, &chain_id).await?;
 
     info!(
         "Successfully imported key {} as relayer {} (id: {}, address: {}, wallet_index: {})",
