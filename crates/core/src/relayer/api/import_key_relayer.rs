@@ -10,7 +10,7 @@ use tracing::info;
 
 use crate::relayer::cache::invalidate_relayer_cache;
 use crate::relayer::types::RelayerId;
-use crate::shared::{bad_request, internal_server_error, not_found, HttpError};
+use crate::shared::{bad_request, conflict, internal_server_error, not_found, HttpError};
 use crate::{
     app_state::AppState,
     network::ChainId,
@@ -77,6 +77,19 @@ pub async fn import_key_relayer(
              Key import is supported for: AWS KMS."
                 .to_string(),
         ));
+    }
+
+    // Check if a relayer with this address already exists for this chain
+    if let Some(existing) = state
+        .db
+        .get_relayer_by_address(&request.address, &chain_id)
+        .await
+        .map_err(|e| internal_server_error(Some(format!("Failed to check for existing relayer: {}", e))))?
+    {
+        return Err(conflict(format!(
+            "A relayer with address {} already exists for chain {} (id: {})",
+            request.address, chain_id, existing.id
+        )));
     }
 
     // Acquire mutex to prevent concurrent relayer creation deadlocks
