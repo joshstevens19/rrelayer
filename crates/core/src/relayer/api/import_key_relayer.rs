@@ -80,11 +80,10 @@ pub async fn import_key_relayer(
     }
 
     // Check if a relayer with this address already exists for this chain
-    if let Some(existing) = state
-        .db
-        .get_relayer_by_address(&request.address, &chain_id)
-        .await
-        .map_err(|e| internal_server_error(Some(format!("Failed to check for existing relayer: {}", e))))?
+    if let Some(existing) =
+        state.db.get_relayer_by_address(&request.address, &chain_id).await.map_err(|e| {
+            internal_server_error(Some(format!("Failed to check for existing relayer: {}", e)))
+        })?
     {
         return Err(conflict(format!(
             "A relayer with address {} already exists for chain {} (id: {})",
