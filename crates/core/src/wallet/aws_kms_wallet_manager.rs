@@ -1,6 +1,6 @@
 use crate::common_types::EvmAddress;
 use crate::network::ChainId;
-use crate::wallet::{WalletError, WalletManagerChainId, WalletManagerTrait};
+use crate::wallet::{ImportKeyResult, WalletError, WalletManagerChainId, WalletManagerTrait};
 use crate::yaml::AwsKmsSigningProviderConfig;
 use alloy::consensus::TypedTransaction;
 use alloy::dyn_abi::TypedData;
@@ -388,6 +388,86 @@ impl AwsKmsWalletManager {
 
         Ok(aliases)
     }
+
+    /// Creates an alias for an existing KMS key to be used by rrelayer.
+    /// This allows importing existing KMS keys into rrelayer.
+    pub async fn assign_alias_to_existing_key(
+        &self,
+        kms_key_id: &str,
+        wallet_index: u32,
+        chain_id: &ChainId,
+    ) -> Result<String, WalletError> {
+        self.validate_aws_config().await?;
+
+        let alias_name = self.build_alias(wallet_index, chain_id);
+        info!("AWS KMS: Assigning alias {} to existing key {}", alias_name, kms_key_id);
+
+        let aws_config = self.build_aws_config().await;
+        let kms = Client::new(&aws_config);
+
+        // First verify the key exists and is the right type
+        let key_info = kms.describe_key().key_id(kms_key_id).send().await.map_err(|e| {
+            WalletError::ApiError {
+                message: format!("Failed to describe KMS key {}: {:?}", kms_key_id, e),
+            }
+        })?;
+
+        let metadata = key_info.key_metadata().ok_or_else(|| WalletError::ApiError {
+            message: format!("No metadata returned for KMS key {}", kms_key_id),
+        })?;
+
+        // Verify it's the right key type for Ethereum signing
+        if metadata.key_spec() != Some(&KeySpec::EccSecgP256K1) {
+            return Err(WalletError::ApiError {
+                message: format!(
+                    "KMS key {} has spec {:?}, but ECC_SECG_P256K1 is required for Ethereum signing",
+                    kms_key_id,
+                    metadata.key_spec()
+                ),
+            });
+        }
+
+        if metadata.key_usage() != Some(&KeyUsageType::SignVerify) {
+            return Err(WalletError::ApiError {
+                message: format!(
+                    "KMS key {} has usage {:?}, but SIGN_VERIFY is required",
+                    kms_key_id,
+                    metadata.key_usage()
+                ),
+            });
+        }
+
+        // Check if the alias already exists
+        let existing_aliases = self.list_aliases().await?;
+        if let Some((_, existing_key_id)) =
+            existing_aliases.iter().find(|(name, _)| name == &alias_name)
+        {
+            if existing_key_id == kms_key_id {
+                info!("AWS KMS: Alias {} already exists and points to the correct key", alias_name);
+                return Ok(alias_name);
+            } else {
+                return Err(WalletError::ApiError {
+                    message: format!(
+                        "Alias {} already exists but points to a different key {}",
+                        alias_name, existing_key_id
+                    ),
+                });
+            }
+        }
+
+        kms.create_alias().alias_name(&alias_name).target_key_id(kms_key_id).send().await.map_err(
+            |e| WalletError::ApiError {
+                message: format!(
+                    "Failed to create alias {} for key {}: {:?}",
+                    alias_name, kms_key_id, e
+                ),
+            },
+        )?;
+
+        info!("AWS KMS: Successfully created alias {} for key {}", alias_name, kms_key_id);
+
+        Ok(alias_name)
+    }
 }
 
 #[async_trait]
@@ -472,5 +552,39 @@ impl WalletManagerTrait for AwsKmsWalletManager {
 
     fn supports_blobs(&self) -> bool {
         true
+    }
+
+    fn supports_key_import(&self) -> bool {
+        true
+    }
+
+    async fn import_existing_key(
+        &self,
+        key_id: &str,
+        wallet_index: u32,
+        chain_id: &ChainId,
+        expected_address: &EvmAddress,
+    ) -> Result<ImportKeyResult, WalletError> {
+        // First, verify the key's address matches expected BEFORE creating any alias
+        // Initialize a signer directly from the key ID to get the address
+        let signer = self.initialize_aws_kms_signer(key_id, Some(chain_id.u64())).await?;
+
+        let actual_address = EvmAddress::from(alloy::signers::Signer::address(&signer));
+
+        if &actual_address != expected_address {
+            return Err(WalletError::ApiError {
+                message: format!(
+                    "Address mismatch: provided address {} does not match the key's actual address {}",
+                    expected_address, actual_address
+                ),
+            });
+        }
+
+        info!("AWS KMS: Verified key {} has expected address {}", key_id, actual_address);
+
+        // Now that we've verified the address, create the alias
+        let key_alias = self.assign_alias_to_existing_key(key_id, wallet_index, chain_id).await?;
+
+        Ok(ImportKeyResult { key_alias })
     }
 }

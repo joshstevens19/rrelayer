@@ -123,4 +123,17 @@ impl PostgresClient {
             Some(row) => Ok(Some(build_relayer(&row))),
         }
     }
+
+    /// Gets the next available wallet_index for a given chain_id.
+    /// Returns MAX(wallet_index) + 1, or 0 if no relayers exist for this chain.
+    pub async fn get_next_wallet_index(&self, chain_id: &ChainId) -> Result<i32, PostgresError> {
+        let row = self
+            .query_one(
+                "SELECT COALESCE(MAX(wallet_index), -1) + 1 AS next_index FROM relayer.record WHERE chain_id = $1 AND deleted = FALSE",
+                &[chain_id],
+            )
+            .await?;
+
+        Ok(row.get("next_index"))
+    }
 }

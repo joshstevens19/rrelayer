@@ -12,7 +12,6 @@ pub use tokio_postgres::types::{ToSql, Type as PgType};
 use tokio_postgres::{
     config::SslMode, Config, CopyInSink, Error as PgError, Row, Statement, ToStatement,
 };
-use tracing::error;
 
 pub fn connection_string() -> Result<String, env::VarError> {
     dotenv().ok();
