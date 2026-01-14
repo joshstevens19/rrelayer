@@ -23,6 +23,7 @@ pub use clone_relayer::CloneRelayerRequest;
 pub use create_relayer::{CreateRelayerRequest, CreateRelayerResult};
 pub use get_relayer::GetRelayerResult;
 pub use get_relayers::GetRelayersQuery;
+pub use import_relayer::ImportRelayerResult;
 
 use clone_relayer::clone_relayer;
 use create_relayer::create_relayer;

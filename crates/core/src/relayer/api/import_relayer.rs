@@ -21,7 +21,7 @@ use crate::{
 use chrono::Utc;
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct ImportKeyRelayerRequest {
+pub struct ImportRelayerRequest {
     /// The name for the relayer
     pub name: String,
     /// The key ID (format depends on the signing provider, e.g., KMS key ARN for AWS KMS)
@@ -32,7 +32,7 @@ pub struct ImportKeyRelayerRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ImportKeyRelayerResult {
+pub struct ImportRelayerResult {
     pub id: RelayerId,
     pub address: EvmAddress,
     #[serde(rename = "walletIndex")]
@@ -56,8 +56,8 @@ pub async fn import_relayer(
     State(state): State<Arc<AppState>>,
     Path(chain_id): Path<ChainId>,
     headers: HeaderMap,
-    Json(request): Json<ImportKeyRelayerRequest>,
-) -> Result<Json<ImportKeyRelayerResult>, HttpError> {
+    Json(request): Json<ImportRelayerRequest>,
+) -> Result<Json<ImportRelayerResult>, HttpError> {
     state.validate_basic_auth_valid(&headers)?;
 
     if state.private_key_only_networks.contains(&chain_id) {
@@ -145,7 +145,7 @@ pub async fn import_relayer(
         request.key_id, request.name, relayer_id, request.address, wallet_index
     );
 
-    Ok(Json(ImportKeyRelayerResult {
+    Ok(Json(ImportRelayerResult {
         id: relayer_id,
         address: request.address,
         wallet_index,
