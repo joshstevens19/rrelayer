@@ -4,6 +4,7 @@ export * from './create-relayer';
 export * from './delete-relayer';
 export * from './get-relayer';
 export * from './get-relayers';
+export * from './import-relayer';
 export * from './pause-relayer';
 export * from './types';
 export * from './unpause-relayer';
