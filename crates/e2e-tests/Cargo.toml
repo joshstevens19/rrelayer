@@ -10,7 +10,7 @@ path = "src/main.rs"
 
 [dependencies]
 # Core dependencies
-tokio = { version = "1.0", features = ["full"] }
+tokio = { version = "1.49", features = ["full"] }
 anyhow = "1.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
@@ -23,7 +23,7 @@ alloy-rlp = { workspace = true }
 alloy-eips = { workspace = true }
 
 # HTTP client
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.13", features = ["json"] }
 
 # Database client for schema reset
 tokio-postgres = "0.7"
@@ -44,9 +44,9 @@ dotenv = "0.15"
 futures = "0.3"
 
 # Temporary files
-tempfile = "3.8"
+tempfile = "3.24"
 # Simple HTTP server for gas API
-warp = "0.3"
+warp = "0.4"
 rand = "0.9.2"
 
 # Webhook testing dependencies

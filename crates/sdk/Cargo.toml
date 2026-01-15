@@ -19,13 +19,13 @@ include = [
 ]
 
 [dependencies]
-reqwest = { version = "0.12.15", features = ["json", "native-tls", "cookies"] }
+reqwest = { version = "0.13.1", features = ["json", "native-tls", "cookies"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
-thiserror = "2.0.6"
+thiserror = "2.0.17"
 alloy = { workspace = true, features = ["full", "signer-mnemonic", "eips", "eip712"] }
-base64 = "0.22.0"
+base64 = "0.22.1"
 rrelayer_core = { path = "../core" }
 tokio = { version = "1", features = ["time"] }
 async-trait = "0.1"
