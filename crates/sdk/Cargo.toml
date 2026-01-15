@@ -30,4 +30,3 @@ rrelayer_core = { path = "../core" }
 tokio = { version = "1", features = ["time"] }
 async-trait = "0.1"
 hex = "0.4"
-
