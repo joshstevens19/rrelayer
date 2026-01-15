@@ -60,6 +60,79 @@ const relayerClient = await client.getRelayerClient(
 );
 ```
 
+## Import Relayer
+
+:::info
+Only basic auth authentication can import relayers. This endpoint is only available when using signing providers that support key import.
+:::
+
+Import an existing signing key (e.g., AWS KMS key) as a relayer. This allows you to use pre-existing keys with rrelayer without manually creating database records or renaming key aliases.
+
+### Response
+
+```ts
+Promise<ImportRelayerResult>;
+```
+
+Just so you understand the properties returned
+
+```ts
+export interface ImportRelayerResult {
+  id: string;
+  address: string;
+  walletIndex: number;
+  keyAlias: string;
+}
+```
+
+### Example
+
+```ts
+// config.ts
+import { createClient } from 'rrelayer';
+import * as dotenv from 'dotenv';
+dotenv.config();
+
+export const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: process.env.RRELAYER_AUTH_USERNAME!,
+    password: process.env.RRELAYER_AUTH_PASSWORD!,
+  },
+});
+
+///
+
+// import-relayer.ts
+import { client } from './config';
+
+// Import an existing KMS key as a relayer
+// Returns ImportRelayerResult - import { ImportRelayerResult } from 'rrelayer';
+const importResult = await client.relayer.import(
+  11155111, // chainId
+  'my-imported-relayer', // name
+  'arn:aws:kms:us-east-1:123456789012:key/abc123-def456-ghi789', // keyId (KMS key ARN)
+  '0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b' // address (must match the key's actual address)
+);
+
+// importResult.id = relayer id
+// importResult.address = relayer address
+// importResult.walletIndex = assigned wallet index
+// importResult.keyAlias = KMS alias created (e.g., "alias/rrelayer-wallet-0-11155111")
+
+// You can then create the relayer client doing this
+const relayerClient = await client.getRelayerClient(
+  importResult.id,
+  // This is optional it defaults to fast and is a fallback
+  // You can override this with the transaction request
+  TransactionSpeed.FAST
+);
+```
+
+:::warning
+The provided `address` must match the actual Ethereum address derived from the key. The endpoint verifies this before creating any side effects. If the addresses don't match, the request will fail with a 400 error.
+:::
+
 ## Get Relayers
 
 :::info

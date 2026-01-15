@@ -73,16 +73,18 @@ pub async fn load_providers(
             || signing_key.gcp_secret_manager.is_some();
 
         // If we only have private keys and no main signing provider, use private key manager only
-        if private_key_strings.is_some() && !has_main_signing_provider {
-            let provider = EvmProvider::new_with_private_keys(
-                config,
-                private_key_strings.unwrap(),
-                get_gas_estimator(&config.provider_urls, setup_config, config).await?,
-            )
-            .await?;
+        if let Some(private_keys) = &private_key_strings {
+            if !has_main_signing_provider {
+                let provider = EvmProvider::new_with_private_keys(
+                    config,
+                    private_keys.clone(),
+                    get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                )
+                .await?;
 
-            providers.push(provider);
-            continue;
+                providers.push(provider);
+                continue;
+            }
         }
 
         let provider = if let Some(privy) = &signing_key.privy {

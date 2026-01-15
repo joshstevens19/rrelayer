@@ -8,14 +8,11 @@ use axum::{
 use serde::{Deserialize, Serialize};
 
 use crate::relayer::db::CreateRelayerMode;
+use crate::relayer::{cache::invalidate_relayer_cache, start_relayer_queue, types::RelayerId};
 use crate::shared::{bad_request, not_found, HttpError};
 use crate::{
-    app_state::AppState,
-    network::ChainId,
-    provider::find_provider_for_chain_id,
-    relayer::{cache::invalidate_relayer_cache, types::RelayerId},
+    app_state::AppState, network::ChainId, provider::find_provider_for_chain_id,
     shared::common_types::EvmAddress,
-    transaction::{queue_system::TransactionsQueueSetup, NonceManager},
 };
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -56,39 +53,10 @@ pub async fn create_relayer(
         .await?;
     invalidate_relayer_cache(&state.cache, &relayer.id).await;
 
-    let current_nonce = provider.get_nonce(&relayer).await?;
-
     let id = relayer.id;
     let address = relayer.address;
 
-    let network_config = state.network_configs.iter().find(|config| config.chain_id == chain_id);
+    start_relayer_queue(&state, relayer, provider, &chain_id).await?;
 
-    let gas_bump_config =
-        network_config.map(|config| config.gas_bump_blocks_every.clone()).unwrap_or_default();
-
-    let max_gas_price_multiplier =
-        network_config.map(|config| config.max_gas_price_multiplier).unwrap_or(2);
-
-    state
-        .transactions_queues
-        .lock()
-        .await
-        .add_new_relayer(
-            TransactionsQueueSetup::new(
-                relayer,
-                provider.clone(),
-                NonceManager::new(current_nonce),
-                Default::default(),
-                Default::default(),
-                Default::default(),
-                state.safe_proxy_manager.clone(),
-                gas_bump_config,
-                max_gas_price_multiplier,
-            ),
-            state.transactions_queues.clone(),
-        )
-        .await?;
-
-    invalidate_relayer_cache(&state.cache, &id).await;
     Ok(Json(CreateRelayerResult { id, address }))
 }

@@ -2,9 +2,9 @@ use crate::gas::BLOB_GAS_PER_BLOB;
 use crate::provider::layer_extensions::RpcLoggingLayer;
 use crate::relayer::Relayer;
 use crate::wallet::{
-    AwsKmsWalletManager, CompositeWalletManager, FireblocksWalletManager, MnemonicWalletManager,
-    Pkcs11WalletManager, PrivateKeyWalletManager, PrivyWalletManager, TurnkeyWalletManager,
-    WalletError, WalletManagerTrait,
+    AwsKmsWalletManager, CompositeWalletManager, FireblocksWalletManager, ImportKeyResult,
+    MnemonicWalletManager, Pkcs11WalletManager, PrivateKeyWalletManager, PrivyWalletManager,
+    TurnkeyWalletManager, WalletError, WalletManagerTrait,
 };
 use crate::yaml::{
     AwsKmsSigningProviderConfig, FireblocksSigningProviderConfig, Pkcs11SigningProviderConfig,
@@ -303,6 +303,25 @@ impl EvmProvider {
 
     pub fn can_clone(&self) -> bool {
         self.can_clone
+    }
+
+    /// Returns whether this provider supports importing existing keys
+    pub fn supports_key_import(&self) -> bool {
+        self.wallet_manager.supports_key_import()
+    }
+
+    /// Imports an existing key into the wallet manager.
+    /// Only supported for certain wallet managers (e.g., AWS KMS).
+    /// Verifies the key's address matches expected_address before making any changes.
+    pub async fn import_existing_key(
+        &self,
+        key_id: &str,
+        wallet_index: u32,
+        expected_address: &EvmAddress,
+    ) -> Result<ImportKeyResult, WalletError> {
+        self.wallet_manager
+            .import_existing_key(key_id, wallet_index, &self.chain_id, expected_address)
+            .await
     }
 
     pub async fn get_receipt(

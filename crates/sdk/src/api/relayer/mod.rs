@@ -7,9 +7,9 @@ use crate::api::{
 pub use allowlist::RelayerAllowlist;
 use rrelayer_core::relayer::{CloneRelayerRequest, CreateRelayerRequest};
 use rrelayer_core::{
-    common_types::{PagingContext, PagingResult},
+    common_types::{EvmAddress, PagingContext, PagingResult},
     network::ChainId,
-    relayer::{CreateRelayerResult, GetRelayerResult, Relayer, RelayerId},
+    relayer::{CreateRelayerResult, GetRelayerResult, ImportRelayerResult, Relayer, RelayerId},
 };
 use std::sync::Arc;
 
@@ -109,5 +109,32 @@ impl RelayerApi {
 
     pub async fn get_inmempool_count(&self, id: &RelayerId) -> ApiResult<u32> {
         self.client.get(&format!("transactions/relayers/{}/inmempool/count", id)).await
+    }
+
+    pub async fn import(
+        &self,
+        chain_id: u64,
+        name: &str,
+        key_id: &str,
+        address: &EvmAddress,
+    ) -> ApiResult<ImportRelayerResult> {
+        #[derive(serde::Serialize)]
+        struct ImportRelayerRequest {
+            name: String,
+            #[serde(rename = "keyId")]
+            key_id: String,
+            address: EvmAddress,
+        }
+
+        self.client
+            .post(
+                &format!("relayers/{}/import", chain_id),
+                &ImportRelayerRequest {
+                    name: name.to_string(),
+                    key_id: key_id.to_string(),
+                    address: *address,
+                },
+            )
+            .await
     }
 }

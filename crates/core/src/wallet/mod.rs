@@ -151,6 +151,12 @@ impl From<ChainId> for WalletManagerChainId {
     }
 }
 
+/// Result of importing an existing key into the wallet manager
+pub struct ImportKeyResult {
+    /// The alias or identifier assigned to the key
+    pub key_alias: String,
+}
+
 #[async_trait]
 pub trait WalletManagerTrait: Send + Sync {
     async fn create_wallet(
@@ -188,4 +194,25 @@ pub trait WalletManagerTrait: Send + Sync {
 
     /// Returns whether this wallet manager supports EIP-4844 blob transactions
     fn supports_blobs(&self) -> bool;
+
+    /// Returns whether this wallet manager supports importing existing keys
+    fn supports_key_import(&self) -> bool {
+        false
+    }
+
+    /// Imports an existing key into the wallet manager.
+    /// The key_id format depends on the provider (e.g., KMS key ARN for AWS KMS).
+    /// The expected_address is verified against the key's actual address before any changes are made.
+    /// Returns the alias/identifier that was assigned to the key.
+    async fn import_existing_key(
+        &self,
+        _key_id: &str,
+        _wallet_index: u32,
+        _chain_id: &ChainId,
+        _expected_address: &EvmAddress,
+    ) -> Result<ImportKeyResult, WalletError> {
+        Err(WalletError::UnsupportedOperation(
+            "This wallet manager does not support importing existing keys".to_string(),
+        ))
+    }
 }

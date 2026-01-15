@@ -17,6 +17,8 @@ import {
   getRelayerAllowlistAddress,
   TransactionSpeed,
   cloneRelayer,
+  importRelayer,
+  ImportRelayerResult,
   getNetwork,
   TransactionToSend,
   sendTransactionRandom,
@@ -85,6 +87,22 @@ export class Client {
         name: string
       ): Promise<CreateRelayerResult> => {
         return cloneRelayer(relayerId, chainId, name, this._apiBaseConfig);
+      },
+      /**
+       * Import an existing signing key as a relayer
+       * @param chainId The chain id to import the relayer on
+       * @param name The name of the relayer
+       * @param keyId The key identifier (e.g., KMS key ARN for AWS KMS)
+       * @param address The Ethereum address derived from the key
+       * @returns Promise<ImportRelayerResult>
+       */
+      import: async (
+        chainId: number,
+        name: string,
+        keyId: string,
+        address: string
+      ): Promise<ImportRelayerResult> => {
+        return importRelayer(chainId, name, keyId, address, this._apiBaseConfig);
       },
       /**
        * Delete a relayer
