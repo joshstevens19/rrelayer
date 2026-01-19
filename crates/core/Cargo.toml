@@ -1,6 +1,6 @@
 [package]
 name = "rrelayer_core"
-version = "0.9.1"
+version = "0.10.0"
 resolver = "2"
 edition = "2021"
 authors = ["joshstevens19@hotmail.co.uk"]
@@ -52,9 +52,10 @@ postgres-native-tls = "0.5"
 hex = "0.4.3"
 anyhow = "1.0.98"
 rust_decimal = { version = "1.35.0", features = ["db-tokio-postgres"] }
-google-secretmanager1 = "5.0"
+google-secretmanager1 = "6.0"
 hyper = "0.14"
 hyper-rustls = "0.24"
+rustls = { version = "0.23.35", features = ["ring"]}
 hmac = "0.12"
 sha2 = "0.10"
 p256 = { version = "0.13", features = ["ecdsa"] }

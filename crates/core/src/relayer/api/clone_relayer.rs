@@ -9,14 +9,9 @@ use serde::{Deserialize, Serialize};
 
 use super::create_relayer::CreateRelayerResult;
 use crate::relayer::db::CreateRelayerMode;
+use crate::relayer::{cache::invalidate_relayer_cache, start_relayer_queue, types::RelayerId};
 use crate::shared::{not_found, HttpError};
-use crate::{
-    app_state::AppState,
-    network::ChainId,
-    provider::find_provider_for_chain_id,
-    relayer::{cache::invalidate_relayer_cache, types::RelayerId},
-    transaction::{queue_system::TransactionsQueueSetup, NonceManager},
-};
+use crate::{app_state::AppState, network::ChainId, provider::find_provider_for_chain_id};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CloneRelayerRequest {
@@ -39,50 +34,22 @@ pub async fn clone_relayer(
         .await
         .ok_or(not_found("Could not find provider for the chain id".to_string()))?;
 
+    let chain_id = relayer.chain_id;
     let relayer = state
         .db
         .create_relayer(
             &relayer.new_relayer_name,
-            &relayer.chain_id,
+            &chain_id,
             provider,
             CreateRelayerMode::Clone(relayer_id),
         )
         .await?;
 
-    let current_nonce = provider.get_nonce(&relayer).await?;
-
     let id = relayer.id;
     let address = relayer.address;
 
-    let network_config =
-        state.network_configs.iter().find(|config| config.chain_id == relayer.chain_id);
-
-    let gas_bump_config =
-        network_config.map(|config| config.gas_bump_blocks_every.clone()).unwrap_or_default();
-
-    let max_gas_price_multiplier =
-        network_config.map(|config| config.max_gas_price_multiplier).unwrap_or(2);
-
-    state
-        .transactions_queues
-        .lock()
-        .await
-        .add_new_relayer(
-            TransactionsQueueSetup::new(
-                relayer,
-                provider.clone(),
-                NonceManager::new(current_nonce),
-                Default::default(),
-                Default::default(),
-                Default::default(),
-                state.safe_proxy_manager.clone(),
-                gas_bump_config,
-                max_gas_price_multiplier,
-            ),
-            state.transactions_queues.clone(),
-        )
-        .await?;
-
     invalidate_relayer_cache(&state.cache, &id).await;
+    start_relayer_queue(&state, relayer, provider, &chain_id).await?;
+
     Ok(Json(CreateRelayerResult { id, address }))
 }

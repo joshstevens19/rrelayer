@@ -1,6 +1,6 @@
 use crate::wallet::WalletError;
 use crate::yaml::GcpSecretManagerProviderConfig;
-use google_secretmanager1::{hyper, hyper_rustls, oauth2, SecretManager};
+use google_secretmanager1::{hyper_rustls, hyper_util, yup_oauth2, SecretManager};
 use std::path::Path;
 
 pub async fn get_gcp_secret(
@@ -9,18 +9,19 @@ pub async fn get_gcp_secret(
 ) -> Result<String, WalletError> {
     let key_path = project_path.join(&config.service_account_key_path);
 
-    let service_account_key = oauth2::read_service_account_key(&key_path).await.map_err(|e| {
-        WalletError::ConfigurationError {
-            message: format!("Failed to read service account key: {}", e),
-        }
-    })?;
+    let service_account_key =
+        yup_oauth2::read_service_account_key(&key_path).await.map_err(|e| {
+            WalletError::ConfigurationError {
+                message: format!("Failed to read service account key: {}", e),
+            }
+        })?;
 
     let project_id =
         service_account_key.project_id.clone().ok_or(WalletError::ConfigurationError {
             message: "No project_id found in service account key".to_string(),
         })?;
 
-    let auth = oauth2::ServiceAccountAuthenticator::builder(service_account_key)
+    let auth = yup_oauth2::ServiceAccountAuthenticator::builder(service_account_key)
         .build()
         .await
         .map_err(|e| WalletError::AuthenticationError {
@@ -36,7 +37,11 @@ pub async fn get_gcp_secret(
         .enable_http1()
         .build();
 
-    let client = SecretManager::new(hyper::Client::builder().build(https), auth);
+    let hyper_client =
+        hyper_util::client::legacy::Client::builder(hyper_util::rt::TokioExecutor::new())
+            .build(https);
+
+    let client = SecretManager::new(hyper_client, auth);
 
     let version = config.version.as_deref().unwrap_or("latest");
     let secret_path = format!("projects/{}/secrets/{}/versions/{}", project_id, config.id, version);

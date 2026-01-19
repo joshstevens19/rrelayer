@@ -16,6 +16,7 @@ use rrelayer_core::{
     common_types::{EvmAddress, PagingContext, PagingResult},
     gas::GasEstimatorResult,
     network::{ChainId, Network},
+    relayer::ImportRelayerResult,
     relayer::{CreateRelayerResult, GetRelayerResult, Relayer, RelayerId},
     transaction::api::RelayTransactionStatusResult,
     transaction::types::{Transaction, TransactionHash, TransactionId},
@@ -168,6 +169,16 @@ impl<'a> ClientRelayerApi<'a> {
         only_for_chain_id: Option<u64>,
     ) -> ApiResult<PagingResult<Relayer>> {
         self.relayer_api.get_all(only_for_chain_id, paging_context).await
+    }
+
+    pub async fn import(
+        &self,
+        chain_id: u64,
+        name: &str,
+        key_id: &str,
+        address: &EvmAddress,
+    ) -> ApiResult<ImportRelayerResult> {
+        self.relayer_api.import(chain_id, name, key_id, address).await
     }
 }
 

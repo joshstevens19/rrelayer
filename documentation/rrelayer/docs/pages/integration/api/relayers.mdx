@@ -48,6 +48,93 @@ curl -X POST https://your-rrelayer.com/relayers/11155111/new \
   -d '{"name": "my-app-relayer"}'
 ```
 
+## Import Relayer
+
+Import an existing signing key (e.g., AWS KMS key) as a relayer. This allows you to use pre-existing keys with rrelayer without manually creating database records or renaming key aliases.
+
+**Note:** This endpoint is only available when using signing providers that support key import (currently AWS KMS).
+
+### Endpoint
+
+```
+POST /relayers/{chain_id}/import
+```
+
+### Request Body
+
+```json
+{
+  "name": "my-imported-relayer",
+  "keyId": "arn:aws:kms:us-east-1:123456789012:key/abc123-def456-ghi789",
+  "address": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b"
+}
+```
+
+#### Parameters
+
+| Field     | Type     | Required | Description                                                                 |
+| --------- | -------- | -------- | --------------------------------------------------------------------------- |
+| `name`    | `string` | Yes      | Human-readable name for the relayer                                         |
+| `keyId`   | `string` | Yes      | The key identifier (format depends on provider, e.g., KMS key ARN for AWS)  |
+| `address` | `string` | Yes      | The Ethereum address derived from the key (verified against the actual key) |
+
+### Response
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "address": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b",
+  "walletIndex": 0,
+  "keyAlias": "alias/rrelayer-wallet-0-11155111"
+}
+```
+
+#### Response Fields
+
+| Field        | Type     | Description                                                      |
+| ------------ | -------- | ---------------------------------------------------------------- |
+| `id`         | `string` | Unique identifier for the imported relayer                        |
+| `address`    | `string` | Ethereum address of the relayer                                  |
+| `walletIndex`| `number` | Wallet index assigned to this relayer                            |
+| `keyAlias`   | `string` | The alias/identifier assigned to the key (e.g., KMS alias)       |
+
+### Validation
+
+The endpoint performs the following validations:
+
+1. **Provider Support** - Verifies the signing provider supports key import
+2. **Key Existence** - Confirms the key exists and is accessible
+3. **Key Type** - Validates the key is the correct type (e.g., `ECC_SECG_P256K1` for AWS KMS)
+4. **Address Match** - Verifies the provided address matches the key's actual address (before creating any side effects)
+5. **Duplicate Check** - Returns `409 Conflict` if a relayer with the same address already exists for this chain
+
+### Error Responses
+
+| Status | Description                                                          |
+| ------ | -------------------------------------------------------------------- |
+| 400    | Invalid request, key doesn't exist, or address mismatch             |
+| 409    | A relayer with this address already exists for the specified chain  |
+| 500    | Server error during key import                                   |
+
+### Example
+
+```bash
+curl -X POST https://your-rrelayer.com/relayers/11155111/import \
+  -u "username:password" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "my-imported-relayer",
+    "keyId": "arn:aws:kms:us-east-1:123456789012:key/abc123-def456-ghi789",
+    "address": "0x742d35cc6466c4b0de3e3e8c7b8e8f9e8a8d8c8b"
+  }'
+```
+
+### Use Cases
+
+- **Migrating from another system** - Import existing KMS keys from previous infrastructure
+- **Using pre-configured keys** - Import keys that were set up manually or via infrastructure-as-code
+- **Key rotation** - Import new keys while maintaining the same relayer configuration
+
 ## Get Relayers
 
 Get a list of all relayers.
@@ -357,14 +444,14 @@ curl -X DELETE https://your-rrelayer.com/relayers/0x742d35cc6466c4b0de3e3e8c7b8e
 
 ### Common Error Codes
 
-| Status | Code              | Description                 |
-| ------ | ----------------- | --------------------------- |
-| 400    | `INVALID_REQUEST` | Invalid request parameters  |
-| 401    | `UNAUTHORIZED`    | Authentication required     |
-| 403    | `FORBIDDEN`       | Insufficient permissions    |
-| 404    | `NOT_FOUND`       | Relayer not found           |
-| 409    | `CONFLICT`        | Relayer name already exists |
-| 500    | `INTERNAL_ERROR`  | Server error                |
+| Status | Code              | Description                                                      |
+| ------ | ----------------- | ---------------------------------------------------------------- |
+| 400    | `INVALID_REQUEST` | Invalid request parameters                                       |
+| 401    | `UNAUTHORIZED`    | Authentication required                                          |
+| 403    | `FORBIDDEN`       | Insufficient permissions                                         |
+| 404    | `NOT_FOUND`       | Relayer not found                                                |
+| 409    | `CONFLICT`        | Relayer name already exists or address already exists for chain  |
+| 500    | `INTERNAL_ERROR`  | Server error                                                     |
 
 ## Best Practices
 
