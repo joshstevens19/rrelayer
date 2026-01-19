@@ -18,7 +18,7 @@ use rrelayer_core::{
     network::{ChainId, Network},
     relayer::{CreateRelayerResult, GetRelayerResult, Relayer, RelayerId},
     transaction::api::RelayTransactionStatusResult,
-    transaction::types::{Transaction, TransactionId},
+    transaction::types::{Transaction, TransactionHash, TransactionId},
 };
 
 #[derive(Debug, Clone)]
@@ -561,6 +561,20 @@ pub struct RelayerClientTransactionApi<'a> {
 impl<'a> RelayerClientTransactionApi<'a> {
     pub async fn get(&self, transaction_id: &TransactionId) -> ApiResult<Option<Transaction>> {
         self.transaction_api.get(transaction_id).await
+    }
+
+    pub async fn get_by_tx_hash(
+        &self,
+        tx_hash: &TransactionHash,
+    ) -> ApiResult<Option<Transaction>> {
+        self.transaction_api.get_by_tx_hash(tx_hash).await
+    }
+
+    pub async fn get_by_external_id(
+        &self,
+        external_id: &str,
+    ) -> ApiResult<Option<Transaction>> {
+        self.transaction_api.get_by_external_id(external_id).await
     }
 
     pub async fn get_status(
