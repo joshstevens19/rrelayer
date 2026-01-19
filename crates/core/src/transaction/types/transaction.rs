@@ -2,8 +2,7 @@ use std::fmt::Display;
 
 use alloy::{
     consensus::{
-        BlobTransactionSidecarVariant, TxEip1559, TxEip4844, TxEip4844Variant,
-        TxEip4844WithSidecar, TxLegacy, TypedTransaction,
+        TxEip1559, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxLegacy, TypedTransaction,
     },
     eips::eip2930::AccessList,
     primitives::TxKind,
@@ -286,7 +285,7 @@ impl Transaction {
         };
 
         Ok(TypedTransaction::Eip4844(TxEip4844Variant::TxEip4844WithSidecar(
-            TxEip4844WithSidecar { tx, sidecar: BlobTransactionSidecarVariant::Eip4844(sidecar) },
+            TxEip4844WithSidecar { tx, sidecar },
         )))
     }
 
