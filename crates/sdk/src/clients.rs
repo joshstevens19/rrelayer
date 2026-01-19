@@ -359,6 +359,20 @@ impl<'a> AdminRelayerClientTransactionApi<'a> {
         self.transaction_api.get(transaction_id).await
     }
 
+    pub async fn get_by_tx_hash(
+        &self,
+        tx_hash: &TransactionHash,
+    ) -> ApiResult<Option<Transaction>> {
+        self.transaction_api.get_by_tx_hash(tx_hash).await
+    }
+
+    pub async fn get_by_external_id(
+        &self,
+        external_id: &str,
+    ) -> ApiResult<Option<Transaction>> {
+        self.transaction_api.get_by_external_id(external_id).await
+    }
+
     pub async fn get_status(
         &self,
         transaction_id: &TransactionId,
