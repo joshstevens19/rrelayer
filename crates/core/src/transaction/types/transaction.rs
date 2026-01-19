@@ -1,8 +1,8 @@
 use std::fmt::Display;
 
 use alloy::{
-    consensus::{TxEip1559, TxEip4844, TxEip4844Variant,
-        TxEip4844WithSidecar, TxLegacy, TypedTransaction,
+    consensus::{
+        TxEip1559, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxLegacy, TypedTransaction,
     },
     eips::eip2930::AccessList,
     primitives::TxKind,
