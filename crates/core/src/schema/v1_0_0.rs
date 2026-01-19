@@ -134,7 +134,7 @@ pub async fn apply_v1_0_0_schema(client: &PostgresClient) -> Result<(), Postgres
         CREATE INDEX IF NOT EXISTS idx_transaction_sent_with_gas 
         ON relayer.transaction(sent_with_gas) WHERE sent_with_gas IS NOT NULL;
 
-        CREATE INDEX IF NOT EXISTS idx_transaction_sent_with_blob_gas 
+        CREATE INDEX IF NOT EXISTS idx_transaction_sent_with_blob_gas
         ON relayer.transaction(sent_with_blob_gas) WHERE sent_with_blob_gas IS NOT NULL;
 
         CREATE INDEX IF NOT EXISTS idx_relayer_chain_deleted 

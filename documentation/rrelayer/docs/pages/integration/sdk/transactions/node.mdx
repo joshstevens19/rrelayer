@@ -493,6 +493,138 @@ import { relayerClient } from './config';
 let response = await relayerClient.transaction.get('ebf8a8c1-9de5-4307-9810-8e842dad7bde');
 ```
 
+## Get Transaction by External ID
+
+:::info
+Basic auth can get transactions for all relayers, and API keys can only get transactions with the relayer they have permission to use.
+:::
+
+Get a transaction by its external ID. The external ID is a custom identifier you can set when sending a transaction.
+
+### Response
+
+```ts
+Promise<Transaction | null>;
+```
+
+### Basic Auth
+
+```ts
+// config.ts
+import { createClient, TransactionSpeed } from 'rrelayer';
+import * as dotenv from "dotenv";
+dotenv.config();
+
+const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: process.env.RRELAYER_AUTH_USERNAME!,
+    password: process.env.RRELAYER_AUTH_PASSWORD!,
+  },
+});
+
+export const relayerClient = await client.getRelayerClient(
+  '94afb207-bb47-4392-9229-ba87e4d783cb',
+  TransactionSpeed.FAST
+);
+
+...
+
+// get-transaction-by-external-id.ts
+import { relayerClient } from './config';
+
+// returns a Transaction | null - import { Transaction } from 'rrelayer';
+let response = await relayerClient.transaction.getByExternalId('my-custom-external-id');
+```
+
+### API Key Auth
+
+```ts
+// config.ts
+import { createRelayerClient, TransactionSpeed } from 'rrelayer';
+
+export let relayerClient = createRelayerClient({
+  serverUrl: 'http://localhost:8000',
+  relayerId: '94afb207-bb47-4392-9229-ba87e4d783cb',
+  apiKey: 'YOUR_API_KEY',
+  speed: TransactionSpeed.FAST,
+});
+
+...
+
+// get-transaction-by-external-id.ts
+import { relayerClient } from './config';
+
+// returns a Transaction | null - import { Transaction } from 'rrelayer';
+let response = await relayerClient.transaction.getByExternalId('my-custom-external-id');
+```
+
+## Get Transaction by Transaction Hash
+
+:::info
+Basic auth can get transactions for all relayers, and API keys can only get transactions with the relayer they have permission to use.
+:::
+
+Get a transaction by its blockchain transaction hash.
+
+### Response
+
+```ts
+Promise<Transaction | null>;
+```
+
+### Basic Auth
+
+```ts
+// config.ts
+import { createClient, TransactionSpeed } from 'rrelayer';
+import * as dotenv from "dotenv";
+dotenv.config();
+
+const client = createClient({
+  serverUrl: 'http://localhost:8000',
+  auth: {
+    username: process.env.RRELAYER_AUTH_USERNAME!,
+    password: process.env.RRELAYER_AUTH_PASSWORD!,
+  },
+});
+
+export const relayerClient = await client.getRelayerClient(
+  '94afb207-bb47-4392-9229-ba87e4d783cb',
+  TransactionSpeed.FAST
+);
+
+...
+
+// get-transaction-by-tx-hash.ts
+import { relayerClient } from './config';
+
+// returns a Transaction | null - import { Transaction } from 'rrelayer';
+let response = await relayerClient.transaction.getByTxHash('0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef');
+```
+
+### API Key Auth
+
+```ts
+// config.ts
+import { createRelayerClient, TransactionSpeed } from 'rrelayer';
+
+export let relayerClient = createRelayerClient({
+  serverUrl: 'http://localhost:8000',
+  relayerId: '94afb207-bb47-4392-9229-ba87e4d783cb',
+  apiKey: 'YOUR_API_KEY',
+  speed: TransactionSpeed.FAST,
+});
+
+...
+
+// get-transaction-by-tx-hash.ts
+import { relayerClient } from './config';
+
+// returns a Transaction | null - import { Transaction } from 'rrelayer';
+let response = await relayerClient.transaction.getByTxHash('0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef');
+```
+
 ## Transaction Status
 
 :::info

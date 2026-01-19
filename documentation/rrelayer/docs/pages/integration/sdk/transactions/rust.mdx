@@ -801,6 +801,208 @@ async fn example() -> Result<()> {
 }
 ```
 
+## Get Transaction by External ID
+
+:::info
+Basic auth can get transactions for all relayers, and API keys can only get transactions with the relayer they have permission to use.
+:::
+
+Get a transaction by its external ID. The external ID is a custom identifier you can set when sending a transaction.
+
+### Response
+
+```rust
+pub type Response = ApiResult<Option<Transaction>>; // [!code focus]
+```
+
+### Basic Auth
+
+```rust
+use anyhow::Result;
+use rrelayer::{
+    AdminRelayerClient, CreateClientAuth, CreateClientConfig, RelayerId, Transaction,
+    TransactionSpeed, create_client,
+};
+use std::str::FromStr;
+use dotenvy::dotenv;
+use std::env;
+
+async fn get_relayer_client() -> Result<AdminRelayerClient> {
+    dotenv().ok();
+
+    let username = env::var("RRELAYER_AUTH_USERNAME")
+        .expect("RRELAYER_AUTH_USERNAME must be set");
+
+    let password = env::var("RRELAYER_AUTH_PASSWORD")
+        .expect("RRELAYER_AUTH_PASSWORD must be set");
+
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username,
+            password,
+        },
+    });
+
+    let relayer_client: AdminRelayerClient = client
+        .get_relayer_client(
+            &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+            Some(TransactionSpeed::FAST),
+        )
+        .await?;
+
+    Ok(relayer_client)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let transaction: Option<Transaction> = relayer_client
+        .transaction()
+        .get_by_external_id("my-custom-external-id")
+        .await?;
+    println!("{:?}", transaction);
+
+    Ok(())
+}
+```
+
+### API Key Auth
+
+```rust
+use anyhow::Result;
+use rrelayer::{
+    CreateRelayerClientConfig, RelayerClient, RelayerId, Transaction,
+    TransactionSpeed, create_relayer_client,
+};
+use std::str::FromStr;
+
+async fn get_relayer_client() -> Result<RelayerClient> {
+    let relayer: RelayerClient = create_relayer_client(CreateRelayerClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        relayer_id: RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+        api_key: "YOUR_API_KEY".to_string(),
+        speed: Some(TransactionSpeed::FAST),
+    });
+
+    Ok(relayer)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let transaction: Option<Transaction> = relayer_client
+        .transaction()
+        .get_by_external_id("my-custom-external-id")
+        .await?;
+    println!("{:?}", transaction);
+
+    Ok(())
+}
+```
+
+## Get Transaction by Transaction Hash
+
+:::info
+Basic auth can get transactions for all relayers, and API keys can only get transactions with the relayer they have permission to use.
+:::
+
+Get a transaction by its blockchain transaction hash.
+
+### Response
+
+```rust
+pub type Response = ApiResult<Option<Transaction>>; // [!code focus]
+```
+
+### Basic Auth
+
+```rust
+use anyhow::Result;
+use rrelayer::{
+    AdminRelayerClient, CreateClientAuth, CreateClientConfig, RelayerId, Transaction,
+    TransactionHash, TransactionSpeed, create_client,
+};
+use std::str::FromStr;
+use dotenvy::dotenv;
+use std::env;
+
+async fn get_relayer_client() -> Result<AdminRelayerClient> {
+    dotenv().ok();
+
+    let username = env::var("RRELAYER_AUTH_USERNAME")
+        .expect("RRELAYER_AUTH_USERNAME must be set");
+
+    let password = env::var("RRELAYER_AUTH_PASSWORD")
+        .expect("RRELAYER_AUTH_PASSWORD must be set");
+
+    let client = create_client(CreateClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        auth: CreateClientAuth {
+            username,
+            password,
+        },
+    });
+
+    let relayer_client: AdminRelayerClient = client
+        .get_relayer_client(
+            &RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+            Some(TransactionSpeed::FAST),
+        )
+        .await?;
+
+    Ok(relayer_client)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let tx_hash = TransactionHash::from_str("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef")?;
+    let transaction: Option<Transaction> = relayer_client
+        .transaction()
+        .get_by_tx_hash(&tx_hash)
+        .await?;
+    println!("{:?}", transaction);
+
+    Ok(())
+}
+```
+
+### API Key Auth
+
+```rust
+use anyhow::Result;
+use rrelayer::{
+    CreateRelayerClientConfig, RelayerClient, RelayerId, Transaction,
+    TransactionHash, TransactionSpeed, create_relayer_client,
+};
+use std::str::FromStr;
+
+async fn get_relayer_client() -> Result<RelayerClient> {
+    let relayer: RelayerClient = create_relayer_client(CreateRelayerClientConfig {
+        server_url: "http://localhost:8000".to_string(),
+        relayer_id: RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?,
+        api_key: "YOUR_API_KEY".to_string(),
+        speed: Some(TransactionSpeed::FAST),
+    });
+
+    Ok(relayer)
+}
+
+async fn example() -> Result<()> {
+    let relayer_client = get_relayer_client().await?;
+
+    let tx_hash = TransactionHash::from_str("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef")?;
+    let transaction: Option<Transaction> = relayer_client
+        .transaction()
+        .get_by_tx_hash(&tx_hash)
+        .await?;
+    println!("{:?}", transaction);
+
+    Ok(())
+}
+```
+
 ## Transaction Status
 
 :::info

@@ -9,7 +9,7 @@ use rrelayer_core::{
     RATE_LIMIT_HEADER_NAME,
     common_types::{PagingContext, PagingResult},
     relayer::RelayerId,
-    transaction::types::{Transaction, TransactionId},
+    transaction::types::{Transaction, TransactionHash, TransactionId},
 };
 use std::sync::Arc;
 
@@ -25,6 +25,17 @@ impl TransactionApi {
 
     pub async fn get(&self, transaction_id: &TransactionId) -> ApiResult<Option<Transaction>> {
         self.client.get_or_none(&format!("transactions/{}", transaction_id)).await
+    }
+
+    pub async fn get_by_tx_hash(
+        &self,
+        tx_hash: &TransactionHash,
+    ) -> ApiResult<Option<Transaction>> {
+        self.client.get_or_none(&format!("transactions/hash/{}", tx_hash)).await
+    }
+
+    pub async fn get_by_external_id(&self, external_id: &str) -> ApiResult<Option<Transaction>> {
+        self.client.get_or_none(&format!("transactions/external/{}", external_id)).await
     }
 
     pub async fn get_all(
