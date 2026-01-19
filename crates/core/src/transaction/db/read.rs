@@ -3,7 +3,7 @@ use crate::{
     postgres::{PostgresClient, PostgresError},
     relayer::RelayerId,
     shared::common_types::{PagingContext, PagingResult},
-    transaction::types::{Transaction, TransactionId, TransactionStatus},
+    transaction::types::{Transaction, TransactionHash, TransactionId, TransactionStatus},
 };
 
 impl PostgresClient {
@@ -81,5 +81,47 @@ impl PostgresClient {
         let result_count = results.len();
 
         Ok(PagingResult::new(results, paging_context.next(result_count), paging_context.previous()))
+    }
+
+    pub async fn get_transaction_by_hash(
+        &self,
+        hash: &TransactionHash,
+    ) -> Result<Option<Transaction>, PostgresError> {
+        let row = self
+            .query_one_or_none(
+                "
+                    SELECT *
+                    FROM relayer.transaction
+                    WHERE hash = $1;
+                ",
+                &[hash],
+            )
+            .await?;
+
+        match row {
+            None => Ok(None),
+            Some(row) => Ok(Some(build_transaction_from_transaction_view(&row))),
+        }
+    }
+
+    pub async fn get_transaction_by_external_id(
+        &self,
+        external_id: &str,
+    ) -> Result<Option<Transaction>, PostgresError> {
+        let row = self
+            .query_one_or_none(
+                "
+                    SELECT *
+                    FROM relayer.transaction
+                    WHERE external_id = $1;
+                ",
+                &[&external_id],
+            )
+            .await?;
+
+        match row {
+            None => Ok(None),
+            Some(row) => Ok(Some(build_transaction_from_transaction_view(&row))),
+        }
     }
 }

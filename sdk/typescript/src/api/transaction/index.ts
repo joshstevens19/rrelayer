@@ -1,5 +1,7 @@
 export * from './cancel-transaction';
 export * from './get-transaction';
+export * from './get-transaction-by-external-id';
+export * from './get-transaction-by-tx-hash';
 export * from './get-transaction-status';
 export * from './get-transactions';
 export * from './get-transactions-inmempool-count';

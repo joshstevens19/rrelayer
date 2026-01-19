@@ -208,6 +208,64 @@ curl https://your-rrelayer.com/transactions/550e8400-e29b-41d4-a716-446655440000
   -u "username:password"
 ```
 
+## Get Transaction by Hash
+
+Get transaction details by blockchain transaction hash.
+
+### Endpoint
+
+```
+GET /transactions/hash/{tx_hash}
+```
+
+### Path Parameters
+
+| Parameter | Type     | Required | Description                                           |
+| --------- | -------- | -------- | ----------------------------------------------------- |
+| `tx_hash` | `string` | Yes      | The blockchain transaction hash (e.g., `0xabcdef...`) |
+
+### Response
+
+Same format as [Get Transaction](#get-transaction).
+
+Returns `null` if no transaction is found with the given hash.
+
+### Example
+
+```bash
+curl https://your-rrelayer.com/transactions/hash/0xabcdef123456789abcdef123456789abcdef123456789abcdef123456789abcdef \
+  -u "username:password"
+```
+
+## Get Transaction by External ID
+
+Get transaction details by custom external ID.
+
+### Endpoint
+
+```
+GET /transactions/external/{external_id}
+```
+
+### Path Parameters
+
+| Parameter     | Type     | Required | Description                                                          |
+| ------------- | -------- | -------- | -------------------------------------------------------------------- |
+| `external_id` | `string` | Yes      | The custom external ID provided when the transaction was created     |
+
+### Response
+
+Same format as [Get Transaction](#get-transaction).
+
+Returns `null` if no transaction is found with the given external ID.
+
+### Example
+
+```bash
+curl https://your-rrelayer.com/transactions/external/order_12345 \
+  -u "username:password"
+```
+
 ## Get Transaction Status
 
 Get the current status and receipt information for a transaction.

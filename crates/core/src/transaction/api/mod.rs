@@ -10,7 +10,9 @@ use crate::app_state::AppState;
 mod cancel_transaction;
 pub use cancel_transaction::CancelTransactionResponse;
 mod get_relayer_transactions;
+mod get_transaction_by_external_id;
 mod get_transaction_by_id;
+mod get_transaction_by_tx_hash;
 mod get_transaction_status;
 pub use get_transaction_status::RelayTransactionStatusResult;
 mod get_transactions_inmempool_count;
@@ -25,6 +27,11 @@ pub use types::TransactionSpeed;
 pub fn create_transactions_routes() -> Router<Arc<AppState>> {
     // All transaction routes handle authentication internally via validate_allowed_passed_basic_auth + validate_auth_basic_or_api_key
     Router::new()
+        .route("/hash/:tx_hash", get(get_transaction_by_tx_hash::get_transaction_by_tx_hash_api))
+        .route(
+            "/external/:external_id",
+            get(get_transaction_by_external_id::get_transaction_by_external_id_api),
+        )
         .route("/:id", get(get_transaction_by_id::get_transaction_by_id_api))
         .route("/status/:id", get(get_transaction_status::get_transaction_status))
         .route("/relayers/:relayer_id/send", post(send_transaction::handle_send_transaction))
