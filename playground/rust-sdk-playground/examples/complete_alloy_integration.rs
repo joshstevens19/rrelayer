@@ -227,7 +227,7 @@ fn create_relayer_signer() -> Result<RelayerSigner> {
     let relayer_id = RelayerId::from_str("94afb207-bb47-4392-9229-ba87e4d783cb")?;
     let config = RelayerClientConfig {
         server_url: "https://api.relayer.example.com".to_string(),
-        relayer_id: relayer_id.clone(),
+        relayer_id,
         auth: RelayerClientAuth::ApiKey { api_key: "your-api-key-here".to_string() },
         fallback_speed: None,
     };

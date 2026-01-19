@@ -2,8 +2,7 @@ use std::fmt::Display;
 
 use alloy::{
     consensus::{
-        BlobTransactionSidecarVariant, TxEip1559, TxEip4844, TxEip4844Variant,
-        TxEip4844WithSidecar, TxLegacy, TypedTransaction,
+        TxEip1559, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxLegacy, TypedTransaction,
     },
     eips::eip2930::AccessList,
     primitives::TxKind,
@@ -12,6 +11,7 @@ use alloy_eips::eip4844::{
     builder::{SidecarBuilder, SimpleCoder},
     BlobTransactionSidecar,
 };
+use alloy_eips::eip7594::BlobTransactionSidecarVariant;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
