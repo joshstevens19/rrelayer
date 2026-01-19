@@ -366,10 +366,7 @@ impl<'a> AdminRelayerClientTransactionApi<'a> {
         self.transaction_api.get_by_tx_hash(tx_hash).await
     }
 
-    pub async fn get_by_external_id(
-        &self,
-        external_id: &str,
-    ) -> ApiResult<Option<Transaction>> {
+    pub async fn get_by_external_id(&self, external_id: &str) -> ApiResult<Option<Transaction>> {
         self.transaction_api.get_by_external_id(external_id).await
     }
 
@@ -584,10 +581,7 @@ impl<'a> RelayerClientTransactionApi<'a> {
         self.transaction_api.get_by_tx_hash(tx_hash).await
     }
 
-    pub async fn get_by_external_id(
-        &self,
-        external_id: &str,
-    ) -> ApiResult<Option<Transaction>> {
+    pub async fn get_by_external_id(&self, external_id: &str) -> ApiResult<Option<Transaction>> {
         self.transaction_api.get_by_external_id(external_id).await
     }
 
