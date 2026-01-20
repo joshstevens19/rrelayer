@@ -27,6 +27,10 @@ impl TransactionHash {
     pub fn into_alloy_hash(self) -> TxHash {
         self.0
     }
+
+    pub fn new(hash: TxHash) -> Self {
+        Self(hash)
+    }
 }
 
 impl Display for TransactionHash {
