@@ -682,7 +682,7 @@ impl TransactionsQueues {
 
                         self.invalidate_transaction_cache(&transaction.id).await;
 
-                        info!("cancel_transaction: sent cancel tx {} with hash {} and nonce {:?} to replace original tx {}", 
+                        info!("cancel_transaction: sent cancel tx {} with hash {} and nonce {:?} to replace original tx {}",
                               cancel_transaction_id, transaction_sent.hash, cancel_transaction.nonce, transaction.id);
 
                         if let Some(webhook_manager) = &self.webhook_manager {
@@ -956,7 +956,7 @@ impl TransactionsQueues {
 
                         self.invalidate_transaction_cache(&transaction.id).await;
 
-                        info!("replace_transaction: added competitive replace tx {} with hash {} and nonce {:?} to replace original tx {}", 
+                        info!("replace_transaction: added competitive replace tx {} with hash {} and nonce {:?} to replace original tx {}",
                               replace_transaction_id, transaction_sent.hash, replace_transaction.nonce, transaction.id);
 
                         if let Some(webhook_manager) = &self.webhook_manager {
@@ -1449,7 +1449,7 @@ impl TransactionsQueues {
                                         Ok(tx_sent) => tx_sent,
                                         Err(TransactionQueueSendTransactionError::TransactionSendError(error)) => {
                                             let error_msg = error.to_string().to_lowercase();
-                                            if error_msg.contains("nonce too low") 
+                                            if error_msg.contains("nonce too low")
                                                 || error_msg.contains("nonce is too low")
                                                 || error_msg.contains("invalid nonce")
                                                 || error_msg.contains("nonce has already been used")
@@ -1506,6 +1506,20 @@ impl TransactionsQueues {
                                     transaction.sent_with_gas =
                                         Some(transaction_sent.sent_with_gas.clone());
                                     transaction.sent_at = Some(Utc::now());
+
+                                    if let Err(db_error) = self
+                                        .db
+                                        .transaction_sent(
+                                            &transaction_sent.id,
+                                            &transaction_sent.hash,
+                                            &transaction_sent.sent_with_gas,
+                                            transaction_sent.sent_with_blob_gas.as_ref(),
+                                            transactions_queue.is_legacy_transactions(),
+                                        )
+                                        .await
+                                    {
+                                        error!("Failed to persist gas bump to database for transaction {}: {}", transaction.id, db_error);
+                                    }
 
                                     self.invalidate_transaction_cache(&transaction.id).await;
 

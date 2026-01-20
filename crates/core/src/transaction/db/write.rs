@@ -112,12 +112,12 @@ impl PostgresClient {
             .execute(
                 "
                     INSERT INTO relayer.transaction_audit_log (
-                        id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit, 
-                        speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at, 
-                        failed_at, failed_reason, hash, sent_max_priority_fee_per_gas, 
+                        id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
+                        speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
+                        failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
                         sent_max_fee_per_gas, gas_price, sent_with_gas, sent_with_blob_gas, external_id
                     )
-                    SELECT 
+                    SELECT
                         id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
                         speed, $2, expires_at, queued_at, NOW(), mined_at, confirmed_at,
                         failed_at, failed_reason, $3, $4, $5, $6, $7, $8, external_id
@@ -215,7 +215,7 @@ impl PostgresClient {
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
                         sent_max_fee_per_gas, gas_price, external_id
                     )
-                    SELECT 
+                    SELECT
                         id, relayer_id, $2, \"from\", nonce, chain_id, $4, $3, blobs, gas_limit,
                         speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
@@ -265,7 +265,7 @@ impl PostgresClient {
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
                         sent_max_fee_per_gas, gas_price, external_id
                     )
-                    SELECT 
+                    SELECT
                         id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
                         speed, $2, expires_at, queued_at, sent_at, mined_at, confirmed_at,
                         NOW(), $3, hash, sent_max_priority_fee_per_gas,
@@ -297,6 +297,7 @@ impl PostgresClient {
         let gas_used = GasLimit::from(transaction_receipt.gas_used);
         let block_hash = transaction_receipt.block_hash.map(BlockHash::new);
         let block_number = transaction_receipt.block_number.map(BlockNumber::new);
+        let hash = TransactionHash::new(transaction_receipt.transaction_hash);
 
         trans
             .execute(
@@ -333,7 +334,7 @@ impl PostgresClient {
                     &block_hash,
                     &block_number,
                     &transaction.speed,
-                    &transaction.known_transaction_hash,
+                    &hash,
                     &transaction.sent_with_max_fee_per_gas,
                     &transaction.sent_with_max_priority_fee_per_gas,
                     &transaction.external_id,
@@ -350,7 +351,7 @@ impl PostgresClient {
                     failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
                     sent_max_fee_per_gas, gas_price, block_hash, block_number, external_id
                 )
-                SELECT 
+                SELECT
                     $1, relayer_id, $3, $4, $7, $8, $6, $5, blobs, $9,
                     $12, $2, expires_at, queued_at, sent_at, NOW(), confirmed_at,
                     failed_at, failed_reason, $13, $15, $14, gas_price, $10, $11, $16
@@ -410,7 +411,7 @@ impl PostgresClient {
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
                         sent_max_fee_per_gas, gas_price, block_hash, block_number, external_id
                     )
-                    SELECT 
+                    SELECT
                         id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
                         speed, $2, expires_at, queued_at, sent_at, mined_at, NOW(),
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
@@ -451,7 +452,7 @@ impl PostgresClient {
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
                         sent_max_fee_per_gas, gas_price, block_hash, block_number, external_id
                     )
-                    SELECT 
+                    SELECT
                         id, relayer_id, \"to\", \"from\", $2, chain_id, data, value, blobs, gas_limit,
                         speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
@@ -496,7 +497,7 @@ impl PostgresClient {
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
                         sent_max_fee_per_gas, gas_price, block_hash, block_number, expired_at, external_id
                     )
-                    SELECT 
+                    SELECT
                         id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
                         speed, $2, expires_at, queued_at, sent_at, mined_at, confirmed_at,
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
@@ -591,10 +592,10 @@ impl PostgresClient {
                         id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
                         speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
-                        sent_max_fee_per_gas, gas_price, sent_with_gas, sent_with_blob_gas, 
+                        sent_max_fee_per_gas, gas_price, sent_with_gas, sent_with_blob_gas,
                         block_hash, block_number, expired_at, external_id
                     )
-                    SELECT 
+                    SELECT
                         id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
                         speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
