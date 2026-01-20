@@ -1111,13 +1111,19 @@ impl TransactionsQueues {
                                 ))
                             }
                             TransactionQueueSendTransactionError::TransactionSendError(error) => {
-                                // Check if this is an insufficient funds error - auto-fail these
                                 let error_msg = error.to_string().to_lowercase();
-                                if error_msg.contains("insufficient funds")
+                                // Check if this is an insufficient funds error - auto-fail these
+                                let insufficient_funds = error_msg.contains("insufficient funds")
                                     || error_msg.contains("balance")
-                                    || error_msg.contains("overshot")
-                                {
-                                    info!("process_single_pending: transaction {} failed due to insufficient funds moved to failed", transaction.id);
+                                    || error_msg.contains("overshot");
+                                let will_revert = error_msg.contains("execution reverted");
+                                if insufficient_funds || will_revert {
+                                    if insufficient_funds {
+                                        error!("process_single_pending: transaction {} failed due to insufficient funds moved to failed - error {}", transaction.id, error_msg);
+                                    }
+                                    if will_revert {
+                                        error!("process_single_pending: transaction {} failed as would always revert - error {}", transaction.id, error_msg);
+                                    }
                                     self.db
                                         .update_transaction_failed(
                                             &transaction.id,
