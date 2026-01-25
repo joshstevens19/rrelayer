@@ -48,7 +48,7 @@ async fn main() -> Result<()> {
     println!("   Using: hijacked_provider.send_transaction(tx)");
 
     // This demonstrates the transaction hijacking concept
-    match hijacked_provider.send_transaction_via_relayer(bob, 100).await {
+    match hijacked_provider.send_transaction_via_relayer(bob, U256::from(100)).await {
         Ok(tx_hash) => {
             println!("✅ Transaction sent via relayer!");
             println!("   Transaction ID: {}", tx_hash);
