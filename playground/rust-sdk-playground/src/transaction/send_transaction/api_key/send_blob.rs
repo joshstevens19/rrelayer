@@ -24,6 +24,7 @@ async fn example() -> Result<()> {
     let hex_blob = format!("0x{}", alloy::hex::encode(&blob_data));
 
     let request = RelayTransactionRequest {
+        authorization_list: None,
         to: EvmAddress::from_str("0x5FCD072a0BD58B6fa413031582E450FE724dba6D")?,
         value: TransactionValue::zero(),
         data: TransactionData::empty(),
