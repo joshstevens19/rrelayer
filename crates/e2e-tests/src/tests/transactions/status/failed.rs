@@ -23,6 +23,7 @@ impl TestRunner {
             self.contract_interactor.contract_address().context("Test contract not deployed")?;
 
         let tx_request = RelayTransactionRequest {
+            authorization_list: None,
             to: contract_address,
             value: TransactionValue::new(U256::ZERO),
             data: TransactionData::new(alloy::primitives::Bytes::from_static(&[

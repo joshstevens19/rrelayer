@@ -20,6 +20,7 @@ async fn rate_limit_example() -> Result<()> {
     let relayer = get_relayer().await?;
 
     let tx_request = RelayTransactionRequest {
+        authorization_list: None,
         to: EvmAddress::from_str("0xa4635F69E5A64CD48da3FbC999aCed87B00756F6")?,
         value: TransactionValue::from_str("1000000000000000000")
             .map_err(|e| anyhow::anyhow!("Invalid value: {}", e))?, // 1 ETH in wei

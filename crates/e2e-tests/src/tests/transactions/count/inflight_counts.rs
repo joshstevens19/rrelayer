@@ -37,6 +37,7 @@ impl TestRunner {
         let mut transaction_ids = Vec::new();
         for i in 0..3 {
             let tx_request = RelayTransactionRequest {
+                authorization_list: None,
                 to: self.config.anvil_accounts[1],
                 value: TransactionValue::new(U256::from(100000000000000000u128 * (i + 1))),
                 data: TransactionData::empty(),

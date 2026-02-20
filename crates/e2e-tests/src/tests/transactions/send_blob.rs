@@ -22,6 +22,7 @@ impl TestRunner {
         let hex_blob = format!("0x{}", alloy::hex::encode(&blob_data));
 
         let tx_request = RelayTransactionRequest {
+            authorization_list: None,
             to: self.config.anvil_accounts[1],
             value: TransactionValue::new(U256::ZERO),
             data: TransactionData::empty(),
