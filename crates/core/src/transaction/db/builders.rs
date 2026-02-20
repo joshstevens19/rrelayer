@@ -10,6 +10,7 @@ pub fn build_transaction_from_transaction_view(row: &Row) -> Transaction {
     Transaction {
         id: row.get("id"),
         relayer_id: row.get("relayer_id"),
+        authorization_list: row.get("authorization_list"),
         to,
         from,
         value: row.get("value"),
