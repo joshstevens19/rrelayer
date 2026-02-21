@@ -15,6 +15,7 @@ mod v1_0_3;
 pub async fn apply_schema(client: &PostgresClient) -> Result<(), PostgresError> {
     apply_v1_0_0_schema(client).await?;
     apply_v1_0_1_schema(client).await?;
+    apply_v1_0_2_schema(client).await?;
     apply_v1_0_3_schema(client).await?;
 
     Ok(())
