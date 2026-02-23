@@ -232,6 +232,7 @@ impl TransactionsQueues {
         current_transaction: &mut Transaction,
         replace_with: &RelayTransactionRequest,
     ) {
+        current_transaction.authorization_list = replace_with.authorization_list.clone();
         current_transaction.to = replace_with.to;
         current_transaction.data = replace_with.data.clone();
         current_transaction.value = replace_with.value;
