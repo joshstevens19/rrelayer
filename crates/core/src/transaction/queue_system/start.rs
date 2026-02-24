@@ -100,9 +100,7 @@ async fn continuously_process_pending_transactions(
                                 break;
                             }
                             _ => {
-                                error!("Relayer id {} - PENDING QUEUE ERROR: {}", relayer_id, e);
-                                // Avoid hot retry loops on errors - wait at least 1 second
-                                processes_next_break(&1000).await;
+                                error!("Relayer id {} - PENDING QUEUE ERROR: {}", relayer_id, e)
                             }
                         }
                     }
@@ -148,8 +146,7 @@ async fn continuously_process_inmempool_transactions(
                                 break;
                             }
                             _ => {
-                                error!("Relayer id {} - INMEMPOOL QUEUE ERROR: {}", relayer_id, e);
-                                processes_next_break(&1000).await;
+                                error!("Relayer id {} - INMEMPOOL QUEUE ERROR: {}", relayer_id, e)
                             }
                         }
                     }
@@ -195,8 +192,7 @@ async fn continuously_process_mined_transactions(
                                 break;
                             }
                             _ => {
-                                error!("Relayer id {} - MINED QUEUE ERROR: {}", relayer_id, e);
-                                processes_next_break(&1000).await;
+                                error!("Relayer id {} - MINED QUEUE ERROR: {}", relayer_id, e)
                             }
                         }
                     }
@@ -495,6 +491,7 @@ pub async fn startup_transactions_queues(
     safe_proxy_manager: Arc<SafeProxyManager>,
     network_configs: Arc<Vec<crate::yaml::NetworkSetupConfig>>,
     global_signing_provider: Option<Arc<crate::yaml::SigningProvider>>,
+    advanced: Option<crate::yaml::AdvancedConfig>,
 ) -> Result<Arc<Mutex<TransactionsQueues>>, StartTransactionsQueuesError> {
     let postgres = PostgresClient::new()
         .await
@@ -572,6 +569,7 @@ pub async fn startup_transactions_queues(
             cache,
             webhook_manager,
             safe_proxy_manager,
+            advanced,
         )
         .await?,
     ));

@@ -51,6 +51,7 @@ use crate::{
         types::{Transaction, TransactionData, TransactionId, TransactionStatus, TransactionValue},
     },
     webhooks::WebhookManager,
+    yaml::AdvancedConfig,
 };
 
 /// Container for managing multiple transaction queues across different relayers.
@@ -66,6 +67,7 @@ pub struct TransactionsQueues {
     cache: Arc<Cache>,
     webhook_manager: Option<Arc<Mutex<WebhookManager>>>,
     safe_proxy_manager: Arc<SafeProxyManager>,
+    advanced: Option<AdvancedConfig>,
 }
 
 impl TransactionsQueues {
@@ -76,6 +78,7 @@ impl TransactionsQueues {
         cache: Arc<Cache>,
         webhook_manager: Option<Arc<Mutex<WebhookManager>>>,
         safe_proxy_manager: Arc<SafeProxyManager>,
+        advanced: Option<AdvancedConfig>,
     ) -> Result<Self, TransactionsQueuesError> {
         let mut queues = HashMap::new();
         let mut relayer_block_times_ms = HashMap::new();
@@ -119,7 +122,15 @@ impl TransactionsQueues {
             cache,
             webhook_manager,
             safe_proxy_manager,
+            advanced,
         })
+    }
+
+    fn auto_fail_expired_transactions(&self) -> bool {
+        self.advanced
+            .as_ref()
+            .and_then(|a| a.auto_fail_expired_transactions)
+            .unwrap_or(false)
     }
 
     /// Retrieves a transaction queue for the specified relayer.
@@ -1055,7 +1066,11 @@ impl TransactionsQueues {
                 }
 
                 // Fail noop transactions that have exceeded max retry attempts
-                if transaction.is_noop && transaction.send_attempt_count >= MAX_NOOP_SEND_ATTEMPTS {
+                // (only when auto_fail_expired_transactions is enabled)
+                if self.auto_fail_expired_transactions()
+                    && transaction.is_noop
+                    && transaction.send_attempt_count >= MAX_NOOP_SEND_ATTEMPTS
+                {
                     let fail_msg = format!(
                         "Noop transaction exceeded max send attempts ({}) for relayer {}",
                         MAX_NOOP_SEND_ATTEMPTS, relayer_id
@@ -1230,7 +1245,7 @@ impl TransactionsQueues {
                                         ProcessPendingStatus::NonceSynchronized,
                                         Some(&100),
                                     ))
-                                } else {
+                                } else if self.auto_fail_expired_transactions() {
                                     // For other send errors (RPC down, etc), increment attempt count
                                     // and apply exponential backoff to avoid hot retry loops
                                     transactions_queue.increment_pending_send_attempts().await;
@@ -1245,6 +1260,14 @@ impl TransactionsQueues {
                                     Ok(ProcessResult::<ProcessPendingStatus>::other(
                                         ProcessPendingStatus::SendErrorBackoff,
                                         Some(&backoff_ms),
+                                    ))
+                                } else {
+                                    Err(ProcessPendingTransactionError::SendTransactionError(
+                                        *relayer_id,
+                                        relayer_address,
+                                        TransactionQueueSendTransactionError::TransactionSendError(
+                                            error,
+                                        ),
                                     ))
                                 }
                             }
@@ -1773,9 +1796,10 @@ mod tests {
         }
     }
 
-    /// Simulates the hot loop exit decision logic from process_single_pending.
+    /// Simulates the hot loop exit decision logic from process_single_pending
+    /// when auto_fail_expired_transactions is enabled.
     ///
-    /// This mirrors the exact checks in process_single_pending:
+    /// This mirrors the exact checks in process_single_pending with the flag ON:
     /// 1. Check if transaction expired → convert to noop
     /// 2. Check if noop exceeded max retries → should fail
     /// 3. On send error → apply exponential backoff

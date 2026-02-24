@@ -86,6 +86,7 @@ pub async fn handle_init(path: &Path) -> Result<(), InitError> {
         },
         webhooks: None,
         rate_limits: None,
+        advanced: None,
     };
     fs::write(project_path.join("rrelayer.yaml"), serde_yaml::to_string(&yaml_content)?)?;
 

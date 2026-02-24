@@ -915,6 +915,15 @@ pub struct SafeProxyConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AdvancedConfig {
+    /// When enabled, noop/expired transactions are automatically failed after
+    /// max send attempts with exponential backoff to prevent hot retry loops.
+    /// Defaults to false when not specified.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub auto_fail_expired_transactions: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SetupConfig {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -929,6 +938,8 @@ pub struct SetupConfig {
     pub webhooks: Option<Vec<WebhookConfig>>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub rate_limits: Option<RateLimitConfig>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub advanced: Option<AdvancedConfig>,
 }
 
 fn substitute_env_variables(contents: &str) -> Result<String, regex::Error> {

@@ -469,6 +469,7 @@ pub async fn start(project_path: &Path) -> Result<(), StartError> {
         safe_proxy_manager.clone(),
         Arc::new(config.networks.clone()),
         config.signing_provider.clone().map(Arc::new),
+        config.advanced.clone(),
     )
     .await?;
 

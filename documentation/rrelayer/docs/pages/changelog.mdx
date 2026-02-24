@@ -6,12 +6,12 @@
 
 ### Features
 
+- feat: add `auto_fail_expired_transactions` setting under `advanced` config (default: `false`) — when enabled, noop/expired transactions are automatically failed after 10 send attempts with exponential backoff to prevent hot retry loops
+
 ---
 
 ### Bug fixes
 
-- fix: prevent infinite hot retry loop for stuck noop/expired transactions by adding max retry limit (10 attempts) and exponential backoff on send errors
-- fix: add minimum 1 second delay on all queue processing errors to prevent CPU-intensive tight loops
 - fix: correct error message format strings in ProcessPendingTransactionError and ProcessInmempoolTransactionError that were printing relayer ID instead of the actual RPC error
 
 ---
