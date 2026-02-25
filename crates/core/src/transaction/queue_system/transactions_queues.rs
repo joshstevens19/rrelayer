@@ -26,12 +26,11 @@ use super::{
     transactions_queue::TransactionsQueue,
     types::{
         compute_send_error_backoff_ms, AddTransactionError, CancelTransactionError,
-        CancelTransactionResult, CompetitionType, EditableTransactionType,
-        ProcessInmempoolStatus, ProcessInmempoolTransactionError, ProcessMinedStatus,
-        ProcessMinedTransactionError, ProcessPendingStatus, ProcessPendingTransactionError,
-        ProcessResult, ReplaceTransactionError, ReplaceTransactionResult,
-        TransactionRelayerSetup, TransactionToSend, TransactionsQueueSetup,
-        MAX_NOOP_SEND_ATTEMPTS,
+        CancelTransactionResult, CompetitionType, EditableTransactionType, ProcessInmempoolStatus,
+        ProcessInmempoolTransactionError, ProcessMinedStatus, ProcessMinedTransactionError,
+        ProcessPendingStatus, ProcessPendingTransactionError, ProcessResult,
+        ReplaceTransactionError, ReplaceTransactionResult, TransactionRelayerSetup,
+        TransactionToSend, TransactionsQueueSetup, MAX_NOOP_SEND_ATTEMPTS,
     },
 };
 use crate::transaction::api::RelayTransactionRequest;
@@ -127,10 +126,7 @@ impl TransactionsQueues {
     }
 
     fn auto_fail_expired_transactions(&self) -> bool {
-        self.advanced
-            .as_ref()
-            .and_then(|a| a.auto_fail_expired_transactions)
-            .unwrap_or(false)
+        self.advanced.as_ref().and_then(|a| a.auto_fail_expired_transactions).unwrap_or(false)
     }
 
     /// Retrieves a transaction queue for the specified relayer.
@@ -1077,16 +1073,11 @@ impl TransactionsQueues {
                     );
                     error!("{}", fail_msg);
 
-                    self.db
-                        .update_transaction_failed(&transaction.id, &fail_msg)
-                        .await
-                        .map_err(|e| {
-                            ProcessPendingTransactionError::DbError(
-                                *relayer_id,
-                                relayer_address,
-                                e,
-                            )
-                        })?;
+                    self.db.update_transaction_failed(&transaction.id, &fail_msg).await.map_err(
+                        |e| {
+                            ProcessPendingTransactionError::DbError(*relayer_id, relayer_address, e)
+                        },
+                    )?;
 
                     transactions_queue.move_next_pending_to_failed().await;
                     self.invalidate_transaction_cache(&transaction.id).await;
@@ -1752,6 +1743,7 @@ impl TransactionsQueues {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common_types::EvmAddress;
     use crate::network::ChainId;
     use crate::relayer::RelayerId;
     use crate::transaction::types::{
@@ -1760,7 +1752,6 @@ mod tests {
     };
     use alloy::primitives::Address;
     use chrono::{Duration, Utc};
-    use crate::common_types::EvmAddress;
 
     /// Helper to create a test transaction matching the stuck noop scenario from production logs.
     fn make_test_noop_transaction(send_attempt_count: u32) -> Transaction {
@@ -1805,9 +1796,7 @@ mod tests {
     /// 3. On send error → apply exponential backoff
     ///
     /// Returns (should_fail, backoff_ms) where should_fail means the tx should be moved to FAILED.
-    fn simulate_pending_loop_iteration(
-        transaction: &Transaction,
-    ) -> (bool, u64) {
+    fn simulate_pending_loop_iteration(transaction: &Transaction) -> (bool, u64) {
         // Step 1: Check noop retry limit (mirrors the check before send_transaction)
         if transaction.is_noop && transaction.send_attempt_count >= MAX_NOOP_SEND_ATTEMPTS {
             return (true, 0);
@@ -1873,15 +1862,8 @@ mod tests {
 
         let (should_fail, backoff_ms) = simulate_pending_loop_iteration(&transaction);
 
-        assert!(
-            !should_fail,
-            "Non-noop transaction should not be failed by noop retry limit"
-        );
-        assert!(
-            backoff_ms >= 1_000,
-            "Should still apply backoff, got {}ms",
-            backoff_ms
-        );
+        assert!(!should_fail, "Non-noop transaction should not be failed by noop retry limit");
+        assert!(backoff_ms >= 1_000, "Should still apply backoff, got {}ms", backoff_ms);
     }
 
     #[test]

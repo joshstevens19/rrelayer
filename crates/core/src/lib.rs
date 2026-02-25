@@ -15,9 +15,9 @@ pub mod relayer;
 pub mod safe_proxy;
 pub use safe_proxy::{SafeProxyError, SafeProxyManager, SafeTransaction};
 pub use yaml::{
-    read, AdvancedConfig, ApiConfig, AwsKmsSigningProviderConfig, GasProviders,
-    NetworkSetupConfig, RateLimitConfig, RateLimitWithInterval, RawSigningProviderConfig,
-    SafeProxyConfig, SetupConfig, SigningProvider, UserRateLimitConfig,
+    read, AdvancedConfig, ApiConfig, AwsKmsSigningProviderConfig, GasProviders, NetworkSetupConfig,
+    RateLimitConfig, RateLimitWithInterval, RawSigningProviderConfig, SafeProxyConfig, SetupConfig,
+    SigningProvider, UserRateLimitConfig,
 };
 mod shared;
 pub use shared::{common_types, utils::get_chain_id};
