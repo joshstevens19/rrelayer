@@ -26,6 +26,9 @@ impl PostgresClient {
         let mut conn = self.pool.get().await?;
         let trans = conn.transaction().await.map_err(PostgresError::PgError)?;
 
+        let authorization_list_json = transaction.authorization_list.as_ref()
+            .map(|list| serde_json::to_value(list).unwrap_or(serde_json::Value::Null));
+
         for table_name in TRANSACTION_TABLES.iter() {
             trans.execute(
                 format!("
@@ -34,7 +37,7 @@ impl PostgresClient {
             ", table_name).as_str(),
                 &[&transaction.id,
                     &relayer_id,
-                    &transaction.authorization_list,
+                    &authorization_list_json,
                     &transaction.to,
                     &transaction.from,
                     &transaction.nonce,
@@ -152,6 +155,9 @@ impl PostgresClient {
         let mut conn = self.pool.get().await?;
         let trans = conn.transaction().await.map_err(PostgresError::PgError)?;
 
+        let authorization_list_json = transaction.authorization_list.as_ref()
+            .map(|list| serde_json::to_value(list).unwrap_or(serde_json::Value::Null));
+
         for table_name in TRANSACTION_TABLES.iter() {
             trans.execute(
                 format!("
@@ -161,7 +167,7 @@ impl PostgresClient {
                 &[
                     &transaction.id,
                     &relayer_id,
-                    &transaction.authorization_list,
+                    &authorization_list_json,
                     &transaction.to,
                     &transaction.from,
                     &transaction.nonce,
@@ -301,6 +307,9 @@ impl PostgresClient {
         let block_number = transaction_receipt.block_number.map(BlockNumber::new);
         let hash = TransactionHash::new(transaction_receipt.transaction_hash);
 
+        let authorization_list_json = transaction.authorization_list.as_ref()
+            .map(|list| serde_json::to_value(list).unwrap_or(serde_json::Value::Null));
+
         trans
             .execute(
                 "
@@ -327,6 +336,7 @@ impl PostgresClient {
                 &[
                     &transaction.id,
                     &TransactionStatus::MINED,
+                    &authorization_list_json,
                     &transaction.to,
                     &transaction.from,
                     &transaction.value,
@@ -356,16 +366,17 @@ impl PostgresClient {
                     authorization_list
                 )
                 SELECT
-                    $1, relayer_id, $3, $4, $7, $8, $6, $5, blobs, $9,
-                    $12, $2, expires_at, queued_at, sent_at, NOW(), confirmed_at,
-                    failed_at, failed_reason, $13, $15, $14, gas_price, $10, $11, $16,
-                    $17
+                    $1, relayer_id, $4, $5, $8, $9, $7, $6, blobs, $10,
+                    $13, $2, expires_at, queued_at, sent_at, NOW(), confirmed_at,
+                    failed_at, failed_reason, $14, $16, $15, gas_price, $11, $12, $17,
+                    $3
                 FROM relayer.transaction
                 WHERE id = $1;
             ",
                 &[
                     &transaction.id,
                     &TransactionStatus::MINED,
+                    &authorization_list_json,
                     &transaction.to,
                     &transaction.from,
                     &transaction.value,
@@ -380,7 +391,6 @@ impl PostgresClient {
                     &transaction.sent_with_max_fee_per_gas,
                     &transaction.sent_with_max_priority_fee_per_gas,
                     &transaction.external_id,
-                    &transaction.authorization_list
                 ],
             )
             .await?;
@@ -540,6 +550,9 @@ impl PostgresClient {
             .as_ref()
             .map(|blob_gas| serde_json::to_value(blob_gas).unwrap_or(serde_json::Value::Null));
 
+        let authorization_list_json = transaction.authorization_list.as_ref()
+            .map(|list| serde_json::to_value(list).unwrap_or(serde_json::Value::Null));
+
         trans
             .execute(
                 "
@@ -572,7 +585,7 @@ impl PostgresClient {
                 &[
                     &transaction.id,
                     &transaction.relayer_id,
-                    &transaction.authorization_list,
+                    &authorization_list_json,
                     &transaction.to,
                     &transaction.from,
                     &transaction.nonce,
