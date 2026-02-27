@@ -813,6 +813,8 @@ pub struct NetworkAutomaticTopUpConfig {
     pub native: Option<NativeTokenConfig>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub erc20_tokens: Option<Vec<Erc20TokenConfig>>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub additional_addresses: Option<Vec<EvmAddress>>,
 }
 
 impl NetworkAutomaticTopUpConfig {
@@ -915,6 +917,15 @@ pub struct SafeProxyConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AdvancedConfig {
+    /// When enabled, allows the automatic top-up job to send funds to addresses
+    /// specified in `additional_addresses` that are not registered relayers.
+    /// Defaults to false when not specified.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub allow_non_relayer_topups: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SetupConfig {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -929,6 +940,8 @@ pub struct SetupConfig {
     pub webhooks: Option<Vec<WebhookConfig>>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub rate_limits: Option<RateLimitConfig>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub advanced: Option<AdvancedConfig>,
 }
 
 fn substitute_env_variables(contents: &str) -> Result<String, regex::Error> {

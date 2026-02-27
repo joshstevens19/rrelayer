@@ -1,0 +1,71 @@
+# Advanced
+
+The `advanced` section in your `rrelayer.yaml` configuration file contains experimental or fine-tuning options. All options are optional and default to safe values when not specified.
+
+## Configuration
+
+```yaml [rrelayer.yaml]
+advanced: // [!code focus]
+  allow_non_relayer_topups: true // [!code focus]
+```
+
+## Options
+
+### `allow_non_relayer_topups` - optional (default: `false`)
+
+When enabled, allows the automatic top-up job to send funds to addresses specified in `additional_addresses` on network automatic top-up configs, even if those addresses are not registered relayers.
+
+**What this solves:**
+
+By default, the automatic top-up system only sends funds to registered relayer addresses as a security measure. If you need to top up external wallets, contracts, or other services, enabling this option together with `additional_addresses` allows you to do so.
+
+**Behavior when enabled (`true`):**
+
+- Addresses listed in `additional_addresses` on any network's `automatic_top_up` config are included in the top-up cycle
+- These addresses skip the relayer validation check
+- The `from` address and any addresses already in the relayer list are automatically excluded from `additional_addresses`
+
+**Behavior when disabled (`false`) or not set:**
+
+- `additional_addresses` entries are ignored
+- Only registered relayer addresses receive automatic top-ups
+
+:::warning
+This bypasses the security check that ensures top-up targets are registered relayers. Only use this with addresses you trust.
+:::
+
+### Example
+
+```yaml [rrelayer.yaml]
+name: my-rrelayer
+description: "production rrelayer"
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+networks:
+  - name: "ethereum"
+    chain_id: 1
+    provider_urls:
+      - "${ETHEREUM_RPC}"
+    block_explorer_url: "https://etherscan.io"
+    automatic_top_up:
+      - from:
+          relayer:
+            address: "0x33993A4F4AA617DA4558A0CFD0C39A7989B67720"
+        relayers: "*"
+        native:
+          min_balance: "0.1"
+          top_up_amount: "0.5"
+        additional_addresses:
+          - "0xABCDEF1234567890ABCDEF1234567890ABCDEF12"
+advanced: // [!code focus]
+  allow_non_relayer_topups: true // [!code focus]
+```
+
+:::info
+The `advanced` section is entirely optional. If omitted, all options default to their safe values.
+:::
