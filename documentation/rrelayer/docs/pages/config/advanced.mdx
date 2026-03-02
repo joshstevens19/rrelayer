@@ -1,0 +1,56 @@
+# Advanced
+
+The `advanced` section in your `rrelayer.yaml` configuration file contains experimental or fine-tuning options for transaction processing behavior. All options are optional and default to safe values when not specified.
+
+## Configuration
+
+```yaml [rrelayer.yaml]
+advanced: // [!code focus]
+  auto_fail_expired_transactions: true // [!code focus]
+```
+
+## Options
+
+### `auto_fail_expired_transactions` - optional (default: `false`)
+
+When enabled, noop/expired transactions are automatically failed after 10 send attempts with exponential backoff to prevent hot retry loops.
+
+**What this solves:**
+
+When a transaction becomes a noop (already mined or expired on-chain), the relayer may continuously retry sending it, consuming CPU resources in a hot loop. Enabling this option ensures those stuck transactions are gracefully failed after a reasonable number of attempts.
+
+**Behavior when enabled (`true`):**
+
+- Noop/expired transactions are retried up to 10 times with exponential backoff between attempts
+- After 10 failed attempts, the transaction is automatically marked as failed
+- Prevents high CPU usage from hot retry loops on stuck transactions
+
+**Behavior when disabled (`false`) or not set:**
+
+- Default behavior is preserved — noop transactions are still handled but without the exponential backoff mechanism
+
+### Example
+
+```yaml [rrelayer.yaml]
+name: my-rrelayer
+description: "production rrelayer"
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+networks:
+  - name: "ethereum"
+    chain_id: 1
+    provider_urls:
+      - "${ETHEREUM_RPC}"
+    block_explorer_url: "https://etherscan.io"
+advanced: // [!code focus]
+  auto_fail_expired_transactions: true // [!code focus]
+```
+
+:::info
+The `advanced` section is entirely optional. If omitted, all options default to their safe values.
+:::

@@ -12,6 +12,8 @@
 
 ### Bug fixes
 
+- fix: connection/transport errors (RPC down, timeout) no longer count toward noop send attempt limits — they are always retried with a fixed 5s backoff instead of permanently failing transactions during extended RPC outages
+- fix: add 5s backoff to processing loop error branches to prevent hot retry loops on persistent errors
 - fix: correct error message format strings in ProcessPendingTransactionError and ProcessInmempoolTransactionError that were printing relayer ID instead of the actual RPC error
 
 ---

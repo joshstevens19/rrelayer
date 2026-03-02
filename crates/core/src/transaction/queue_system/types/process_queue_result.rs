@@ -102,14 +102,6 @@ mod tests {
     }
 
     #[test]
-    fn test_noop_should_fail_after_max_attempts() {
-        // A noop transaction at exactly MAX_NOOP_SEND_ATTEMPTS should be failed
-        assert!(MAX_NOOP_SEND_ATTEMPTS >= MAX_NOOP_SEND_ATTEMPTS);
-        // Below the limit, should not fail
-        assert!(MAX_NOOP_SEND_ATTEMPTS - 1 < MAX_NOOP_SEND_ATTEMPTS);
-    }
-
-    #[test]
     fn test_send_error_backoff_variant_exists() {
         let result = ProcessResult::<ProcessPendingStatus>::other(
             ProcessPendingStatus::SendErrorBackoff,

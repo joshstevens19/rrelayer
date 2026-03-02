@@ -33,6 +33,7 @@ use super::{
         TransactionToSend, TransactionsQueueSetup, MAX_NOOP_SEND_ATTEMPTS,
     },
 };
+use crate::provider::SendTransactionError;
 use crate::transaction::api::RelayTransactionRequest;
 use crate::transaction::queue_system::types::SendTransactionGasPriceError;
 use crate::transaction::types::{TransactionBlob, TransactionConversionError, TransactionSpeed};
@@ -1128,26 +1129,38 @@ impl TransactionsQueues {
                             TransactionQueueSendTransactionError::TransactionEstimateGasError(
                                 error,
                             ) => {
-                                self.db
-                                    .update_transaction_failed(&transaction.id, &error.to_string())
-                                    .await
-                                    .map_err(|e| {
-                                        ProcessPendingTransactionError::DbError(
-                                            *relayer_id,
-                                            relayer_address,
-                                            e,
-                                        )
-                                    })?;
+                                // Transport errors (RPC down, timeout) should retry, not fail
+                                if error.is_transport_error() {
+                                    warn!(
+                                        "process_single_pending: gas estimation transport error for tx {}, retrying in 5s: {}",
+                                        transaction.id, error
+                                    );
+                                    Ok(ProcessResult::<ProcessPendingStatus>::other(
+                                        ProcessPendingStatus::SendErrorBackoff,
+                                        Some(&5_000),
+                                    ))
+                                } else {
+                                    self.db
+                                        .update_transaction_failed(&transaction.id, &error.to_string())
+                                        .await
+                                        .map_err(|e| {
+                                            ProcessPendingTransactionError::DbError(
+                                                *relayer_id,
+                                                relayer_address,
+                                                e,
+                                            )
+                                        })?;
 
-                                transactions_queue.move_next_pending_to_failed().await;
+                                    transactions_queue.move_next_pending_to_failed().await;
 
-                                self.invalidate_transaction_cache(&transaction.id).await;
+                                    self.invalidate_transaction_cache(&transaction.id).await;
 
-                                Err(ProcessPendingTransactionError::TransactionEstimateGasError(
-                                    *relayer_id,
-                                    relayer_address,
-                                    error,
-                                ))
+                                    Err(ProcessPendingTransactionError::TransactionEstimateGasError(
+                                        *relayer_id,
+                                        relayer_address,
+                                        error,
+                                    ))
+                                }
                             }
                             TransactionQueueSendTransactionError::TransactionSendError(error) => {
                                 let error_msg = error.to_string().to_lowercase();
@@ -1236,8 +1249,19 @@ impl TransactionsQueues {
                                         ProcessPendingStatus::NonceSynchronized,
                                         Some(&100),
                                     ))
+                                } else if matches!(&error, SendTransactionError::RpcError(rpc_err) if rpc_err.is_transport_error()) {
+                                    // Transport errors (RPC down, timeout) should always retry
+                                    // without counting toward failure limits
+                                    warn!(
+                                        "process_single_pending: transport error for tx {}, retrying in 5s: {}",
+                                        transaction.id, error
+                                    );
+                                    Ok(ProcessResult::<ProcessPendingStatus>::other(
+                                        ProcessPendingStatus::SendErrorBackoff,
+                                        Some(&5_000),
+                                    ))
                                 } else if self.auto_fail_expired_transactions() {
-                                    // For other send errors (RPC down, etc), increment attempt count
+                                    // For other send errors, increment attempt count
                                     // and apply exponential backoff to avoid hot retry loops
                                     transactions_queue.increment_pending_send_attempts().await;
                                     let attempts = transaction.send_attempt_count + 1;
@@ -1542,13 +1566,37 @@ impl TransactionsQueues {
                                                     Some(&100),
                                                 ));
                                             }
+                                            // Transport errors should retry without failing
+                                            if matches!(&error, SendTransactionError::RpcError(rpc_err) if rpc_err.is_transport_error()) {
+                                                warn!(
+                                                    "process_single_inmempool: transport error during gas bump for tx {}, retrying in 5s: {}",
+                                                    transaction.id, error
+                                                );
+                                                return Ok(ProcessResult::<ProcessInmempoolStatus>::other(
+                                                    ProcessInmempoolStatus::StillInmempool,
+                                                    Some(&5_000),
+                                                ));
+                                            }
                                             return Err(ProcessInmempoolTransactionError::SendTransactionError(
                                                 *relayer_id,
                                                 relayer_address,
                                                 TransactionQueueSendTransactionError::TransactionSendError(error)
                                             ));
                                         }
-                                        Err(e) => return Err(ProcessInmempoolTransactionError::SendTransactionError(*relayer_id, relayer_address, e)),
+                                        Err(e) => {
+                                            // Transport errors should retry without failing
+                                            if e.is_connection_error() {
+                                                warn!(
+                                                    "process_single_inmempool: connection error during gas bump for tx {}, retrying in 5s: {}",
+                                                    transaction.id, e
+                                                );
+                                                return Ok(ProcessResult::<ProcessInmempoolStatus>::other(
+                                                    ProcessInmempoolStatus::StillInmempool,
+                                                    Some(&5_000),
+                                                ));
+                                            }
+                                            return Err(ProcessInmempoolTransactionError::SendTransactionError(*relayer_id, relayer_address, e));
+                                        }
                                     };
 
                                     // Update the actual transaction in the inmempool queue
@@ -1793,16 +1841,24 @@ mod tests {
     /// This mirrors the exact checks in process_single_pending with the flag ON:
     /// 1. Check if transaction expired → convert to noop
     /// 2. Check if noop exceeded max retries → should fail
-    /// 3. On send error → apply exponential backoff
+    /// 3. On send error → check if connection error (no increment) or real error (increment + backoff)
     ///
     /// Returns (should_fail, backoff_ms) where should_fail means the tx should be moved to FAILED.
-    fn simulate_pending_loop_iteration(transaction: &Transaction) -> (bool, u64) {
+    fn simulate_pending_loop_iteration(
+        transaction: &Transaction,
+        is_connection_error: bool,
+    ) -> (bool, u64) {
         // Step 1: Check noop retry limit (mirrors the check before send_transaction)
         if transaction.is_noop && transaction.send_attempt_count >= MAX_NOOP_SEND_ATTEMPTS {
             return (true, 0);
         }
 
-        // Step 2: On send error, compute backoff (mirrors the catch-all else branch)
+        // Step 2: Connection errors get fixed backoff, no counter increment
+        if is_connection_error {
+            return (false, 5_000);
+        }
+
+        // Step 3: Non-connection send errors → increment + exponential backoff
         let backoff_ms = compute_send_error_backoff_ms(transaction.send_attempt_count + 1);
         (false, backoff_ms)
     }
@@ -1820,7 +1876,7 @@ mod tests {
 
         for attempt in 0..100 {
             let transaction = make_test_noop_transaction(attempt);
-            let (should_fail, backoff_ms) = simulate_pending_loop_iteration(&transaction);
+            let (should_fail, backoff_ms) = simulate_pending_loop_iteration(&transaction, false);
 
             if should_fail {
                 iterations = attempt;
@@ -1860,7 +1916,7 @@ mod tests {
         let mut transaction = make_test_noop_transaction(MAX_NOOP_SEND_ATTEMPTS + 5);
         transaction.is_noop = false; // NOT a noop
 
-        let (should_fail, backoff_ms) = simulate_pending_loop_iteration(&transaction);
+        let (should_fail, backoff_ms) = simulate_pending_loop_iteration(&transaction, false);
 
         assert!(!should_fail, "Non-noop transaction should not be failed by noop retry limit");
         assert!(backoff_ms >= 1_000, "Should still apply backoff, got {}ms", backoff_ms);
@@ -1936,6 +1992,103 @@ mod tests {
         assert_eq!(
             deserialized.send_attempt_count, 0,
             "Deserialized transaction should have send_attempt_count = 0"
+        );
+    }
+
+    #[test]
+    fn test_connection_errors_never_abandon_noop() {
+        // Connection errors should never increment the attempt counter,
+        // so a noop tx should survive any number of connection errors.
+        for attempt_count in 0..150 {
+            // With is_connection_error=true, the attempt count check happens first
+            // but since we never increment the counter, attempt_count stays at whatever
+            // the initial value is. Simulate: always connection error, counter never incremented.
+            let tx = make_test_noop_transaction(0); // counter stays at 0
+            let (should_fail, backoff_ms) = simulate_pending_loop_iteration(&tx, true);
+
+            assert!(
+                !should_fail,
+                "Connection error at iteration {} should NOT fail the noop tx",
+                attempt_count
+            );
+            assert_eq!(
+                backoff_ms, 5_000,
+                "Connection error should use fixed 5s backoff"
+            );
+        }
+    }
+
+    #[test]
+    fn test_non_connection_errors_still_abandon_noop() {
+        // Non-connection errors should still increment the counter and fail after MAX_NOOP_SEND_ATTEMPTS
+        let mut iterations = 0;
+
+        for attempt in 0..100 {
+            let transaction = make_test_noop_transaction(attempt);
+            let (should_fail, _backoff_ms) = simulate_pending_loop_iteration(&transaction, false);
+
+            if should_fail {
+                iterations = attempt;
+                break;
+            }
+        }
+
+        assert_eq!(
+            iterations, MAX_NOOP_SEND_ATTEMPTS,
+            "Noop should fail after exactly {} non-connection error attempts",
+            MAX_NOOP_SEND_ATTEMPTS
+        );
+    }
+
+    #[test]
+    fn test_mixed_connection_and_real_errors() {
+        // Simulate alternating connection and non-connection errors.
+        // Only non-connection errors should count toward the limit.
+        let mut real_error_count: u32 = 0;
+        let mut total_iterations = 0;
+
+        for i in 0..1000 {
+            let transaction = make_test_noop_transaction(real_error_count);
+            let is_connection = i % 2 == 0; // even iterations are connection errors
+            let (should_fail, _backoff_ms) =
+                simulate_pending_loop_iteration(&transaction, is_connection);
+
+            if should_fail {
+                total_iterations = i;
+                break;
+            }
+
+            if !is_connection {
+                real_error_count += 1;
+            }
+        }
+
+        assert_eq!(
+            real_error_count, MAX_NOOP_SEND_ATTEMPTS,
+            "Should fail after exactly {} real errors, but had {}",
+            MAX_NOOP_SEND_ATTEMPTS, real_error_count
+        );
+        // With alternating pattern, we need 2x iterations (connection errors interleaved)
+        assert!(
+            total_iterations > MAX_NOOP_SEND_ATTEMPTS,
+            "Total iterations ({}) should exceed MAX_NOOP_SEND_ATTEMPTS due to interleaved connection errors",
+            total_iterations
+        );
+    }
+
+    #[test]
+    fn test_gas_estimation_connection_error_does_not_fail_tx() {
+        // Gas estimation transport errors should return retry, not fail
+        let tx = make_test_noop_transaction(0);
+        let (should_fail, backoff_ms) = simulate_pending_loop_iteration(&tx, true);
+
+        assert!(
+            !should_fail,
+            "Gas estimation connection error should not fail the tx"
+        );
+        assert_eq!(
+            backoff_ms, 5_000,
+            "Should use fixed 5s backoff for connection errors"
         );
     }
 }
