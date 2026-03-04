@@ -73,28 +73,26 @@ mod tests {
 
     #[test]
     fn test_estimate_gas_transport_error_is_connection_error() {
-        let err = TransactionQueueSendTransactionError::TransactionEstimateGasError(
-            RpcError::Transport(TransportErrorKind::Custom(
-                "connection refused".to_string().into(),
-            )),
-        );
+        let err =
+            TransactionQueueSendTransactionError::TransactionEstimateGasError(RpcError::Transport(
+                TransportErrorKind::Custom("connection refused".to_string().into()),
+            ));
         assert!(err.is_connection_error());
     }
 
     #[test]
     fn test_estimate_gas_error_resp_is_not_connection_error() {
-        let err = TransactionQueueSendTransactionError::TransactionEstimateGasError(
-            RpcError::NullResp,
-        );
+        let err =
+            TransactionQueueSendTransactionError::TransactionEstimateGasError(RpcError::NullResp);
         assert!(!err.is_connection_error());
     }
 
     #[test]
     fn test_send_error_rpc_transport_is_connection_error() {
         let err = TransactionQueueSendTransactionError::TransactionSendError(
-            SendTransactionError::RpcError(RpcError::Transport(
-                TransportErrorKind::Custom("timeout".to_string().into()),
-            )),
+            SendTransactionError::RpcError(RpcError::Transport(TransportErrorKind::Custom(
+                "timeout".to_string().into(),
+            ))),
         );
         assert!(err.is_connection_error());
     }

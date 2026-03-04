@@ -1060,9 +1060,7 @@ impl TransactionsQueues {
                 }
 
                 // Fail noop transactions that have exceeded max retry attempts
-                if transaction.is_noop
-                    && transaction.send_attempt_count >= MAX_NOOP_SEND_ATTEMPTS
-                {
+                if transaction.is_noop && transaction.send_attempt_count >= MAX_NOOP_SEND_ATTEMPTS {
                     let fail_msg = format!(
                         "Noop transaction exceeded max send attempts ({}) for relayer {}",
                         MAX_NOOP_SEND_ATTEMPTS, relayer_id
@@ -1136,7 +1134,10 @@ impl TransactionsQueues {
                                     ))
                                 } else {
                                     self.db
-                                        .update_transaction_failed(&transaction.id, &error.to_string())
+                                        .update_transaction_failed(
+                                            &transaction.id,
+                                            &error.to_string(),
+                                        )
                                         .await
                                         .map_err(|e| {
                                             ProcessPendingTransactionError::DbError(
@@ -1150,11 +1151,13 @@ impl TransactionsQueues {
 
                                     self.invalidate_transaction_cache(&transaction.id).await;
 
-                                    Err(ProcessPendingTransactionError::TransactionEstimateGasError(
-                                        *relayer_id,
-                                        relayer_address,
-                                        error,
-                                    ))
+                                    Err(
+                                        ProcessPendingTransactionError::TransactionEstimateGasError(
+                                            *relayer_id,
+                                            relayer_address,
+                                            error,
+                                        ),
+                                    )
                                 }
                             }
                             TransactionQueueSendTransactionError::TransactionSendError(error) => {
@@ -1244,7 +1247,8 @@ impl TransactionsQueues {
                                         ProcessPendingStatus::NonceSynchronized,
                                         Some(&100),
                                     ))
-                                } else if matches!(&error, SendTransactionError::RpcError(rpc_err) if rpc_err.is_transport_error()) {
+                                } else if matches!(&error, SendTransactionError::RpcError(rpc_err) if rpc_err.is_transport_error())
+                                {
                                     // Transport errors (RPC down, timeout) should always retry
                                     // without counting toward failure limits
                                     warn!(
@@ -1997,10 +2001,7 @@ mod tests {
                 "Connection error at iteration {} should NOT fail the noop tx",
                 attempt_count
             );
-            assert_eq!(
-                backoff_ms, 5_000,
-                "Connection error should use fixed 5s backoff"
-            );
+            assert_eq!(backoff_ms, 5_000, "Connection error should use fixed 5s backoff");
         }
     }
 
@@ -2068,13 +2069,7 @@ mod tests {
         let tx = make_test_noop_transaction(0);
         let (should_fail, backoff_ms) = simulate_pending_loop_iteration(&tx, true);
 
-        assert!(
-            !should_fail,
-            "Gas estimation connection error should not fail the tx"
-        );
-        assert_eq!(
-            backoff_ms, 5_000,
-            "Should use fixed 5s backoff for connection errors"
-        );
+        assert!(!should_fail, "Gas estimation connection error should not fail the tx");
+        assert_eq!(backoff_ms, 5_000, "Should use fixed 5s backoff for connection errors");
     }
 }
