@@ -86,7 +86,6 @@ async fn continuously_process_pending_transactions(
             } => {
                 match result {
                     Ok(result) => {
-                        // info!("PENDING: {:?}", result);
                         processes_next_break(&result.process_again_after).await;
                     }
                     Err(e) => {
@@ -101,7 +100,6 @@ async fn continuously_process_pending_transactions(
                             }
                             _ => {
                                 error!("Relayer id {} - PENDING QUEUE ERROR: {}", relayer_id, e);
-                                processes_next_break(&5_000).await;
                             }
                         }
                     }
@@ -133,7 +131,6 @@ async fn continuously_process_inmempool_transactions(
             } => {
                 match result {
                     Ok(result) => {
-                        // info!("INMEMPOOL: {:?}", result);
                         processes_next_break(&result.process_again_after).await;
                     }
                     Err(e) => {
@@ -148,7 +145,6 @@ async fn continuously_process_inmempool_transactions(
                             }
                             _ => {
                                 error!("Relayer id {} - INMEMPOOL QUEUE ERROR: {}", relayer_id, e);
-                                processes_next_break(&5_000).await;
                             }
                         }
                     }
@@ -180,7 +176,6 @@ async fn continuously_process_mined_transactions(
             } => {
                 match result {
                     Ok(result) => {
-                        // info!("MINED: {:?}", result);
                         processes_next_break(&result.process_again_after).await;
                     }
                     Err(e) => {
@@ -195,7 +190,6 @@ async fn continuously_process_mined_transactions(
                             }
                             _ => {
                                 error!("Relayer id {} - MINED QUEUE ERROR: {}", relayer_id, e);
-                                processes_next_break(&5_000).await;
                             }
                         }
                     }

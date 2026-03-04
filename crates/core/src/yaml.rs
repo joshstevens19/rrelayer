@@ -915,13 +915,7 @@ pub struct SafeProxyConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AdvancedConfig {
-    /// When enabled, noop/expired transactions are automatically failed after
-    /// max send attempts with exponential backoff to prevent hot retry loops.
-    /// Defaults to false when not specified.
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub auto_fail_expired_transactions: Option<bool>,
-}
+pub struct AdvancedConfig {}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SetupConfig {

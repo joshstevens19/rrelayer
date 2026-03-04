@@ -67,6 +67,7 @@ pub struct TransactionsQueues {
     cache: Arc<Cache>,
     webhook_manager: Option<Arc<Mutex<WebhookManager>>>,
     safe_proxy_manager: Arc<SafeProxyManager>,
+    #[allow(dead_code)]
     advanced: Option<AdvancedConfig>,
 }
 
@@ -124,10 +125,6 @@ impl TransactionsQueues {
             safe_proxy_manager,
             advanced,
         })
-    }
-
-    fn auto_fail_expired_transactions(&self) -> bool {
-        self.advanced.as_ref().and_then(|a| a.auto_fail_expired_transactions).unwrap_or(false)
     }
 
     /// Retrieves a transaction queue for the specified relayer.
@@ -1063,9 +1060,7 @@ impl TransactionsQueues {
                 }
 
                 // Fail noop transactions that have exceeded max retry attempts
-                // (only when auto_fail_expired_transactions is enabled)
-                if self.auto_fail_expired_transactions()
-                    && transaction.is_noop
+                if transaction.is_noop
                     && transaction.send_attempt_count >= MAX_NOOP_SEND_ATTEMPTS
                 {
                     let fail_msg = format!(
@@ -1260,7 +1255,7 @@ impl TransactionsQueues {
                                         ProcessPendingStatus::SendErrorBackoff,
                                         Some(&5_000),
                                     ))
-                                } else if self.auto_fail_expired_transactions() {
+                                } else {
                                     // For other send errors, increment attempt count
                                     // and apply exponential backoff to avoid hot retry loops
                                     transactions_queue.increment_pending_send_attempts().await;
@@ -1275,14 +1270,6 @@ impl TransactionsQueues {
                                     Ok(ProcessResult::<ProcessPendingStatus>::other(
                                         ProcessPendingStatus::SendErrorBackoff,
                                         Some(&backoff_ms),
-                                    ))
-                                } else {
-                                    Err(ProcessPendingTransactionError::SendTransactionError(
-                                        *relayer_id,
-                                        relayer_address,
-                                        TransactionQueueSendTransactionError::TransactionSendError(
-                                            error,
-                                        ),
                                     ))
                                 }
                             }
@@ -1835,8 +1822,7 @@ mod tests {
         }
     }
 
-    /// Simulates the hot loop exit decision logic from process_single_pending
-    /// when auto_fail_expired_transactions is enabled.
+    /// Simulates the hot loop exit decision logic from process_single_pending.
     ///
     /// This mirrors the exact checks in process_single_pending with the flag ON:
     /// 1. Check if transaction expired → convert to noop
