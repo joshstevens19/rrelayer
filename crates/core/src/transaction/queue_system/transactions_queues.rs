@@ -1117,12 +1117,17 @@ impl TransactionsQueues {
                                     || error_msg.contains("balance")
                                     || error_msg.contains("overshot");
                                 let will_revert = error_msg.contains("execution reverted");
-                                if insufficient_funds || will_revert {
+                                let intrinsic_gas_too_low =
+                                    error_msg.contains("intrinsic gas too low");
+                                if insufficient_funds || will_revert || intrinsic_gas_too_low {
                                     if insufficient_funds {
                                         error!("process_single_pending: transaction {} failed due to insufficient funds moved to failed - error {}", transaction.id, error_msg);
                                     }
                                     if will_revert {
                                         error!("process_single_pending: transaction {} failed as would always revert - error {}", transaction.id, error_msg);
+                                    }
+                                    if intrinsic_gas_too_low {
+                                        error!("process_single_pending: transaction {} failed due to intrinsic gas too low - error {}", transaction.id, error_msg);
                                     }
                                     self.db
                                         .update_transaction_failed(
