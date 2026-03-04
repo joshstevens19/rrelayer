@@ -140,23 +140,23 @@ pub enum ProcessPendingTransactionError {
     #[error("Relayer transactions queue not found for relayer id {0}")]
     RelayerTransactionsQueueNotFound(RelayerId),
 
-    #[error("Relayer id {0} / address {1} - Send transaction error: {0}")]
+    #[error("Relayer id {0} / address {1} - Send transaction error: {2}")]
     SendTransactionError(RelayerId, EvmAddress, TransactionQueueSendTransactionError),
 
-    #[error("Transaction could not be sent due to gas calculation error for relayer id {0} / address {1}: tx {1}")]
+    #[error("Transaction could not be sent due to gas calculation error for relayer id {0} / address {1}: tx {2}")]
     GasCalculationError(RelayerId, EvmAddress, Transaction),
 
-    #[error("Relayer id {0} / address {1} - {0}")]
+    #[error("Relayer id {0} / address {1} - {2}")]
     MovePendingTransactionToInmempoolError(
         RelayerId,
         EvmAddress,
         MovePendingTransactionToInmempoolError,
     ),
 
-    #[error("Relayer id {0} / address {1} - Transaction estimate gas error: {0}")]
+    #[error("Relayer id {0} / address {1} - Transaction estimate gas error: {2}")]
     TransactionEstimateGasError(RelayerId, EvmAddress, RpcError<TransportErrorKind>),
 
-    #[error("Relayer id {0} / address {1} - Transaction could not be updated in DB: {0}")]
+    #[error("Relayer id {0} / address {1} - Transaction could not be updated in DB: {2}")]
     DbError(RelayerId, EvmAddress, PostgresError),
 }
 
@@ -165,11 +165,11 @@ pub enum ProcessInmempoolTransactionError {
     #[error("Relayer transactions queue not found for relayer {0}")]
     RelayerTransactionsQueueNotFound(RelayerId),
 
-    #[error("Relayer id {0} / address {1} - Send transaction error: {0}")]
+    #[error("Relayer id {0} / address {1} - Send transaction error: {2}")]
     SendTransactionError(RelayerId, EvmAddress, TransactionQueueSendTransactionError),
 
     #[error(
-        "Transaction status {4} could not be updated in the database for relayer id {0} / address {1}: tx {2} - error {3}"
+        "Transaction status {3} could not be updated in the database for relayer id {0} / address {1}: tx {2} - error {4}"
     )]
     CouldNotUpdateTransactionStatusInTheDatabase(
         RelayerId,
@@ -179,7 +179,7 @@ pub enum ProcessInmempoolTransactionError {
         PostgresError,
     ),
 
-    #[error("Relayer id {0} / address {1} - {0}")]
+    #[error("Relayer id {0} / address {1} - {2}")]
     MoveInmempoolTransactionToMinedError(
         RelayerId,
         EvmAddress,

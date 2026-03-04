@@ -12,6 +12,7 @@
 
 - fix: replace paginated `list_aliases` with direct `describe_key` lookup in KMS wallet manager to prevent cloned relayers resolving to wrong EVM address
 - fix: return error instead of logging when cloned wallet unexpectedly creates a new KMS key
+- fix: correct error message format strings in `ProcessPendingTransactionError` and `ProcessInmempoolTransactionError` that were printing relayer ID instead of the actual error details
 
 ---
 
