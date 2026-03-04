@@ -124,21 +124,17 @@ impl AwsKmsWalletManager {
         let kms = Client::new(&aws_config);
 
         // AWS KMS DescribeKey accepts an alias directly as the key-id parameter
-        let result = kms
-            .describe_key()
-            .key_id(&expected_alias)
-            .send()
-            .await
-            .map_err(|e| WalletError::ApiError {
+        let result = kms.describe_key().key_id(&expected_alias).send().await.map_err(|e| {
+            WalletError::ApiError {
                 message: format!("No KMS key found for alias {}: {:?}", expected_alias, e),
-            })?;
+            }
+        })?;
 
-        let key_id = result
-            .key_metadata()
-            .map(|m| m.key_id().to_string())
-            .ok_or_else(|| WalletError::ApiError {
+        let key_id = result.key_metadata().map(|m| m.key_id().to_string()).ok_or_else(|| {
+            WalletError::ApiError {
                 message: format!("No key metadata returned for alias: {}", expected_alias),
-            })?;
+            }
+        })?;
 
         Ok(key_id)
     }
@@ -461,7 +457,10 @@ impl AwsKmsWalletManager {
             if let Some(existing_metadata) = existing.key_metadata() {
                 let existing_key_id = existing_metadata.key_id();
                 if existing_key_id == kms_key_id {
-                    info!("AWS KMS: Alias {} already exists and points to the correct key", alias_name);
+                    info!(
+                        "AWS KMS: Alias {} already exists and points to the correct key",
+                        alias_name
+                    );
                     return Ok(alias_name);
                 } else {
                     return Err(WalletError::ApiError {
