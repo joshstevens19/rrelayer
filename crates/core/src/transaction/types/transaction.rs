@@ -2,7 +2,8 @@ use std::fmt::Display;
 
 use alloy::{
     consensus::{
-        TxEip1559, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxLegacy, TypedTransaction,
+        TxEip1559, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxLegacy,
+        TypedTransaction,
     },
     eips::eip2930::AccessList,
     primitives::TxKind,
@@ -28,13 +29,15 @@ pub enum TransactionConversionError {
     BlobSidecarBuild(String),
     #[error("Gas limit not set")]
     NoGasLimit,
+    #[error("No authorization list found in transaction")]
+    NoAuthorizationList,
 }
 
 use super::{
     TransactionBlob, TransactionData, TransactionHash, TransactionId, TransactionNonce,
     TransactionSpeed, TransactionStatus, TransactionValue,
 };
-use crate::common_types::BlockNumber;
+use crate::{common_types::BlockNumber, transaction::types::TransactionAuthorization};
 use crate::{
     gas::{BlobGasPriceResult, GasLimit, GasPriceResult, MaxFee, MaxPriorityFee},
     network::ChainId,
@@ -48,6 +51,8 @@ pub struct Transaction {
 
     #[serde(rename = "relayerId")]
     pub relayer_id: RelayerId,
+
+    pub authorization_list: Option<Vec<TransactionAuthorization>>,
 
     pub to: EvmAddress,
 
@@ -128,6 +133,71 @@ impl Transaction {
     /// * `bool` - True if the transaction has a sent_at timestamp
     pub fn has_been_sent_before(&self) -> bool {
         self.sent_at.is_some()
+    }
+
+    /// Converts this transaction to an EIP-7702 typed transaction.
+    ///
+    /// Creates an EIP-7702 transaction with max priority fee and max fee per gas.
+    ///
+    /// # Arguments
+    /// * `override_gas_price` - Optional gas price to override stored values
+    /// * `override_gas_limit` - Optional gas limit to override stored values
+    ///
+    /// # Returns
+    /// * `Ok(TypedTransaction)` - EIP-7702 typed transaction
+    /// * `Err(TransactionConversionError)` - If gas price information is missing
+    pub fn to_eip7702_typed_transaction(
+        &self,
+        override_gas_price: Option<&GasPriceResult>,
+    ) -> Result<TypedTransaction, TransactionConversionError> {
+        self.to_eip7702_typed_transaction_with_gas_limit(override_gas_price, None)
+    }
+
+    /// Converts this transaction to an EIP-7702 typed transaction with optional gas limit override.
+    ///
+    /// Creates an EIP-7702 transaction with max priority fee and max fee per gas.
+    ///
+    /// # Arguments
+    /// * `override_gas_price` - Optional gas price to override stored values
+    /// * `override_gas_limit` - Optional gas limit to override stored values
+    ///
+    /// # Returns
+    /// * `Ok(TypedTransaction)` - EIP-7702 typed transaction
+    /// * `Err(TransactionConversionError)` - If gas price or gas limit information is missing
+    /// * `Err(NoAuthorizationList)` - If authorization list information is missing
+    pub fn to_eip7702_typed_transaction_with_gas_limit(
+        &self,
+        override_gas_price: Option<&GasPriceResult>,
+        override_gas_limit: Option<GasLimit>,
+    ) -> Result<TypedTransaction, TransactionConversionError> {
+        let gas_price_result = match override_gas_price {
+            Some(gas_price) => gas_price,
+            None => self.sent_with_gas.as_ref().ok_or(TransactionConversionError::NoGasPrice)?,
+        };
+
+        let gas_limit = match override_gas_limit {
+            Some(limit) => limit,
+            None => self.gas_limit.ok_or(TransactionConversionError::NoGasLimit)?,
+        };
+
+        Ok(TypedTransaction::Eip7702(TxEip7702 {
+            to: self.to.into(),
+            value: self.value.into(),
+            input: self.data.clone().into(),
+            gas_limit: gas_limit.into(),
+            nonce: self.nonce.into(),
+            max_priority_fee_per_gas: gas_price_result.max_priority_fee.into(),
+            max_fee_per_gas: gas_price_result.max_fee.into(),
+            chain_id: self.chain_id.into(),
+            access_list: AccessList::default(),
+            authorization_list: self
+                .authorization_list
+                .as_ref()
+                .ok_or(TransactionConversionError::NoAuthorizationList)?
+                .iter()
+                .map(|auth| auth.into())
+                .collect(),
+        }))
     }
 
     /// Converts this transaction to an EIP-1559 typed transaction.
@@ -296,5 +366,13 @@ impl Transaction {
     /// * `bool` - True if the transaction has blob data
     pub fn is_blob_transaction(&self) -> bool {
         self.blobs.is_some()
+    }
+
+    /// Checks if this is a 7702 transaction (EIP-7702).
+    ///
+    /// # Returns
+    /// * `bool` - True if the transaction has authorization data
+    pub fn is_7702_transaction(&self) -> bool {
+        self.authorization_list.is_some()
     }
 }

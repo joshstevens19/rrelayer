@@ -1,3 +1,6 @@
+mod transaction_authorization;
+pub use transaction_authorization::TransactionAuthorization;
+
 mod transaction_data;
 pub use transaction_data::TransactionData;
 

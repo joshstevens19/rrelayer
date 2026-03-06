@@ -22,6 +22,7 @@ async fn example() -> Result<()> {
     let client = get_client().await?;
 
     let request = RelayTransactionRequest {
+        authorization_list: None,
         to: EvmAddress::from_str("0x5FCD072a0BD58B6fa413031582E450FE724dba6D")?,
         value: TransactionValue::from_str("1000000000000000000")
             .map_err(|e| anyhow::anyhow!("Invalid value: {}", e))?, // 1 ETH in wei

@@ -26,14 +26,18 @@ impl PostgresClient {
         let mut conn = self.pool.get().await?;
         let trans = conn.transaction().await.map_err(PostgresError::PgError)?;
 
+        let authorization_list_json = transaction.authorization_list.as_ref()
+            .map(|list| serde_json::to_value(list).unwrap_or(serde_json::Value::Null));
+
         for table_name in TRANSACTION_TABLES.iter() {
             trans.execute(
                 format!("
-                INSERT INTO {}(id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit, speed, status, expires_at, queued_at, hash, external_id, cancelled_by_transaction_id)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17);
+                INSERT INTO {}(id, relayer_id, authorization_list, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit, speed, status, expires_at, queued_at, hash, external_id, cancelled_by_transaction_id)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18);
             ", table_name).as_str(),
                 &[&transaction.id,
                     &relayer_id,
+                    &authorization_list_json,
                     &transaction.to,
                     &transaction.from,
                     &transaction.nonce,
@@ -151,15 +155,19 @@ impl PostgresClient {
         let mut conn = self.pool.get().await?;
         let trans = conn.transaction().await.map_err(PostgresError::PgError)?;
 
+        let authorization_list_json = transaction.authorization_list.as_ref()
+            .map(|list| serde_json::to_value(list).unwrap_or(serde_json::Value::Null));
+
         for table_name in TRANSACTION_TABLES.iter() {
             trans.execute(
                 format!("
-                INSERT INTO {}(id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, speed, status, expires_at, queued_at, failed_at, failed_reason, external_id)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), $14, $15);
+                INSERT INTO {}(id, relayer_id, authorization_list, \"to\", \"from\", nonce, chain_id, data, value, blobs, speed, status, expires_at, queued_at, failed_at, failed_reason, external_id)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), $15, $16);
                 ", table_name).as_str(),
                 &[
                     &transaction.id,
                     &relayer_id,
+                    &authorization_list_json,
                     &transaction.to,
                     &transaction.from,
                     &transaction.nonce,
@@ -299,31 +307,36 @@ impl PostgresClient {
         let block_number = transaction_receipt.block_number.map(BlockNumber::new);
         let hash = TransactionHash::new(transaction_receipt.transaction_hash);
 
+        let authorization_list_json = transaction.authorization_list.as_ref()
+            .map(|list| serde_json::to_value(list).unwrap_or(serde_json::Value::Null));
+
         trans
             .execute(
                 "
                 UPDATE relayer.transaction
                 SET status = $2,
-                    \"to\" = $3,
-                    \"from\" = $4,
-                    value = $5,
-                    data = $6,
-                    nonce = $7,
-                    chain_id = $8,
-                    gas_limit = $9,
-                    block_hash = $10,
-                    block_number = $11,
-                    speed = $12,
-                    hash = $13,
-                    sent_max_fee_per_gas = $14,
-                    sent_max_priority_fee_per_gas = $15,
-                    external_id = $16,
+                    authorization_list = $3,
+                    \"to\" = $4,
+                    \"from\" = $5,
+                    value = $6,
+                    data = $7,
+                    nonce = $8,
+                    chain_id = $9,
+                    gas_limit = $10,
+                    block_hash = $11,
+                    block_number = $12,
+                    speed = $13,
+                    hash = $14,
+                    sent_max_fee_per_gas = $15,
+                    sent_max_priority_fee_per_gas = $16,
+                    external_id = $17,
                     mined_at = NOW()
                 WHERE id = $1;
             ",
                 &[
                     &transaction.id,
                     &TransactionStatus::MINED,
+                    &authorization_list_json,
                     &transaction.to,
                     &transaction.from,
                     &transaction.value,
@@ -349,18 +362,21 @@ impl PostgresClient {
                     id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
                     speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
                     failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
-                    sent_max_fee_per_gas, gas_price, block_hash, block_number, external_id
+                    sent_max_fee_per_gas, gas_price, block_hash, block_number, external_id,
+                    authorization_list
                 )
                 SELECT
-                    $1, relayer_id, $3, $4, $7, $8, $6, $5, blobs, $9,
-                    $12, $2, expires_at, queued_at, sent_at, NOW(), confirmed_at,
-                    failed_at, failed_reason, $13, $15, $14, gas_price, $10, $11, $16
+                    $1, relayer_id, $4, $5, $8, $9, $7, $6, blobs, $10,
+                    $13, $2, expires_at, queued_at, sent_at, NOW(), confirmed_at,
+                    failed_at, failed_reason, $14, $16, $15, gas_price, $11, $12, $17,
+                    $3
                 FROM relayer.transaction
                 WHERE id = $1;
             ",
                 &[
                     &transaction.id,
                     &TransactionStatus::MINED,
+                    &authorization_list_json,
                     &transaction.to,
                     &transaction.from,
                     &transaction.value,
@@ -409,13 +425,15 @@ impl PostgresClient {
                         id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
                         speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
-                        sent_max_fee_per_gas, gas_price, block_hash, block_number, external_id
+                        sent_max_fee_per_gas, gas_price, block_hash, block_number, external_id,
+                        authorization_list
                     )
                     SELECT
                         id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
                         speed, $2, expires_at, queued_at, sent_at, mined_at, NOW(),
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
-                        sent_max_fee_per_gas, gas_price, block_hash, block_number, external_id
+                        sent_max_fee_per_gas, gas_price, block_hash, block_number, external_id,
+                        authorization_list
                     FROM relayer.transaction
                     WHERE id = $1;
                 ",
@@ -450,13 +468,15 @@ impl PostgresClient {
                         id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
                         speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
-                        sent_max_fee_per_gas, gas_price, block_hash, block_number, external_id
+                        sent_max_fee_per_gas, gas_price, block_hash, block_number, external_id,
+                        authorization_list
                     )
                     SELECT
                         id, relayer_id, \"to\", \"from\", $2, chain_id, data, value, blobs, gas_limit,
                         speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
-                        sent_max_fee_per_gas, gas_price, block_hash, block_number, external_id
+                        sent_max_fee_per_gas, gas_price, block_hash, block_number, external_id,
+                        authorization_list
                     FROM relayer.transaction
                     WHERE id = $1;
                 ",
@@ -495,13 +515,15 @@ impl PostgresClient {
                         id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
                         speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
-                        sent_max_fee_per_gas, gas_price, block_hash, block_number, expired_at, external_id
+                        sent_max_fee_per_gas, gas_price, block_hash, block_number, expired_at, external_id,
+                        authorization_list
                     )
                     SELECT
                         id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
                         speed, $2, expires_at, queued_at, sent_at, mined_at, confirmed_at,
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
-                        sent_max_fee_per_gas, gas_price, block_hash, block_number, NOW(), external_id
+                        sent_max_fee_per_gas, gas_price, block_hash, block_number, NOW(), external_id,
+                        authorization_list
                     FROM relayer.transaction
                     WHERE id = $1;
                 ",
@@ -528,37 +550,42 @@ impl PostgresClient {
             .as_ref()
             .map(|blob_gas| serde_json::to_value(blob_gas).unwrap_or(serde_json::Value::Null));
 
+        let authorization_list_json = transaction.authorization_list.as_ref()
+            .map(|list| serde_json::to_value(list).unwrap_or(serde_json::Value::Null));
+
         trans
             .execute(
                 "
                     UPDATE relayer.transaction
                     SET relayer_id = $2,
-                        \"to\" = $3,
-                        \"from\" = $4,
-                        nonce = $5,
-                        chain_id = $6,
-                        data = $7,
-                        value = $8,
-                        speed = $9,
-                        status = $10,
-                        expires_at = $11,
-                        queued_at = $12,
-                        sent_at = $13,
-                        mined_at = $14,
-                        confirmed_at = $15,
-                        gas_limit = $16,
-                        hash = $17,
-                        sent_max_fee_per_gas = $18,
-                        sent_max_priority_fee_per_gas = $19,
-                        sent_with_gas = $20,
-                        sent_with_blob_gas = $21,
-                        external_id = $22,
-                        cancelled_by_transaction_id = $23
+                        authorization_list = $3,
+                        \"to\" = $4,
+                        \"from\" = $5,
+                        nonce = $6,
+                        chain_id = $7,
+                        data = $8,
+                        value = $9,
+                        speed = $10,
+                        status = $11,
+                        expires_at = $12,
+                        queued_at = $13,
+                        sent_at = $14,
+                        mined_at = $15,
+                        confirmed_at = $16,
+                        gas_limit = $17,
+                        hash = $18,
+                        sent_max_fee_per_gas = $19,
+                        sent_max_priority_fee_per_gas = $20,
+                        sent_with_gas = $21,
+                        sent_with_blob_gas = $22,
+                        external_id = $23,
+                        cancelled_by_transaction_id = $24
                     WHERE id = $1
                 ",
                 &[
                     &transaction.id,
                     &transaction.relayer_id,
+                    &authorization_list_json,
                     &transaction.to,
                     &transaction.from,
                     &transaction.nonce,
@@ -593,14 +620,14 @@ impl PostgresClient {
                         speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
                         sent_max_fee_per_gas, gas_price, sent_with_gas, sent_with_blob_gas,
-                        block_hash, block_number, expired_at, external_id
+                        block_hash, block_number, expired_at, external_id, authorization_list
                     )
                     SELECT
                         id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
                         speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
                         sent_max_fee_per_gas, gas_price, sent_with_gas, sent_with_blob_gas,
-                        block_hash, block_number, expired_at, external_id
+                        block_hash, block_number, expired_at, external_id, authorization_list
                     FROM relayer.transaction
                     WHERE id = $1
                 ",
