@@ -4,13 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g., 1.2.3) - leave empty for master build'
-        required: false
-        type: string
-  workflow_call:
-    inputs:
-      version:
-        description: 'Release version (e.g., 1.2.3)'
+        description: 'Release version (e.g., 1.2.3) - leave empty for edge build'
         required: false
         type: string
   release:
@@ -28,19 +22,13 @@ jobs:
       contents: read
       packages: write
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Create docker-binary directory
-        run: mkdir -p docker-binary
-
-      - name: Set up Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-unknown-linux-gnu
 
-      - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2
         with:
           key: x86_64-unknown-linux-gnu-docker
 
@@ -53,8 +41,7 @@ jobs:
         working-directory: crates/cli
         env:
           RUSTFLAGS: '-C target-cpu=x86-64-v2'
-        run: |
-          cargo build --release --target x86_64-unknown-linux-gnu --features jemalloc
+        run: cargo build --release --target x86_64-unknown-linux-gnu --features jemalloc
 
       - name: Prepare binary for Docker
         run: |
@@ -62,23 +49,22 @@ jobs:
           cp target/x86_64-unknown-linux-gnu/release/rrelayer_cli docker-binary/rrelayer_cli
           chmod +x docker-binary/rrelayer_cli
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v3
 
-      - name: Log into registry ${{ env.REGISTRY }}
+      - name: Log into registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Generate SHA-based internal tag
+      - name: Generate tag
         id: tags
         run: |
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
           echo "tag=${{ env.IMAGE }}:sha-${SHORT_SHA}-amd64" >> $GITHUB_OUTPUT
 
-      - name: Build and push AMD64 Docker image
+      - name: Build and push AMD64 image
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -88,8 +74,8 @@ jobs:
           platforms: linux/amd64
           provenance: mode=max
           sbom: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=docker-amd64
+          cache-to: type=gha,mode=max,scope=docker-amd64
 
   build-arm64:
     name: Build ARM64 Docker Image
@@ -98,19 +84,13 @@ jobs:
       contents: read
       packages: write
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Create docker-binary directory
-        run: mkdir -p docker-binary
-
-      - name: Set up Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-unknown-linux-gnu
 
-      - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2
         with:
           key: aarch64-unknown-linux-gnu-docker
 
@@ -123,8 +103,7 @@ jobs:
         working-directory: crates/cli
         env:
           RUSTFLAGS: '-C target-cpu=neoverse-n1'
-        run: |
-          cargo build --release --target aarch64-unknown-linux-gnu
+        run: cargo build --release --target aarch64-unknown-linux-gnu
 
       - name: Prepare binary for Docker
         run: |
@@ -132,23 +111,22 @@ jobs:
           cp target/aarch64-unknown-linux-gnu/release/rrelayer_cli docker-binary/rrelayer_cli
           chmod +x docker-binary/rrelayer_cli
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v3
 
-      - name: Log into registry ${{ env.REGISTRY }}
+      - name: Log into registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Generate SHA-based internal tag
+      - name: Generate tag
         id: tags
         run: |
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
           echo "tag=${{ env.IMAGE }}:sha-${SHORT_SHA}-arm64" >> $GITHUB_OUTPUT
 
-      - name: Build and push ARM64 Docker image
+      - name: Build and push ARM64 image
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -158,8 +136,8 @@ jobs:
           platforms: linux/arm64
           provenance: mode=max
           sbom: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=docker-arm64
+          cache-to: type=gha,mode=max,scope=docker-arm64
 
   create-manifest:
     name: Create Multi-Arch Manifest
@@ -169,49 +147,37 @@ jobs:
       contents: read
       packages: write
     steps:
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v3
 
-      - name: Log into registry ${{ env.REGISTRY }}
+      - name: Log into registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            VERSION="${{ github.event.release.tag_name }}"
+            echo "version=${VERSION#v}" >> $GITHUB_OUTPUT
+          elif [ -n "${{ inputs.version }}" ]; then
+            echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=" >> $GITHUB_OUTPUT
+          fi
+
       - name: Create and push multi-arch manifest
         run: |
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-          AMD64_IMAGE="${{ env.IMAGE }}:sha-${SHORT_SHA}-amd64"
-          ARM64_IMAGE="${{ env.IMAGE }}:sha-${SHORT_SHA}-arm64"
-          
-          echo "Source images:"
-          echo "  AMD64: $AMD64_IMAGE"
-          echo "  ARM64: $ARM64_IMAGE"
-          
-          VERSION="${{ inputs.version }}"
-          
+          AMD64="${{ env.IMAGE }}:sha-${SHORT_SHA}-amd64"
+          ARM64="${{ env.IMAGE }}:sha-${SHORT_SHA}-arm64"
+          VERSION="${{ steps.version.outputs.version }}"
+
           if [ -n "$VERSION" ]; then
-            # Release build: create version tag and latest tag
-            echo "Creating release manifests for version: $VERSION"
-            
-            # Version tag (e.g., 1.2.3)
-            echo "Creating manifest for tag: $VERSION"
-            docker buildx imagetools create -t "${{ env.IMAGE }}:$VERSION" \
-              "$AMD64_IMAGE" \
-              "$ARM64_IMAGE"
-            
-            # Latest tag
-            echo "Creating manifest for tag: latest"
-            docker buildx imagetools create -t "${{ env.IMAGE }}:latest" \
-              "$AMD64_IMAGE" \
-              "$ARM64_IMAGE"
+            docker buildx imagetools create -t "${{ env.IMAGE }}:${VERSION}" "$AMD64" "$ARM64"
+            docker buildx imagetools create -t "${{ env.IMAGE }}:latest" "$AMD64" "$ARM64"
           else
-            # Non-release build (master): create master tag only
-            echo "Creating master manifest"
-            docker buildx imagetools create -t "${{ env.IMAGE }}:master" \
-              "$AMD64_IMAGE" \
-              "$ARM64_IMAGE"
+            docker buildx imagetools create -t "${{ env.IMAGE }}:edge" "$AMD64" "$ARM64"
           fi
-          
-          echo "Manifests created successfully"
