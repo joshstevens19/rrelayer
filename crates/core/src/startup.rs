@@ -191,16 +191,10 @@ async fn start_api(
             };
 
             // Check if only private keys are configured
-            if signing_provider.private_keys.is_some()
-                && signing_provider.raw.is_none()
-                && signing_provider.aws_secret_manager.is_none()
-                && signing_provider.gcp_secret_manager.is_none()
-                && signing_provider.privy.is_none()
-                && signing_provider.aws_kms.is_none()
-                && signing_provider.turnkey.is_none()
-                && signing_provider.pkcs11.is_none()
-                && signing_provider.fireblocks.is_none()
-            {
+            let is_private_key_only = signing_provider.private_keys.is_some()
+                && !signing_provider.has_main_signing_provider();
+
+            if is_private_key_only {
                 Some(network_config.chain_id)
             } else {
                 None

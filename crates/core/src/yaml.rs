@@ -16,6 +16,7 @@ use crate::shared::utils::format_token_amount;
 use crate::transaction::types::TransactionSpeed;
 use crate::{rrelayer_error, shared::common_types::EvmAddress};
 
+#[cfg(feature = "gcp")]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GcpSecretManagerProviderConfig {
     pub id: String,
@@ -25,6 +26,7 @@ pub struct GcpSecretManagerProviderConfig {
     pub service_account_key_path: String,
 }
 
+#[cfg(feature = "aws")]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AwsSecretManagerProviderConfig {
     pub id: String,
@@ -32,6 +34,7 @@ pub struct AwsSecretManagerProviderConfig {
     pub region: String,
 }
 
+#[cfg(feature = "aws")]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AwsKmsSigningProviderConfig {
     pub region: String,
@@ -47,12 +50,14 @@ pub struct RawSigningProviderConfig {
     pub mnemonic: String,
 }
 
+#[cfg(feature = "privy")]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PrivySigningProviderConfig {
     pub app_id: String,
     pub app_secret: String,
 }
 
+#[cfg(feature = "turnkey")]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TurnkeySigningProviderConfig {
     pub api_public_key: String,
@@ -61,6 +66,7 @@ pub struct TurnkeySigningProviderConfig {
     pub wallet_id: String,
 }
 
+#[cfg(feature = "pkcs11")]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Pkcs11SigningProviderConfig {
     pub library_path: String,
@@ -75,6 +81,7 @@ pub struct Pkcs11SigningProviderConfig {
     pub test_mode: Option<bool>,
 }
 
+#[cfg(feature = "fireblocks")]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FireblocksSigningProviderConfig {
     pub api_key: String,
@@ -92,29 +99,36 @@ pub struct PrivateKeyConfig {
     pub raw: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct SigningProvider {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub raw: Option<RawSigningProviderConfig>,
 
+    #[cfg(feature = "aws")]
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub aws_secret_manager: Option<AwsSecretManagerProviderConfig>,
 
+    #[cfg(feature = "gcp")]
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub gcp_secret_manager: Option<GcpSecretManagerProviderConfig>,
 
+    #[cfg(feature = "privy")]
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub privy: Option<PrivySigningProviderConfig>,
 
+    #[cfg(feature = "aws")]
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub aws_kms: Option<AwsKmsSigningProviderConfig>,
 
+    #[cfg(feature = "turnkey")]
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub turnkey: Option<TurnkeySigningProviderConfig>,
 
+    #[cfg(feature = "pkcs11")]
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub pkcs11: Option<Pkcs11SigningProviderConfig>,
 
+    #[cfg(feature = "fireblocks")]
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub fireblocks: Option<FireblocksSigningProviderConfig>,
 
@@ -147,6 +161,7 @@ pub struct RateLimitConfig {
     pub fallback_to_relayer: bool,
 }
 
+#[cfg(feature = "aws")]
 impl AwsKmsSigningProviderConfig {
     pub fn validate(&self) -> Result<(), String> {
         if self.region.is_empty() {
@@ -156,6 +171,7 @@ impl AwsKmsSigningProviderConfig {
     }
 }
 
+#[cfg(feature = "turnkey")]
 impl TurnkeySigningProviderConfig {
     pub fn validate(&self) -> Result<(), String> {
         if self.api_public_key.is_empty() {
@@ -174,6 +190,7 @@ impl TurnkeySigningProviderConfig {
     }
 }
 
+#[cfg(feature = "fireblocks")]
 impl FireblocksSigningProviderConfig {
     pub fn validate(&self) -> Result<(), String> {
         if self.api_key.is_empty() {
@@ -226,8 +243,23 @@ impl FireblocksSigningProviderConfig {
 
         Ok(())
     }
+
+    /// Returns the appropriate base URL based on sandbox setting
+    pub fn get_base_url(&self) -> String {
+        if self.sandbox.unwrap_or(false) {
+            "https://sandbox-api.fireblocks.io".to_string()
+        } else {
+            "https://api.fireblocks.io".to_string()
+        }
+    }
+
+    /// Returns true if running in sandbox mode
+    pub fn is_sandbox(&self) -> bool {
+        self.sandbox.unwrap_or(false)
+    }
 }
 
+#[cfg(feature = "pkcs11")]
 impl Pkcs11SigningProviderConfig {
     pub fn validate(&self) -> Result<(), String> {
         if self.library_path.is_empty() {
@@ -257,112 +289,113 @@ impl Pkcs11SigningProviderConfig {
     }
 }
 
-impl FireblocksSigningProviderConfig {
-    /// Returns the appropriate base URL based on sandbox setting
-    pub fn get_base_url(&self) -> String {
-        if self.sandbox.unwrap_or(false) {
-            // Use sandbox environment
-            "https://sandbox-api.fireblocks.io".to_string()
-        } else {
-            // Use production environment (default)
-            "https://api.fireblocks.io".to_string()
-        }
-    }
-
-    /// Returns true if running in sandbox mode
-    pub fn is_sandbox(&self) -> bool {
-        self.sandbox.unwrap_or(false)
-    }
-}
-
 impl SigningProvider {
     pub fn from_raw(raw: RawSigningProviderConfig) -> Self {
-        Self {
-            raw: Some(raw),
-            aws_secret_manager: None,
-            gcp_secret_manager: None,
-            privy: None,
-            aws_kms: None,
-            turnkey: None,
-            pkcs11: None,
-            fireblocks: None,
-            private_keys: None,
-        }
+        Self { raw: Some(raw), ..Default::default() }
     }
 
+    #[cfg(feature = "aws")]
     pub fn from_aws_kms(aws_kms: AwsKmsSigningProviderConfig) -> Self {
-        Self {
-            raw: None,
-            aws_secret_manager: None,
-            gcp_secret_manager: None,
-            privy: None,
-            aws_kms: Some(aws_kms),
-            turnkey: None,
-            pkcs11: None,
-            fireblocks: None,
-            private_keys: None,
-        }
+        Self { aws_kms: Some(aws_kms), ..Default::default() }
     }
 
+    #[cfg(feature = "turnkey")]
     pub fn from_turnkey(turnkey: TurnkeySigningProviderConfig) -> Self {
-        Self {
-            raw: None,
-            aws_secret_manager: None,
-            gcp_secret_manager: None,
-            privy: None,
-            aws_kms: None,
-            turnkey: Some(turnkey),
-            pkcs11: None,
-            fireblocks: None,
-            private_keys: None,
-        }
+        Self { turnkey: Some(turnkey), ..Default::default() }
     }
 
+    #[cfg(feature = "pkcs11")]
     pub fn from_pkcs11(pkcs11: Pkcs11SigningProviderConfig) -> Self {
-        Self {
-            raw: None,
-            aws_secret_manager: None,
-            gcp_secret_manager: None,
-            privy: None,
-            aws_kms: None,
-            turnkey: None,
-            pkcs11: Some(pkcs11),
-            fireblocks: None,
-            private_keys: None,
-        }
+        Self { pkcs11: Some(pkcs11), ..Default::default() }
     }
 
+    #[cfg(feature = "fireblocks")]
     pub fn from_fireblocks(fireblocks: FireblocksSigningProviderConfig) -> Self {
-        Self {
-            raw: None,
-            aws_secret_manager: None,
-            gcp_secret_manager: None,
-            privy: None,
-            aws_kms: None,
-            turnkey: None,
-            pkcs11: None,
-            fireblocks: Some(fireblocks),
-            private_keys: None,
-        }
+        Self { fireblocks: Some(fireblocks), ..Default::default() }
     }
-}
 
-impl SigningProvider {
+    /// Returns true if any main signing provider (non-private-key) is configured.
+    pub fn has_main_signing_provider(&self) -> bool {
+        #[allow(unused_mut)]
+        let mut result = self.raw.is_some();
+
+        #[cfg(feature = "aws")]
+        {
+            result = result || self.aws_kms.is_some() || self.aws_secret_manager.is_some();
+        }
+
+        #[cfg(feature = "gcp")]
+        if self.gcp_secret_manager.is_some() {
+            result = true;
+        }
+
+        #[cfg(feature = "privy")]
+        if self.privy.is_some() {
+            result = true;
+        }
+
+        #[cfg(feature = "turnkey")]
+        if self.turnkey.is_some() {
+            result = true;
+        }
+
+        #[cfg(feature = "pkcs11")]
+        if self.pkcs11.is_some() {
+            result = true;
+        }
+
+        #[cfg(feature = "fireblocks")]
+        if self.fireblocks.is_some() {
+            result = true;
+        }
+
+        result
+    }
+
     pub fn validate(&self) -> Result<(), String> {
-        let configured_methods = [
-            self.raw.is_some(),
-            self.aws_secret_manager.is_some(),
-            self.gcp_secret_manager.is_some(),
-            self.privy.is_some(),
-            self.aws_kms.is_some(),
-            self.turnkey.is_some(),
-            self.pkcs11.is_some(),
-            self.fireblocks.is_some(),
-            self.private_keys.is_some(),
-        ]
-        .iter()
-        .filter(|&&x| x)
-        .count();
+        let mut configured_methods = 0usize;
+
+        if self.raw.is_some() {
+            configured_methods += 1;
+        }
+        if self.private_keys.is_some() {
+            configured_methods += 1;
+        }
+
+        #[cfg(feature = "aws")]
+        {
+            if self.aws_secret_manager.is_some() {
+                configured_methods += 1;
+            }
+            if self.aws_kms.is_some() {
+                configured_methods += 1;
+            }
+        }
+
+        #[cfg(feature = "gcp")]
+        if self.gcp_secret_manager.is_some() {
+            configured_methods += 1;
+        }
+
+        #[cfg(feature = "privy")]
+        if self.privy.is_some() {
+            configured_methods += 1;
+        }
+
+        #[cfg(feature = "turnkey")]
+        if self.turnkey.is_some() {
+            configured_methods += 1;
+        }
+
+        #[cfg(feature = "pkcs11")]
+        if self.pkcs11.is_some() {
+            configured_methods += 1;
+        }
+
+        #[cfg(feature = "fireblocks")]
+        if self.fireblocks.is_some() {
+            configured_methods += 1;
+        }
 
         match configured_methods {
             0 => Err("Signing key is not set".to_string()),
@@ -999,18 +1032,22 @@ pub fn read(file_path: &PathBuf, raw_yaml: bool) -> Result<SetupConfig, ReadYaml
     if let Some(signing_key) = &config.signing_provider {
         signing_key.validate().map_err(ReadYamlError::SigningProviderYamlError)?;
 
+        #[cfg(feature = "aws")]
         if let Some(aws_kms) = &signing_key.aws_kms {
             aws_kms.validate().map_err(ReadYamlError::SigningProviderYamlError)?;
         }
 
+        #[cfg(feature = "turnkey")]
         if let Some(turnkey) = &signing_key.turnkey {
             turnkey.validate().map_err(ReadYamlError::SigningProviderYamlError)?;
         }
 
+        #[cfg(feature = "fireblocks")]
         if let Some(fireblocks) = &signing_key.fireblocks {
             fireblocks.validate().map_err(ReadYamlError::SigningProviderYamlError)?;
         }
 
+        #[cfg(feature = "pkcs11")]
         if let Some(pkcs11) = &signing_key.pkcs11 {
             pkcs11.validate().map_err(ReadYamlError::SigningProviderYamlError)?;
         }
