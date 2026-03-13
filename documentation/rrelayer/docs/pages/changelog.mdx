@@ -7,6 +7,7 @@
 ### Features
 
 - feat: all third-party signing provider integrations are now behind cargo feature flags (all enabled by default). Available features: `gcp`, `aws`, `privy`, `turnkey`, `pkcs11`, `fireblocks`. Disable unneeded providers with `--no-default-features` to reduce compile time and binary size.
+- feat: the Rust SDK (`rrelayer` crate) no longer pulls in signing provider dependencies from `rrelayer_core` by default, reducing dependency footprint for SDK consumers.
 - chore: removed unused `hmac` and `rsa` dependencies.
 - feat: expose webhook types (WebhookEventType, WebhookPayload, WebhookSigningPayload, WebhookLowBalancePayload) to Rust and TypeScript SDKs
 

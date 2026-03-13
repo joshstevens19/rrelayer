@@ -26,7 +26,7 @@ anyhow = { workspace = true }
 thiserror = { workspace = true }
 alloy = { workspace = true, features = ["full", "signer-mnemonic", "eips", "eip712"] }
 base64 = { workspace = true }
-rrelayer_core = { path = "../core" }
+rrelayer_core = { path = "../core", default-features = false }
 tokio = { workspace = true, features = ["time"] }
 async-trait = { workspace = true }
 hex = { workspace = true }
