@@ -1239,8 +1239,7 @@ mod tests {
             relayers: AllOrAddresses::All,
             native: None,
             erc20_tokens: None,
-            additional_addresses: additional
-                .map(|addrs| addrs.into_iter().map(addr).collect()),
+            additional_addresses: additional.map(|addrs| addrs.into_iter().map(addr).collect()),
         }
     }
 
