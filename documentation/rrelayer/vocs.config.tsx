@@ -188,6 +188,7 @@ export default defineConfig({
         },
         { text: 'Webhooks', link: '/config/webhooks' },
         { text: 'Rate limits', link: '/config/rate-limits' },
+        { text: 'Advanced', link: '/config/advanced' },
       ],
     },
     {

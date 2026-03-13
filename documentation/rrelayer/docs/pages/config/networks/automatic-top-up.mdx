@@ -302,6 +302,58 @@ networks: // [!code focus]
             decimals: 18 # [!code focus]
 ```
 
+### additional_addresses - optional
+
+If you need to top up addresses that are **not** registered relayers (e.g. external wallets, contracts, or other services),
+you can use `additional_addresses` together with the `allow_non_relayer_topups` advanced config flag.
+
+These addresses are processed separately from the relayer addresses and skip the relayer validation check.
+
+:::warning
+This bypasses the security check that ensures top-up targets are registered relayers. Only use this with addresses you trust.
+:::
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: "my first rrelayer"
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider:
+  aws_kms:
+    region: "eu-west-1"
+advanced: // [!code focus]
+  allow_non_relayer_topups: true // [!code focus]
+networks: // [!code focus]
+  - name: local_anvil
+    chain_id: 31337
+    provider_urls:
+      - http://127.0.0.1:8545
+    block_explorer_url: http://localhost:8545
+    max_gas_price_multiplier: 4
+    gas_bump_blocks_every:
+      slow: 10
+      medium: 5
+      fast: 4
+      super_fast: 2
+    automatic_top_up: // [!code focus]
+      - from:
+          relayer:
+            address: "0x33993A4F4AA617DA4558A0CFD0C39A7989B67720"
+        relayers: "*"
+        native:
+          min_balance: "0.1"
+          top_up_amount: "0.5"
+        additional_addresses: // [!code focus]
+          - "0xABCDEF1234567890ABCDEF1234567890ABCDEF12" // [!code focus]
+          - "0x1234567890ABCDEF1234567890ABCDEF12345678" // [!code focus]
+```
+
+:::info
+`additional_addresses` requires `advanced.allow_non_relayer_topups: true` at the top level of your config. Without it, the additional addresses will be ignored.
+:::
+
 ## Multiple Top-up Configurations
 
 You can configure multiple top-up strategies on the same network. This is useful when you want different funding sources or strategies for different sets of relayers:
