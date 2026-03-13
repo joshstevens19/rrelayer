@@ -738,11 +738,7 @@ impl AutomaticTopUpTask {
         config: &NetworkAutomaticTopUpConfig,
         relayer_addresses: &[EvmAddress],
     ) -> Vec<EvmAddress> {
-        resolve_additional_addresses(
-            self.allow_non_relayer_topups,
-            config,
-            relayer_addresses,
-        )
+        resolve_additional_addresses(self.allow_non_relayer_topups, config, relayer_addresses)
     }
 
     /// Checks if the from_address has sufficient native balance for top-up operations.
@@ -1222,9 +1218,7 @@ fn resolve_additional_addresses(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::yaml::{
-        AllOrAddresses, NetworkAutomaticTopUpFrom, NetworkAutomaticTopUpRelayer,
-    };
+    use crate::yaml::{AllOrAddresses, NetworkAutomaticTopUpFrom, NetworkAutomaticTopUpRelayer};
 
     fn addr(s: &str) -> EvmAddress {
         s.parse().expect("valid address")
@@ -1246,7 +1240,7 @@ mod tests {
             native: None,
             erc20_tokens: None,
             additional_addresses: additional
-                .map(|addrs| addrs.into_iter().map(|a| addr(a)).collect()),
+                .map(|addrs| addrs.into_iter().map(addr).collect()),
         }
     }
 
