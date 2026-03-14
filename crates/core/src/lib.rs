@@ -34,7 +34,7 @@ pub use wallet::{generate_seed_phrase, AwsKmsWalletManager, WalletError};
 mod background_tasks;
 mod rate_limiting;
 pub use rate_limiting::RATE_LIMIT_HEADER_NAME;
-mod webhooks;
+pub mod webhooks;
 mod yaml;
 
 pub use docker::generate_docker_file;
