@@ -10,11 +10,25 @@ members = [
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
-serde_json = "1.0"
-anyhow = "1.0.98"
-alloy = { version = "1.1.3", features = ["full", "signer-mnemonic", "signer-keystore", "eips", "eip712"] }
-alloy-rlp = "0.3.12"
-alloy-eips = "1.1.3"
+serde_json = "1"
+serde_yaml = "0.9"
+anyhow = "1"
+thiserror = "2.0"
+alloy = { version = "1.7", features = ["full", "signer-mnemonic", "signer-keystore", "eips", "eip712"] }
+reqwest = { version = "0.13.2", features = ["json", "query"] }
+dotenvy = "0.15.7"
+tokio = { version = "1", features = ["full"] }
+tokio-postgres = { version = "0.7", features = ["with-uuid-1", "with-chrono-0_4", "with-serde_json-1"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+async-trait = "0.1"
+chrono = "0.4"
+hex = "0.4"
+base64 = "0.22"
+rand = "0.10"
+hmac = "0.12"
+sha2 = "0.10"
+regex = "1"
 
 [profile.release]
 lto = "fat"

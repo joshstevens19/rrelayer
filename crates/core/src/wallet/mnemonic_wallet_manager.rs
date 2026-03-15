@@ -13,7 +13,6 @@ use alloy::signers::{
     Signer,
 };
 use async_trait::async_trait;
-use rand::thread_rng;
 use std::collections::HashMap;
 use tokio::sync::Mutex;
 
@@ -139,7 +138,7 @@ impl WalletManagerTrait for MnemonicWalletManager {
 
 /// Generates a new 24-word BIP39 mnemonic seed phrase.
 pub fn generate_seed_phrase() -> Result<String, WalletError> {
-    let mut rng = thread_rng();
+    let mut rng = rand_core::OsRng;
     let mnemonic = Mnemonic::<English>::new_with_count(&mut rng, 24)
         .map_err(|e| WalletError::MnemonicError(format!("Failed to generate mnemonic: {}", e)))?;
     let phrase = mnemonic.to_phrase();

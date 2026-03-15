@@ -56,7 +56,7 @@ pub enum WalletError {
     StringEncodingError(#[from] std::string::FromUtf8Error),
 
     #[error("RLP decoding error: {0}")]
-    RlpError(#[from] alloy_rlp::Error),
+    RlpError(#[from] alloy::rlp::Error),
 
     #[error("Signature parsing error: {0}")]
     SignatureError(#[from] alloy::primitives::SignatureError),

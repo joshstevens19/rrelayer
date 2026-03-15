@@ -3,7 +3,7 @@ use crate::wallet::{WalletError, WalletManagerChainId, WalletManagerTrait};
 use alloy::consensus::{TxEnvelope, TypedTransaction};
 use alloy::dyn_abi::TypedData;
 use alloy::primitives::Signature;
-use alloy_rlp::Decodable;
+use alloy::rlp::Decodable;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

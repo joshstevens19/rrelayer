@@ -4,13 +4,10 @@ use crate::yaml::TurnkeySigningProviderConfig;
 use alloy::consensus::{TxEnvelope, TypedTransaction};
 use alloy::dyn_abi::TypedData;
 use alloy::primitives::{keccak256, Signature};
-use alloy_rlp::Decodable;
+use alloy::rlp::Decodable;
 use async_trait::async_trait;
 use base64::{engine::general_purpose, Engine as _};
-use p256::{
-    ecdsa::{signature::Signer, Signature as EcdsaSignature, SigningKey},
-    SecretKey,
-};
+use p256::ecdsa::{signature::Signer, Signature as EcdsaSignature, SigningKey};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -134,12 +131,10 @@ impl TurnkeyWalletManager {
             WalletError::ApiError { message: format!("Failed to decode private key: {}", e) }
         })?;
 
-        let secret_key = SecretKey::from_slice(&private_key_bytes).map_err(|e| {
+        let signing_key = SigningKey::from_slice(&private_key_bytes).map_err(|e| {
             error!("Failed to create secret key from bytes: {}", e);
             WalletError::ApiError { message: format!("Failed to create secret key: {}", e) }
         })?;
-
-        let signing_key = SigningKey::from(&secret_key);
 
         let signature: EcdsaSignature = signing_key.sign(body.as_bytes());
         let signature_bytes = signature.to_der();
@@ -392,7 +387,7 @@ impl WalletManagerTrait for TurnkeyWalletManager {
                     access_list: tx.access_list.clone(),
                 };
 
-                let encoded = alloy_rlp::encode(&unsigned_tx);
+                let encoded = alloy::rlp::encode(&unsigned_tx);
                 format!("0x02{}", hex::encode(&encoded))
             }
             TypedTransaction::Legacy(tx) => {
@@ -406,7 +401,7 @@ impl WalletManagerTrait for TurnkeyWalletManager {
                     input: tx.input.clone(),
                 };
 
-                let encoded = alloy_rlp::encode(&unsigned_tx);
+                let encoded = alloy::rlp::encode(&unsigned_tx);
                 format!("0x{}", hex::encode(&encoded))
             }
             TypedTransaction::Eip2930(tx) => {
@@ -421,7 +416,7 @@ impl WalletManagerTrait for TurnkeyWalletManager {
                     access_list: tx.access_list.clone(),
                 };
 
-                let encoded = alloy_rlp::encode(&unsigned_tx);
+                let encoded = alloy::rlp::encode(&unsigned_tx);
                 format!("0x01{}", hex::encode(&encoded))
             }
             TypedTransaction::Eip4844(tx_variant) => {
@@ -448,7 +443,7 @@ impl WalletManagerTrait for TurnkeyWalletManager {
                     max_fee_per_blob_gas: tx.max_fee_per_blob_gas,
                 };
 
-                let encoded = alloy_rlp::encode(&unsigned_tx);
+                let encoded = alloy::rlp::encode(&unsigned_tx);
                 format!("0x03{}", hex::encode(&encoded))
             }
             _ => {

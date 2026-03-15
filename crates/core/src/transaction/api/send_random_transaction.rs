@@ -9,7 +9,7 @@ use axum::{
     http::HeaderMap,
     Json,
 };
-use rand::seq::SliceRandom;
+use rand::seq::IndexedRandom;
 use std::sync::Arc;
 
 /// Handles random relayer selection for transaction requests
@@ -44,7 +44,7 @@ async fn select_random_relayer(
         return Err(not_found(format!("No relayers found for chain {}", chain_id)));
     }
 
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     // TODO: it should be smart enough to also only pick the one with enough native funds to send the tx
     let available_relayers: Vec<_> = relayers
         .into_iter()

@@ -3,8 +3,7 @@ use crate::credentials::{self};
 use crate::error::CliError;
 use clap::Subcommand;
 // use dialoguer::{Input, Password};
-use rand::Rng;
-use rand::distributions::Alphanumeric;
+use rand::distr::{Alphanumeric, SampleString};
 
 #[derive(Subcommand)]
 pub enum AuthCommand {
@@ -46,11 +45,7 @@ pub async fn handle_auth_command(cmd: &AuthCommand) -> Result<(), CliError> {
             list_profiles().await?;
         }
         AuthCommand::GenApiKey => {
-            let key = rand::thread_rng()
-                .sample_iter(&Alphanumeric)
-                .take(8)
-                .map(char::from)
-                .collect::<String>();
+            let key = Alphanumeric.sample_string(&mut rand::rng(), 8);
             println!(
                 "API key generated - note you have to config it in the networks yaml - {}",
                 key

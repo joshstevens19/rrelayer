@@ -37,7 +37,7 @@ use axum::{
     routing::get,
     Json, Router,
 };
-use dotenv::dotenv;
+use dotenvy::dotenv;
 use rustls::crypto::ring::default_provider;
 use rustls::crypto::CryptoProvider;
 use std::collections::HashMap;

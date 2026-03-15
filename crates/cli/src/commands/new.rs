@@ -3,8 +3,7 @@ use std::{fs, path::Path};
 use crate::project_location::ProjectLocation;
 use crate::{commands::error::InitError, print_error_message, print_success_message};
 use dialoguer::{Confirm, Input};
-use rand::Rng;
-use rand::distributions::Alphanumeric;
+use rand::distr::{Alphanumeric, SampleString};
 use rrelayer_core::network::ChainId;
 use rrelayer_core::{
     ApiConfig, NetworkSetupConfig, RawSigningProviderConfig, SetupConfig, SigningProvider,
@@ -25,11 +24,9 @@ fn write_gitignore(path: &Path) -> Result<(), WriteFileError> {
 }
 
 fn generate_random_credentials() -> (String, String) {
-    let username: String =
-        rand::thread_rng().sample_iter(&Alphanumeric).take(8).map(char::from).collect();
-
-    let password: String =
-        rand::thread_rng().sample_iter(&Alphanumeric).take(16).map(char::from).collect();
+    let mut rng = rand::rng();
+    let username = Alphanumeric.sample_string(&mut rng, 8);
+    let password = Alphanumeric.sample_string(&mut rng, 16);
 
     (format!("development_username_{}", username), format!("development_password_{}", password))
 }
