@@ -53,18 +53,15 @@ anyhow = { workspace = true }
 rust_decimal = { version = "1.35.0", features = ["db-tokio-postgres"] }
 google-secretmanager1 = { version = "7.0", features = ["yup-oauth2-service-account"], optional = true }
 yup-oauth2 = { version = "12", default-features = false, features = ["service-account", "hyper-rustls", "ring"], optional = true }
-hyper = "1.8"
 hyper-rustls = "0.27"
 rustls = { version = "0.23.35", features = ["ring"]}
-hmac = { workspace = true }
 sha2 = { workspace = true, optional = true }
 p256 = { version = "0.13", features = ["ecdsa"], optional = true }
 tower = "0.5.2"
 subtle = "2.6.1"
-cryptoki = "0.12"
-secrecy = "0.10"
-jsonwebtoken = "10"
-rsa = "0.9"
+cryptoki = { version = "0.12", optional = true }
+secrecy = {  version = "0.10", optional = true }
+jsonwebtoken = { version = "10", optional = true }
 
 [features]
 default = ["gcp", "aws", "privy", "turnkey", "pkcs11", "fireblocks"]
