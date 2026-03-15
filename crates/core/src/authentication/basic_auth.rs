@@ -5,7 +5,6 @@ use axum::extract::Request;
 use axum::middleware::Next;
 use axum::response::Response;
 use axum::{
-    async_trait,
     extract::FromRequestParts,
     http::{request::Parts, HeaderMap, StatusCode},
 };
@@ -89,7 +88,6 @@ impl BasicAuthCredentials {
 pub struct Authenticated;
 
 /// Basic auth extractor that validates server-wide credentials
-#[async_trait]
 impl<S> FromRequestParts<S> for Authenticated
 where
     S: Send + Sync,

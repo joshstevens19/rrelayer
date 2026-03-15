@@ -41,7 +41,7 @@ use alloy::{
         RpcError, TransportErrorKind,
     },
 };
-use rand::{thread_rng, Rng};
+use rand::RngExt;
 use reqwest::Url;
 use std::sync::Arc;
 use std::time::Duration;
@@ -282,8 +282,8 @@ impl EvmProvider {
     }
 
     pub fn rpc_client(&self) -> Arc<RelayerProvider> {
-        let mut rng = thread_rng();
-        let index = rng.gen_range(0..self.rpc_clients.len());
+        let mut rng = rand::rng();
+        let index = rng.random_range(0..self.rpc_clients.len());
         self.rpc_clients[index].clone()
     }
 
