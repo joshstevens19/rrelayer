@@ -21,6 +21,7 @@ use crate::{
     NetworkSetupConfig,
 };
 use alloy::consensus::{SignableTransaction, TxEnvelope};
+use alloy::eips::eip2718::Encodable2718;
 use alloy::network::{AnyNetwork, AnyTransactionReceipt};
 use alloy::rpc::client::RpcClient;
 use alloy::rpc::types::serde_helpers::WithOtherFields;
@@ -40,7 +41,6 @@ use alloy::{
         RpcError, TransportErrorKind,
     },
 };
-use alloy_eips::eip2718::Encodable2718;
 use rand::{thread_rng, Rng};
 use reqwest::Url;
 use std::sync::Arc;
