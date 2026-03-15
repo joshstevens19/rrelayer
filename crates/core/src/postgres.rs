@@ -4,7 +4,7 @@ use crate::rrelayer_error;
 use bb8::{Pool, RunError};
 use bb8_postgres::PostgresConnectionManager;
 use bytes::Buf;
-use dotenv::dotenv;
+use dotenvy::dotenv;
 use native_tls::TlsConnector;
 use postgres_native_tls::MakeTlsConnector;
 use tokio::{task, time::timeout};

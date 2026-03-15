@@ -22,12 +22,12 @@ tokio-postgres = { version = "0.7", features = ["with-uuid-1", "with-chrono-0_4"
 tokio = { version = "1", features = ["full"] }
 axum = "0.7"
 tower-http = { version = "0.5", features = ["cors"] }
-dotenv = "0.15.0"
+dotenvy = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = "0.9.30"
 async-trait = "0.1"
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { workspace = true }
 alloy = { workspace = true, features = ["full", "signer-mnemonic", "eips", "eip712", "signer-keystore", "signer-aws", "json-rpc"] }
 uuid = { version = "1.0", features = ["v4", "serde"] }
 rand = "0.8"
