@@ -6,12 +6,12 @@ use alloy::consensus::{SignableTransaction, TypedTransaction};
 use alloy::dyn_abi::TypedData;
 use alloy::primitives::{keccak256, Address, Signature, B256, U256};
 use async_trait::async_trait;
-use cryptoki::context::{CInitializeArgs, Pkcs11};
+use cryptoki::context::{CInitializeArgs, CInitializeFlags, Pkcs11};
 use cryptoki::mechanism::Mechanism;
 use cryptoki::object::{Attribute, AttributeType, ObjectClass, ObjectHandle};
 use cryptoki::session::{Session, UserType};
 use cryptoki::slot::Slot;
-use secrecy::Secret;
+use cryptoki::types::AuthPin;
 use std::collections::HashMap;
 use std::path::Path;
 use tokio::sync::Mutex;
@@ -40,7 +40,7 @@ impl Pkcs11WalletManager {
             WalletError::GenericSignerError(format!("Failed to load PKCS#11 library: {}", e))
         })?;
 
-        match ctx.initialize(CInitializeArgs::OsThreads) {
+        match ctx.initialize(CInitializeArgs::new(CInitializeFlags::OS_LOCKING_OK)) {
             Ok(_) => debug!("PKCS#11 library initialized successfully"),
             Err(e) => {
                 let error_str = e.to_string().to_lowercase();
@@ -87,7 +87,7 @@ impl Pkcs11WalletManager {
         })?;
 
         if let Some(pin) = &self.config.pin {
-            let secret_pin = Secret::new(pin.clone());
+            let secret_pin = AuthPin::from(pin.clone());
             match session.login(UserType::User, Some(&secret_pin)) {
                 Ok(_) => debug!("Successfully authenticated with PKCS#11 token"),
                 Err(e) => {

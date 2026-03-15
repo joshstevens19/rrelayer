@@ -1,5 +1,4 @@
 use axum::{
-    async_trait,
     extract::FromRequestParts,
     http::{request::Parts, StatusCode},
 };
@@ -20,7 +19,6 @@ use tracing::error;
 #[allow(dead_code)]
 pub struct Authenticated;
 
-#[async_trait]
 impl<S> FromRequestParts<S> for Authenticated
 where
     S: Send + Sync,

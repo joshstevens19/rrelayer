@@ -1,5 +1,5 @@
 use anyhow::Result;
-use dotenv::dotenv;
+use dotenvy::dotenv;
 use std::env;
 use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};

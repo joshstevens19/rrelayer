@@ -14,10 +14,11 @@ pub use provider::create_retry_client;
 pub mod relayer;
 pub mod safe_proxy;
 pub use safe_proxy::{SafeProxyError, SafeProxyManager, SafeTransaction};
+#[cfg(feature = "aws")]
+pub use yaml::AwsKmsSigningProviderConfig;
 pub use yaml::{
-    read, ApiConfig, AwsKmsSigningProviderConfig, GasProviders, NetworkSetupConfig,
-    RateLimitConfig, RateLimitWithInterval, RawSigningProviderConfig, SafeProxyConfig, SetupConfig,
-    SigningProvider, UserRateLimitConfig,
+    read, ApiConfig, GasProviders, NetworkSetupConfig, RateLimitConfig, RateLimitWithInterval,
+    RawSigningProviderConfig, SafeProxyConfig, SetupConfig, SigningProvider, UserRateLimitConfig,
 };
 mod shared;
 pub use shared::{common_types, utils::get_chain_id};
@@ -30,11 +31,13 @@ mod schema;
 pub mod signing;
 pub mod transaction;
 mod wallet;
-pub use wallet::{generate_seed_phrase, AwsKmsWalletManager, WalletError};
+#[cfg(feature = "aws")]
+pub use wallet::AwsKmsWalletManager;
+pub use wallet::{generate_seed_phrase, WalletError};
 mod background_tasks;
 mod rate_limiting;
 pub use rate_limiting::RATE_LIMIT_HEADER_NAME;
-mod webhooks;
+pub mod webhooks;
 mod yaml;
 
 pub use docker::generate_docker_file;

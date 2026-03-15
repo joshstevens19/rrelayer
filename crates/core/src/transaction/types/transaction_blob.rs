@@ -1,5 +1,5 @@
+use alloy::eips::eip4844::{Blob, BYTES_PER_BLOB};
 use alloy::primitives::FixedBytes;
-use alloy_eips::eip4844::{Blob, BYTES_PER_BLOB};
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;

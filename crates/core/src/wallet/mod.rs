@@ -12,22 +12,32 @@ pub use mnemonic_wallet_manager::{generate_seed_phrase, MnemonicWalletManager};
 mod mnemonic_signing_key_providers;
 pub use mnemonic_signing_key_providers::get_mnemonic_from_signing_key;
 
+#[cfg(feature = "aws")]
 mod aws_kms_wallet_manager;
+#[cfg(feature = "aws")]
 pub use aws_kms_wallet_manager::AwsKmsWalletManager;
 
+#[cfg(feature = "privy")]
 mod privy_wallet_manager;
+#[cfg(feature = "privy")]
 pub use privy_wallet_manager::PrivyWalletManager;
 
+#[cfg(feature = "turnkey")]
 mod turnkey_wallet_manager;
+#[cfg(feature = "turnkey")]
 pub use turnkey_wallet_manager::TurnkeyWalletManager;
 
 mod private_key_wallet_manager;
 pub use private_key_wallet_manager::PrivateKeyWalletManager;
 
+#[cfg(feature = "pkcs11")]
 mod pkcs11_wallet_manager;
+#[cfg(feature = "pkcs11")]
 pub use pkcs11_wallet_manager::Pkcs11WalletManager;
 
+#[cfg(feature = "fireblocks")]
 mod fireblocks_wallet_manager;
+#[cfg(feature = "fireblocks")]
 pub use fireblocks_wallet_manager::FireblocksWalletManager;
 
 mod composite_wallet_manager;
@@ -56,7 +66,7 @@ pub enum WalletError {
     StringEncodingError(#[from] std::string::FromUtf8Error),
 
     #[error("RLP decoding error: {0}")]
-    RlpError(#[from] alloy_rlp::Error),
+    RlpError(#[from] alloy::rlp::Error),
 
     #[error("Signature parsing error: {0}")]
     SignatureError(#[from] alloy::primitives::SignatureError),

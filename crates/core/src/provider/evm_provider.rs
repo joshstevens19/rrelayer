@@ -1,15 +1,28 @@
 use crate::gas::BLOB_GAS_PER_BLOB;
 use crate::provider::layer_extensions::RpcLoggingLayer;
 use crate::relayer::Relayer;
+#[cfg(feature = "aws")]
+use crate::wallet::AwsKmsWalletManager;
+#[cfg(feature = "fireblocks")]
+use crate::wallet::FireblocksWalletManager;
+#[cfg(feature = "pkcs11")]
+use crate::wallet::Pkcs11WalletManager;
+#[cfg(feature = "privy")]
+use crate::wallet::PrivyWalletManager;
+#[cfg(feature = "turnkey")]
+use crate::wallet::TurnkeyWalletManager;
 use crate::wallet::{
-    AwsKmsWalletManager, CompositeWalletManager, FireblocksWalletManager, ImportKeyResult,
-    MnemonicWalletManager, Pkcs11WalletManager, PrivateKeyWalletManager, PrivyWalletManager,
-    TurnkeyWalletManager, WalletError, WalletManagerTrait,
+    CompositeWalletManager, ImportKeyResult, MnemonicWalletManager, PrivateKeyWalletManager,
+    WalletError, WalletManagerTrait,
 };
-use crate::yaml::{
-    AwsKmsSigningProviderConfig, FireblocksSigningProviderConfig, Pkcs11SigningProviderConfig,
-    TurnkeySigningProviderConfig,
-};
+#[cfg(feature = "aws")]
+use crate::yaml::AwsKmsSigningProviderConfig;
+#[cfg(feature = "fireblocks")]
+use crate::yaml::FireblocksSigningProviderConfig;
+#[cfg(feature = "pkcs11")]
+use crate::yaml::Pkcs11SigningProviderConfig;
+#[cfg(feature = "turnkey")]
+use crate::yaml::TurnkeySigningProviderConfig;
 use crate::{
     gas::{
         BaseGasFeeEstimator, BlobGasEstimatorResult, BlobGasPriceResult, GasEstimatorError,
@@ -21,6 +34,7 @@ use crate::{
     NetworkSetupConfig,
 };
 use alloy::consensus::{SignableTransaction, TxEnvelope};
+use alloy::eips::eip2718::Encodable2718;
 use alloy::network::{AnyNetwork, AnyTransactionReceipt};
 use alloy::rpc::client::RpcClient;
 use alloy::rpc::types::serde_helpers::WithOtherFields;
@@ -40,8 +54,7 @@ use alloy::{
         RpcError, TransportErrorKind,
     },
 };
-use alloy_eips::eip2718::Encodable2718;
-use rand::{thread_rng, Rng};
+use rand::RngExt;
 use reqwest::Url;
 use std::sync::Arc;
 use std::time::Duration;
@@ -168,6 +181,7 @@ impl EvmProvider {
         Self::new_internal(network_setup_config, wallet_manager, gas_estimator, true).await
     }
 
+    #[cfg(feature = "privy")]
     pub async fn new_with_privy(
         network_setup_config: &NetworkSetupConfig,
         app_id: String,
@@ -179,6 +193,7 @@ impl EvmProvider {
         Self::new_internal(network_setup_config, wallet_manager, gas_estimator, true).await
     }
 
+    #[cfg(feature = "aws")]
     pub async fn new_with_aws_kms(
         network_setup_config: &NetworkSetupConfig,
         aws_kms_config: AwsKmsSigningProviderConfig,
@@ -188,6 +203,7 @@ impl EvmProvider {
         Self::new_internal(network_setup_config, wallet_manager, gas_estimator, true).await
     }
 
+    #[cfg(feature = "turnkey")]
     pub async fn new_with_turnkey(
         network_setup_config: &NetworkSetupConfig,
         turnkey_config: TurnkeySigningProviderConfig,
@@ -207,6 +223,7 @@ impl EvmProvider {
         Self::new_internal(network_setup_config, wallet_manager, gas_estimator, false).await
     }
 
+    #[cfg(feature = "pkcs11")]
     pub async fn new_with_pkcs11(
         network_setup_config: &NetworkSetupConfig,
         pkcs11_config: Pkcs11SigningProviderConfig,
@@ -216,6 +233,7 @@ impl EvmProvider {
         Self::new_internal(network_setup_config, wallet_manager, gas_estimator, true).await
     }
 
+    #[cfg(feature = "fireblocks")]
     pub async fn new_with_fireblocks(
         network_setup_config: &NetworkSetupConfig,
         fireblocks_config: FireblocksSigningProviderConfig,
@@ -282,8 +300,8 @@ impl EvmProvider {
     }
 
     pub fn rpc_client(&self) -> Arc<RelayerProvider> {
-        let mut rng = thread_rng();
-        let index = rng.gen_range(0..self.rpc_clients.len());
+        let mut rng = rand::rng();
+        let index = rng.random_range(0..self.rpc_clients.len());
         self.rpc_clients[index].clone()
     }
 
