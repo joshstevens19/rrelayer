@@ -168,7 +168,7 @@ impl PostgresClient {
                     &transaction.value,
                     &transaction.blobs,
                     &transaction.speed,
-                    &transaction.status,
+                    &TransactionStatus::FAILED,
                     &transaction.expires_at,
                     &transaction.queued_at,
                     &failed_reason.chars().take(2000).collect::<String>(),

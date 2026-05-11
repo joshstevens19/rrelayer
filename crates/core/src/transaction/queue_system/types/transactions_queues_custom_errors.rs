@@ -1,13 +1,18 @@
 use std::time::SystemTimeError;
 
-use alloy::transports::{RpcError, TransportErrorKind};
+use alloy::{
+    rpc::json_rpc::ErrorPayload,
+    transports::{RpcError, TransportErrorKind},
+};
 use thiserror::Error;
 
 use super::{
     SendTransactionGasPriceError, TransactionQueueSendTransactionError, TransactionSentWithRelayer,
 };
 use crate::common_types::EvmAddress;
-use crate::shared::{bad_request, forbidden, internal_server_error, not_found, HttpError};
+use crate::shared::{
+    bad_request, conflict, forbidden, internal_server_error, not_found, HttpError,
+};
 use crate::transaction::types::TransactionConversionError;
 use crate::{
     postgres::PostgresError,
@@ -33,6 +38,12 @@ pub enum ReplaceTransactionError {
     #[error("Relayer could not update the transaction in the db {0}")]
     CouldNotUpdateTransactionInDb(#[from] PostgresError),
 
+    #[error("Transaction could not be read from DB: {0}")]
+    CouldNotReadTransactionDb(PostgresError),
+
+    #[error("external_id {external_id} has already been used for relayer {relayer_id}")]
+    ExternalIdAlreadyUsed { relayer_id: RelayerId, external_id: String },
+
     #[error("Nonce synchronization recovered, replacement transaction should be retried")]
     NonceSynchronizationRecovered,
 }
@@ -47,6 +58,10 @@ impl From<ReplaceTransactionError> for HttpError {
             return forbidden(value.to_string());
         }
 
+        if matches!(value, ReplaceTransactionError::ExternalIdAlreadyUsed { .. }) {
+            return conflict(value.to_string());
+        }
+
         internal_server_error(Some(value.to_string()))
     }
 }
@@ -55,6 +70,9 @@ impl From<ReplaceTransactionError> for HttpError {
 pub enum AddTransactionError {
     #[error("Transaction could not be saved in DB: {0}")]
     CouldNotSaveTransactionDb(PostgresError),
+
+    #[error("Transaction could not be read from DB: {0}")]
+    CouldNotReadTransactionDb(PostgresError),
 
     #[error("Relayer could not be found: {0}")]
     RelayerNotFound(RelayerId),
@@ -74,6 +92,9 @@ pub enum AddTransactionError {
     #[error("could not estimate gas limit - {0}")]
     TransactionEstimateGasError(RelayerId, RpcError<TransportErrorKind>),
 
+    #[error("transaction simulation reverted - {1}")]
+    TransactionSimulationReverted(RelayerId, RpcError<TransportErrorKind>),
+
     #[error("Could not get current on chain nonce for relayer {0} - {1}")]
     CouldNotGetCurrentOnChainNonce(RelayerId, RpcError<TransportErrorKind>),
 
@@ -82,23 +103,71 @@ pub enum AddTransactionError {
 
     #[error("Unsupported transaction type: {message}")]
     UnsupportedTransactionType { message: String },
+
+    #[error("external_id {external_id} has already been used with a different transaction payload for relayer {relayer_id}")]
+    ExternalIdPayloadMismatch { relayer_id: RelayerId, external_id: String },
+
+    #[error("transaction for external_id {external_id} on relayer {relayer_id} previously failed before broadcast")]
+    IdempotentTransactionFailed { relayer_id: RelayerId, external_id: String },
 }
 
 impl From<AddTransactionError> for HttpError {
     fn from(value: AddTransactionError) -> Self {
-        if matches!(value, AddTransactionError::RelayerIsPaused(_)) {
-            return forbidden(value.to_string());
+        match &value {
+            AddTransactionError::RelayerIsPaused(_) => forbidden(value.to_string()),
+            AddTransactionError::RelayerNotFound(_) => not_found(value.to_string()),
+            AddTransactionError::UnsupportedTransactionType { .. }
+            | AddTransactionError::TransactionSimulationReverted(_, _)
+            | AddTransactionError::IdempotentTransactionFailed { .. } => {
+                bad_request(value.to_string())
+            }
+            AddTransactionError::ExternalIdPayloadMismatch { .. } => conflict(value.to_string()),
+            AddTransactionError::CouldNotSaveTransactionDb(_)
+            | AddTransactionError::CouldNotReadTransactionDb(_)
+            | AddTransactionError::CouldNotReadAllowlistsFromDb(_)
+            | AddTransactionError::TransactionGasPriceError(_)
+            | AddTransactionError::ComputeTransactionHashError(_)
+            | AddTransactionError::TransactionEstimateGasError(_, _)
+            | AddTransactionError::CouldNotGetCurrentOnChainNonce(_, _)
+            | AddTransactionError::TransactionConversionError(_) => {
+                internal_server_error(Some(value.to_string()))
+            }
+        }
+    }
+}
+
+impl AddTransactionError {
+    pub fn transaction_estimate_gas_error(
+        relayer_id: RelayerId,
+        error: RpcError<TransportErrorKind>,
+    ) -> Self {
+        if is_deterministic_simulation_revert(&error) {
+            return Self::TransactionSimulationReverted(relayer_id, error);
         }
 
-        if matches!(value, AddTransactionError::RelayerNotFound(_)) {
-            return not_found(value.to_string());
-        }
+        Self::TransactionEstimateGasError(relayer_id, error)
+    }
+}
 
-        if matches!(value, AddTransactionError::UnsupportedTransactionType { .. }) {
-            return bad_request(value.to_string());
-        }
+fn error_payload_is_revert(payload: &ErrorPayload) -> bool {
+    payload.as_revert_data().is_some()
+        || payload.message.to_ascii_lowercase().contains("execution reverted")
+}
 
-        internal_server_error(Some(value.to_string()))
+fn is_deterministic_simulation_revert(error: &RpcError<TransportErrorKind>) -> bool {
+    match error {
+        RpcError::ErrorResp(payload) => error_payload_is_revert(payload),
+        RpcError::DeserError { text, .. } => serde_json::from_str::<ErrorPayload>(text)
+            .map(|payload| error_payload_is_revert(&payload))
+            .unwrap_or(false),
+        RpcError::Transport(TransportErrorKind::Custom(error)) => {
+            error.to_string().to_ascii_lowercase().contains("execution reverted")
+        }
+        RpcError::NullResp
+        | RpcError::UnsupportedFeature(_)
+        | RpcError::LocalUsageError(_)
+        | RpcError::SerError(_)
+        | RpcError::Transport(_) => false,
     }
 }
 
@@ -109,6 +178,12 @@ pub enum CancelTransactionError {
 
     #[error("Could not update transaction in database: {0}")]
     CouldNotUpdateTransactionDb(PostgresError),
+
+    #[error("Transaction could not be read from DB: {0}")]
+    CouldNotReadTransactionDb(PostgresError),
+
+    #[error("external_id {external_id} has already been used for relayer {relayer_id}")]
+    ExternalIdAlreadyUsed { relayer_id: RelayerId, external_id: String },
 
     #[error("Relayer could not be found: {0}")]
     RelayerNotFound(RelayerId),
@@ -128,6 +203,10 @@ impl From<CancelTransactionError> for HttpError {
 
         if matches!(value, CancelTransactionError::RelayerNotFound(_)) {
             return not_found(value.to_string());
+        }
+
+        if matches!(value, CancelTransactionError::ExternalIdAlreadyUsed { .. }) {
+            return conflict(value.to_string());
         }
 
         internal_server_error(Some(value.to_string()))
@@ -246,4 +325,53 @@ pub struct CompetitionResolutionResult {
     pub winner_status: TransactionStatus,
     /// The transaction that lost the race (if there was competition)
     pub loser: Option<Transaction>,
+}
+
+#[cfg(test)]
+mod tests {
+    use alloy::{
+        rpc::json_rpc::ErrorPayload,
+        transports::{RpcError, TransportErrorKind},
+    };
+    use reqwest::StatusCode;
+
+    use super::AddTransactionError;
+    use crate::{relayer::RelayerId, shared::HttpError};
+
+    #[test]
+    fn simulation_revert_maps_to_bad_request() {
+        let payload: ErrorPayload = serde_json::from_str(
+            r#"{"code":3,"message":"execution reverted: Multicall3: call failed"}"#,
+        )
+        .unwrap();
+        let error: RpcError<TransportErrorKind> = RpcError::ErrorResp(payload);
+
+        let http_error: HttpError =
+            AddTransactionError::transaction_estimate_gas_error(RelayerId::new(), error).into();
+
+        assert_eq!(http_error.0, StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn transport_failure_stays_server_error() {
+        let error: RpcError<TransportErrorKind> =
+            RpcError::Transport(TransportErrorKind::BackendGone);
+
+        let http_error: HttpError =
+            AddTransactionError::transaction_estimate_gas_error(RelayerId::new(), error).into();
+
+        assert_eq!(http_error.0, StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[test]
+    fn custom_transport_revert_without_colon_maps_to_bad_request() {
+        let error: RpcError<TransportErrorKind> = RpcError::Transport(TransportErrorKind::Custom(
+            "execution reverted".to_string().into(),
+        ));
+
+        let http_error: HttpError =
+            AddTransactionError::transaction_estimate_gas_error(RelayerId::new(), error).into();
+
+        assert_eq!(http_error.0, StatusCode::BAD_REQUEST);
+    }
 }

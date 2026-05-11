@@ -26,19 +26,20 @@ use super::{
     transactions_queue::TransactionsQueue,
     types::{
         AddTransactionError, CancelTransactionError, CancelTransactionResult, CompetitionType,
-        EditableTransactionType, ProcessInmempoolStatus, ProcessInmempoolTransactionError,
-        ProcessMinedStatus, ProcessMinedTransactionError, ProcessPendingStatus,
-        ProcessPendingTransactionError, ProcessResult, ReplaceTransactionError,
-        ReplaceTransactionResult, TransactionRelayerSetup, TransactionToSend,
-        TransactionsQueueSetup,
+        CompetitiveTransaction, EditableTransactionType, ProcessInmempoolStatus,
+        ProcessInmempoolTransactionError, ProcessMinedStatus, ProcessMinedTransactionError,
+        ProcessPendingStatus, ProcessPendingTransactionError, ProcessResult,
+        ReplaceTransactionError, ReplaceTransactionResult, TransactionRelayerSetup,
+        TransactionToSend, TransactionsQueueSetup,
     },
 };
+use crate::schema::TRANSACTION_EXTERNAL_ID_UNIQUE_INDEX;
 use crate::transaction::api::RelayTransactionRequest;
 use crate::transaction::queue_system::types::SendTransactionGasPriceError;
 use crate::transaction::types::{TransactionBlob, TransactionConversionError, TransactionSpeed};
 use crate::{
     gas::{BlobGasOracleCache, BlobGasPriceResult, GasLimit, GasOracleCache, GasPriceResult},
-    postgres::{PostgresClient, PostgresConnectionError},
+    postgres::{PostgresClient, PostgresConnectionError, PostgresError},
     relayer::RelayerId,
     safe_proxy::SafeProxyManager,
     shared::{cache::Cache, common_types::WalletOrProviderError},
@@ -47,7 +48,10 @@ use crate::{
         cache::invalidate_transaction_no_state_cache,
         nonce_manager::NonceManager,
         queue_system::types::TransactionQueueSendTransactionError,
-        types::{Transaction, TransactionData, TransactionId, TransactionStatus, TransactionValue},
+        types::{
+            Transaction, TransactionData, TransactionId, TransactionNonce, TransactionStatus,
+            TransactionValue,
+        },
     },
     webhooks::WebhookManager,
 };
@@ -80,11 +84,26 @@ impl TransactionsQueues {
         let mut relayer_block_times_ms = HashMap::new();
 
         for setup in setups {
-            let current_nonce = setup.evm_provider.get_nonce(&setup.relayer).await?;
+            let onchain_nonce = setup.evm_provider.get_nonce(&setup.relayer).await?;
+            // read the nonces assigned to in-flight transactions to determine the next nonce to use.
+            let open_local_nonce = Self::next_nonce_after_open_transactions(
+                &setup.pending_transactions,
+                &setup.inmempool_transactions,
+                &setup.mined_transactions,
+            );
+            let current_nonce = open_local_nonce
+                .filter(|local_nonce| local_nonce.into_inner() > onchain_nonce.into_inner())
+                .unwrap_or(onchain_nonce);
 
             info!(
-                "Startup nonce synchronization for relayer {} ({}): synchronizing nonce manager with on-chain nonce {}",
-                setup.relayer.name, setup.relayer.id, current_nonce.into_inner()
+                "Startup nonce synchronization for relayer {} ({}): on-chain nonce {}, open local next nonce {}, using {}",
+                setup.relayer.name,
+                setup.relayer.id,
+                onchain_nonce.into_inner(),
+                open_local_nonce
+                    .map(|nonce| nonce.into_inner().to_string())
+                    .unwrap_or_else(|| "none".to_string()),
+                current_nonce.into_inner()
             );
 
             relayer_block_times_ms.insert(setup.relayer.id, setup.evm_provider.blocks_every);
@@ -207,9 +226,210 @@ impl TransactionsQueues {
         Utc::now() + chrono::Duration::hours(12)
     }
 
+    fn next_nonce_after_open_transactions(
+        pending_transactions: &VecDeque<Transaction>,
+        inmempool_transactions: &VecDeque<CompetitiveTransaction>,
+        mined_transactions: &HashMap<TransactionId, Transaction>,
+    ) -> Option<TransactionNonce> {
+        fn nonce_if_open(transaction: &Transaction) -> Option<TransactionNonce> {
+            match transaction.status {
+                TransactionStatus::PENDING
+                | TransactionStatus::INMEMPOOL
+                | TransactionStatus::MINED => Some(transaction.nonce),
+                TransactionStatus::CONFIRMED
+                | TransactionStatus::FAILED
+                | TransactionStatus::EXPIRED
+                | TransactionStatus::CANCELLED
+                | TransactionStatus::DROPPED
+                | TransactionStatus::REPLACED => None,
+            }
+        }
+
+        let pending_nonces = pending_transactions.iter().filter_map(nonce_if_open);
+        let inmempool_nonces = inmempool_transactions.iter().flat_map(|transaction| {
+            nonce_if_open(&transaction.original).into_iter().chain(
+                transaction
+                    .competitive
+                    .as_ref()
+                    .and_then(|(transaction, _)| nonce_if_open(transaction)),
+            )
+        });
+        let mined_nonces = mined_transactions.values().filter_map(nonce_if_open);
+
+        pending_nonces
+            .chain(inmempool_nonces)
+            .chain(mined_nonces)
+            .map(|nonce| nonce.into_inner())
+            .max()
+            .map(|nonce| TransactionNonce::new(nonce + 1))
+    }
+
     /// Checks if a transaction has expired.
     fn has_expired(&self, transaction: &Transaction) -> bool {
         transaction.expires_at < Utc::now()
+    }
+
+    fn transaction_matches_payload(
+        transaction: &Transaction,
+        relayer_id: &RelayerId,
+        transaction_to_send: &TransactionToSend,
+    ) -> bool {
+        transaction.relayer_id == *relayer_id
+            && transaction.to == transaction_to_send.to
+            && transaction.value == transaction_to_send.value
+            && transaction.data == transaction_to_send.data
+            && transaction.speed == transaction_to_send.speed
+            && transaction.blobs == transaction_to_send.blobs
+            && transaction.external_id == transaction_to_send.external_id
+    }
+
+    /// Replays a prior idempotent result once the payload matches; status is intentionally ignored after a hash exists.
+    fn resolve_idempotent_transaction(
+        transaction: Transaction,
+        relayer_id: &RelayerId,
+        transaction_to_send: &TransactionToSend,
+        external_id: &str,
+    ) -> Result<Transaction, AddTransactionError> {
+        if !Self::transaction_matches_payload(&transaction, relayer_id, transaction_to_send) {
+            return Err(AddTransactionError::ExternalIdPayloadMismatch {
+                relayer_id: *relayer_id,
+                external_id: external_id.to_string(),
+            });
+        }
+
+        if transaction.known_transaction_hash.is_some() {
+            return Ok(transaction);
+        }
+
+        Err(AddTransactionError::IdempotentTransactionFailed {
+            relayer_id: *relayer_id,
+            external_id: external_id.to_string(),
+        })
+    }
+
+    /// Loads an existing transaction for a relayer-scoped external id.
+    async fn load_idempotent_transaction(
+        &self,
+        relayer_id: &RelayerId,
+        external_id: &str,
+    ) -> Result<Option<Transaction>, AddTransactionError> {
+        self.db
+            .get_transaction_by_relayer_and_external_id(relayer_id, external_id)
+            .await
+            .map_err(AddTransactionError::CouldNotReadTransactionDb)
+    }
+
+    /// Checks whether a relayer-scoped external id is already assigned to a transaction.
+    async fn external_id_already_used(
+        &self,
+        relayer_id: &RelayerId,
+        external_id: Option<&str>,
+    ) -> Result<bool, PostgresError> {
+        let Some(external_id) = external_id else {
+            return Ok(false);
+        };
+
+        self.db
+            .get_transaction_by_relayer_and_external_id(relayer_id, external_id)
+            .await
+            .map(|transaction| transaction.is_some())
+    }
+
+    /// Checks for a pre-existing idempotent result before nonce reservation.
+    async fn check_idempotent_existing_transaction(
+        &self,
+        relayer_id: &RelayerId,
+        transaction_to_send: &TransactionToSend,
+    ) -> Result<Option<Transaction>, AddTransactionError> {
+        let Some(external_id) = transaction_to_send.external_id.as_deref() else {
+            return Ok(None);
+        };
+
+        let Some(transaction) = self.load_idempotent_transaction(relayer_id, external_id).await?
+        else {
+            return Ok(None);
+        };
+
+        let transaction = Self::resolve_idempotent_transaction(
+            transaction,
+            relayer_id,
+            transaction_to_send,
+            external_id,
+        )?;
+        info!(
+            %relayer_id,
+            external_id,
+            transaction_id = %transaction.id,
+            "Returning existing idempotent transaction"
+        );
+        Ok(Some(transaction))
+    }
+
+    /// Recovers an idempotent result after a concurrent insert wins the unique-index race.
+    async fn resolve_idempotent_insert_conflict(
+        &self,
+        relayer_id: &RelayerId,
+        transaction_to_send: &TransactionToSend,
+        external_id: &str,
+    ) -> Result<Transaction, AddTransactionError> {
+        let existing = self
+            .load_idempotent_transaction(relayer_id, external_id)
+            .await?
+            .ok_or_else(|| AddTransactionError::ExternalIdPayloadMismatch {
+                relayer_id: *relayer_id,
+                external_id: external_id.to_string(),
+            })?;
+
+        let transaction = Self::resolve_idempotent_transaction(
+            existing,
+            relayer_id,
+            transaction_to_send,
+            external_id,
+        )?;
+        info!(
+            %relayer_id,
+            external_id,
+            transaction_id = %transaction.id,
+            "Returning existing idempotent transaction after insert conflict"
+        );
+        Ok(transaction)
+    }
+
+    /// Returns the external id when a DB error is the idempotency unique-index race.
+    fn idempotent_insert_conflict_external_id<'a>(
+        error: &PostgresError,
+        transaction_to_send: &'a TransactionToSend,
+    ) -> Option<&'a str> {
+        let external_id = transaction_to_send.external_id.as_deref()?;
+        error.is_unique_violation_on(TRANSACTION_EXTERNAL_ID_UNIQUE_INDEX).then_some(external_id)
+    }
+
+    /// Persists deterministic simulation failures or resolves the winning duplicate insert.
+    async fn save_failed_simulation_or_resolve_conflict(
+        &self,
+        relayer_id: &RelayerId,
+        transaction: &Transaction,
+        transaction_to_send: &TransactionToSend,
+        failed_reason: &str,
+    ) -> Result<Option<Transaction>, AddTransactionError> {
+        match self.db.transaction_failed_on_send(relayer_id, transaction, failed_reason).await {
+            Ok(()) => Ok(None),
+            Err(error) => {
+                let Some(external_id) =
+                    Self::idempotent_insert_conflict_external_id(&error, transaction_to_send)
+                else {
+                    return Err(AddTransactionError::CouldNotSaveTransactionDb(error));
+                };
+
+                self.resolve_idempotent_insert_conflict(
+                    relayer_id,
+                    transaction_to_send,
+                    external_id,
+                )
+                .await
+                .map(Some)
+            }
+        }
     }
 
     /// Converts a transaction to a no-op transaction.
@@ -322,7 +542,7 @@ impl TransactionsQueues {
             .estimate_gas(&temp_transaction_request, transaction.is_noop)
             .await
             .map_err(|e| {
-                AddTransactionError::TransactionEstimateGasError(transaction.relayer_id, e)
+                AddTransactionError::transaction_estimate_gas_error(transaction.relayer_id, e)
             })?;
 
         let relayer_balance = transactions_queue.get_balance().await.map_err(|e| {
@@ -361,6 +581,12 @@ impl TransactionsQueues {
             .get_transactions_queue(relayer_id)
             .ok_or(AddTransactionError::RelayerNotFound(*relayer_id))?;
 
+        if let Some(transaction) =
+            self.check_idempotent_existing_transaction(relayer_id, transaction_to_send).await?
+        {
+            return Ok(transaction);
+        }
+
         let mut transactions_queue = queue_arc.lock().await;
 
         if transactions_queue.is_paused() {
@@ -375,15 +601,6 @@ impl TransactionsQueues {
             });
         }
 
-        // Sync nonce manager with on-chain nonce to ensure consistency
-        let current_onchain_nonce = transactions_queue
-            .get_nonce()
-            .await
-            .map_err(|e| AddTransactionError::CouldNotGetCurrentOnChainNonce(*relayer_id, e))?;
-
-        transactions_queue.nonce_manager.sync_with_onchain_nonce(current_onchain_nonce).await;
-        let assigned_nonce = transactions_queue.nonce_manager.get_and_increment().await;
-
         let mut transaction = Transaction {
             id: transaction_to_send.id,
             relayer_id: *relayer_id,
@@ -391,7 +608,8 @@ impl TransactionsQueues {
             from: transactions_queue.relay_address(),
             value: transaction_to_send.value,
             data: transaction_to_send.data.clone(),
-            nonce: assigned_nonce,
+            // placeholder nonce, will be set to the next available nonce from the nonce manager.
+            nonce: TransactionNonce::new(0),
             gas_limit: None,
             status: TransactionStatus::PENDING,
             blobs: transaction_to_send.blobs.clone(),
@@ -430,22 +648,36 @@ impl TransactionsQueues {
 
         let estimated_gas_limit = match estimated_gas_limit {
             Ok(limit) => limit,
-            Err(err) => {
-                self.db
-                    .transaction_failed_on_send(
+            Err(err @ AddTransactionError::TransactionSimulationReverted(_, _)) => {
+                let failed_reason = err.to_string();
+                if let Some(existing) = self
+                    .save_failed_simulation_or_resolve_conflict(
                         relayer_id,
                         &transaction,
-                        "Failed to send transaction as always failing on gas estimation",
+                        transaction_to_send,
+                        &failed_reason,
                     )
-                    .await
-                    .map_err(AddTransactionError::CouldNotSaveTransactionDb)?;
+                    .await?
+                {
+                    return Ok(existing);
+                }
 
                 self.invalidate_transaction_cache(&transaction.id).await;
                 return Err(err);
             }
+            Err(err) => return Err(err),
         };
 
         transaction.gas_limit = Some(estimated_gas_limit);
+
+        let current_onchain_nonce = transactions_queue
+            .get_nonce()
+            .await
+            .map_err(|e| AddTransactionError::CouldNotGetCurrentOnChainNonce(*relayer_id, e))?;
+
+        transactions_queue.nonce_manager.sync_with_onchain_nonce(current_onchain_nonce).await;
+        let nonce_reservation = transactions_queue.nonce_manager.reserve_next().await;
+        transaction.nonce = nonce_reservation.nonce();
 
         let transaction_request = Self::create_typed_transaction(
             &transactions_queue,
@@ -458,13 +690,30 @@ impl TransactionsQueues {
         transaction.known_transaction_hash =
             Some(transactions_queue.compute_tx_hash(&transaction_request).await?);
 
-        self.db
-            .save_transaction(relayer_id, &transaction)
-            .await
-            .map_err(AddTransactionError::CouldNotSaveTransactionDb)?;
+        match self.db.save_transaction(relayer_id, &transaction).await {
+            Ok(()) => {}
+            Err(error) => {
+                let Some(external_id) =
+                    Self::idempotent_insert_conflict_external_id(&error, transaction_to_send)
+                else {
+                    return Err(AddTransactionError::CouldNotSaveTransactionDb(error));
+                };
+
+                drop(nonce_reservation);
+                return self
+                    .resolve_idempotent_insert_conflict(
+                        relayer_id,
+                        transaction_to_send,
+                        external_id,
+                    )
+                    .await;
+            }
+        }
 
         transactions_queue.add_pending_transaction(transaction.clone()).await;
-        // Nonce already incremented atomically above - no need for separate increase call
+        // release the nonce manager lock after the transaction has been successfully added to the queue.
+        // releasing the nonce manager lock too soon may cause downstream failures to lead to eager (and faulty) nonce increment.
+        nonce_reservation.commit();
         self.invalidate_transaction_cache(&transaction.id).await;
 
         if let Some(webhook_manager) = &self.webhook_manager {
@@ -573,6 +822,22 @@ impl TransactionsQueues {
                             external_id: Some(format!("cancel_{}", transaction.id)),
                             cancelled_by_transaction_id: None,
                         };
+
+                        if let Some(external_id) = cancel_transaction.external_id.as_deref() {
+                            if self
+                                .external_id_already_used(
+                                    &transaction.relayer_id,
+                                    Some(external_id),
+                                )
+                                .await
+                                .map_err(CancelTransactionError::CouldNotReadTransactionDb)?
+                            {
+                                return Err(CancelTransactionError::ExternalIdAlreadyUsed {
+                                    relayer_id: transaction.relayer_id,
+                                    external_id: external_id.to_string(),
+                                });
+                            }
+                        }
 
                         info!("cancel_transaction: creating higher gas cancel transaction for inmempool tx with same nonce {:?}", cancel_transaction.nonce);
 
@@ -821,6 +1086,22 @@ impl TransactionsQueues {
                                 .or_else(|| Some(format!("replace_{}", transaction.id))),
                             cancelled_by_transaction_id: None,
                         };
+
+                        if let Some(external_id) = replace_transaction.external_id.as_deref() {
+                            if self
+                                .external_id_already_used(
+                                    &transaction.relayer_id,
+                                    Some(external_id),
+                                )
+                                .await
+                                .map_err(ReplaceTransactionError::CouldNotReadTransactionDb)?
+                            {
+                                return Err(ReplaceTransactionError::ExternalIdAlreadyUsed {
+                                    relayer_id: transaction.relayer_id,
+                                    external_id: external_id.to_string(),
+                                });
+                            }
+                        }
 
                         info!("replace_transaction: creating competitive replace transaction for inmempool tx with same nonce {:?}", replace_transaction.nonce);
 
@@ -1177,8 +1458,10 @@ impl TransactionsQueues {
                                         ));
                                     }
 
-                                    let new_nonce =
-                                        transactions_queue.nonce_manager.get_and_increment().await;
+                                    let nonce_reservation =
+                                        transactions_queue.nonce_manager.reserve_next().await;
+                                    let new_nonce = nonce_reservation.nonce();
+                                    nonce_reservation.commit();
                                     transaction.nonce = new_nonce;
 
                                     transactions_queue
@@ -1477,7 +1760,9 @@ impl TransactionsQueues {
                                                     ));
                                                 }
 
-                                                let new_nonce = transactions_queue.nonce_manager.get_and_increment().await;
+                                                let nonce_reservation = transactions_queue.nonce_manager.reserve_next().await;
+                                                let new_nonce = nonce_reservation.nonce();
+                                                nonce_reservation.commit();
                                                 transaction.nonce = new_nonce;
 
                                                 transactions_queue.update_inmempool_transaction_nonce(&transaction.id, new_nonce).await;
@@ -1688,5 +1973,176 @@ impl TransactionsQueues {
         } else {
             Err(ProcessMinedTransactionError::RelayerTransactionsQueueNotFound(*relayer_id))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::{HashMap, VecDeque};
+
+    use alloy::primitives::{TxHash, U256};
+    use chrono::Utc;
+
+    use super::TransactionsQueues;
+    use crate::{
+        network::ChainId,
+        relayer::RelayerId,
+        shared::common_types::EvmAddress,
+        transaction::{
+            queue_system::types::{CompetitionType, CompetitiveTransaction, TransactionToSend},
+            types::{
+                Transaction, TransactionData, TransactionHash, TransactionId, TransactionNonce,
+                TransactionSpeed, TransactionStatus, TransactionValue,
+            },
+        },
+    };
+
+    fn transaction_with_nonce(status: TransactionStatus, nonce: u64) -> Transaction {
+        Transaction {
+            id: TransactionId::new(),
+            relayer_id: RelayerId::new(),
+            to: EvmAddress::zero(),
+            from: EvmAddress::zero(),
+            value: TransactionValue::zero(),
+            data: TransactionData::empty(),
+            nonce: TransactionNonce::new(nonce),
+            gas_limit: None,
+            status,
+            blobs: None,
+            chain_id: ChainId::new(1),
+            known_transaction_hash: None,
+            queued_at: Utc::now(),
+            expires_at: Utc::now(),
+            sent_at: None,
+            mined_at: None,
+            mined_at_block_number: None,
+            confirmed_at: None,
+            speed: TransactionSpeed::FAST,
+            sent_with_max_priority_fee_per_gas: None,
+            sent_with_max_fee_per_gas: None,
+            is_noop: false,
+            sent_with_gas: None,
+            sent_with_blob_gas: None,
+            external_id: None,
+            cancelled_by_transaction_id: None,
+        }
+    }
+
+    fn to_transaction_to_send(transaction: &Transaction) -> TransactionToSend {
+        TransactionToSend::new(
+            transaction.to,
+            transaction.value,
+            transaction.data.clone(),
+            Some(transaction.speed.clone()),
+            transaction.blobs.clone(),
+            transaction.external_id.clone(),
+        )
+    }
+
+    #[test]
+    fn next_nonce_after_open_transactions_ignores_failed_rows() {
+        let mut pending = VecDeque::new();
+        pending.push_back(transaction_with_nonce(TransactionStatus::FAILED, 99));
+        pending.push_back(transaction_with_nonce(TransactionStatus::PENDING, 3));
+
+        let next_nonce = TransactionsQueues::next_nonce_after_open_transactions(
+            &pending,
+            &VecDeque::new(),
+            &HashMap::new(),
+        )
+        .unwrap();
+
+        assert_eq!(next_nonce, TransactionNonce::new(4));
+    }
+
+    #[test]
+    fn next_nonce_after_open_transactions_counts_inmempool_and_mined() {
+        let mut inmempool = VecDeque::new();
+        let mut competitive =
+            CompetitiveTransaction::new(transaction_with_nonce(TransactionStatus::INMEMPOOL, 7));
+        competitive.add_competitor(
+            transaction_with_nonce(TransactionStatus::INMEMPOOL, 7),
+            CompetitionType::Replace,
+        );
+        inmempool.push_back(competitive);
+
+        let mined_transaction = transaction_with_nonce(TransactionStatus::MINED, 12);
+        let mut mined = HashMap::new();
+        mined.insert(mined_transaction.id, mined_transaction);
+
+        let next_nonce = TransactionsQueues::next_nonce_after_open_transactions(
+            &VecDeque::new(),
+            &inmempool,
+            &mined,
+        )
+        .unwrap();
+
+        assert_eq!(next_nonce, TransactionNonce::new(13));
+    }
+
+    #[test]
+    fn idempotent_resolve_returns_matching_transaction_with_hash() {
+        let relayer_id = RelayerId::new();
+        let mut transaction = transaction_with_nonce(TransactionStatus::PENDING, 1);
+        transaction.relayer_id = relayer_id;
+        transaction.external_id = Some("idempotent-key".to_string());
+        transaction.known_transaction_hash = Some(TransactionHash::new(TxHash::ZERO));
+
+        let transaction_to_send = to_transaction_to_send(&transaction);
+
+        let resolved = TransactionsQueues::resolve_idempotent_transaction(
+            transaction.clone(),
+            &relayer_id,
+            &transaction_to_send,
+            "idempotent-key",
+        )
+        .unwrap();
+
+        assert_eq!(resolved.id, transaction.id);
+    }
+
+    #[test]
+    fn idempotent_resolve_rejects_payload_mismatch() {
+        let relayer_id = RelayerId::new();
+        let mut transaction = transaction_with_nonce(TransactionStatus::PENDING, 1);
+        transaction.relayer_id = relayer_id;
+        transaction.external_id = Some("idempotent-key".to_string());
+
+        let mut transaction_to_send = to_transaction_to_send(&transaction);
+        transaction_to_send.value = TransactionValue::new(U256::from(1_u128));
+
+        let result = TransactionsQueues::resolve_idempotent_transaction(
+            transaction,
+            &relayer_id,
+            &transaction_to_send,
+            "idempotent-key",
+        );
+
+        assert!(matches!(
+            result,
+            Err(super::AddTransactionError::ExternalIdPayloadMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn idempotent_resolve_returns_bad_request_for_prior_failed_simulation() {
+        let relayer_id = RelayerId::new();
+        let mut transaction = transaction_with_nonce(TransactionStatus::FAILED, 1);
+        transaction.relayer_id = relayer_id;
+        transaction.external_id = Some("idempotent-key".to_string());
+
+        let transaction_to_send = to_transaction_to_send(&transaction);
+
+        let result = TransactionsQueues::resolve_idempotent_transaction(
+            transaction,
+            &relayer_id,
+            &transaction_to_send,
+            "idempotent-key",
+        );
+
+        assert!(matches!(
+            result,
+            Err(super::AddTransactionError::IdempotentTransactionFailed { .. })
+        ));
     }
 }
