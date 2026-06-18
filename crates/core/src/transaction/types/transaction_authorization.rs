@@ -8,10 +8,17 @@ use crate::common_types::EvmAddress;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransactionAuthorization {
     pub address: EvmAddress,
+
+    #[serde(rename = "chainId")]
     pub chain_id: U256,
+
     pub nonce: u64,
+
     pub r: U256,
+
     pub s: U256,
+
+    #[serde(rename = "yParity")]
     pub y_parity: u8,
 }
 
