@@ -26,7 +26,9 @@ impl PostgresClient {
         let mut conn = self.pool.get().await?;
         let trans = conn.transaction().await.map_err(PostgresError::PgError)?;
 
-        let authorization_list_json = transaction.authorization_list.as_ref()
+        let authorization_list_json = transaction
+            .authorization_list
+            .as_ref()
             .map(|list| serde_json::to_value(list).unwrap_or(serde_json::Value::Null));
 
         for table_name in TRANSACTION_TABLES.iter() {
@@ -155,7 +157,9 @@ impl PostgresClient {
         let mut conn = self.pool.get().await?;
         let trans = conn.transaction().await.map_err(PostgresError::PgError)?;
 
-        let authorization_list_json = transaction.authorization_list.as_ref()
+        let authorization_list_json = transaction
+            .authorization_list
+            .as_ref()
             .map(|list| serde_json::to_value(list).unwrap_or(serde_json::Value::Null));
 
         for table_name in TRANSACTION_TABLES.iter() {
@@ -307,7 +311,9 @@ impl PostgresClient {
         let block_number = transaction_receipt.block_number.map(BlockNumber::new);
         let hash = TransactionHash::new(transaction_receipt.transaction_hash);
 
-        let authorization_list_json = transaction.authorization_list.as_ref()
+        let authorization_list_json = transaction
+            .authorization_list
+            .as_ref()
             .map(|list| serde_json::to_value(list).unwrap_or(serde_json::Value::Null));
 
         trans
@@ -550,7 +556,9 @@ impl PostgresClient {
             .as_ref()
             .map(|blob_gas| serde_json::to_value(blob_gas).unwrap_or(serde_json::Value::Null));
 
-        let authorization_list_json = transaction.authorization_list.as_ref()
+        let authorization_list_json = transaction
+            .authorization_list
+            .as_ref()
             .map(|list| serde_json::to_value(list).unwrap_or(serde_json::Value::Null));
 
         trans

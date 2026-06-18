@@ -52,6 +52,7 @@ pub struct Transaction {
     #[serde(rename = "relayerId")]
     pub relayer_id: RelayerId,
 
+    #[serde(rename = "authorizationList")]
     pub authorization_list: Option<Vec<TransactionAuthorization>>,
 
     pub to: EvmAddress,
