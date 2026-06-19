@@ -1174,7 +1174,17 @@ impl TransactionsQueue {
         // Estimate gas limit by creating a temporary transaction with a high gas limit to avoid failing the estimate
         let temp_gas_limit = GasLimit::new(10_000_000);
 
-        let temp_transaction_request = if working_transaction.is_blob_transaction() {
+        let temp_transaction_request = if working_transaction.is_7702_transaction() {
+            info!(
+                "Creating EIP-7702 transaction for gas estimation for relayer: {}",
+                self.relayer.name
+            );
+            working_transaction
+                .to_eip7702_typed_transaction_with_gas_limit(Some(&gas_price), Some(temp_gas_limit))
+                .map_err(|e| {
+                    TransactionQueueSendTransactionError::TransactionConversionError(e.to_string())
+                })?
+        } else if working_transaction.is_blob_transaction() {
             info!(
                 "Creating blob transaction for gas estimation for relayer: {}",
                 self.relayer.name
@@ -1259,7 +1269,18 @@ impl TransactionsQueue {
         let (transaction_request, sent_with_blob_gas): (
             TypedTransaction,
             Option<BlobGasPriceResult>,
-        ) = if working_transaction.is_blob_transaction() {
+        ) = if working_transaction.is_7702_transaction() {
+            info!("Creating final EIP-7702 transaction for relayer: {}", self.relayer.name);
+            let tx_request = working_transaction
+                .to_eip7702_typed_transaction_with_gas_limit(
+                    Some(&gas_price),
+                    Some(estimated_gas_limit),
+                )
+                .map_err(|e| {
+                    TransactionQueueSendTransactionError::TransactionConversionError(e.to_string())
+                })?;
+            (tx_request, None)
+        } else if working_transaction.is_blob_transaction() {
             info!("Creating final blob transaction for relayer: {}", self.relayer.name);
             let blob_gas_price = self
                 .compute_blob_gas_price_for_transaction(

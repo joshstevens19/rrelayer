@@ -278,7 +278,10 @@ impl TransactionsQueues {
         blob_gas_price: Option<&BlobGasPriceResult>,
         gas_limit: GasLimit,
     ) -> Result<TypedTransaction, TransactionConversionError> {
-        if transaction.is_blob_transaction() {
+        if transaction.is_7702_transaction() {
+            Ok(transaction
+                .to_eip7702_typed_transaction_with_gas_limit(Some(gas_price), Some(gas_limit))?)
+        } else if transaction.is_blob_transaction() {
             Ok(transaction.to_blob_typed_transaction_with_gas_limit(
                 Some(gas_price),
                 blob_gas_price,
