@@ -374,6 +374,9 @@ impl Transaction {
     /// # Returns
     /// * `bool` - True if the transaction has authorization data
     pub fn is_7702_transaction(&self) -> bool {
-        self.authorization_list.is_some()
+        self.authorization_list
+            .as_ref()
+            .map(|authorization_list| !authorization_list.is_empty())
+            .unwrap_or_default()
     }
 }
