@@ -435,7 +435,9 @@ impl TransactionsQueues {
                     .transaction_failed_on_send(
                         relayer_id,
                         &transaction,
-                        "Failed to send transaction as always failing on gas estimation",
+                        format!(
+                            "Failed to send transaction as always failing on gas estimation: {err}"
+                        ),
                     )
                     .await
                     .map_err(AddTransactionError::CouldNotSaveTransactionDb)?;
