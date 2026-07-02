@@ -146,7 +146,7 @@ impl PostgresClient {
         &self,
         relayer_id: &RelayerId,
         transaction: &Transaction,
-        failed_reason: &str,
+        failed_reason: String,
     ) -> Result<(), PostgresError> {
         let mut conn = self.pool.get().await?;
         let trans = conn.transaction().await.map_err(PostgresError::PgError)?;
