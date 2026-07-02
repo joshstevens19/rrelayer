@@ -532,15 +532,6 @@ impl TransactionsQueues {
                         let cancel_transaction_id = TransactionId::new();
                         let expires_at = self.expires_at();
 
-                        let original_gas_limit = result.transaction.gas_limit.ok_or_else(|| {
-                            CancelTransactionError::SendTransactionError(
-                                TransactionQueueSendTransactionError::GasCalculationError,
-                            )
-                        })?;
-                        let bumped_gas_limit = GasLimit::new(
-                            original_gas_limit.into_inner() + (original_gas_limit.into_inner() / 5),
-                        );
-
                         let mut cancel_transaction = Transaction {
                             id: cancel_transaction_id,
                             relayer_id: transaction.relayer_id,
@@ -551,8 +542,7 @@ impl TransactionsQueues {
                             data: TransactionData::empty(),
                             // Use the same nonce as the original transaction to replace it
                             nonce: result.transaction.nonce,
-                            // Use original gas + 20% instead of estimating
-                            gas_limit: Some(bumped_gas_limit),
+                            gas_limit: Some(GasLimit::new(21_000)),
                             status: TransactionStatus::PENDING,
                             blobs: None,
                             chain_id: transactions_queue.chain_id(),
