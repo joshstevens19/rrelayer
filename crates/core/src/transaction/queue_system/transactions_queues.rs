@@ -532,15 +532,6 @@ impl TransactionsQueues {
                         let cancel_transaction_id = TransactionId::new();
                         let expires_at = self.expires_at();
 
-                        let original_gas_limit = result.transaction.gas_limit.ok_or_else(|| {
-                            CancelTransactionError::SendTransactionError(
-                                TransactionQueueSendTransactionError::GasCalculationError,
-                            )
-                        })?;
-                        let bumped_gas_limit = GasLimit::new(
-                            original_gas_limit.into_inner() + (original_gas_limit.into_inner() / 5),
-                        );
-
                         let mut cancel_transaction = Transaction {
                             id: cancel_transaction_id,
                             relayer_id: transaction.relayer_id,
@@ -551,8 +542,7 @@ impl TransactionsQueues {
                             data: TransactionData::empty(),
                             // Use the same nonce as the original transaction to replace it
                             nonce: result.transaction.nonce,
-                            // Use original gas + 20% instead of estimating
-                            gas_limit: Some(bumped_gas_limit),
+                            gas_limit: Some(GasLimit::new(21_000)),
                             status: TransactionStatus::PENDING,
                             blobs: None,
                             chain_id: transactions_queue.chain_id(),
@@ -1117,12 +1107,17 @@ impl TransactionsQueues {
                                     || error_msg.contains("balance")
                                     || error_msg.contains("overshot");
                                 let will_revert = error_msg.contains("execution reverted");
-                                if insufficient_funds || will_revert {
+                                let intrinsic_gas_too_low =
+                                    error_msg.contains("intrinsic gas too low");
+                                if insufficient_funds || will_revert || intrinsic_gas_too_low {
                                     if insufficient_funds {
                                         error!("process_single_pending: transaction {} failed due to insufficient funds moved to failed - error {}", transaction.id, error_msg);
                                     }
                                     if will_revert {
                                         error!("process_single_pending: transaction {} failed as would always revert - error {}", transaction.id, error_msg);
+                                    }
+                                    if intrinsic_gas_too_low {
+                                        error!("process_single_pending: transaction {} failed due to intrinsic gas too low - error {}", transaction.id, error_msg);
                                     }
                                     self.db
                                         .update_transaction_failed(

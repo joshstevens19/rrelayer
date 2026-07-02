@@ -1,0 +1,227 @@
+# Webhook Types
+
+The Rust SDK re-exports all webhook payload types from `rrelayer_core` so you can deserialize and type-check incoming webhook payloads.
+
+## Event Types
+
+```rust
+use rrelayer::{WebhookEventType};
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum WebhookEventType {
+    TransactionQueued,
+    TransactionSent,
+    TransactionMined,
+    TransactionConfirmed,
+    TransactionFailed,
+    TransactionExpired,
+    TransactionCancelled,
+    TransactionReplaced,
+    TextSigned,
+    TypedDataSigned,
+    LowBalance,
+}
+```
+
+## Transaction Webhook Payload
+
+```rust
+use rrelayer::{WebhookPayload, WebhookTransactionData};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebhookPayload {
+    pub event_type: WebhookEventType,
+    pub transaction: WebhookTransactionData,
+    pub timestamp: DateTime<Utc>,
+    pub api_version: String,
+    pub original_transaction: Option<WebhookTransactionData>,
+    pub receipt: Option<AnyTransactionReceipt>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebhookTransactionData {
+    pub id: TransactionId,
+    pub relayer_id: RelayerId,
+    pub to: EvmAddress,
+    pub from: EvmAddress,
+    pub value: TransactionValue,
+    pub data: TransactionData,
+    pub chain_id: ChainId,
+    pub status: TransactionStatus,
+    pub transaction_hash: Option<TransactionHash>,
+    pub queued_at: DateTime<Utc>,
+    pub sent_at: Option<DateTime<Utc>>,
+    pub confirmed_at: Option<DateTime<Utc>>,
+    pub expires_at: DateTime<Utc>,
+    pub external_id: Option<String>,
+    pub blobs: Option<Vec<TransactionBlob>>,
+    pub nonce: TransactionNonce,
+    pub mined_at: Option<DateTime<Utc>>,
+    pub mined_at_block_number: Option<BlockNumber>,
+    pub sent_with_max_priority_fee_per_gas: Option<MaxPriorityFee>,
+    pub sent_with_max_fee_per_gas: Option<MaxFee>,
+    pub is_noop: bool,
+}
+```
+
+## Signing Webhook Payload
+
+```rust
+use rrelayer::{WebhookSigningPayload, WebhookSigningData};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebhookSigningPayload {
+    pub event_type: WebhookEventType,
+    pub signing: WebhookSigningData,
+    pub timestamp: DateTime<Utc>,
+    pub api_version: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebhookSigningData {
+    pub relayer_id: RelayerId,
+    pub chain_id: ChainId,
+    pub signature: Signature,
+    pub signed_at: DateTime<Utc>,
+    pub message: Option<String>,
+    pub domain_data: Option<serde_json::Value>,
+    pub message_data: Option<serde_json::Value>,
+    pub primary_type: Option<String>,
+}
+```
+
+## Low Balance Webhook Payload
+
+```rust
+use rrelayer::{WebhookLowBalancePayload, WebhookBalanceAlertData};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebhookLowBalancePayload {
+    pub event_type: WebhookEventType,
+    pub balance_alert: WebhookBalanceAlertData,
+    pub timestamp: DateTime<Utc>,
+    pub api_version: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebhookBalanceAlertData {
+    pub relayer_id: String,
+    pub address: EvmAddress,
+    pub chain_id: ChainId,
+    pub current_balance: String,
+    pub minimum_balance: String,
+    pub current_balance_formatted: String,
+    pub minimum_balance_formatted: String,
+    pub detected_at: DateTime<Utc>,
+}
+```
+
+## Usage Examples
+
+### Deserializing Transaction Webhooks
+
+```rust
+use rrelayer::{WebhookPayload, WebhookEventType};
+
+async fn handle_webhook(body: String) -> Result<(), Box<dyn std::error::Error>> {
+    let payload: WebhookPayload = serde_json::from_str(&body)?;
+
+    match payload.event_type {
+        WebhookEventType::TransactionMined => {
+            println!(
+                "Transaction {} mined at block {:?}",
+                payload.transaction.id,
+                payload.transaction.mined_at_block_number
+            );
+        }
+        WebhookEventType::TransactionFailed => {
+            println!("Transaction {} failed", payload.transaction.id);
+        }
+        WebhookEventType::TransactionReplaced => {
+            if let Some(original) = &payload.original_transaction {
+                println!(
+                    "Transaction replaced. New: {}, Original: {}",
+                    payload.transaction.id, original.id
+                );
+            }
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+```
+
+### Deserializing Signing Webhooks
+
+```rust
+use rrelayer::{WebhookSigningPayload, WebhookEventType};
+
+async fn handle_signing_webhook(body: String) -> Result<(), Box<dyn std::error::Error>> {
+    let payload: WebhookSigningPayload = serde_json::from_str(&body)?;
+
+    match payload.event_type {
+        WebhookEventType::TextSigned => {
+            println!(
+                "Message signed by relayer {}: {:?}",
+                payload.signing.relayer_id,
+                payload.signing.message
+            );
+        }
+        WebhookEventType::TypedDataSigned => {
+            println!(
+                "Typed data signed, primary type: {:?}",
+                payload.signing.primary_type
+            );
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+```
+
+### Deserializing Low Balance Alerts
+
+```rust
+use rrelayer::{WebhookLowBalancePayload, WebhookEventType};
+
+async fn handle_balance_alert(body: String) -> Result<(), Box<dyn std::error::Error>> {
+    let payload: WebhookLowBalancePayload = serde_json::from_str(&body)?;
+
+    if payload.event_type == WebhookEventType::LowBalance {
+        let alert = &payload.balance_alert;
+        println!(
+            "Low balance: Relayer {} on chain {} has {} ETH (minimum: {} ETH)",
+            alert.relayer_id,
+            alert.chain_id,
+            alert.current_balance_formatted,
+            alert.minimum_balance_formatted
+        );
+    }
+
+    Ok(())
+}
+```
+
+### Using with Axum
+
+```rust
+use axum::{Json, http::StatusCode};
+use rrelayer::{WebhookPayload, WebhookEventType};
+
+async fn webhook_handler(
+    Json(payload): Json<WebhookPayload>,
+) -> StatusCode {
+    match payload.event_type {
+        WebhookEventType::TransactionConfirmed => {
+            // Process confirmed transaction
+            println!("Confirmed: {}", payload.transaction.id);
+        }
+        _ => {}
+    }
+
+    StatusCode::OK
+}
+```

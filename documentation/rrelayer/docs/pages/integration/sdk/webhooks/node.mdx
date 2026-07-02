@@ -1,0 +1,186 @@
+# Webhook Types
+
+The TypeScript SDK exports all webhook payload types so you can deserialize and type-check incoming webhook payloads.
+
+## Event Types
+
+```ts
+import { WebhookEventType } from 'rrelayer';
+
+export enum WebhookEventType {
+  TransactionQueued = 'transaction_queued',
+  TransactionSent = 'transaction_sent',
+  TransactionMined = 'transaction_mined',
+  TransactionConfirmed = 'transaction_confirmed',
+  TransactionFailed = 'transaction_failed',
+  TransactionExpired = 'transaction_expired',
+  TransactionCancelled = 'transaction_cancelled',
+  TransactionReplaced = 'transaction_replaced',
+  TextSigned = 'text_signed',
+  TypedDataSigned = 'typed_data_signed',
+  LowBalance = 'low_balance',
+}
+```
+
+## Transaction Webhook Payload
+
+```ts
+import { WebhookPayload, WebhookTransactionData } from 'rrelayer';
+
+export interface WebhookTransactionData {
+  id: string;
+  relayerId: string;
+  to: `0x${string}`;
+  from: `0x${string}`;
+  value: string;
+  data: string;
+  chainId: number;
+  status: string;
+  txHash?: string | null;
+  queuedAt: string;
+  sentAt?: string | null;
+  confirmedAt?: string | null;
+  expiresAt: string;
+  externalId?: string | null;
+  blobs?: string[] | null;
+  nonce: string;
+  minedAt?: string | null;
+  minedAtBlockNumber?: string | null;
+  maxPriorityFee?: string | null;
+  maxFee?: string | null;
+  isNoop: boolean;
+}
+
+export interface WebhookPayload {
+  eventType: WebhookEventType;
+  transaction: WebhookTransactionData;
+  timestamp: string;
+  apiVersion: string;
+  originalTransaction?: WebhookTransactionData | null;
+  receipt?: Record<string, unknown> | null;
+}
+```
+
+## Signing Webhook Payload
+
+```ts
+import { WebhookSigningPayload, WebhookSigningData } from 'rrelayer';
+
+export interface WebhookSigningData {
+  relayerId: string;
+  chainId: number;
+  signature: string;
+  signedAt: string;
+  message?: string | null;
+  domainData?: Record<string, unknown> | null;
+  messageData?: Record<string, unknown> | null;
+  primaryType?: string | null;
+}
+
+export interface WebhookSigningPayload {
+  eventType: WebhookEventType;
+  signing: WebhookSigningData;
+  timestamp: string;
+  apiVersion: string;
+}
+```
+
+## Low Balance Webhook Payload
+
+```ts
+import { WebhookLowBalancePayload, WebhookBalanceAlertData } from 'rrelayer';
+
+export interface WebhookBalanceAlertData {
+  relayerId: string;
+  address: `0x${string}`;
+  chainId: number;
+  currentBalance: string;
+  minimumBalance: string;
+  currentBalanceFormatted: string;
+  minimumBalanceFormatted: string;
+  detectedAt: string;
+}
+
+export interface WebhookLowBalancePayload {
+  eventType: WebhookEventType;
+  balanceAlert: WebhookBalanceAlertData;
+  timestamp: string;
+  apiVersion: string;
+}
+```
+
+## Usage Examples
+
+### Handling Transaction Webhooks
+
+```ts
+import express from 'express';
+import {
+  WebhookPayload,
+  WebhookEventType,
+} from 'rrelayer';
+
+const app = express();
+app.use(express.json());
+
+app.post('/webhooks/transactions', (req, res) => {
+  const payload = req.body as WebhookPayload;
+
+  switch (payload.eventType) {
+    case WebhookEventType.TransactionMined:
+      console.log(`Transaction ${payload.transaction.id} mined at block ${payload.transaction.minedAtBlockNumber}`);
+      break;
+    case WebhookEventType.TransactionFailed:
+      console.log(`Transaction ${payload.transaction.id} failed`);
+      break;
+    case WebhookEventType.TransactionReplaced:
+      console.log(`Transaction replaced. New: ${payload.transaction.id}, Original: ${payload.originalTransaction?.id}`);
+      break;
+  }
+
+  res.status(200).json({ received: true });
+});
+```
+
+### Handling Signing Webhooks
+
+```ts
+import {
+  WebhookSigningPayload,
+  WebhookEventType,
+} from 'rrelayer';
+
+app.post('/webhooks/signing', (req, res) => {
+  const payload = req.body as WebhookSigningPayload;
+
+  if (payload.eventType === WebhookEventType.TextSigned) {
+    console.log(`Message signed by relayer ${payload.signing.relayerId}: "${payload.signing.message}"`);
+  } else if (payload.eventType === WebhookEventType.TypedDataSigned) {
+    console.log(`Typed data signed, primary type: ${payload.signing.primaryType}`);
+  }
+
+  res.status(200).json({ received: true });
+});
+```
+
+### Handling Low Balance Alerts
+
+```ts
+import {
+  WebhookLowBalancePayload,
+  WebhookEventType,
+} from 'rrelayer';
+
+app.post('/webhooks/alerts', (req, res) => {
+  const payload = req.body as WebhookLowBalancePayload;
+
+  if (payload.eventType === WebhookEventType.LowBalance) {
+    const { relayerId, chainId, currentBalanceFormatted, minimumBalanceFormatted } = payload.balanceAlert;
+    console.log(
+      `Low balance alert: Relayer ${relayerId} on chain ${chainId} has ${currentBalanceFormatted} ETH (minimum: ${minimumBalanceFormatted} ETH)`
+    );
+  }
+
+  res.status(200).json({ received: true });
+});
+```

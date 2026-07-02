@@ -120,15 +120,23 @@ impl AwsKmsWalletManager {
         let expected_alias = self.build_alias(wallet_index, chain_id);
         info!("AWS KMS: Looking for key with alias: {}", expected_alias);
 
-        let aliases = self.list_aliases().await?;
+        let aws_config = self.build_aws_config().await;
+        let kms = Client::new(&aws_config);
 
-        aliases
-            .into_iter()
-            .find(|(alias_name, _)| alias_name == &expected_alias)
-            .map(|(_, key_id)| key_id)
-            .ok_or_else(|| WalletError::ApiError {
-                message: format!("No KMS key found for alias: {}", expected_alias),
-            })
+        // AWS KMS DescribeKey accepts an alias directly as the key-id parameter
+        let result = kms.describe_key().key_id(&expected_alias).send().await.map_err(|e| {
+            WalletError::ApiError {
+                message: format!("No KMS key found for alias {}: {:?}", expected_alias, e),
+            }
+        })?;
+
+        let key_id = result.key_metadata().map(|m| m.key_id().to_string()).ok_or_else(|| {
+            WalletError::ApiError {
+                message: format!("No key metadata returned for alias: {}", expected_alias),
+            }
+        })?;
+
+        Ok(key_id)
     }
 
     async fn create_key_for_wallet_index(
@@ -179,7 +187,13 @@ impl AwsKmsWalletManager {
         if matches!(chain_id, WalletManagerChainId::Cloned(_))
             && matches!(key_id, GetOrCreateKeyId::Created(_))
         {
-            error!("AWS KMS: Cloned wallets should never create new KMS keys and always use the existing something is wrong...");
+            return Err(WalletError::ApiError {
+                message: format!(
+                    "Cloned wallet (index: {}, lookup_chain: {}) should use existing KMS key but alias not found. \
+                     Created key would have wrong address. Check that the original KMS key alias exists.",
+                    wallet_index, lookup_chain_id
+                ),
+            });
         }
 
         let signer =
@@ -406,6 +420,7 @@ impl AwsKmsWalletManager {
         let kms = Client::new(&aws_config);
 
         // First verify the key exists and is the right type
+        // Note: DescribeKey accepts a key ID, key ARN, or an alias (e.g. `alias/my-key`)
         let key_info = kms.describe_key().key_id(kms_key_id).send().await.map_err(|e| {
             WalletError::ApiError {
                 message: format!("Failed to describe KMS key {}: {:?}", kms_key_id, e),
@@ -437,21 +452,24 @@ impl AwsKmsWalletManager {
             });
         }
 
-        // Check if the alias already exists
-        let existing_aliases = self.list_aliases().await?;
-        if let Some((_, existing_key_id)) =
-            existing_aliases.iter().find(|(name, _)| name == &alias_name)
-        {
-            if existing_key_id == kms_key_id {
-                info!("AWS KMS: Alias {} already exists and points to the correct key", alias_name);
-                return Ok(alias_name);
-            } else {
-                return Err(WalletError::ApiError {
-                    message: format!(
-                        "Alias {} already exists but points to a different key {}",
-                        alias_name, existing_key_id
-                    ),
-                });
+        // Check if the alias already exists via direct describe_key lookup
+        if let Ok(existing) = kms.describe_key().key_id(&alias_name).send().await {
+            if let Some(existing_metadata) = existing.key_metadata() {
+                let existing_key_id = existing_metadata.key_id();
+                if existing_key_id == kms_key_id {
+                    info!(
+                        "AWS KMS: Alias {} already exists and points to the correct key",
+                        alias_name
+                    );
+                    return Ok(alias_name);
+                } else {
+                    return Err(WalletError::ApiError {
+                        message: format!(
+                            "Alias {} already exists but points to a different key {}",
+                            alias_name, existing_key_id
+                        ),
+                    });
+                }
             }
         }
 

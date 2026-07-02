@@ -503,6 +503,66 @@ export default defineConfig({
               ],
             },
             {
+              text: 'Webhooks',
+              collapsed: true,
+              items: [
+                {
+                  text: 'Node',
+                  collapsed: true,
+                  link: '/integration/sdk/webhooks/node',
+                  items: [
+                    {
+                      text: 'Event Types',
+                      link: '/integration/sdk/webhooks/node#event-types',
+                    },
+                    {
+                      text: 'Transaction Payload',
+                      link: '/integration/sdk/webhooks/node#transaction-webhook-payload',
+                    },
+                    {
+                      text: 'Signing Payload',
+                      link: '/integration/sdk/webhooks/node#signing-webhook-payload',
+                    },
+                    {
+                      text: 'Low Balance Payload',
+                      link: '/integration/sdk/webhooks/node#low-balance-webhook-payload',
+                    },
+                    {
+                      text: 'Usage Examples',
+                      link: '/integration/sdk/webhooks/node#usage-examples',
+                    },
+                  ],
+                },
+                {
+                  text: 'Rust',
+                  collapsed: true,
+                  link: '/integration/sdk/webhooks/rust',
+                  items: [
+                    {
+                      text: 'Event Types',
+                      link: '/integration/sdk/webhooks/rust#event-types',
+                    },
+                    {
+                      text: 'Transaction Payload',
+                      link: '/integration/sdk/webhooks/rust#transaction-webhook-payload',
+                    },
+                    {
+                      text: 'Signing Payload',
+                      link: '/integration/sdk/webhooks/rust#signing-webhook-payload',
+                    },
+                    {
+                      text: 'Low Balance Payload',
+                      link: '/integration/sdk/webhooks/rust#low-balance-webhook-payload',
+                    },
+                    {
+                      text: 'Usage Examples',
+                      link: '/integration/sdk/webhooks/rust#usage-examples',
+                    },
+                  ],
+                },
+              ],
+            },
+            {
               text: 'Sign',
               collapsed: true,
               items: [

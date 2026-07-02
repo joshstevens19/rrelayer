@@ -6,11 +6,14 @@
 
 ### Features
 
+- feat: expose webhook types (WebhookEventType, WebhookPayload, WebhookSigningPayload, WebhookLowBalancePayload) to Rust and TypeScript SDKs
+
 ---
 
 ### Bug fixes
 
 - fix: use correct fields in string representation of error
+- fix: always use 21_000 as gas limit on no-op
 
 ---
 
@@ -23,15 +26,45 @@
 
 all release branches are deployed through `release/VERSION_NUMBER` branches
 
+## 0.11.6 - 4th March 2026
+-------------------------------------------------
+
+github branch - https://github.com/joshstevens19/rrelayer/tree/release/0.11.6
+
+- linux binary - https://github.com/joshstevens19/rrelayer/releases/download/v0.11.6/rrelayer_linux-amd64.tar.gz
+- mac apple silicon binary - https://github.com/joshstevens19/rrelayer/releases/download/v0.11.6/rrelayer-arm64.tar.gz
+- mac apple intel binary - https://github.com/joshstevens19/rrelayer/releases/download/v0.11.6/rrelayer-amd64.tar.gz
+- windows binary - https://github.com/joshstevens19/rrelayer/releases/download/v0.11.6/rrelayer-amd64.zip
+
+### Bug fixes
+
+- fix: mark transactions as failed immediately on "intrinsic gas too low" error instead of retrying indefinitely
+
+## 0.11.5 - 4th March 2026
+-------------------------------------------------
+
+github branch - https://github.com/joshstevens19/rrelayer/tree/release/0.11.5
+
+- linux binary - https://github.com/joshstevens19/rrelayer/releases/download/v0.11.5/rrelayer_linux-amd64.tar.gz
+- mac apple silicon binary - https://github.com/joshstevens19/rrelayer/releases/download/v0.11.5/rrelayer-arm64.tar.gz
+- mac apple intel binary - https://github.com/joshstevens19/rrelayer/releases/download/v0.11.5/rrelayer-amd64.tar.gz
+- windows binary - https://github.com/joshstevens19/rrelayer/releases/download/v0.11.5/rrelayer-amd64.zip
+
+### Bug fixes
+
+- fix: replace paginated `list_aliases` with direct `describe_key` lookup in KMS wallet manager to prevent cloned relayers resolving to wrong EVM address
+- fix: return error instead of logging when cloned wallet unexpectedly creates a new KMS key
+- fix: correct error message format strings in `ProcessPendingTransactionError` and `ProcessInmempoolTransactionError` that were printing relayer ID instead of the actual error details
+
 ## 0.11.4 - 20th January 2026
 -------------------------------------------------
 
-github branch - https://github.com/joshstevens19/rrelayer/tree/release/0.11.3
+github branch - https://github.com/joshstevens19/rrelayer/tree/release/0.11.4
 
-- linux binary - https://github.com/joshstevens19/rrelayer/releases/download/v0.11.3/rrelayer_linux-amd64.tar.gz
-- mac apple silicon binary - https://github.com/joshstevens19/rrelayer/releases/download/v0.11.3/rrelayer-arm64.tar.gz
-- mac apple intel binary - https://github.com/joshstevens19/rrelayer/releases/download/v0.11.3/rrelayer-amd64.tar.gz
-- windows binary - https://github.com/joshstevens19/rrelayer/releases/download/v0.11.3/rrelayer-amd64.zip
+- linux binary - https://github.com/joshstevens19/rrelayer/releases/download/v0.11.4/rrelayer_linux-amd64.tar.gz
+- mac apple silicon binary - https://github.com/joshstevens19/rrelayer/releases/download/v0.11.4/rrelayer-arm64.tar.gz
+- mac apple intel binary - https://github.com/joshstevens19/rrelayer/releases/download/v0.11.4/rrelayer-amd64.tar.gz
+- windows binary - https://github.com/joshstevens19/rrelayer/releases/download/v0.11.4/rrelayer-amd64.zip
 
 ### Bug fixes
 

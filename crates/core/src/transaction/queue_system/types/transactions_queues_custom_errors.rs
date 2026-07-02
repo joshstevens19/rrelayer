@@ -169,7 +169,7 @@ pub enum ProcessInmempoolTransactionError {
     SendTransactionError(RelayerId, EvmAddress, TransactionQueueSendTransactionError),
 
     #[error(
-        "Transaction status {4} could not be updated in the database for relayer id {0} / address {1}: tx {2} - error {3}"
+        "Transaction status {3} could not be updated in the database for relayer id {0} / address {1}: tx {2} - error {4}"
     )]
     CouldNotUpdateTransactionStatusInTheDatabase(
         RelayerId,
