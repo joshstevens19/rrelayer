@@ -370,12 +370,14 @@ pub async fn start(project_path: &Path) -> Result<(), StartError> {
     info!("Starting up the server");
 
     let yaml_path = project_path.join("rrelayer.yaml");
+    info!("Config path {}", yaml_path.display());
     if !yaml_path.exists() {
-        error!("Found rrelayer.yaml in the current directory");
+        error!("Found no rrelayer.yaml in the current directory {}", yaml_path.display());
         return Err(StartError::NoYamlFileFound);
     }
 
     let config = read(&yaml_path, false)?;
+    info!("Config loaded successfully from {}", yaml_path.display());
 
     if config.networks.is_empty() {
         return Err(StartError::NoNetworksDefinedInYaml);
