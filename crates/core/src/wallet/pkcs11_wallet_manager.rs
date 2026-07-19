@@ -409,7 +409,8 @@ impl WalletManagerTrait for Pkcs11WalletManager {
         wallet_index: u32,
         chain_id: WalletManagerChainId,
     ) -> Result<EvmAddress, WalletError> {
-        let address = self.get_public_key(wallet_index, chain_id.main()).await?;
+        let address =
+            self.get_public_key(wallet_index, chain_id.cloned_from_chain_id_or_default()).await?;
         Ok(EvmAddress::from(address))
     }
 
@@ -418,7 +419,8 @@ impl WalletManagerTrait for Pkcs11WalletManager {
         wallet_index: u32,
         chain_id: WalletManagerChainId,
     ) -> Result<EvmAddress, WalletError> {
-        let address = self.get_public_key(wallet_index, chain_id.main()).await?;
+        let address =
+            self.get_public_key(wallet_index, chain_id.cloned_from_chain_id_or_default()).await?;
         Ok(EvmAddress::from(address))
     }
 
@@ -429,7 +431,7 @@ impl WalletManagerTrait for Pkcs11WalletManager {
         chain_id: WalletManagerChainId,
     ) -> Result<Signature, WalletError> {
         let tx_hash = transaction.signature_hash();
-        self.sign_hash(wallet_index, &tx_hash, chain_id.main()).await
+        self.sign_hash(wallet_index, &tx_hash, chain_id.cloned_from_chain_id_or_default()).await
     }
 
     async fn sign_text(
@@ -441,7 +443,7 @@ impl WalletManagerTrait for Pkcs11WalletManager {
         let message = format!("\x19Ethereum Signed Message:\n{}{}", text.len(), text);
         let hash = keccak256(message.as_bytes());
 
-        self.sign_hash(wallet_index, &hash, chain_id.main()).await
+        self.sign_hash(wallet_index, &hash, chain_id.cloned_from_chain_id_or_default()).await
     }
 
     async fn sign_typed_data(
@@ -451,7 +453,7 @@ impl WalletManagerTrait for Pkcs11WalletManager {
         chain_id: WalletManagerChainId,
     ) -> Result<Signature, WalletError> {
         let hash = typed_data.eip712_signing_hash()?;
-        self.sign_hash(wallet_index, &hash, chain_id.main()).await
+        self.sign_hash(wallet_index, &hash, chain_id.cloned_from_chain_id_or_default()).await
     }
 
     fn supports_blobs(&self) -> bool {

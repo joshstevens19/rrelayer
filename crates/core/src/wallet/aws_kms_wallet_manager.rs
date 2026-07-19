@@ -31,7 +31,7 @@ pub struct KeyPlan {
 pub struct AwsKmsWalletManager {
     config: AwsKmsSigningProviderConfig,
     alias: String,
-    signers: Arc<RwLock<HashMap<(u32, u64), AwsSigner>>>,
+    signers: Arc<RwLock<HashMap<(u32, u64, u64), AwsSigner>>>,
 }
 
 #[derive(Debug)]
@@ -174,7 +174,8 @@ impl AwsKmsWalletManager {
         chain_id: WalletManagerChainId,
     ) -> Result<AwsSigner, WalletError> {
         let lookup_chain_id = chain_id.cloned_from_chain_id_or_default();
-        let cache_key = (wallet_index, lookup_chain_id.u64());
+        let signing_chain_id = chain_id.main();
+        let cache_key = (wallet_index, lookup_chain_id.u64(), signing_chain_id.u64());
 
         {
             let signers = self.signers.read().await;
@@ -197,7 +198,7 @@ impl AwsKmsWalletManager {
         }
 
         let signer =
-            self.initialize_aws_kms_signer(key_id.item(), Some(chain_id.main().u64())).await?;
+            self.initialize_aws_kms_signer(key_id.item(), Some(signing_chain_id.u64())).await?;
 
         {
             let mut signers = self.signers.write().await;

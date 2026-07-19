@@ -4,7 +4,8 @@ use crate::relayer::Relayer;
 use crate::wallet::{
     AwsKmsWalletManager, CompositeWalletManager, FireblocksWalletManager, ImportKeyResult,
     MnemonicWalletManager, Pkcs11WalletManager, PrivateKeyWalletManager, PrivyWalletManager,
-    TurnkeyWalletManager, WalletError, WalletManagerTrait,
+    TurnkeyWalletManager, WalletError, WalletManagerChainId, WalletManagerCloneChain,
+    WalletManagerTrait,
 };
 use crate::yaml::{
     AwsKmsSigningProviderConfig, FireblocksSigningProviderConfig, Pkcs11SigningProviderConfig,
@@ -288,9 +289,12 @@ impl EvmProvider {
     }
 
     pub async fn clone_wallet(&self, relayer: &Relayer) -> Result<EvmAddress, WalletError> {
-        self.wallet_manager
-            .create_wallet(relayer.wallet_index(), relayer.wallet_manager_chain_id())
-            .await
+        let chain_id = WalletManagerChainId::Cloned(WalletManagerCloneChain {
+            cloned_from: relayer.chain_id,
+            cloned_to: self.chain_id,
+        });
+
+        self.wallet_manager.create_wallet(relayer.wallet_index(), chain_id).await
     }
 
     pub async fn create_wallet(&self, wallet_index: u32) -> Result<EvmAddress, WalletError> {
@@ -506,5 +510,138 @@ impl EvmProvider {
 
     pub fn supports_blobs(&self) -> bool {
         self.wallet_manager.supports_blobs()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::relayer::RelayerId;
+    use crate::wallet::WalletManagerChainId;
+    use async_trait::async_trait;
+    use chrono::Utc;
+    use tokio::sync::Mutex;
+
+    struct RecordingWalletManager {
+        last_create_chain: Arc<Mutex<Option<(u64, u64)>>>,
+        address: EvmAddress,
+    }
+
+    #[async_trait]
+    impl WalletManagerTrait for RecordingWalletManager {
+        async fn create_wallet(
+            &self,
+            _wallet_index: u32,
+            chain_id: WalletManagerChainId,
+        ) -> Result<EvmAddress, WalletError> {
+            match chain_id {
+                WalletManagerChainId::Cloned(chain) => {
+                    let mut last_create_chain = self.last_create_chain.lock().await;
+                    *last_create_chain = Some((chain.cloned_from.u64(), chain.cloned_to.u64()));
+                }
+                WalletManagerChainId::ChainId(chain_id) => {
+                    let mut last_create_chain = self.last_create_chain.lock().await;
+                    *last_create_chain = Some((chain_id.u64(), chain_id.u64()));
+                }
+            }
+
+            Ok(self.address)
+        }
+
+        async fn get_address(
+            &self,
+            _wallet_index: u32,
+            _chain_id: WalletManagerChainId,
+        ) -> Result<EvmAddress, WalletError> {
+            Ok(self.address)
+        }
+
+        async fn sign_transaction(
+            &self,
+            _wallet_index: u32,
+            _transaction: &TypedTransaction,
+            _chain_id: WalletManagerChainId,
+        ) -> Result<Signature, WalletError> {
+            Err(WalletError::UnsupportedOperation("not used in this test".to_string()))
+        }
+
+        async fn sign_text(
+            &self,
+            _wallet_index: u32,
+            _text: &str,
+            _chain_id: WalletManagerChainId,
+        ) -> Result<Signature, WalletError> {
+            Err(WalletError::UnsupportedOperation("not used in this test".to_string()))
+        }
+
+        async fn sign_typed_data(
+            &self,
+            _wallet_index: u32,
+            _typed_data: &TypedData,
+            _chain_id: WalletManagerChainId,
+        ) -> Result<Signature, WalletError> {
+            Err(WalletError::UnsupportedOperation("not used in this test".to_string()))
+        }
+
+        fn supports_blobs(&self) -> bool {
+            true
+        }
+    }
+
+    struct UnusedGasEstimator;
+
+    #[async_trait]
+    impl BaseGasFeeEstimator for UnusedGasEstimator {
+        async fn get_gas_prices(
+            &self,
+            _chain_id: &ChainId,
+        ) -> Result<GasEstimatorResult, GasEstimatorError> {
+            unreachable!("clone_wallet does not estimate gas")
+        }
+
+        fn is_chain_supported(&self, _chain_id: &ChainId) -> bool {
+            true
+        }
+    }
+
+    #[tokio::test]
+    async fn clone_wallet_passes_source_and_destination_chain_ids() {
+        let last_create_chain = Arc::new(Mutex::new(None));
+        let address = EvmAddress::zero();
+        let wallet_manager = Arc::new(RecordingWalletManager {
+            last_create_chain: last_create_chain.clone(),
+            address,
+        });
+
+        let provider = EvmProvider {
+            rpc_clients: Vec::new(),
+            wallet_manager,
+            gas_estimator: Arc::new(UnusedGasEstimator),
+            chain_id: ChainId::new(31337),
+            name: "destination".to_string(),
+            provider_urls: Vec::new(),
+            blocks_every: 250,
+            confirmations: 1,
+            can_clone: true,
+        };
+
+        let source_relayer = Relayer {
+            id: RelayerId::new(),
+            name: "source".to_string(),
+            chain_id: ChainId::new(1),
+            cloned_from_chain_id: None,
+            address,
+            wallet_index: 7,
+            max_gas_price: None,
+            paused: false,
+            eip_1559_enabled: true,
+            created_at: Utc::now(),
+            is_private_key: false,
+        };
+
+        let cloned_address = provider.clone_wallet(&source_relayer).await.unwrap();
+
+        assert_eq!(cloned_address, address);
+        assert_eq!(*last_create_chain.lock().await, Some((1, 31337)));
     }
 }
