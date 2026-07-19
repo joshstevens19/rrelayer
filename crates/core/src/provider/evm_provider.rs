@@ -446,7 +446,15 @@ impl EvmProvider {
         Ok(GasLimit::new(result as u128))
     }
 
-    pub async fn get_block_gas_limit(&self) -> Result<GasLimit, RpcError<TransportErrorKind>> {
+    /// Returns the latest block gas limit.
+    ///
+    /// A single transaction cannot fit in a block if its gas limit exceeds this value, but this is
+    /// not a permanent chain constant. Validators/sequencers can adjust the block gas limit over
+    /// time, so callers should fetch it when validating a transaction instead of caching it
+    /// indefinitely.
+    pub async fn get_latest_block_gas_limit(
+        &self,
+    ) -> Result<GasLimit, RpcError<TransportErrorKind>> {
         let block = self.rpc_client().get_block_by_number(BlockNumberOrTag::Latest).await?.ok_or(
             RpcError::Transport(TransportErrorKind::Custom(
                 "Latest block not found".to_string().into(),
