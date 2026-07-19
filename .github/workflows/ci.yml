@@ -36,6 +36,56 @@ jobs:
       - name: Run clippy
         run: cargo clippy -- -D warnings -A clippy::uninlined_format_args
 
+  e2e_raw:
+    name: E2E Raw Provider
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      RAW_DANGEROUS_MNEMONIC: "enjoy jar sentence ghost buddy humble monster cannon fix ill eternal desert patrol tumble calm logic wrestle wall above grab debate noble absurd merry"
+      DATABASE_URL: "postgresql://postgres:rrelayer@localhost:5447/postgres"
+      POSTGRES_PASSWORD: "rrelayer"
+      RRELAYER_AUTH_USERNAME: "admin"
+      RRELAYER_AUTH_PASSWORD: "your_secure_password_here"
+      RRELAYER_WEBHOOK_SHARED_SECRET: "test-webhook-secret-123"
+      API_KEY_1: "test-api-key-1"
+      API_KEY_2: "test-api-key-2"
+      API_KEY_3: "test-api-key-3"
+      RRELAYER_MULTI_PROVIDER: "1"
+      RRELAYER_PROVIDERS: "raw"
+      FOUNDRY_DISABLE_NIGHTLY_WARNING: "true"
+      RUST_BACKTRACE: "1"
+      RUST_LOG: "error"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: e2e-raw
+          cache-on-failure: true
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y libssl-dev pkg-config
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Install Foundry contract dependencies
+        working-directory: crates/e2e-tests/contracts
+        run: forge install foundry-rs/forge-std@v1.11.0 --no-git
+
+      - name: Run raw provider E2E tests
+        working-directory: crates/e2e-tests
+        run: cargo run --bin e2e-runner
+
+      - name: Clean up E2E services
+        if: always()
+        working-directory: crates/e2e-tests
+        run: docker compose down --volumes --remove-orphans
+
   build:
     if: |
       (github.event_name == 'push' || github.event_name == 'pull_request') &&

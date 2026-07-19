@@ -28,6 +28,7 @@ install-deps: ## Install required dependencies (Foundry)
 	@echo "Installing Foundry..."
 	@curl -L https://foundry.paradigm.xyz | bash
 	@foundryup
+	@cd contracts && forge install foundry-rs/forge-std@v1.11.0 --no-git
 
 build: ## Build the E2E test binary
 	@cargo build --bin e2e-runner
@@ -43,7 +44,7 @@ clean: stop-postgres stop-anvil stop-rrelayer ## Clean up all running processes 
 
 start-postgres: ## Start PostgreSQL database
 	@echo "Starting PostgreSQL database..."
-	@cd ../.. && docker-compose up -d postgresql
+	@docker compose up -d postgresql
 	@echo "Waiting for PostgreSQL to be ready..."
 	@for i in $$(seq 1 30); do \
 		if PGPASSWORD=rrelayer psql -h localhost -p 5447 -U postgres -d postgres -c "SELECT 1;" >/dev/null 2>&1; then \
@@ -56,7 +57,7 @@ start-postgres: ## Start PostgreSQL database
 
 stop-postgres: ## Stop PostgreSQL database
 	@echo "Stopping PostgreSQL database..."
-	@cd ../.. && docker-compose down postgresql
+	@docker compose down postgresql
 
 reset-db: ## Reset database (drop all schemas and recreate)
 	@echo "Resetting database..."

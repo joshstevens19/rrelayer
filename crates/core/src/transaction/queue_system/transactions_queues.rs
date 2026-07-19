@@ -37,7 +37,10 @@ use crate::transaction::api::RelayTransactionRequest;
 use crate::transaction::queue_system::types::SendTransactionGasPriceError;
 use crate::transaction::types::{TransactionBlob, TransactionConversionError, TransactionSpeed};
 use crate::{
-    gas::{BlobGasOracleCache, BlobGasPriceResult, GasLimit, GasOracleCache, GasPriceResult},
+    gas::{
+        BlobGasOracleCache, BlobGasPriceResult, GasLimit, GasOracleCache, GasPriceResult, MaxFee,
+        MaxPriorityFee,
+    },
     postgres::{PostgresClient, PostgresConnectionError},
     relayer::RelayerId,
     safe_proxy::SafeProxyManager,
@@ -51,6 +54,24 @@ use crate::{
     },
     webhooks::WebhookManager,
 };
+
+const SAME_NONCE_BUMP_DIVISOR: u128 = 5;
+const MIN_SAME_NONCE_GAS_BUMP_WEI: u128 = 1_000_000_000;
+
+fn bump_u128_for_same_nonce_competitor(value: u128) -> u128 {
+    value
+        .saturating_add(std::cmp::max(value / SAME_NONCE_BUMP_DIVISOR, MIN_SAME_NONCE_GAS_BUMP_WEI))
+}
+
+fn bump_max_fee_for_same_nonce_competitor(max_fee: MaxFee) -> MaxFee {
+    MaxFee::new(bump_u128_for_same_nonce_competitor(max_fee.into_u128()))
+}
+
+fn bump_max_priority_fee_for_same_nonce_competitor(
+    max_priority_fee: MaxPriorityFee,
+) -> MaxPriorityFee {
+    MaxPriorityFee::new(bump_u128_for_same_nonce_competitor(max_priority_fee.into_u128()))
+}
 
 /// Container for managing multiple transaction queues across different relayers.
 ///
@@ -577,10 +598,14 @@ impl TransactionsQueues {
                                 )
                             })?;
 
-                        // Bump original gas prices by 20% to ensure replacement
-                        let bumped_max_fee = original_gas.max_fee + (original_gas.max_fee / 5);
+                        // Bump original gas prices by 20% with a 1 gwei floor so tiny local
+                        // raw-provider fees still produce a transaction miners prefer.
+                        let bumped_max_fee =
+                            bump_max_fee_for_same_nonce_competitor(original_gas.max_fee);
                         let bumped_max_priority_fee =
-                            original_gas.max_priority_fee + (original_gas.max_priority_fee / 5);
+                            bump_max_priority_fee_for_same_nonce_competitor(
+                                original_gas.max_priority_fee,
+                            );
 
                         let gas_price = GasPriceResult {
                             max_fee: bumped_max_fee,
@@ -836,10 +861,14 @@ impl TransactionsQueues {
                         );
                         replace_transaction.gas_limit = Some(bumped_gas_limit);
 
-                        // Bump original gas prices by 20% to ensure replacement
-                        let bumped_max_fee = original_gas.max_fee + (original_gas.max_fee / 5);
+                        // Bump original gas prices by 20% with a 1 gwei floor so tiny local
+                        // raw-provider fees still produce a transaction miners prefer.
+                        let bumped_max_fee =
+                            bump_max_fee_for_same_nonce_competitor(original_gas.max_fee);
                         let bumped_max_priority_fee =
-                            original_gas.max_priority_fee + (original_gas.max_priority_fee / 5);
+                            bump_max_priority_fee_for_same_nonce_competitor(
+                                original_gas.max_priority_fee,
+                            );
 
                         let gas_price = GasPriceResult {
                             max_fee: bumped_max_fee,
@@ -929,15 +958,6 @@ impl TransactionsQueues {
                             .save_transaction(&transaction.relayer_id, &replace_transaction)
                             .await
                             .map_err(ReplaceTransactionError::CouldNotUpdateTransactionInDb)?;
-
-                        transactions_queue
-                            .add_competitor_to_inmempool_transaction(
-                                &transaction.id,
-                                replace_transaction.clone(),
-                                CompetitionType::Replace,
-                            )
-                            .await
-                            .map_err(ReplaceTransactionError::SendTransactionError)?;
 
                         result.transaction.cancelled_by_transaction_id =
                             Some(replace_transaction_id);
