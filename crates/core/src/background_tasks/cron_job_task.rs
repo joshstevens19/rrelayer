@@ -261,9 +261,21 @@ async fn select_cron_job_relayer(
         .await
         .map_err(|err| err.to_string())?;
 
+    // Automatic top-up "from" relayers default to internal only and cannot be
+    // used to send normal transactions, matching the API transaction paths.
+    let internal_only_relayers: Vec<_> = config
+        .networks
+        .iter()
+        .filter(|network| network.chain_id == network_config.chain_id)
+        .flat_map(|network| network.automatic_top_up.iter().flatten())
+        .filter(|top_up| top_up.from.relayer.internal_only.unwrap_or(true))
+        .map(|top_up| top_up.from.relayer.address)
+        .collect();
+
     let mut available_relayers: Vec<_> = relayers
         .into_iter()
         .filter(|relayer| !relayer.paused)
+        .filter(|relayer| !internal_only_relayers.contains(&relayer.address))
         .filter(|relayer| match &cron_job.relayers {
             AllOrOneOrManyAddresses::All => true,
             relayers => relayers.contains(&relayer.address),
