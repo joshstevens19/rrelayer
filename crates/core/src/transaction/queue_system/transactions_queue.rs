@@ -1063,7 +1063,7 @@ impl TransactionsQueue {
             })?;
 
         if !is_noop {
-            let block_gas_limit = self.evm_provider.get_latest_block_gas_limit().await?;
+            let block_gas_limit = self.evm_provider.get_block_gas_limit().await?;
             if estimated_gas_result > block_gas_limit {
                 return Err(RpcError::Transport(TransportErrorKind::Custom(
                     format!(
@@ -1109,7 +1109,7 @@ impl TransactionsQueue {
         &self,
         gas_limit: GasLimit,
     ) -> Result<(), RpcError<TransportErrorKind>> {
-        let block_gas_limit = self.evm_provider.get_latest_block_gas_limit().await?;
+        let block_gas_limit = self.evm_provider.get_block_gas_limit().await?;
         if gas_limit > block_gas_limit {
             return Err(RpcError::Transport(TransportErrorKind::Custom(
                 format!(

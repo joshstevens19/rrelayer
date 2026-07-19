@@ -44,17 +44,25 @@ use alloy_eips::eip2718::Encodable2718;
 use rand::{thread_rng, Rng};
 use reqwest::Url;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use thiserror::Error;
+use tokio::sync::Mutex;
 use tracing::info;
 
 pub type RelayerProvider = Box<dyn Provider<AnyNetwork> + Send + Sync>;
+
+#[derive(Clone)]
+struct BlockGasLimitCache {
+    gas_limit: GasLimit,
+    fetched_at: Instant,
+}
 
 #[derive(Clone)]
 pub struct EvmProvider {
     rpc_clients: Vec<Arc<RelayerProvider>>,
     wallet_manager: Arc<dyn WalletManagerTrait>,
     gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
+    block_gas_limit_cache: Arc<Mutex<Option<BlockGasLimitCache>>>,
     pub chain_id: ChainId,
     pub name: String,
     pub provider_urls: Vec<String>,
@@ -273,6 +281,7 @@ impl EvmProvider {
             rpc_clients: providers,
             wallet_manager,
             gas_estimator,
+            block_gas_limit_cache: Arc::new(Mutex::new(None)),
             chain_id,
             name: network_setup_config.name.to_string(),
             provider_urls: network_setup_config.provider_urls.to_owned(),
@@ -446,22 +455,34 @@ impl EvmProvider {
         Ok(GasLimit::new(result as u128))
     }
 
-    /// Returns the latest block gas limit.
+    /// Returns the latest block gas limit, cached for roughly one block.
     ///
     /// A single transaction cannot fit in a block if its gas limit exceeds this value, but this is
     /// not a permanent chain constant. Validators/sequencers can adjust the block gas limit over
-    /// time, so callers should fetch it when validating a transaction instead of caching it
-    /// indefinitely.
-    pub async fn get_latest_block_gas_limit(
-        &self,
-    ) -> Result<GasLimit, RpcError<TransportErrorKind>> {
+    /// time, so the cache is intentionally short-lived.
+    pub async fn get_block_gas_limit(&self) -> Result<GasLimit, RpcError<TransportErrorKind>> {
+        let cache_ttl = Duration::from_millis(self.blocks_every);
+
+        {
+            let cache = self.block_gas_limit_cache.lock().await;
+            if let Some(cached) = cache.as_ref() {
+                if cached.fetched_at.elapsed() < cache_ttl {
+                    return Ok(cached.gas_limit);
+                }
+            }
+        }
+
         let block = self.rpc_client().get_block_by_number(BlockNumberOrTag::Latest).await?.ok_or(
             RpcError::Transport(TransportErrorKind::Custom(
                 "Latest block not found".to_string().into(),
             )),
         )?;
 
-        Ok(GasLimit::new(block.header.gas_limit as u128))
+        let gas_limit = GasLimit::new(block.header.gas_limit as u128);
+        let mut cache = self.block_gas_limit_cache.lock().await;
+        *cache = Some(BlockGasLimitCache { gas_limit, fetched_at: Instant::now() });
+
+        Ok(gas_limit)
     }
 
     pub async fn calculate_gas_price(&self) -> Result<GasEstimatorResult, GasEstimatorError> {
