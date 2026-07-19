@@ -51,6 +51,8 @@ use tracing::info;
 
 pub type RelayerProvider = Box<dyn Provider<AnyNetwork> + Send + Sync>;
 
+const BLOCK_GAS_LIMIT_CACHE_TTL: Duration = Duration::from_secs(30);
+
 #[derive(Clone)]
 struct BlockGasLimitCache {
     gas_limit: GasLimit,
@@ -455,18 +457,16 @@ impl EvmProvider {
         Ok(GasLimit::new(result as u128))
     }
 
-    /// Returns the latest block gas limit, cached for roughly one block.
+    /// Returns the latest block gas limit, cached briefly to avoid repeated RPC calls.
     ///
     /// A single transaction cannot fit in a block if its gas limit exceeds this value, but this is
     /// not a permanent chain constant. Validators/sequencers can adjust the block gas limit over
     /// time, so the cache is intentionally short-lived.
     pub async fn get_block_gas_limit(&self) -> Result<GasLimit, RpcError<TransportErrorKind>> {
-        let cache_ttl = Duration::from_millis(self.blocks_every);
-
         {
             let cache = self.block_gas_limit_cache.lock().await;
             if let Some(cached) = cache.as_ref() {
-                if cached.fetched_at.elapsed() < cache_ttl {
+                if cached.fetched_at.elapsed() < BLOCK_GAS_LIMIT_CACHE_TTL {
                     return Ok(cached.gas_limit);
                 }
             }
