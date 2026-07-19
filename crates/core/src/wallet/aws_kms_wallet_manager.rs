@@ -27,11 +27,15 @@ pub struct KeyPlan {
     pub tags: Vec<(String, String)>,
 }
 
+/// Signers keyed by (wallet_index, lookup_chain_id, signing_chain_id).
+type SignerCacheKey = (u32, u64, u64);
+type SignerCache = Arc<RwLock<HashMap<SignerCacheKey, AwsSigner>>>;
+
 #[derive(Debug)]
 pub struct AwsKmsWalletManager {
     config: AwsKmsSigningProviderConfig,
     alias: String,
-    signers: Arc<RwLock<HashMap<(u32, u64, u64), AwsSigner>>>,
+    signers: SignerCache,
 }
 
 #[derive(Debug)]
