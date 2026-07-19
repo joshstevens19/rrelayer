@@ -446,6 +446,16 @@ impl EvmProvider {
         Ok(GasLimit::new(result as u128))
     }
 
+    pub async fn get_block_gas_limit(&self) -> Result<GasLimit, RpcError<TransportErrorKind>> {
+        let block = self.rpc_client().get_block_by_number(BlockNumberOrTag::Latest).await?.ok_or(
+            RpcError::Transport(TransportErrorKind::Custom(
+                "Latest block not found".to_string().into(),
+            )),
+        )?;
+
+        Ok(GasLimit::new(block.header.gas_limit as u128))
+    }
+
     pub async fn calculate_gas_price(&self) -> Result<GasEstimatorResult, GasEstimatorError> {
         self.gas_estimator.get_gas_prices(&self.chain_id).await
     }
