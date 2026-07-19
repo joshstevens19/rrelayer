@@ -160,10 +160,7 @@ async fn next_cron_job_delay(
                     .mark_cron_job_ran(&config.name, &cron_job.name, Utc::now())
                     .await
                 {
-                    error!(
-                        "Cron job {} failed to persist schedule anchor: {}",
-                        cron_job.name, err
-                    );
+                    error!("Cron job {} failed to persist schedule anchor: {}", cron_job.name, err);
                 }
 
                 interval_duration
