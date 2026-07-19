@@ -382,7 +382,6 @@ impl TransactionsQueues {
             .map_err(|e| AddTransactionError::CouldNotGetCurrentOnChainNonce(*relayer_id, e))?;
 
         transactions_queue.nonce_manager.sync_with_onchain_nonce(current_onchain_nonce).await;
-        let assigned_nonce = transactions_queue.nonce_manager.get_and_increment().await;
 
         let mut transaction = Transaction {
             id: transaction_to_send.id,
@@ -391,7 +390,7 @@ impl TransactionsQueues {
             from: transactions_queue.relay_address(),
             value: transaction_to_send.value,
             data: transaction_to_send.data.clone(),
-            nonce: assigned_nonce,
+            nonce: current_onchain_nonce,
             gas_limit: None,
             status: TransactionStatus::PENDING,
             blobs: transaction_to_send.blobs.clone(),
@@ -431,10 +430,12 @@ impl TransactionsQueues {
         let estimated_gas_limit = match estimated_gas_limit {
             Ok(limit) => limit,
             Err(err) => {
+                let failed_transaction =
+                    Transaction { status: TransactionStatus::FAILED, ..transaction };
                 self.db
                     .transaction_failed_on_send(
                         relayer_id,
-                        &transaction,
+                        &failed_transaction,
                         format!(
                             "Failed to send transaction as always failing on gas estimation: {err}"
                         ),
@@ -447,6 +448,8 @@ impl TransactionsQueues {
             }
         };
 
+        let assigned_nonce = transactions_queue.nonce_manager.get_and_increment().await;
+        transaction.nonce = assigned_nonce;
         transaction.gas_limit = Some(estimated_gas_limit);
 
         let transaction_request = Self::create_typed_transaction(
@@ -466,7 +469,6 @@ impl TransactionsQueues {
             .map_err(AddTransactionError::CouldNotSaveTransactionDb)?;
 
         transactions_queue.add_pending_transaction(transaction.clone()).await;
-        // Nonce already incremented atomically above - no need for separate increase call
         self.invalidate_transaction_cache(&transaction.id).await;
 
         if let Some(webhook_manager) = &self.webhook_manager {
@@ -1072,10 +1074,13 @@ impl TransactionsQueues {
                                 ))
                             }
                             TransactionQueueSendTransactionError::GasCalculationError => {
-                                Err(ProcessPendingTransactionError::GasCalculationError(
-                                    *relayer_id,
-                                    relayer_address,
-                                    transaction.clone(),
+                                error!(
+                                    "process_single_pending: transaction {} could not calculate gas; leaving pending for retry",
+                                    transaction.id
+                                );
+                                Ok(ProcessResult::<ProcessPendingStatus>::other(
+                                    ProcessPendingStatus::GasCalculationUnavailable,
+                                    self.relayer_block_times_ms.get(relayer_id),
                                 ))
                             }
                             TransactionQueueSendTransactionError::TransactionEstimateGasError(
@@ -1220,15 +1225,13 @@ impl TransactionsQueues {
                             TransactionQueueSendTransactionError::SendTransactionGasPriceError(
                                 error,
                             ) => {
-                                // should never happen if it does something internal is wrong,
-                                // and we don't want to
-                                // continue processing the queue
-                                // it can stay in a loop forever, so we don't fail pending
-                                // transactions
-                                Err(ProcessPendingTransactionError::SendTransactionError(
-                                    *relayer_id,
-                                    relayer_address,
-                                    TransactionQueueSendTransactionError::SendTransactionGasPriceError(error),
+                                error!(
+                                    "process_single_pending: transaction {} could not calculate gas price - {}; leaving pending for retry",
+                                    transaction.id, error
+                                );
+                                Ok(ProcessResult::<ProcessPendingStatus>::other(
+                                    ProcessPendingStatus::GasCalculationUnavailable,
+                                    self.relayer_block_times_ms.get(relayer_id),
                                 ))
                             }
                             TransactionQueueSendTransactionError::TransactionConversionError(
