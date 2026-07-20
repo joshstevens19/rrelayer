@@ -107,6 +107,11 @@ impl TestModule for TransactionTests {
                 |runner| Box::pin(runner.transaction_gas_estimation()),
             ),
             TestDefinition::new(
+                "transaction_gas_estimation_fails",
+                "Transaction gas estimation failure recovery",
+                |runner| Box::pin(runner.transaction_gas_estimation_fails()),
+            ),
+            TestDefinition::new(
                 "transaction_gas_price_bumping",
                 "Transaction gas price bumping",
                 |runner| Box::pin(runner.transaction_gas_price_bumping()),

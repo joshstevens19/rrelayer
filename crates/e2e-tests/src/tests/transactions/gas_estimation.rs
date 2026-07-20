@@ -102,4 +102,56 @@ impl TestRunner {
 
         Ok(())
     }
+
+    /// run single with:
+    /// RRELAYER_PROVIDERS="raw" make run-test-debug TEST=transaction_gas_estimation_fails
+    /// RRELAYER_PROVIDERS="privy" make run-test-debug TEST=transaction_gas_estimation_fails
+    /// RRELAYER_PROVIDERS="aws_secret_manager" make run-test-debug TEST=transaction_gas_estimation_fails
+    /// RRELAYER_PROVIDERS="aws_kms" make run-test-debug TEST=transaction_gas_estimation_fails
+    /// RRELAYER_PROVIDERS="gcp_secret_manager" make run-test-debug TEST=transaction_gas_estimation_fails
+    /// RRELAYER_PROVIDERS="turnkey" make run-test-debug TEST=transaction_gas_estimation_fails
+    pub async fn transaction_gas_estimation_fails(&self) -> anyhow::Result<()> {
+        info!("Testing recovery after gas estimation failure...");
+        let relayer = self.create_and_fund_relayer("gas-estimation-fails-relayer").await?;
+        info!("Created relayer: {:?}", relayer);
+
+        let balance_before = self
+            .contract_interactor
+            .get_eth_balance(&relayer.address().await?.into_address())
+            .await?;
+
+        let failing_tx_response = self
+            .relayer_client
+            .send_transaction(
+                relayer.id(),
+                &self.config.anvil_accounts[3],
+                (balance_before * alloy::primitives::U256::from(2)).into(),
+                TransactionData::empty(),
+            )
+            .await;
+
+        anyhow::ensure!(
+            failing_tx_response.is_err(),
+            "Transaction above relayer balance should fail gas estimation"
+        );
+
+        let transfer_amount = alloy::primitives::utils::parse_ether("0.1")?;
+        let tx_response = self
+            .relayer_client
+            .send_transaction(
+                relayer.id(),
+                &self.config.anvil_accounts[3],
+                transfer_amount.into(),
+                TransactionData::empty(),
+            )
+            .await?;
+
+        self.wait_for_transaction_completion(&tx_response.0.id).await?;
+
+        info!("[SUCCESS] Gas estimation failure recovery passed:");
+        info!("  - Failing transaction was rejected");
+        info!("  - Subsequent valid transaction completed successfully");
+
+        Ok(())
+    }
 }
