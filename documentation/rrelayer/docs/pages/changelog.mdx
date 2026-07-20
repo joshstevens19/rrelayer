@@ -6,6 +6,8 @@
 
 ### Features
 
+- feat: run raw provider e2e tests in CI for pull requests and pushes
+
 ---
 
 ### Bug fixes
@@ -14,6 +16,7 @@
 - fix: cache AWS KMS signers by lookup and signing chain id so cloned relayers sign with the correct chain id
 - fix: use the source chain id for PKCS#11 key lookups so cloned relayers sign with the original HSM key
 - fix: cache mnemonic signers per chain id so cloning a relayer no longer breaks signing on the source chain
+- fix: make same-nonce replace and cancel transactions use deterministic gas bumps for raw provider e2e tests
 
 ---
 

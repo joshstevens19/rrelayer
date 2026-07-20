@@ -1,7 +1,6 @@
 use crate::tests::test_runner::TestRunner;
 use alloy::dyn_abi::TypedData;
 use anyhow::{anyhow, Context};
-use std::time::Duration;
 use tracing::info;
 
 impl TestRunner {
@@ -14,6 +13,8 @@ impl TestRunner {
     /// RRELAYER_PROVIDERS="turnkey" make run-test-debug TEST=rate_limiting_signing_message_user_limits
     pub async fn rate_limiting_signing_message_user_limits(&self) -> anyhow::Result<()> {
         info!("Testing rate limiting signing message enforcement...");
+
+        super::wait_for_rate_limit_window_headroom().await;
 
         let relayer = self.create_and_fund_relayer("rate-limit-relayer").await?;
         info!("relayer: {:?}", relayer);
@@ -89,8 +90,8 @@ impl TestRunner {
             return Err(anyhow!("Signing typed data rate limiting not enforced"));
         }
 
-        info!("Sleep for 60 seconds to allow the rate limit to expire");
-        tokio::time::sleep(Duration::from_secs(60)).await;
+        info!("Wait for the rate limit to expire");
+        super::wait_for_rate_limit_reset().await;
 
         let sign_result = relayer.sign().text("Hello, RRelayer!", relay_key.clone()).await;
 
@@ -101,8 +102,8 @@ impl TestRunner {
             }
         }
 
-        info!("Sleep for 60 seconds to allow the rate limit to expire so doesnt hurt next test");
-        tokio::time::sleep(Duration::from_secs(60)).await;
+        info!("Wait for the rate limit to expire so doesnt hurt next test");
+        super::wait_for_rate_limit_reset().await;
 
         info!("Rate limiting mechanism verified");
         Ok(())
