@@ -519,7 +519,7 @@ impl TransactionsQueues {
                     EditableTransactionType::Pending => {
                         info!("cancel_transaction: converting pending transaction to no-op so its nonce is consumed");
 
-                        self.transaction_to_noop(&mut transactions_queue, &mut result.transaction);
+                        transactions_queue.transaction_to_noop(&mut result.transaction);
                         result.transaction.known_transaction_hash = None;
                         result.transaction.sent_with_gas = None;
                         result.transaction.sent_with_blob_gas = None;
