@@ -30,6 +30,7 @@ pub enum ProcessPendingStatus {
     RelayerPaused,
     NoPendingTransactions,
     GasPriceTooHigh,
+    GasCalculationUnavailable,
     NonceSynchronized,
 }
 

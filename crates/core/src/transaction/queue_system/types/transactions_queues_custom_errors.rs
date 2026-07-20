@@ -143,9 +143,6 @@ pub enum ProcessPendingTransactionError {
     #[error("Relayer id {0} / address {1} - Send transaction error: {2}")]
     SendTransactionError(RelayerId, EvmAddress, TransactionQueueSendTransactionError),
 
-    #[error("Transaction could not be sent due to gas calculation error for relayer id {0} / address {1}: tx {2}")]
-    GasCalculationError(RelayerId, EvmAddress, Transaction),
-
     #[error("Relayer id {0} / address {1} - {2}")]
     MovePendingTransactionToInmempoolError(
         RelayerId,
