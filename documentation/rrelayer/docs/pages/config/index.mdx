@@ -92,6 +92,22 @@ rate_limits:
       interval: 'minute'
       transactions: 3
       signing_operations: 3
+cron_jobs:
+  - name: heartbeat
+    enabled: true
+    network: sepolia_ethereum
+    relayers: '*'
+    schedule:
+      every: 5m
+      run_on_startup: true
+    transaction:
+      to: '0x0000000000000000000000000000000000000001'
+      speed: FAST
+      externalId: heartbeat
+      contract:
+        function: setNumber(uint256)
+        args:
+          - '42'
 ```
 
 ### Environment Variables

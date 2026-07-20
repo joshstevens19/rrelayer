@@ -225,26 +225,15 @@ impl TransactionsQueues {
     }
 
     fn expires_at(&self) -> DateTime<Utc> {
-        Utc::now() + chrono::Duration::hours(12)
-    }
+        let expiration = std::env::var("RRELAYER_TRANSACTION_EXPIRATION_SECONDS")
+            .ok()
+            .and_then(|value| value.parse::<i64>().ok())
+            .filter(|seconds| *seconds > 0)
+            // try_seconds guards against values chrono::Duration::seconds would panic on
+            .and_then(chrono::Duration::try_seconds)
+            .unwrap_or_else(|| chrono::Duration::hours(12));
 
-    /// Checks if a transaction has expired.
-    fn has_expired(&self, transaction: &Transaction) -> bool {
-        transaction.expires_at < Utc::now()
-    }
-
-    /// Converts a transaction to a no-op transaction.
-    fn transaction_to_noop(
-        &self,
-        transactions_queue: &mut TransactionsQueue,
-        transaction: &mut Transaction,
-    ) {
-        transaction.to = transactions_queue.relay_address();
-        transaction.value = TransactionValue::zero();
-        transaction.data = TransactionData::empty();
-        transaction.gas_limit = Some(GasLimit::new(21000_u128));
-        transaction.is_noop = true;
-        transaction.speed = TransactionSpeed::FAST;
+        Utc::now() + expiration
     }
 
     /// Replaces the content of an existing transaction with new parameters.
@@ -403,7 +392,6 @@ impl TransactionsQueues {
             .map_err(|e| AddTransactionError::CouldNotGetCurrentOnChainNonce(*relayer_id, e))?;
 
         transactions_queue.nonce_manager.sync_with_onchain_nonce(current_onchain_nonce).await;
-        let assigned_nonce = transactions_queue.nonce_manager.get_and_increment().await;
 
         let mut transaction = Transaction {
             id: transaction_to_send.id,
@@ -412,7 +400,7 @@ impl TransactionsQueues {
             from: transactions_queue.relay_address(),
             value: transaction_to_send.value,
             data: transaction_to_send.data.clone(),
-            nonce: assigned_nonce,
+            nonce: current_onchain_nonce,
             gas_limit: None,
             status: TransactionStatus::PENDING,
             blobs: transaction_to_send.blobs.clone(),
@@ -452,10 +440,12 @@ impl TransactionsQueues {
         let estimated_gas_limit = match estimated_gas_limit {
             Ok(limit) => limit,
             Err(err) => {
+                let failed_transaction =
+                    Transaction { status: TransactionStatus::FAILED, ..transaction };
                 self.db
                     .transaction_failed_on_send(
                         relayer_id,
-                        &transaction,
+                        &failed_transaction,
                         format!(
                             "Failed to send transaction as always failing on gas estimation: {err}"
                         ),
@@ -468,6 +458,8 @@ impl TransactionsQueues {
             }
         };
 
+        let assigned_nonce = transactions_queue.nonce_manager.get_and_increment().await;
+        transaction.nonce = assigned_nonce;
         transaction.gas_limit = Some(estimated_gas_limit);
 
         let transaction_request = Self::create_typed_transaction(
@@ -487,7 +479,6 @@ impl TransactionsQueues {
             .map_err(AddTransactionError::CouldNotSaveTransactionDb)?;
 
         transactions_queue.add_pending_transaction(transaction.clone()).await;
-        // Nonce already incremented atomically above - no need for separate increase call
         self.invalidate_transaction_cache(&transaction.id).await;
 
         if let Some(webhook_manager) = &self.webhook_manager {
@@ -526,10 +517,19 @@ impl TransactionsQueues {
 
                 match result.type_name {
                     EditableTransactionType::Pending => {
-                        info!("cancel_transaction: removing pending transaction from queue and marking as cancelled");
+                        info!("cancel_transaction: converting pending transaction to no-op so its nonce is consumed");
 
-                        result.transaction.status = TransactionStatus::CANCELLED;
-                        transactions_queue.remove_pending_transaction_by_id(&transaction.id).await;
+                        self.transaction_to_noop(&mut transactions_queue, &mut result.transaction);
+                        result.transaction.known_transaction_hash = None;
+                        result.transaction.sent_with_gas = None;
+                        result.transaction.sent_with_blob_gas = None;
+                        result.transaction.sent_with_max_fee_per_gas = None;
+                        result.transaction.sent_with_max_priority_fee_per_gas = None;
+                        result.transaction.sent_at = None;
+                        result.transaction.status = TransactionStatus::PENDING;
+                        transactions_queue
+                            .update_pending_transaction(result.transaction.clone())
+                            .await;
 
                         self.db
                             .transaction_update(&result.transaction)
@@ -1058,13 +1058,13 @@ impl TransactionsQueues {
                     );
                     ProcessPendingTransactionError::RelayerTransactionsQueueNotFound(*relayer_id)
                 })?;
-                if self.has_expired(&transaction) {
-                    self.transaction_to_noop(&mut transactions_queue, &mut transaction);
+                if TransactionsQueue::has_expired(&transaction) {
+                    transactions_queue.transaction_to_noop(&mut transaction);
                 }
 
                 match transactions_queue.send_transaction(&mut self.db, &mut transaction).await {
                     Ok(transaction_sent) => {
-                        transactions_queue.move_pending_to_inmempool(&transaction_sent).await
+                        transactions_queue.move_pending_to_inmempool(&transaction, &transaction_sent).await
                             .map_err(|e| ProcessPendingTransactionError::MovePendingTransactionToInmempoolError(*relayer_id, relayer_address, e))?;
 
                         self.invalidate_transaction_cache(&transaction.id).await;
@@ -1092,10 +1092,13 @@ impl TransactionsQueues {
                                 ))
                             }
                             TransactionQueueSendTransactionError::GasCalculationError => {
-                                Err(ProcessPendingTransactionError::GasCalculationError(
-                                    *relayer_id,
-                                    relayer_address,
-                                    transaction.clone(),
+                                error!(
+                                    "process_single_pending: transaction {} could not calculate gas; leaving pending for retry",
+                                    transaction.id
+                                );
+                                Ok(ProcessResult::<ProcessPendingStatus>::other(
+                                    ProcessPendingStatus::GasCalculationUnavailable,
+                                    self.relayer_block_times_ms.get(relayer_id),
                                 ))
                             }
                             TransactionQueueSendTransactionError::TransactionEstimateGasError(
@@ -1240,15 +1243,13 @@ impl TransactionsQueues {
                             TransactionQueueSendTransactionError::SendTransactionGasPriceError(
                                 error,
                             ) => {
-                                // should never happen if it does something internal is wrong,
-                                // and we don't want to
-                                // continue processing the queue
-                                // it can stay in a loop forever, so we don't fail pending
-                                // transactions
-                                Err(ProcessPendingTransactionError::SendTransactionError(
-                                    *relayer_id,
-                                    relayer_address,
-                                    TransactionQueueSendTransactionError::SendTransactionGasPriceError(error),
+                                error!(
+                                    "process_single_pending: transaction {} could not calculate gas price - {}; leaving pending for retry",
+                                    transaction.id, error
+                                );
+                                Ok(ProcessResult::<ProcessPendingStatus>::other(
+                                    ProcessPendingStatus::GasCalculationUnavailable,
+                                    self.relayer_block_times_ms.get(relayer_id),
                                 ))
                             }
                             TransactionQueueSendTransactionError::TransactionConversionError(
@@ -1465,6 +1466,7 @@ impl TransactionsQueues {
                                     elapsed.num_milliseconds() as u64,
                                     &transaction.speed,
                                 ) {
+                                    let was_noop = transaction.is_noop;
                                     let transaction_sent = match transactions_queue
                                         .send_transaction(&mut self.db, &mut transaction)
                                         .await
@@ -1518,6 +1520,18 @@ impl TransactionsQueues {
                                     transactions_queue
                                         .update_inmempool_transaction_gas(&transaction_sent)
                                         .await;
+
+                                    // If the transaction expired mid-send and was replaced with a
+                                    // no-op, the inmempool entry must reflect that so it resolves
+                                    // to EXPIRED (not MINED) once the no-op lands
+                                    if !was_noop && transaction.is_noop {
+                                        transactions_queue
+                                            .update_inmempool_transaction_noop(
+                                                &transaction.id,
+                                                &transaction_sent,
+                                            )
+                                            .await;
+                                    }
 
                                     // Update the local transaction with the new gas values so subsequent bumps work correctly
                                     transaction.known_transaction_hash =

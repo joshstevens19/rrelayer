@@ -1,0 +1,83 @@
+# Cron Jobs
+
+`cron_jobs` lets rrelayer enqueue transactions on a schedule from the YAML file. Jobs run inside the relayer process and use the same transaction queue as API-submitted transactions.
+
+## Configuration
+
+```yaml [rrelayer.yaml]
+name: first-rrelayer
+description: 'my first rrelayer'
+api_config:
+  port: 3000
+  authentication_username: ${RRELAYER_AUTH_USERNAME}
+  authentication_password: ${RRELAYER_AUTH_PASSWORD}
+signing_provider:
+  aws_kms:
+    region: 'eu-west-1'
+networks:
+  - name: sepolia_ethereum
+    chain_id: 11155111
+    provider_urls:
+      - https://sepolia.gateway.tenderly.co
+    block_explorer_url: https://sepolia.etherscan.io
+    max_gas_price_multiplier: 4
+cron_jobs: // [!code focus]
+  - name: refresh-price // [!code focus]
+    enabled: true // [!code focus]
+    network: sepolia_ethereum // [!code focus]
+    relayers: '*' // [!code focus]
+    schedule: // [!code focus]
+      every: 15m // [!code focus]
+      run_on_startup: false // [!code focus]
+    transaction: // [!code focus]
+      to: '0x0000000000000000000000000000000000000001' // [!code focus]
+      value: '0' // [!code focus]
+      speed: FAST // [!code focus]
+      externalId: refresh-price // [!code focus]
+      contract: // [!code focus]
+        function: updatePrice(uint256,address) // [!code focus]
+        args: // [!code focus]
+          - '100000000' // [!code focus]
+          - '0x0000000000000000000000000000000000000002' // [!code focus]
+```
+
+## Relayers
+
+`relayers` is required. Set it to `'*'` to choose any non-paused relayer on the configured `network`, or set it to a single relayer address or list of relayer addresses to restrict which relayers can be used. Relayers that are not allowed to send the transaction because of network [permissions](/config/networks/permissions) are skipped automatically.
+
+```yaml [rrelayer.yaml]
+cron_jobs:
+  - name: restricted-refresh
+    network: sepolia_ethereum
+    relayers: '0x0000000000000000000000000000000000000003'
+    schedule:
+      every: 15m
+    transaction:
+      to: '0x0000000000000000000000000000000000000001'
+      contract:
+        function: updatePrice(uint256)
+        args:
+          - '100000000'
+```
+
+## Schedule
+
+The `every` interval supports `s`, `m`, `h`, `d`, and `w` suffixes. rrelayer stores when each cron job last queued a transaction, keyed by project name and job name, so restarting the server does not immediately rerun a job that ran recently.
+
+Set `run_on_startup: true` to run the job immediately the first time it is seen, instead of waiting a full interval.
+
+## Transaction
+
+Use `transaction.contract` with a human-readable Solidity function signature and args to have rrelayer ABI encode the calldata for you, or for pre-encoded calldata use `transaction.data` instead:
+
+```yaml [rrelayer.yaml]
+cron_jobs:
+  - name: raw-call
+    network: sepolia_ethereum
+    relayers: '*'
+    schedule:
+      every: 1h
+    transaction:
+      to: '0x0000000000000000000000000000000000000001'
+      data: '0x1234'
+```

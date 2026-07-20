@@ -17,7 +17,7 @@ use crate::{
     },
     network::ChainId,
     postgres::PostgresClient,
-    provider::EvmProvider,
+    provider::{EvmProvider, SendTransactionError},
     relayer::{Relayer, RelayerId},
     safe_proxy::SafeProxyManager,
     shared::common_types::EvmAddress,
@@ -252,6 +252,7 @@ impl TransactionsQueue {
 
     pub async fn move_pending_to_inmempool(
         &mut self,
+        transaction: &Transaction,
         transaction_sent: &TransactionSentWithRelayer,
     ) -> Result<(), MovePendingTransactionToInmempoolError> {
         info!(
@@ -262,8 +263,9 @@ impl TransactionsQueue {
         let mut transactions = self.pending_transactions.lock().await;
         let item = transactions.front().cloned();
 
-        if let Some(transaction) = item {
-            if transaction.id == transaction_sent.id {
+        if let Some(queued_transaction) = item {
+            if queued_transaction.id == transaction_sent.id && transaction.id == transaction_sent.id
+            {
                 let mut inmempool_transactions = self.inmempool_transactions.lock().await;
                 let updated_transaction = Transaction {
                     known_transaction_hash: Some(transaction_sent.hash),
@@ -275,7 +277,7 @@ impl TransactionsQueue {
                     sent_with_gas: Some(transaction_sent.sent_with_gas.clone()),
                     sent_with_blob_gas: transaction_sent.sent_with_blob_gas.clone(),
                     sent_at: Some(Utc::now()),
-                    ..transaction
+                    ..transaction.clone()
                 };
                 inmempool_transactions.push_back(CompetitiveTransaction::new(updated_transaction));
 
@@ -285,12 +287,12 @@ impl TransactionsQueue {
                 Ok(())
             } else {
                 info!("Transaction ID mismatch when moving to inmempool for relayer: {}. Expected: {}, Found: {}",
-                    self.relayer.name, transaction_sent.id, transaction.id);
+                    self.relayer.name, transaction_sent.id, queued_transaction.id);
                 Err(MovePendingTransactionToInmempoolError::TransactionIdDoesNotMatch(
                     self.relayer.id,
                     self.relayer.address,
                     transaction_sent.clone(),
-                    transaction.clone(),
+                    queued_transaction.clone(),
                 ))
             }
         } else {
@@ -332,6 +334,22 @@ impl TransactionsQueue {
                 transaction_id,
                 self.relayer.name,
                 transactions.len()
+            );
+            true
+        } else {
+            false
+        }
+    }
+
+    pub async fn update_pending_transaction(&mut self, updated_transaction: Transaction) -> bool {
+        let mut transactions = self.pending_transactions.lock().await;
+        if let Some(transaction) =
+            transactions.iter_mut().find(|tx| tx.id == updated_transaction.id)
+        {
+            *transaction = updated_transaction;
+            info!(
+                "Updated pending transaction {} for relayer {}",
+                transaction.id, self.relayer.name
             );
             true
         } else {
@@ -424,12 +442,15 @@ impl TransactionsQueue {
                     "Updating inmempool transaction {} with no-op details for relayer: {}",
                     transaction_id, self.relayer.name
                 );
-                transaction.known_transaction_hash = Some(transaction_sent.hash);
-                transaction.to = self.relay_address();
+                transaction.to = self.relayer.address;
                 transaction.value = TransactionValue::zero();
                 transaction.data = TransactionData::empty();
+                transaction.blobs = None;
+                transaction.gas_limit = Some(GasLimit::new(21_000));
                 transaction.is_noop = true;
                 transaction.speed = TransactionSpeed::FAST;
+                transaction.sent_with_blob_gas = None;
+                transaction.known_transaction_hash = Some(transaction_sent.hash);
                 transaction.sent_at = Some(Utc::now());
             }
         }
@@ -494,16 +515,16 @@ impl TransactionsQueue {
 
         if let Some(comp_tx) = item {
             if comp_tx.get_transaction_by_id(id).is_some() {
-                let transaction_status: TransactionStatus;
+                let receipt_transaction_status: TransactionStatus;
 
                 if receipt.status() {
-                    transaction_status = TransactionStatus::MINED;
+                    receipt_transaction_status = TransactionStatus::MINED;
                     info!(
                         "Transaction {} successfully mined for relayer: {}",
                         id, self.relayer.name
                     );
                 } else {
-                    transaction_status = TransactionStatus::FAILED;
+                    receipt_transaction_status = TransactionStatus::FAILED;
                     info!("Transaction {} failed on-chain for relayer: {}", id, self.relayer.name);
                 }
 
@@ -519,8 +540,23 @@ impl TransactionsQueue {
                         TransactionStatus::DROPPED
                     };
 
+                    // is_noop is derived as to == from when rehydrating from the database,
+                    // so also require the noop shape (zero value, empty data) to avoid
+                    // misclassifying a genuine user self-send as expired after a restart
+                    let winner_status = if receipt.status()
+                        && comp_tx.competitive.is_none()
+                        && comp_tx.original.is_noop
+                        && comp_tx.original.value.is_zero()
+                        && comp_tx.original.data == TransactionData::empty()
+                        && Self::has_expired(&comp_tx.original)
+                    {
+                        TransactionStatus::EXPIRED
+                    } else {
+                        receipt_transaction_status
+                    };
+
                     let winner = Transaction {
-                        status: transaction_status,
+                        status: winner_status,
                         mined_at: Some(Utc::now()),
                         cancelled_by_transaction_id: None,
                         ..comp_tx.original
@@ -552,7 +588,7 @@ impl TransactionsQueue {
                     };
 
                     let winner = Transaction {
-                        status: transaction_status,
+                        status: receipt_transaction_status,
                         mined_at: Some(Utc::now()),
                         ..competitor
                     };
@@ -567,8 +603,13 @@ impl TransactionsQueue {
                     ));
                 };
 
-                let mut mining_transactions = self.mined_transactions.lock().await;
-                mining_transactions.insert(winner_transaction.id, winner_transaction.clone());
+                let mined_count = if winner_transaction.status == TransactionStatus::MINED {
+                    let mut mining_transactions = self.mined_transactions.lock().await;
+                    mining_transactions.insert(winner_transaction.id, winner_transaction.clone());
+                    mining_transactions.len()
+                } else {
+                    self.mined_transactions.lock().await.len()
+                };
 
                 // Log competition resolution but don't put loser transactions in mined queue
                 // since they weren't actually mined - they were cancelled/dropped
@@ -578,7 +619,7 @@ impl TransactionsQueue {
                         "Competition resolved for relayer {} - Winner: {} ({}), Loser: {} ({})",
                         self.relayer.name,
                         winner_transaction.id,
-                        transaction_status,
+                        winner_transaction.status,
                         loser.id,
                         loser_status
                     );
@@ -591,11 +632,11 @@ impl TransactionsQueue {
 
                 transactions.pop_front();
                 info!("Successfully moved transaction {} to mined status for relayer: {}. Inmempool: {}, Mined: {}",
-                    id, self.relayer.name, transactions.len(), mining_transactions.len());
+                    id, self.relayer.name, transactions.len(), mined_count);
 
                 Ok(CompetitionResolutionResult {
+                    winner_status: winner_transaction.status,
                     winner: winner_transaction,
-                    winner_status: transaction_status,
                     loser: loser_for_result,
                 })
             } else {
@@ -750,6 +791,21 @@ impl TransactionsQueue {
             );
         }
         in_range
+    }
+
+    pub fn has_expired(transaction: &Transaction) -> bool {
+        transaction.expires_at < Utc::now()
+    }
+
+    pub fn transaction_to_noop(&self, transaction: &mut Transaction) {
+        transaction.to = self.relay_address();
+        transaction.value = TransactionValue::zero();
+        transaction.data = TransactionData::empty();
+        transaction.blobs = None;
+        transaction.gas_limit = Some(GasLimit::new(21_000));
+        transaction.is_noop = true;
+        transaction.speed = TransactionSpeed::FAST;
+        transaction.sent_with_blob_gas = None;
     }
 
     pub async fn compute_gas_price_for_transaction(
@@ -1075,7 +1131,31 @@ impl TransactionsQueue {
             })?;
 
         if !is_noop {
-            let estimated_gas = estimated_gas_result * 12 / 10;
+            let block_gas_limit = self.evm_provider.get_block_gas_limit().await?;
+            if estimated_gas_result > block_gas_limit {
+                return Err(RpcError::Transport(TransportErrorKind::Custom(
+                    format!(
+                        "Estimated gas {} exceeds latest block gas limit {}",
+                        estimated_gas_result.into_inner(),
+                        block_gas_limit.into_inner()
+                    )
+                    .into(),
+                )));
+            }
+
+            let buffered_gas = estimated_gas_result * 12 / 10;
+            let estimated_gas = std::cmp::min(buffered_gas, block_gas_limit);
+            if estimated_gas < buffered_gas {
+                info!(
+                    "Gas estimation for relayer: {} - base: {}, buffered: {}, capped to block gas limit: {}",
+                    self.relayer.name,
+                    estimated_gas_result.into_inner(),
+                    buffered_gas.into_inner(),
+                    block_gas_limit.into_inner()
+                );
+                return Ok(estimated_gas);
+            }
+
             info!(
                 "Gas estimation for relayer: {} - base: {}, with 20% buffer: {}",
                 self.relayer.name,
@@ -1093,11 +1173,32 @@ impl TransactionsQueue {
         Ok(estimated_gas_result)
     }
 
+    async fn validate_gas_limit_within_block_cap(
+        &self,
+        gas_limit: GasLimit,
+    ) -> Result<(), RpcError<TransportErrorKind>> {
+        let block_gas_limit = self.evm_provider.get_block_gas_limit().await?;
+        if gas_limit > block_gas_limit {
+            return Err(RpcError::Transport(TransportErrorKind::Custom(
+                format!(
+                    "Transaction gas limit {} exceeds latest block gas limit {}",
+                    gas_limit.into_inner(),
+                    block_gas_limit.into_inner()
+                )
+                .into(),
+            )));
+        }
+
+        Ok(())
+    }
+
     pub async fn send_transaction(
         &mut self,
         db: &mut PostgresClient,
         transaction: &mut Transaction,
     ) -> Result<TransactionSentWithRelayer, TransactionQueueSendTransactionError> {
+        let was_previously_sent = transaction.sent_with_gas.is_some();
+
         info!(
             "Preparing to send transaction {} for relayer: {} with speed {:?}",
             transaction.id, self.relayer.name, transaction.speed
@@ -1120,10 +1221,14 @@ impl TransactionsQueue {
             return Err(TransactionQueueSendTransactionError::GasPriceTooHigh);
         }
 
-        let (final_to, final_data) = if let Some(safe_address) = self
-            .safe_proxy_manager
-            .get_safe_proxy_for_relayer(&self.relayer.address, transaction.chain_id)
-        {
+        let safe_proxy_address = if transaction.is_noop {
+            None
+        } else {
+            self.safe_proxy_manager
+                .get_safe_proxy_for_relayer(&self.relayer.address, transaction.chain_id)
+        };
+
+        let (final_to, final_data) = if let Some(safe_address) = safe_proxy_address {
             info!(
                 "Routing transaction {} through safe proxy {} for relayer: {}",
                 transaction.id, safe_address, self.relayer.name
@@ -1191,11 +1296,7 @@ impl TransactionsQueue {
 
         // If using safe proxy, the transaction value should be 0 because the ETH transfer
         // amount is encoded in the execTransaction call data, not in the transaction value
-        if self
-            .safe_proxy_manager
-            .get_safe_proxy_for_relayer(&self.relayer.address, transaction.chain_id)
-            .is_some()
-        {
+        if safe_proxy_address.is_some() {
             working_transaction.value = TransactionValue::zero();
         }
 
@@ -1252,11 +1353,7 @@ impl TransactionsQueue {
                 .map_err(TransactionQueueSendTransactionError::TransactionEstimateGasError)?
         };
 
-        if self
-            .safe_proxy_manager
-            .get_safe_proxy_for_relayer(&self.relayer.address, transaction.chain_id)
-            .is_some()
-        {
+        if safe_proxy_address.is_some() {
             let original_estimate = estimated_gas_limit;
 
             // Safe proxy gas overhead calculation:
@@ -1281,10 +1378,14 @@ impl TransactionsQueue {
             );
         }
 
+        self.validate_gas_limit_within_block_cap(estimated_gas_limit)
+            .await
+            .map_err(TransactionQueueSendTransactionError::TransactionEstimateGasError)?;
+
         working_transaction.gas_limit = Some(estimated_gas_limit);
         transaction.gas_limit = Some(estimated_gas_limit);
 
-        let (transaction_request, sent_with_blob_gas): (
+        let (mut transaction_request, mut sent_with_blob_gas): (
             TypedTransaction,
             Option<BlobGasPriceResult>,
         ) = if working_transaction.is_blob_transaction() {
@@ -1335,14 +1436,108 @@ impl TransactionsQueue {
             self.relayer.name
         );
 
+        // A broadcast blob transaction can only be replaced by another blob transaction
+        // (geth/reth reject cross-type replacements at the same nonce), so an expired one
+        // must keep being bumped as-is instead of being converted to a no-op
+        let can_replace_with_noop = !was_previously_sent || !transaction.is_blob_transaction();
+
+        if !transaction.is_noop && can_replace_with_noop && Self::has_expired(transaction) {
+            info!(
+                "Transaction {} expired before broadcast for relayer: {}, sending no-op replacement",
+                transaction.id, self.relayer.name
+            );
+
+            self.transaction_to_noop(transaction);
+            working_transaction = transaction.clone();
+            sent_with_blob_gas = None;
+
+            transaction_request = if self.is_legacy_transactions() {
+                working_transaction
+                    .to_legacy_typed_transaction_with_gas_limit(
+                        Some(&gas_price),
+                        Some(GasLimit::new(21_000)),
+                    )
+                    .map_err(|e| {
+                        TransactionQueueSendTransactionError::TransactionConversionError(
+                            e.to_string(),
+                        )
+                    })?
+            } else {
+                working_transaction
+                    .to_eip1559_typed_transaction_with_gas_limit(
+                        Some(&gas_price),
+                        Some(GasLimit::new(21_000)),
+                    )
+                    .map_err(|e| {
+                        TransactionQueueSendTransactionError::TransactionConversionError(
+                            e.to_string(),
+                        )
+                    })?
+            };
+        }
+
         info!(
             "Sending transaction {:?} to network for relayer: {}",
             transaction_request, self.relayer.name
         );
 
+        let mut signature =
+            self.evm_provider.sign_transaction(&self.relayer, &transaction_request).await.map_err(
+                |e| {
+                    TransactionQueueSendTransactionError::TransactionSendError(
+                        SendTransactionError::InternalError(e.to_string()),
+                    )
+                },
+            )?;
+
+        if !transaction.is_noop && can_replace_with_noop && Self::has_expired(transaction) {
+            info!(
+                "Transaction {} expired after signing for relayer: {}, signing no-op replacement",
+                transaction.id, self.relayer.name
+            );
+
+            self.transaction_to_noop(transaction);
+            working_transaction = transaction.clone();
+            sent_with_blob_gas = None;
+
+            transaction_request = if self.is_legacy_transactions() {
+                working_transaction
+                    .to_legacy_typed_transaction_with_gas_limit(
+                        Some(&gas_price),
+                        Some(GasLimit::new(21_000)),
+                    )
+                    .map_err(|e| {
+                        TransactionQueueSendTransactionError::TransactionConversionError(
+                            e.to_string(),
+                        )
+                    })?
+            } else {
+                working_transaction
+                    .to_eip1559_typed_transaction_with_gas_limit(
+                        Some(&gas_price),
+                        Some(GasLimit::new(21_000)),
+                    )
+                    .map_err(|e| {
+                        TransactionQueueSendTransactionError::TransactionConversionError(
+                            e.to_string(),
+                        )
+                    })?
+            };
+
+            signature = self
+                .evm_provider
+                .sign_transaction(&self.relayer, &transaction_request)
+                .await
+                .map_err(|e| {
+                    TransactionQueueSendTransactionError::TransactionSendError(
+                        SendTransactionError::InternalError(e.to_string()),
+                    )
+                })?;
+        }
+
         let transaction_hash = self
             .evm_provider
-            .send_transaction(&self.relayer, transaction_request)
+            .send_signed_transaction(transaction_request, signature)
             .await
             .map_err(TransactionQueueSendTransactionError::TransactionSendError)?;
 
@@ -1353,17 +1548,39 @@ impl TransactionsQueue {
             sent_with_blob_gas,
         };
 
+        transaction.known_transaction_hash = Some(transaction_sent.hash);
+        transaction.sent_with_max_fee_per_gas = Some(transaction_sent.sent_with_gas.max_fee);
+        transaction.sent_with_max_priority_fee_per_gas =
+            Some(transaction_sent.sent_with_gas.max_priority_fee);
+        transaction.sent_with_gas = Some(transaction_sent.sent_with_gas.clone());
+        transaction.sent_with_blob_gas = transaction_sent.sent_with_blob_gas.clone();
+        transaction.sent_at = Some(Utc::now());
+        transaction.status = TransactionStatus::INMEMPOOL;
+
         info!(
             "Transaction {} sent successfully with hash {} for relayer: {}",
             transaction_sent.id, transaction_sent.hash, self.relayer.name
         );
 
-        if transaction.sent_with_gas.is_none() || transaction.is_noop {
+        if !was_previously_sent || transaction.is_noop {
             info!(
                 "Updating database for sent transaction {} on relayer: {}",
                 transaction.id, self.relayer.name
             );
-            if transaction.sent_with_gas.is_none() {
+            // Persist the no-op fields before marking the transaction as sent so a crash
+            // between the two commits leaves a pending no-op row (safe to resend) rather
+            // than an inmempool row that still carries the original payload
+            if transaction.is_noop {
+                db.update_transaction_noop(
+                    &transaction.id,
+                    &transaction.to,
+                    &transaction.speed,
+                    &transaction.gas_limit.unwrap_or(GasLimit::new(21_000)),
+                )
+                .await?;
+            }
+
+            if !was_previously_sent {
                 db.transaction_sent(
                     &transaction_sent.id,
                     &transaction_sent.hash,
@@ -1372,8 +1589,6 @@ impl TransactionsQueue {
                     self.is_legacy_transactions(),
                 )
                 .await?;
-            } else if transaction.is_noop {
-                db.update_transaction_noop(&transaction.id, &transaction.to).await?;
             }
         } else {
             info!(

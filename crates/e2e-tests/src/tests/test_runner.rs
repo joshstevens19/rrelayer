@@ -310,11 +310,7 @@ impl TestRunner {
             info!("Transaction {} status: {:?}", transaction_id, result);
 
             match result.status {
-                TransactionStatus::CONFIRMED
-                | TransactionStatus::MINED
-                | TransactionStatus::DROPPED
-                | TransactionStatus::CANCELLED
-                | TransactionStatus::REPLACED => {
+                TransactionStatus::CONFIRMED | TransactionStatus::MINED => {
                     info!("Transaction {} completed successfully", transaction_id);
                     let transaction = self
                         .relayer_client
@@ -326,6 +322,68 @@ impl TestRunner {
                         transaction,
                         result.receipt.expect("Transaction receipt should always be present now"),
                     ));
+                }
+                TransactionStatus::DROPPED
+                | TransactionStatus::CANCELLED
+                | TransactionStatus::REPLACED => {
+                    anyhow::bail!(
+                        "Transaction {} reached terminal status {} without a mined receipt",
+                        transaction_id,
+                        result.status
+                    );
+                }
+                TransactionStatus::FAILED => {
+                    anyhow::bail!("Transaction {} failed: {:?}", transaction_id, result);
+                }
+                TransactionStatus::PENDING | TransactionStatus::INMEMPOOL => {
+                    info!(
+                        "Transaction {} still pending, mining a block and waiting...",
+                        transaction_id
+                    );
+                    self.mine_and_wait().await?;
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                }
+                TransactionStatus::EXPIRED => {
+                    anyhow::bail!("Transaction {} expired: {:?}", transaction_id, result);
+                }
+            }
+        }
+    }
+
+    pub async fn wait_for_transaction_terminal(
+        &self,
+        transaction_id: &TransactionId,
+    ) -> anyhow::Result<Transaction> {
+        let timeout = Duration::from_secs(self.config.test_timeout_seconds);
+        let start = tokio::time::Instant::now();
+
+        loop {
+            if start.elapsed() > timeout {
+                anyhow::bail!(
+                    "Transaction {} timed out after {} seconds",
+                    transaction_id,
+                    self.config.test_timeout_seconds
+                );
+            }
+
+            let result = self.relayer_client.get_transaction_status(transaction_id).await?;
+            info!("Transaction {} status: {:?}", transaction_id, result);
+
+            match result.status {
+                TransactionStatus::CONFIRMED
+                | TransactionStatus::MINED
+                | TransactionStatus::DROPPED
+                | TransactionStatus::CANCELLED
+                | TransactionStatus::REPLACED => {
+                    info!(
+                        "Transaction {} reached terminal status {}",
+                        transaction_id, result.status
+                    );
+                    return self
+                        .relayer_client
+                        .get_transaction(transaction_id)
+                        .await
+                        .context("Could not get the transaction");
                 }
                 TransactionStatus::FAILED => {
                     anyhow::bail!("Transaction {} failed: {:?}", transaction_id, result);
