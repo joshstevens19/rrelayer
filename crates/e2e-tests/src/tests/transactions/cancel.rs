@@ -60,11 +60,11 @@ impl TestRunner {
             return Err(anyhow::anyhow!("Cancel transaction failed"));
         }
 
-        self.wait_for_transaction_completion(&send_result.id)
+        let transaction = self
+            .wait_for_transaction_terminal(&send_result.id)
             .await
             .context("Cancelled transaction did not complete as a no-op")?;
 
-        let transaction = self.relayer_client.get_transaction(&send_result.id).await?;
         if !transaction.is_noop {
             return Err(anyhow::anyhow!(
                 "Expected the transaction to be a no-op {}",
