@@ -339,6 +339,22 @@ impl TransactionsQueue {
         }
     }
 
+    pub async fn update_pending_transaction(&mut self, updated_transaction: Transaction) -> bool {
+        let mut transactions = self.pending_transactions.lock().await;
+        if let Some(transaction) =
+            transactions.iter_mut().find(|tx| tx.id == updated_transaction.id)
+        {
+            *transaction = updated_transaction;
+            info!(
+                "Updated pending transaction {} for relayer {}",
+                transaction.id, self.relayer.name
+            );
+            true
+        } else {
+            false
+        }
+    }
+
     pub async fn add_competitor_to_inmempool_transaction(
         &mut self,
         original_transaction_id: &TransactionId,
@@ -1075,7 +1091,31 @@ impl TransactionsQueue {
             })?;
 
         if !is_noop {
-            let estimated_gas = estimated_gas_result * 12 / 10;
+            let block_gas_limit = self.evm_provider.get_block_gas_limit().await?;
+            if estimated_gas_result > block_gas_limit {
+                return Err(RpcError::Transport(TransportErrorKind::Custom(
+                    format!(
+                        "Estimated gas {} exceeds latest block gas limit {}",
+                        estimated_gas_result.into_inner(),
+                        block_gas_limit.into_inner()
+                    )
+                    .into(),
+                )));
+            }
+
+            let buffered_gas = estimated_gas_result * 12 / 10;
+            let estimated_gas = std::cmp::min(buffered_gas, block_gas_limit);
+            if estimated_gas < buffered_gas {
+                info!(
+                    "Gas estimation for relayer: {} - base: {}, buffered: {}, capped to block gas limit: {}",
+                    self.relayer.name,
+                    estimated_gas_result.into_inner(),
+                    buffered_gas.into_inner(),
+                    block_gas_limit.into_inner()
+                );
+                return Ok(estimated_gas);
+            }
+
             info!(
                 "Gas estimation for relayer: {} - base: {}, with 20% buffer: {}",
                 self.relayer.name,
@@ -1091,6 +1131,25 @@ impl TransactionsQueue {
             estimated_gas_result.into_inner()
         );
         Ok(estimated_gas_result)
+    }
+
+    async fn validate_gas_limit_within_block_cap(
+        &self,
+        gas_limit: GasLimit,
+    ) -> Result<(), RpcError<TransportErrorKind>> {
+        let block_gas_limit = self.evm_provider.get_block_gas_limit().await?;
+        if gas_limit > block_gas_limit {
+            return Err(RpcError::Transport(TransportErrorKind::Custom(
+                format!(
+                    "Transaction gas limit {} exceeds latest block gas limit {}",
+                    gas_limit.into_inner(),
+                    block_gas_limit.into_inner()
+                )
+                .into(),
+            )));
+        }
+
+        Ok(())
     }
 
     pub async fn send_transaction(
@@ -1280,6 +1339,10 @@ impl TransactionsQueue {
                 estimated_gas_limit.into_inner()
             );
         }
+
+        self.validate_gas_limit_within_block_cap(estimated_gas_limit)
+            .await
+            .map_err(TransactionQueueSendTransactionError::TransactionEstimateGasError)?;
 
         working_transaction.gas_limit = Some(estimated_gas_limit);
         transaction.gas_limit = Some(estimated_gas_limit);

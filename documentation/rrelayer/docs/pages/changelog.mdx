@@ -6,6 +6,7 @@
 
 ### Features
 
+- feat: add YAML-driven cron jobs for recurring relayer transactions and contract calls, with persisted last-run state across restarts
 - feat: run raw provider e2e tests in CI for pull requests and pushes
 
 ---
@@ -13,6 +14,7 @@
 ### Bug fixes
 
 - fix: prevent failed gas estimation from leaving transactions stuck in the pending queue
+- fix: preserve transaction nonce order when cancelling pending transactions
 - fix: make same-nonce replace and cancel transactions use deterministic gas bumps for raw provider e2e tests
 
 ---

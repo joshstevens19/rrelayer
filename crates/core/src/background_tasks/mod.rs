@@ -1,9 +1,11 @@
 mod automatic_top_up_task;
 mod balance_monitor;
+mod cron_job_task;
 mod webhook_manager_task;
 
 use crate::background_tasks::{
-    balance_monitor::balance_monitor, webhook_manager_task::run_webhook_manager_task,
+    balance_monitor::balance_monitor, cron_job_task::run_cron_job_tasks,
+    webhook_manager_task::run_webhook_manager_task,
 };
 use crate::gas::{blob_gas_oracle, gas_oracle, BlobGasOracleCache, GasOracleCache};
 use crate::{
@@ -45,9 +47,11 @@ pub async fn run_background_tasks(
         config.clone(),
         postgres_client.clone(),
         providers.clone(),
-        transactions_queues,
+        transactions_queues.clone(),
         safe_proxy_manager,
     );
+
+    run_cron_job_tasks(config.clone(), postgres_client.clone(), transactions_queues.clone());
 
     let balance_monitor_task =
         balance_monitor(providers.clone(), postgres_client.clone(), webhook_manager.clone());

@@ -1,7 +1,7 @@
 use crate::tests::test_runner::TestRunner;
 use anyhow::Context;
 use rrelayer_core::transaction::api::{RelayTransactionRequest, TransactionSpeed};
-use rrelayer_core::transaction::types::{TransactionData, TransactionStatus};
+use rrelayer_core::transaction::types::TransactionData;
 use tracing::info;
 
 impl TestRunner {
@@ -33,6 +33,21 @@ impl TestRunner {
             .await
             .context("Failed to send transaction")?;
 
+        let next_tx_request = RelayTransactionRequest {
+            to: self.config.anvil_accounts[2],
+            value: alloy::primitives::utils::parse_ether("0.1")?.into(),
+            data: TransactionData::empty(),
+            speed: Some(TransactionSpeed::SLOW),
+            external_id: Some("test-after-cancel".to_string()),
+            blobs: None,
+        };
+
+        let next_send_result = relayer
+            .transaction()
+            .send(&next_tx_request, None)
+            .await
+            .context("Failed to send follow-up transaction")?;
+
         let transaction_id = &send_result.id;
 
         let cancel_result = relayer
@@ -45,30 +60,25 @@ impl TestRunner {
             return Err(anyhow::anyhow!("Cancel transaction failed"));
         }
 
-        self.anvil_manager.mine_and_wait().await?;
-        let mut attempts = 0;
-        loop {
-            if attempts > 10 {
-                return Err(anyhow::anyhow!("Cancel transaction failed"));
-            }
-            let result = self.relayer_client.get_transaction_status(&send_result.id).await?;
-            if result.status == TransactionStatus::MINED
-                || result.status == TransactionStatus::EXPIRED
-                || result.status == TransactionStatus::CANCELLED
-            {
-                break;
-            } else {
-                attempts += 1;
-                self.anvil_manager.mine_and_wait().await?;
-            }
-        }
+        let transaction = self
+            .wait_for_transaction_terminal(&send_result.id)
+            .await
+            .context("Cancelled transaction did not complete as a no-op")?;
 
-        let transaction = self.relayer_client.get_transaction(&send_result.id).await?;
         if !transaction.is_noop {
             return Err(anyhow::anyhow!(
                 "Expected the transaction to be a no-op {}",
                 transaction_id
             ));
+        }
+
+        let next_transaction = self
+            .wait_for_transaction_completion(&next_send_result.id)
+            .await
+            .context("Follow-up transaction did not complete after cancelling prior nonce")?;
+
+        if next_transaction.0.is_noop {
+            return Err(anyhow::anyhow!("Expected the follow-up transaction to stay intact"));
         }
 
         info!("[SUCCESS] Transaction {} cancel operation works correctly", transaction_id);

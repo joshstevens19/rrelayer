@@ -528,10 +528,19 @@ impl TransactionsQueues {
 
                 match result.type_name {
                     EditableTransactionType::Pending => {
-                        info!("cancel_transaction: removing pending transaction from queue and marking as cancelled");
+                        info!("cancel_transaction: converting pending transaction to no-op so its nonce is consumed");
 
-                        result.transaction.status = TransactionStatus::CANCELLED;
-                        transactions_queue.remove_pending_transaction_by_id(&transaction.id).await;
+                        self.transaction_to_noop(&mut transactions_queue, &mut result.transaction);
+                        result.transaction.known_transaction_hash = None;
+                        result.transaction.sent_with_gas = None;
+                        result.transaction.sent_with_blob_gas = None;
+                        result.transaction.sent_with_max_fee_per_gas = None;
+                        result.transaction.sent_with_max_priority_fee_per_gas = None;
+                        result.transaction.sent_at = None;
+                        result.transaction.status = TransactionStatus::PENDING;
+                        transactions_queue
+                            .update_pending_transaction(result.transaction.clone())
+                            .await;
 
                         self.db
                             .transaction_update(&result.transaction)

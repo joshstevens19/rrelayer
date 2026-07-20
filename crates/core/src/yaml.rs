@@ -1,9 +1,10 @@
+use alloy::json_abi::Function;
 use alloy::primitives::utils::{parse_units, ParseUnits};
 use alloy::primitives::U256;
 use regex::{Captures, Regex};
 use serde::de::Visitor;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-use std::{env, fmt, fs::File, io::Read, path::PathBuf};
+use std::{env, fmt, fs::File, io::Read, path::PathBuf, time::Duration};
 use thiserror::Error;
 
 use crate::gas::{
@@ -915,6 +916,154 @@ pub struct SafeProxyConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CronJobScheduleConfig {
+    /// Run the job at this interval. Supports s, m, h, d, and w suffixes.
+    pub every: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub run_on_startup: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CronJobContractCallConfig {
+    /// Human-readable Solidity signature, e.g. "transfer(address,uint256)".
+    pub function: String,
+    #[serde(default)]
+    pub args: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CronJobTransactionConfig {
+    pub to: EvmAddress,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub value: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub speed: Option<TransactionSpeed>,
+    #[serde(rename = "externalId", skip_serializing_if = "Option::is_none", default)]
+    pub external_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub data: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub contract: Option<CronJobContractCallConfig>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CronJobConfig {
+    pub name: String,
+    #[serde(default = "default_cron_job_enabled")]
+    pub enabled: bool,
+    /// Network name from the networks section.
+    pub network: String,
+    /// Relayer addresses to choose from. Use "*" to allow any relayer on the network.
+    pub relayers: AllOrOneOrManyAddresses,
+    pub schedule: CronJobScheduleConfig,
+    pub transaction: CronJobTransactionConfig,
+}
+
+fn default_cron_job_enabled() -> bool {
+    true
+}
+
+pub fn parse_cron_job_interval(interval: &str) -> Result<Duration, String> {
+    let trimmed = interval.trim();
+    if trimmed.len() < 2 || !trimmed.is_ascii() {
+        return Err("interval must include a positive number and unit".to_string());
+    }
+
+    let (amount, unit) = trimmed.split_at(trimmed.len() - 1);
+    let amount: u64 = amount.parse().map_err(|_| {
+        "interval must include a positive whole number followed by s, m, h, d, or w".to_string()
+    })?;
+
+    if amount == 0 {
+        return Err("interval must be greater than zero".to_string());
+    }
+
+    let seconds = match unit {
+        "s" => amount,
+        "m" => amount * 60,
+        "h" => amount * 60 * 60,
+        "d" => amount * 60 * 60 * 24,
+        "w" => amount * 60 * 60 * 24 * 7,
+        _ => return Err("interval unit must be one of s, m, h, d, or w".to_string()),
+    };
+
+    Ok(Duration::from_secs(seconds))
+}
+
+impl CronJobConfig {
+    fn validate(&self, networks: &[NetworkSetupConfig]) -> Result<(), String> {
+        if self.name.trim().is_empty() {
+            return Err("cron job name cannot be empty".to_string());
+        }
+
+        if self.network.trim().is_empty() {
+            return Err(format!("cron job {} network cannot be empty", self.name));
+        }
+
+        if !networks.iter().any(|network| network.name == self.network) {
+            return Err(format!(
+                "cron job {} references unknown network {}",
+                self.name, self.network
+            ));
+        }
+
+        if self.relayers.is_empty() {
+            return Err(format!("cron job {} relayers cannot be empty", self.name));
+        }
+
+        parse_cron_job_interval(&self.schedule.every)
+            .map_err(|err| format!("cron job {} has invalid schedule.every: {err}", self.name))?;
+
+        if self.transaction.data.is_some() && self.transaction.contract.is_some() {
+            return Err(format!(
+                "cron job {} must define either transaction.data or transaction.contract, not both",
+                self.name
+            ));
+        }
+
+        if self.transaction.data.is_none() && self.transaction.contract.is_none() {
+            return Err(format!(
+                "cron job {} must define transaction.data or transaction.contract",
+                self.name
+            ));
+        }
+
+        if let Some(data) = &self.transaction.data {
+            crate::transaction::types::TransactionData::raw_hex(data).map_err(|err| {
+                format!("cron job {} has invalid transaction.data: {err}", self.name)
+            })?;
+        }
+
+        if let Some(value) = &self.transaction.value {
+            value.parse::<crate::transaction::types::TransactionValue>().map_err(|err| {
+                format!("cron job {} has invalid transaction.value: {err}", self.name)
+            })?;
+        }
+
+        if let Some(contract) = &self.transaction.contract {
+            if contract.function.trim().is_empty() {
+                return Err(format!("cron job {} contract.function cannot be empty", self.name));
+            }
+
+            let function = Function::parse(&contract.function).map_err(|err| {
+                format!("cron job {} has invalid contract.function: {err}", self.name)
+            })?;
+
+            if function.inputs.len() != contract.args.len() {
+                return Err(format!(
+                    "cron job {} contract.function expects {} arg(s), got {}",
+                    self.name,
+                    function.inputs.len(),
+                    contract.args.len()
+                ));
+            }
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SetupConfig {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -929,6 +1078,8 @@ pub struct SetupConfig {
     pub webhooks: Option<Vec<WebhookConfig>>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub rate_limits: Option<RateLimitConfig>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub cron_jobs: Option<Vec<CronJobConfig>>,
 }
 
 fn substitute_env_variables(contents: &str) -> Result<String, regex::Error> {
@@ -968,6 +1119,9 @@ pub enum ReadYamlError {
 
     #[error("Network {0} provider urls not defined")]
     NetworkProviderUrlsNotDefined(String),
+
+    #[error("Cron job yaml bad format: {0}")]
+    CronJobYamlError(String),
 }
 
 /// Reads and parses the RRelayer configuration YAML file.
@@ -1016,5 +1170,79 @@ pub fn read(file_path: &PathBuf, raw_yaml: bool) -> Result<SetupConfig, ReadYaml
         }
     }
 
+    if let Some(cron_jobs) = &config.cron_jobs {
+        let mut cron_job_names = std::collections::HashSet::new();
+        for cron_job in cron_jobs {
+            cron_job.validate(&config.networks).map_err(ReadYamlError::CronJobYamlError)?;
+
+            if !cron_job_names.insert(cron_job.name.as_str()) {
+                return Err(ReadYamlError::CronJobYamlError(format!(
+                    "cron job name {} is used more than once",
+                    cron_job.name
+                )));
+            }
+        }
+    }
+
     Ok(config)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_cron_job_intervals() {
+        assert_eq!(parse_cron_job_interval("30s").unwrap(), Duration::from_secs(30));
+        assert_eq!(parse_cron_job_interval("5m").unwrap(), Duration::from_secs(300));
+        assert_eq!(parse_cron_job_interval("2h").unwrap(), Duration::from_secs(7200));
+        assert_eq!(parse_cron_job_interval("1d").unwrap(), Duration::from_secs(86400));
+        assert_eq!(parse_cron_job_interval("1w").unwrap(), Duration::from_secs(604800));
+    }
+
+    #[test]
+    fn rejects_invalid_cron_job_intervals() {
+        assert!(parse_cron_job_interval("").is_err());
+        assert!(parse_cron_job_interval("0m").is_err());
+        assert!(parse_cron_job_interval("1 month").is_err());
+        assert!(parse_cron_job_interval("10x").is_err());
+        assert!(parse_cron_job_interval("5м").is_err());
+    }
+
+    #[test]
+    fn parses_setup_config_with_cron_jobs() {
+        let yaml = r#"
+name: cron-project
+signing_provider:
+  raw:
+    mnemonic: test test test test test test test test test test test junk
+networks:
+  - name: local
+    chain_id: 31337
+    provider_urls:
+      - http://localhost:8545
+api_config:
+  port: 8000
+  authentication_username: user
+  authentication_password: pass
+cron_jobs:
+  - name: heartbeat
+    network: local
+    relayers: "*"
+    schedule:
+      every: 5m
+      run_on_startup: true
+    transaction:
+      to: "0x0000000000000000000000000000000000000001"
+      contract:
+        function: setNumber(uint256)
+        args:
+          - "42"
+"#;
+
+        let config: SetupConfig = serde_yaml::from_str(yaml).unwrap();
+        let cron_jobs = config.cron_jobs.unwrap();
+        assert_eq!(cron_jobs.len(), 1);
+        assert!(cron_jobs[0].validate(&config.networks).is_ok());
+    }
 }
