@@ -386,15 +386,18 @@ impl EvmProvider {
         transaction: TypedTransaction,
     ) -> Result<TransactionHash, SendTransactionError> {
         let signature = self
-            .wallet_manager
-            .sign_transaction(
-                relayer.wallet_index(),
-                &transaction,
-                relayer.wallet_manager_chain_id(),
-            )
+            .sign_transaction(relayer, &transaction)
             .await
             .map_err(|e| SendTransactionError::InternalError(e.to_string()))?;
 
+        self.send_signed_transaction(transaction, signature).await
+    }
+
+    pub async fn send_signed_transaction(
+        &self,
+        transaction: TypedTransaction,
+        signature: Signature,
+    ) -> Result<TransactionHash, SendTransactionError> {
         let tx_envelope = match transaction {
             TypedTransaction::Legacy(tx) => TxEnvelope::Legacy(tx.into_signed(signature)),
             TypedTransaction::Eip2930(tx) => TxEnvelope::Eip2930(tx.into_signed(signature)),

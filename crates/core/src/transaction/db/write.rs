@@ -9,7 +9,7 @@ use crate::{
     },
     transaction::types::{
         Transaction, TransactionData, TransactionHash, TransactionId, TransactionNonce,
-        TransactionStatus, TransactionValue,
+        TransactionSpeed, TransactionStatus, TransactionValue,
     },
 };
 use alloy::network::AnyTransactionReceipt;
@@ -188,6 +188,8 @@ impl PostgresClient {
         &mut self,
         transaction_id: &TransactionId,
         to: &EvmAddress,
+        speed: &TransactionSpeed,
+        gas_limit: &GasLimit,
     ) -> Result<(), PostgresError> {
         let mut conn = self.pool.get().await?;
         let trans = conn.transaction().await.map_err(PostgresError::PgError)?;
@@ -198,10 +200,20 @@ impl PostgresClient {
                     UPDATE relayer.transaction
                     SET \"to\" = $2,
                         value = $3,
-                        data = $4
+                        data = $4,
+                        blobs = NULL,
+                        gas_limit = $5,
+                        speed = $6
                     WHERE id = $1;
                 ",
-                &[&transaction_id, &to, &TransactionValue::zero(), &TransactionData::empty()],
+                &[
+                    &transaction_id,
+                    &to,
+                    &TransactionValue::zero(),
+                    &TransactionData::empty(),
+                    gas_limit,
+                    speed,
+                ],
             )
             .await
             .map_err(PostgresError::PgError)?;
@@ -216,14 +228,21 @@ impl PostgresClient {
                         sent_max_fee_per_gas, gas_price, external_id
                     )
                     SELECT
-                        id, relayer_id, $2, \"from\", nonce, chain_id, $4, $3, blobs, gas_limit,
-                        speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
+                        id, relayer_id, $2, \"from\", nonce, chain_id, $4, $3, NULL, $5,
+                        $6, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
                         sent_max_fee_per_gas, gas_price, external_id
                     FROM relayer.transaction
                     WHERE id = $1;
                 ",
-                &[&transaction_id, &to, &TransactionValue::zero(), &TransactionData::empty()],
+                &[
+                    &transaction_id,
+                    &to,
+                    &TransactionValue::zero(),
+                    &TransactionData::empty(),
+                    gas_limit,
+                    speed,
+                ],
             )
             .await
             .map_err(PostgresError::PgError)?;
