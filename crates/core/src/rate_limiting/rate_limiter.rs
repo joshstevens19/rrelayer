@@ -47,9 +47,19 @@ impl RateLimiter {
     }
 
     fn parse_interval(interval: &str) -> u32 {
+        let interval = interval.trim();
         match interval {
-            "1m" => 60,
-            _ => 60,
+            "second" | "seconds" => 1,
+            "minute" | "minutes" => 60,
+            _ => {
+                if let Some(seconds) = interval.strip_suffix('s') {
+                    seconds.parse::<u32>().unwrap_or(60).max(1)
+                } else if let Some(minutes) = interval.strip_suffix('m') {
+                    minutes.parse::<u32>().map(|value| value * 60).unwrap_or(60).max(1)
+                } else {
+                    60
+                }
+            }
         }
     }
 
