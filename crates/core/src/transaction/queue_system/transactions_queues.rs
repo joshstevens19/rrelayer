@@ -204,26 +204,15 @@ impl TransactionsQueues {
     }
 
     fn expires_at(&self) -> DateTime<Utc> {
-        Utc::now() + chrono::Duration::hours(12)
-    }
+        let expiration = std::env::var("RRELAYER_TRANSACTION_EXPIRATION_SECONDS")
+            .ok()
+            .and_then(|value| value.parse::<i64>().ok())
+            .filter(|seconds| *seconds > 0)
+            // try_seconds guards against values chrono::Duration::seconds would panic on
+            .and_then(chrono::Duration::try_seconds)
+            .unwrap_or_else(|| chrono::Duration::hours(12));
 
-    /// Checks if a transaction has expired.
-    fn has_expired(&self, transaction: &Transaction) -> bool {
-        transaction.expires_at < Utc::now()
-    }
-
-    /// Converts a transaction to a no-op transaction.
-    fn transaction_to_noop(
-        &self,
-        transactions_queue: &mut TransactionsQueue,
-        transaction: &mut Transaction,
-    ) {
-        transaction.to = transactions_queue.relay_address();
-        transaction.value = TransactionValue::zero();
-        transaction.data = TransactionData::empty();
-        transaction.gas_limit = Some(GasLimit::new(21000_u128));
-        transaction.is_noop = true;
-        transaction.speed = TransactionSpeed::FAST;
+        Utc::now() + expiration
     }
 
     /// Replaces the content of an existing transaction with new parameters.
@@ -1038,13 +1027,13 @@ impl TransactionsQueues {
                     );
                     ProcessPendingTransactionError::RelayerTransactionsQueueNotFound(*relayer_id)
                 })?;
-                if self.has_expired(&transaction) {
-                    self.transaction_to_noop(&mut transactions_queue, &mut transaction);
+                if TransactionsQueue::has_expired(&transaction) {
+                    transactions_queue.transaction_to_noop(&mut transaction);
                 }
 
                 match transactions_queue.send_transaction(&mut self.db, &mut transaction).await {
                     Ok(transaction_sent) => {
-                        transactions_queue.move_pending_to_inmempool(&transaction_sent).await
+                        transactions_queue.move_pending_to_inmempool(&transaction, &transaction_sent).await
                             .map_err(|e| ProcessPendingTransactionError::MovePendingTransactionToInmempoolError(*relayer_id, relayer_address, e))?;
 
                         self.invalidate_transaction_cache(&transaction.id).await;
@@ -1445,6 +1434,7 @@ impl TransactionsQueues {
                                     elapsed.num_milliseconds() as u64,
                                     &transaction.speed,
                                 ) {
+                                    let was_noop = transaction.is_noop;
                                     let transaction_sent = match transactions_queue
                                         .send_transaction(&mut self.db, &mut transaction)
                                         .await
@@ -1498,6 +1488,18 @@ impl TransactionsQueues {
                                     transactions_queue
                                         .update_inmempool_transaction_gas(&transaction_sent)
                                         .await;
+
+                                    // If the transaction expired mid-send and was replaced with a
+                                    // no-op, the inmempool entry must reflect that so it resolves
+                                    // to EXPIRED (not MINED) once the no-op lands
+                                    if !was_noop && transaction.is_noop {
+                                        transactions_queue
+                                            .update_inmempool_transaction_noop(
+                                                &transaction.id,
+                                                &transaction_sent,
+                                            )
+                                            .await;
+                                    }
 
                                     // Update the local transaction with the new gas values so subsequent bumps work correctly
                                     transaction.known_transaction_hash =
