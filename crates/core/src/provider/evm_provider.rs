@@ -659,6 +659,7 @@ mod tests {
             rpc_clients: Vec::new(),
             wallet_manager,
             gas_estimator: Arc::new(UnusedGasEstimator),
+            block_gas_limit_cache: Arc::new(Mutex::new(None)),
             chain_id: ChainId::new(31337),
             name: "destination".to_string(),
             provider_urls: Vec::new(),
