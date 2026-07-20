@@ -18,7 +18,7 @@ use std::collections::HashMap;
 use tokio::sync::Mutex;
 
 pub struct MnemonicWalletManager {
-    wallets: Mutex<HashMap<u32, PrivateKeySigner>>,
+    wallets: Mutex<HashMap<(u32, u64), PrivateKeySigner>>,
     mnemonic: String,
 }
 
@@ -36,9 +36,10 @@ impl MnemonicWalletManager {
         index: u32,
         chain_id: &ChainId,
     ) -> Result<PrivateKeySigner, LocalSignerError> {
+        let cache_key = (index, chain_id.u64());
         let mut wallets = self.wallets.lock().await;
 
-        if let Some(wallet) = wallets.get(&index) {
+        if let Some(wallet) = wallets.get(&cache_key) {
             Ok(wallet.clone())
         } else {
             let wallet = MnemonicBuilder::<English>::default()
@@ -47,7 +48,7 @@ impl MnemonicWalletManager {
                 .build()?
                 .with_chain_id(Some((*chain_id).into()));
 
-            wallets.insert(index, wallet.clone());
+            wallets.insert(cache_key, wallet.clone());
 
             Ok(wallet)
         }

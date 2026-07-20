@@ -13,6 +13,10 @@
 
 ### Bug fixes
 
+- fix: pass source and destination chain ids when cloning a relayer so cloned wallets resolve the original key
+- fix: cache AWS KMS signers by lookup and signing chain id so cloned relayers sign with the correct chain id
+- fix: use the source chain id for PKCS#11 key lookups so cloned relayers sign with the original HSM key
+- fix: cache mnemonic signers per chain id so cloning a relayer no longer breaks signing on the source chain
 - fix: prevent failed gas estimation from leaving transactions stuck in the pending queue
 - fix: preserve transaction nonce order when cancelling pending transactions
 - fix: make same-nonce replace and cancel transactions use deterministic gas bumps for raw provider e2e tests
