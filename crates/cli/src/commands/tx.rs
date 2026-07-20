@@ -205,6 +205,7 @@ async fn handle_withdraw(
                 .transaction()
                 .send(
                     &RelayTransactionRequest {
+                        authorization_list: None,
                         to: *token_address,
                         value: TransactionValue::zero(),
                         data: TransactionData::new(call.abi_encode().into()),
@@ -225,6 +226,7 @@ async fn handle_withdraw(
                 .transaction()
                 .send(
                     &RelayTransactionRequest {
+                        authorization_list: None,
                         to: *to,
                         value: TransactionValue::new(amount_wei),
                         data: TransactionData::empty(),

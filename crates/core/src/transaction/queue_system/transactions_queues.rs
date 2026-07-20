@@ -253,6 +253,7 @@ impl TransactionsQueues {
         current_transaction: &mut Transaction,
         replace_with: &RelayTransactionRequest,
     ) {
+        current_transaction.authorization_list = replace_with.authorization_list.clone();
         current_transaction.to = replace_with.to;
         current_transaction.data = replace_with.data.clone();
         current_transaction.value = replace_with.value;
@@ -298,7 +299,10 @@ impl TransactionsQueues {
         blob_gas_price: Option<&BlobGasPriceResult>,
         gas_limit: GasLimit,
     ) -> Result<TypedTransaction, TransactionConversionError> {
-        if transaction.is_blob_transaction() {
+        if transaction.is_7702_transaction() {
+            Ok(transaction
+                .to_eip7702_typed_transaction_with_gas_limit(Some(gas_price), Some(gas_limit))?)
+        } else if transaction.is_blob_transaction() {
             Ok(transaction.to_blob_typed_transaction_with_gas_limit(
                 Some(gas_price),
                 blob_gas_price,
@@ -408,6 +412,7 @@ impl TransactionsQueues {
         let mut transaction = Transaction {
             id: transaction_to_send.id,
             relayer_id: *relayer_id,
+            authorization_list: transaction_to_send.authorization_list.clone(),
             to: transaction_to_send.to,
             from: transactions_queue.relay_address(),
             value: transaction_to_send.value,
@@ -559,6 +564,7 @@ impl TransactionsQueues {
                             id: cancel_transaction_id,
                             relayer_id: transaction.relayer_id,
                             // Send to self (no-op)
+                            authorization_list: None,
                             to: transactions_queue.relay_address(),
                             from: transactions_queue.relay_address(),
                             value: TransactionValue::zero(),
@@ -793,6 +799,7 @@ impl TransactionsQueues {
                         let mut replace_transaction = Transaction {
                             id: replace_transaction_id,
                             relayer_id: transaction.relayer_id,
+                            authorization_list: transaction.authorization_list.clone(),
                             to: replace_with.to,
                             from: transactions_queue.relay_address(),
                             value: replace_with.value,

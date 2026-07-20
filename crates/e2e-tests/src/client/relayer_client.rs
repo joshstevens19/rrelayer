@@ -126,6 +126,7 @@ impl E2ERelayerClient {
         info!("Sending transaction to: {} via relayer: {}", to, relayer_id);
 
         let request = RelayTransactionRequest {
+            authorization_list: None,
             to: *to,
             value,
             data,

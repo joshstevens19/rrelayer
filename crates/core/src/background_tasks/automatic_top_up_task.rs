@@ -517,6 +517,7 @@ impl AutomaticTopUpTask {
         };
 
         let transaction_to_send = TransactionToSend::new(
+            None,
             final_to,
             TransactionValue::new(final_value),
             TransactionData::new(final_data),
@@ -964,6 +965,7 @@ impl AutomaticTopUpTask {
         };
 
         let transaction_to_send = TransactionToSend::new(
+            None,
             final_to,
             TransactionValue::new(final_value),
             TransactionData::new(final_data),

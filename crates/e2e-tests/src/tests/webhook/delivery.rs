@@ -27,6 +27,7 @@ impl TestRunner {
 
         info!("Test 1: Simple ETH transfer webhook events");
         let tx_request = RelayTransactionRequest {
+            authorization_list: None,
             to: self.config.anvil_accounts[1],
             value: alloy::primitives::utils::parse_ether("0.1")?.into(),
             data: TransactionData::empty(),
@@ -77,6 +78,7 @@ impl TestRunner {
 
         let contract_data = self.contract_interactor.encode_simple_call(42)?;
         let contract_tx_request = RelayTransactionRequest {
+            authorization_list: None,
             to: contract_address,
             value: TransactionValue::zero(),
             data: TransactionData::raw_hex(&contract_data).unwrap(),
@@ -227,6 +229,7 @@ impl TestRunner {
         info!("Test 6: Transaction cancelled webhook");
 
         let tx_request = RelayTransactionRequest {
+            authorization_list: None,
             to: self.config.anvil_accounts[1],
             value: alloy::primitives::utils::parse_ether("0.1")?.into(),
             data: TransactionData::empty(),
@@ -262,6 +265,7 @@ impl TestRunner {
         info!("Test 7: Transaction replacement webhook");
 
         let tx_request = RelayTransactionRequest {
+            authorization_list: None,
             to: self.config.anvil_accounts[1],
             value: alloy::primitives::utils::parse_ether("0.1")?.into(),
             data: TransactionData::empty(),

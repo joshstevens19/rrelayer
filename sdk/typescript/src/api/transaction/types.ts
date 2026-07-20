@@ -1,5 +1,14 @@
 import { GasPriceResult, BlobGasPriceResult } from '../network';
 
+export interface TransactionAuthorization {
+  address: `0x${string}`;
+  chainId: number;
+  nonce: number;
+  r: string | bigint;
+  s: string | bigint;
+  yParity: number;
+}
+
 export enum TransactionStatus {
   PENDING = 'PENDING',
   INMEMPOOL = 'INMEMPOOL',
@@ -22,6 +31,7 @@ export enum TransactionSpeed {
 export interface Transaction {
   id: string;
   relayerId: string;
+  authorizationList?: TransactionAuthorization[];
   to: `0x${string}`;
   from: `0x${string}`;
   value: string;
@@ -49,6 +59,7 @@ export interface Transaction {
 }
 
 export interface TransactionToSend {
+  authorizationList?: TransactionAuthorization[];
   to: string;
   value?: string | bigint | null;
   data?: string | null;

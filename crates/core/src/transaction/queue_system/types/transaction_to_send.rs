@@ -1,4 +1,4 @@
-use crate::transaction::types::TransactionBlob;
+use crate::transaction::types::{TransactionAuthorization, TransactionBlob};
 use crate::{
     shared::common_types::EvmAddress,
     transaction::types::{TransactionData, TransactionId, TransactionSpeed, TransactionValue},
@@ -8,6 +8,7 @@ use crate::{
 pub struct TransactionToSend {
     pub id: TransactionId,
     pub speed: TransactionSpeed,
+    pub authorization_list: Option<Vec<TransactionAuthorization>>,
     pub to: EvmAddress,
     pub value: TransactionValue,
     pub data: TransactionData,
@@ -17,6 +18,7 @@ pub struct TransactionToSend {
 
 impl TransactionToSend {
     pub fn new(
+        authorization_list: Option<Vec<TransactionAuthorization>>,
         to: EvmAddress,
         value: TransactionValue,
         data: TransactionData,
@@ -27,6 +29,7 @@ impl TransactionToSend {
         Self {
             id: TransactionId::new(),
             speed: speed.unwrap_or(TransactionSpeed::FAST),
+            authorization_list,
             to,
             value,
             data,

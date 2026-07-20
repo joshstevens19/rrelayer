@@ -1,14 +1,14 @@
 name: sepolia
 signing_provider:
-  raw:
-    mnemonic: ${RAW_DANGEROUS_MNEMONIC}
+  private_keys:
+    - raw: ${SOLVER_PRIVATE_KEY}
 networks:
 - name: sepolia_ethereum
   chain_id: 11155111
   provider_urls:
   - ${RPC}
   block_explorer_url: https://sepolia.etherscan.io
-  enable_sending_blobs: true
+  enable_sending_blobs: false
   gas_bump_blocks_every:
     slow: 10
     medium: 6
