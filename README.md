@@ -80,6 +80,7 @@ rrelayer and all the commands available to you.
 - API Keys: Built-in API keys for relayers to allow you to give access to a system without giving access to every part of the rrelayer
 - Webhooks: Notifications built in get notified of the transaction's status every step of the way or if balances are low.
 - Rate Limiting: Built-in rate limiting allowing you to rate limit user transactions allowance by just updating the rrelayer.yaml
+- Cron Jobs: Schedule recurring contract calls or raw calldata transactions from rrelayer.yaml.
 - Flexibility: No hard constraints on features like you can config how often it bumps gas depending on your need. Maybe a liquidation bot may want to bump every block for example.
 - CLI: rrelayer is CLI first, so you can do everything with the command line tool.
 - Full transactions support: rrelayer can send blob transactions and any kind of EVM transaction.
