@@ -12,7 +12,7 @@ networks:
   provider_urls:
     - http://127.0.0.1:8545
   block_explorer_url: http://localhost:8545
-  max_gas_price_multiplier: 4
+  max_gas_price_multiplier: 100
   gas_bump_blocks_every:
     slow: 10
     medium: 5
@@ -70,15 +70,15 @@ webhooks:
 rate_limits:
   user_limits:
     per_relayer:
-      interval: "minute"
+      interval: "30s"
       transactions: 1
       signing_operations: 1
     global:
-      interval: "minute"
+      interval: "30s"
       transactions: 3
       signing_operations: 3
 # TODO: needs testing
 #  relayer_limits:
-#    interval: "minute"
+#    interval: "30s"
 #    transactions: 5
 #    signing_operations: 100

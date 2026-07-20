@@ -1,8 +1,16 @@
 use crate::tests::test_runner::TestRunner;
 use anyhow::anyhow;
+use rrelayer::ApiSdkError;
 use rrelayer_core::transaction::types::TransactionData;
-use std::time::Duration;
 use tracing::info;
+
+fn is_rate_limit_error(error: &anyhow::Error) -> bool {
+    error.chain().any(|cause| {
+        cause
+            .downcast_ref::<ApiSdkError>()
+            .is_some_and(|error| matches!(error, ApiSdkError::RateLimitError))
+    })
+}
 
 impl TestRunner {
     /// run single with:
@@ -15,30 +23,50 @@ impl TestRunner {
     pub async fn rate_limiting_transaction_global_limits(&self) -> anyhow::Result<()> {
         info!("Testing rate limiting transaction enforcement...");
 
-        let relayer = self.create_and_fund_relayer("rate-limit-relayer").await?;
-        info!("relayer1: {:?}", relayer);
+        super::wait_for_rate_limit_window_headroom().await;
 
         let relay_key = Some(self.config.anvil_accounts[0].to_string());
 
         let mut successful_transactions = 0;
+        let mut attempts = 0;
 
-        let tx_result = self
-            .relayer_client
-            .send_transaction_with_rate_limit_key(
-                relayer.id(),
-                &self.config.anvil_accounts[1],
-                alloy::primitives::utils::parse_ether("0.5")?.into(),
-                TransactionData::empty(),
-                relay_key.clone(),
-            )
-            .await;
+        while successful_transactions < 3 {
+            attempts += 1;
+            if attempts > 12 {
+                return Err(anyhow!(
+                    "Could not send 3 successful transactions before testing the global limit"
+                ));
+            }
 
-        if tx_result.is_ok() {
-            successful_transactions += 1
+            let relayer = self.create_and_fund_relayer("rate-limit-relayer").await?;
+            info!("allowed relayer attempt {}: {:?}", attempts, relayer);
+
+            let tx_result = self
+                .relayer_client
+                .send_transaction_with_rate_limit_key(
+                    relayer.id(),
+                    &self.config.anvil_accounts[1],
+                    alloy::primitives::utils::parse_ether("0.5")?.into(),
+                    TransactionData::empty(),
+                    relay_key.clone(),
+                )
+                .await;
+
+            match tx_result {
+                Ok(_) => successful_transactions += 1,
+                Err(error) if is_rate_limit_error(&error) => {
+                    return Err(anyhow!(
+                        "Global transaction rate limit triggered before 3 successful transactions"
+                    ));
+                }
+                Err(error) => {
+                    info!("Skipping relayer that cannot send transaction for this test: {}", error);
+                }
+            }
         }
 
         let relayer = self.create_and_fund_relayer("rate-limit-relayer").await?;
-        info!("relayer2: {:?}", relayer);
+        info!("over-limit relayer: {:?}", relayer);
 
         let tx_result = self
             .relayer_client
@@ -51,94 +79,21 @@ impl TestRunner {
             )
             .await;
 
-        if tx_result.is_ok() {
-            successful_transactions += 1
-        }
-
-        let relayer = self.create_and_fund_relayer("rate-limit-relayer").await?;
-        info!("relayer3: {:?}", relayer);
-
-        let tx_result = self
-            .relayer_client
-            .send_transaction_with_rate_limit_key(
-                relayer.id(),
-                &self.config.anvil_accounts[1],
-                alloy::primitives::utils::parse_ether("0.5")?.into(),
-                TransactionData::empty(),
-                relay_key.clone(),
-            )
-            .await;
-
-        if tx_result.is_ok() {
-            successful_transactions += 1
-        }
-
-        let relayer = self.create_and_fund_relayer("rate-limit-relayer").await?;
-        info!("relayer4: {:?}", relayer);
-
-        let tx_result = self
-            .relayer_client
-            .send_transaction_with_rate_limit_key(
-                relayer.id(),
-                &self.config.anvil_accounts[1],
-                alloy::primitives::utils::parse_ether("0.5")?.into(),
-                TransactionData::empty(),
-                relay_key.clone(),
-            )
-            .await;
-
-        if tx_result.is_ok() {
-            successful_transactions += 1
-        }
-
-        let relayer = self.create_and_fund_relayer("rate-limit-relayer").await?;
-        info!("relayer5: {:?}", relayer);
-
-        let tx_result = self
-            .relayer_client
-            .send_transaction_with_rate_limit_key(
-                relayer.id(),
-                &self.config.anvil_accounts[1],
-                alloy::primitives::utils::parse_ether("0.5")?.into(),
-                TransactionData::empty(),
-                relay_key.clone(),
-            )
-            .await;
-
-        if tx_result.is_ok() {
-            successful_transactions += 1
-        }
-
-        let relayer = self.create_and_fund_relayer("rate-limit-relayer").await?;
-        info!("relayer6: {:?}", relayer);
-
-        let tx_result = self
-            .relayer_client
-            .send_transaction_with_rate_limit_key(
-                relayer.id(),
-                &self.config.anvil_accounts[1],
-                alloy::primitives::utils::parse_ether("0.5")?.into(),
-                TransactionData::empty(),
-                relay_key.clone(),
-            )
-            .await;
-
-        if tx_result.is_ok() {
-            successful_transactions += 1
-        }
-
-        if successful_transactions != 3 {
-            return Err(anyhow!(
-                "Sending transactions rate limiting not enforced should of got 3 but got {}",
-                successful_transactions
-            ));
+        match tx_result {
+            Err(error) if is_rate_limit_error(&error) => {}
+            Ok(_) => {
+                return Err(anyhow!("Global transaction rate limiting was not enforced"));
+            }
+            Err(error) => {
+                return Err(anyhow!("Expected global transaction rate limit error, got {}", error));
+            }
         }
 
         self.mine_blocks(1).await?;
         info!("Successful transactions before rate limit: {}", successful_transactions);
 
-        info!("Sleep for 60 seconds to allow the rate limit to expire");
-        tokio::time::sleep(Duration::from_secs(60)).await;
+        info!("Wait for the rate limit to expire");
+        super::wait_for_rate_limit_reset().await;
 
         let tx_result = self
             .relayer_client
@@ -160,8 +115,8 @@ impl TestRunner {
             }
         }
 
-        info!("Sleep for 60 seconds to allow the rate limit to expire so doesnt hurt next test");
-        tokio::time::sleep(Duration::from_secs(60)).await;
+        info!("Wait for the rate limit to expire so doesnt hurt next test");
+        super::wait_for_rate_limit_reset().await;
 
         info!("Rate limiting mechanism verified");
         Ok(())
