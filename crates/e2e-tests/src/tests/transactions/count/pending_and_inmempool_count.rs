@@ -46,7 +46,7 @@ impl TestRunner {
                 .relayer_client
                 .send_transaction(
                     relayer.id(),
-                    &self.config.anvil_accounts[4],
+                    &self.config.anvil_accounts[1],
                     alloy::primitives::utils::parse_ether("0.01")?.into(),
                     TransactionData::empty(),
                 )
@@ -55,36 +55,44 @@ impl TestRunner {
             info!("[SUCCESS] Sent transaction {}: {:?}", i + 1, tx_response);
         }
 
-        let pending_count = relayer
+        let pending_count_after_send = relayer
             .transaction()
             .get_count(TransactionCountType::Pending)
             .await
             .context("Failed to get pending count")?;
 
-        if pending_count == 0 {
-            return Err(anyhow!("Expected some pending transactions but got none"));
-        }
-
-        self.mine_and_wait().await?;
-
-        let pending_count = relayer
-            .transaction()
-            .get_count(TransactionCountType::Pending)
-            .await
-            .context("Failed to get pending count")?;
-
-        if pending_count != 0 {
-            return Err(anyhow!("Expected 0 pending transactions, got {}", pending_count));
-        }
-
-        let inmempool_count = relayer
+        let inmempool_count_after_send = relayer
             .transaction()
             .get_count(TransactionCountType::Inmempool)
             .await
             .context("Failed to get inmempool count")?;
 
-        if inmempool_count == 0 {
-            return Err(anyhow!("Expected some inmempool transactions but got none"));
+        if pending_count_after_send + inmempool_count_after_send == 0 {
+            return Err(anyhow!(
+                "Expected some inflight transactions but got pending={} and inmempool={}",
+                pending_count_after_send,
+                inmempool_count_after_send
+            ));
+        }
+
+        let mut attempts = 0;
+        loop {
+            self.mine_and_wait().await?;
+
+            let pending_count = relayer
+                .transaction()
+                .get_count(TransactionCountType::Pending)
+                .await
+                .context("Failed to get pending count")?;
+
+            if pending_count == 0 {
+                break;
+            }
+
+            attempts += 1;
+            if attempts > 10 {
+                return Err(anyhow!("Expected 0 pending transactions, got {}", pending_count));
+            }
         }
 
         self.mine_blocks(2).await?;

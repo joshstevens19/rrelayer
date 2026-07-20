@@ -3,7 +3,7 @@ use alloy::network::ReceiptResponse;
 use anyhow::Context;
 use rrelayer_core::transaction::api::{RelayTransactionRequest, TransactionSpeed};
 use rrelayer_core::transaction::types::{TransactionData, TransactionStatus};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tracing::info;
 
 impl TestRunner {
@@ -61,66 +61,36 @@ impl TestRunner {
                 .sent_with_max_priority_fee_per_gas
                 .context("transaction_before did not have sent_with_max_priority_fee_per_gas")?;
 
-        // wait 10 seconds as gas bumping happens based on time
-        tokio::time::sleep(Duration::from_secs(10)).await;
+        let started_waiting_for_bump = Instant::now();
+        loop {
+            tokio::time::sleep(Duration::from_millis(500)).await;
 
-        self.mine_and_wait().await?;
-        self.mine_and_wait().await?;
-        self.mine_and_wait().await?;
-        self.mine_and_wait().await?;
-        self.mine_and_wait().await?;
-        self.mine_and_wait().await?;
-        self.mine_and_wait().await?;
-        self.mine_and_wait().await?;
-        self.mine_and_wait().await?;
-        self.mine_and_wait().await?;
-        self.mine_and_wait().await?;
-        self.mine_and_wait().await?;
-        self.mine_and_wait().await?;
-        self.mine_and_wait().await?;
-        self.mine_and_wait().await?;
-        self.mine_and_wait().await?;
-        self.mine_and_wait().await?;
-        self.mine_and_wait().await?;
-        self.mine_and_wait().await?;
-        self.mine_and_wait().await?;
-        self.mine_and_wait().await?;
-        self.mine_and_wait().await?;
-        self.mine_and_wait().await?;
-        self.mine_and_wait().await?;
-        self.mine_and_wait().await?;
-        self.mine_and_wait().await?;
-        self.mine_and_wait().await?;
-        self.mine_and_wait().await?;
-        self.mine_and_wait().await?;
-        self.mine_and_wait().await?;
-        self.mine_and_wait().await?;
-        self.mine_and_wait().await?;
+            let transaction = relayer
+                .transaction()
+                .get(&send_result.id)
+                .await?
+                .context("Transaction not found")?;
+            let max_fee_per_gas_after = transaction
+                .sent_with_max_fee_per_gas
+                .context("transaction_after did not have sent_with_max_fee_per_gas")?;
+            let sent_with_max_priority_after = transaction
+                .sent_with_max_priority_fee_per_gas
+                .context("transaction_after did not have sent_with_max_priority_fee_per_gas")?;
 
-        let transaction_after =
-            relayer.transaction().get(&send_result.id).await?.context("Transaction not found")?;
-        let max_fee_per_gas_after = transaction_after
-            .sent_with_max_fee_per_gas
-            .context("transaction_after did not have sent_with_max_fee_per_gas")?;
-        let sent_with_max_priority_after = transaction_after
-            .sent_with_max_priority_fee_per_gas
-            .context("transaction_after did not have sent_with_max_priority_fee_per_gas")?;
+            if max_fee_per_gas_before != max_fee_per_gas_after
+                || sent_with_max_priority_before != sent_with_max_priority_after
+            {
+                break;
+            }
 
-        if max_fee_per_gas_before == max_fee_per_gas_after
-            && sent_with_max_priority_before == sent_with_max_priority_after
-        {
-            return Err(anyhow::anyhow!(
-                "Gas price did not bump max_fee or sent_with_max_priority one must be bumped"
-            ));
+            if started_waiting_for_bump.elapsed() > Duration::from_secs(20) {
+                return Err(anyhow::anyhow!(
+                    "Gas price did not bump max_fee or sent_with_max_priority one must be bumped"
+                ));
+            }
         }
 
-        let transaction_status = relayer
-            .transaction()
-            .get_status(&send_result.id)
-            .await?
-            .context("Transaction status not found")?
-            .receipt
-            .context("Transaction status did not have receipt")?;
+        let (_, transaction_status) = self.wait_for_transaction_completion(&send_result.id).await?;
         if !transaction_status.status() {
             return Err(anyhow::anyhow!("Transaction failed after gas bumping"));
         }

@@ -1,7 +1,6 @@
 use crate::tests::test_runner::TestRunner;
 use anyhow::anyhow;
 use rrelayer_core::transaction::types::TransactionData;
-use std::time::Duration;
 use tracing::info;
 
 impl TestRunner {
@@ -14,6 +13,8 @@ impl TestRunner {
     /// RRELAYER_PROVIDERS="turnkey" make run-test-debug TEST=rate_limiting_transaction_user_limits
     pub async fn rate_limiting_transaction_user_limits(&self) -> anyhow::Result<()> {
         info!("Testing rate limiting transaction enforcement...");
+
+        super::wait_for_rate_limit_window_headroom().await;
 
         let relayer = self.create_and_fund_relayer("rate-limit-relayer").await?;
         info!("relayer: {:?}", relayer);
@@ -45,8 +46,8 @@ impl TestRunner {
         self.mine_blocks(1).await?;
         info!("Successful transactions before rate limit: {}", successful_transactions);
 
-        info!("Sleep for 60 seconds to allow the rate limit to expire");
-        tokio::time::sleep(Duration::from_secs(62)).await;
+        info!("Wait for the rate limit to expire");
+        super::wait_for_rate_limit_reset().await;
 
         self.mine_blocks(1).await?;
         self.mine_blocks(1).await?;
@@ -77,8 +78,8 @@ impl TestRunner {
             }
         }
 
-        info!("Sleep for 60 seconds to allow the rate limit to expire so doesnt hurt next test");
-        tokio::time::sleep(Duration::from_secs(60)).await;
+        info!("Wait for the rate limit to expire so doesnt hurt next test");
+        super::wait_for_rate_limit_reset().await;
 
         info!("Rate limiting mechanism verified");
         Ok(())
