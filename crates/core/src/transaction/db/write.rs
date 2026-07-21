@@ -488,6 +488,50 @@ impl PostgresClient {
         Ok(())
     }
 
+    /// Records the hash of a signed payload whose broadcast outcome is unknown (the
+    /// transaction row stays PENDING). Restores the ability to recognise the broadcast
+    /// as our own if it mines, even across a restart.
+    pub async fn transaction_update_known_hash(
+        &mut self,
+        transaction_id: &TransactionId,
+        transaction_hash: &TransactionHash,
+    ) -> Result<(), PostgresError> {
+        let mut conn = self.pool.get().await?;
+        let trans = conn.transaction().await.map_err(PostgresError::PgError)?;
+
+        trans
+            .execute(
+                "UPDATE relayer.transaction SET hash = $2 WHERE id = $1",
+                &[&transaction_id, &transaction_hash],
+            )
+            .await?;
+
+        trans
+            .execute(
+                "
+                    INSERT INTO relayer.transaction_audit_log (
+                        id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
+                        speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
+                        failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
+                        sent_max_fee_per_gas, gas_price, block_hash, block_number, external_id
+                    )
+                    SELECT
+                        id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
+                        speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
+                        failed_at, failed_reason, $2, sent_max_priority_fee_per_gas,
+                        sent_max_fee_per_gas, gas_price, block_hash, block_number, external_id
+                    FROM relayer.transaction
+                    WHERE id = $1;
+                ",
+                &[&transaction_id, &transaction_hash],
+            )
+            .await?;
+
+        trans.commit().await?;
+
+        Ok(())
+    }
+
     pub async fn transaction_expired(
         &mut self,
         transaction_id: &TransactionId,
@@ -547,6 +591,11 @@ impl PostgresClient {
             .as_ref()
             .map(|blob_gas| serde_json::to_value(blob_gas).unwrap_or(serde_json::Value::Null));
 
+        let truncated_failed_reason = transaction
+            .failed_reason
+            .as_ref()
+            .map(|reason| reason.chars().take(2000).collect::<String>());
+
         trans
             .execute(
                 "
@@ -572,7 +621,10 @@ impl PostgresClient {
                         sent_with_gas = $20,
                         sent_with_blob_gas = $21,
                         external_id = $22,
-                        cancelled_by_transaction_id = $23
+                        cancelled_by_transaction_id = $23,
+                        blobs = $24,
+                        failed_reason = $25,
+                        failed_at = CASE WHEN $25::TEXT IS NULL THEN failed_at ELSE NOW() END
                     WHERE id = $1
                 ",
                 &[
@@ -599,6 +651,8 @@ impl PostgresClient {
                     &sent_with_blob_gas_json,
                     &transaction.external_id,
                     &transaction.cancelled_by_transaction_id,
+                    &transaction.blobs,
+                    &truncated_failed_reason,
                 ],
             )
             .await

@@ -165,6 +165,80 @@ impl TestRunner {
         Ok(())
     }
 
+    /// Sends a transaction FROM an arbitrary address via anvil impersonation and mines
+    /// it - used to consume a relayer's nonce externally (simulating the relayer key
+    /// being used outside the relayer).
+    pub async fn send_impersonated_transaction(
+        &self,
+        from: &EvmAddress,
+        to: &EvmAddress,
+        value: U256,
+    ) -> anyhow::Result<()> {
+        let anvil_url = format!("http://127.0.0.1:{}", self.config.anvil_port);
+        let client = reqwest::Client::new();
+
+        let calls = [
+            serde_json::json!({"jsonrpc": "2.0", "method": "anvil_impersonateAccount", "params": [from.into_address()], "id": 9990}),
+            serde_json::json!({"jsonrpc": "2.0", "method": "eth_sendTransaction", "params": [{"from": from.into_address(), "to": to.into_address(), "value": format!("0x{:x}", value)}], "id": 9991}),
+            serde_json::json!({"jsonrpc": "2.0", "method": "anvil_mine", "params": [1], "id": 9992}),
+            serde_json::json!({"jsonrpc": "2.0", "method": "anvil_stopImpersonatingAccount", "params": [from.into_address()], "id": 9993}),
+        ];
+
+        for call in &calls {
+            let response = client
+                .post(&anvil_url)
+                .header("Content-Type", "application/json")
+                .json(call)
+                .send()
+                .await
+                .context("Failed impersonated anvil call")?;
+            let body: serde_json::Value = response.json().await?;
+            anyhow::ensure!(
+                body.get("error").is_none(),
+                "impersonated call failed: {:?} -> {:?}",
+                call["method"],
+                body["error"]
+            );
+        }
+
+        info!("Sent impersonated transaction from {} (nonce consumed externally)", from);
+        Ok(())
+    }
+
+    /// Overwrite an account's balance directly via anvil_setBalance (no mining needed),
+    /// used to simulate a relayer running out of funds between admission and send.
+    pub async fn set_relayer_balance(
+        &self,
+        relayer_address: &EvmAddress,
+        balance: U256,
+    ) -> anyhow::Result<()> {
+        let anvil_url = format!("http://127.0.0.1:{}", self.config.anvil_port);
+
+        let request = serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "anvil_setBalance",
+            "params": [relayer_address.into_address(), format!("0x{:x}", balance)],
+            "id": 9998
+        });
+
+        let response = reqwest::Client::new()
+            .post(&anvil_url)
+            .header("Content-Type", "application/json")
+            .json(&request)
+            .send()
+            .await
+            .context("Failed to call anvil_setBalance")?;
+
+        anyhow::ensure!(
+            response.status().is_success(),
+            "anvil_setBalance failed: {}",
+            response.status()
+        );
+
+        info!("Set relayer {} balance to {} wei", relayer_address, balance);
+        Ok(())
+    }
+
     pub async fn create_relayer(&self, name: &str) -> anyhow::Result<AdminRelayerClient> {
         let relayer = self
             .relayer_client

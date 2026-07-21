@@ -8,6 +8,7 @@
 
 - feat: add YAML-driven cron jobs for recurring relayer transactions and contract calls, with persisted last-run state across restarts
 - feat: run raw provider e2e tests in CI for pull requests and pushes
+- feat: expose failedReason on transactions so API and SDK consumers can read why a payload was permanently rejected
 
 ---
 
@@ -21,6 +22,10 @@
 - fix: preserve transaction nonce order when cancelling pending transactions
 - fix: make same-nonce replace and cancel transactions use deterministic gas bumps for raw provider e2e tests
 - fix: expire queued transactions before broadcast without blocking later nonces
+- fix: retry sends on insufficient relayer funds instead of failing the transaction so topping up drains the queue with no stranded nonce
+- fix: close out permanently rejected payloads as FAILED via a same-nonce no-op so the reserved nonce is always consumed
+- fix: check the transaction's own receipt before reassigning a nonce during desync recovery and treat already-known responses as a live broadcast, preventing duplicate execution
+- fix: classify node send errors centrally so revert reasons mentioning balance and geth's gas-allowance wording are routed correctly
 
 ---
 

@@ -46,6 +46,12 @@ export interface Transaction {
   isNoop: boolean;
   externalId?: string | null;
   cancelledByTransactionId?: string | null;
+  /**
+   * Set when the node permanently rejected this transaction's payload and the queue
+   * replaced it with a same-nonce no-op; once that no-op mines the transaction
+   * resolves to FAILED carrying this reason.
+   */
+  failedReason?: string | null;
 }
 
 export interface TransactionToSend {

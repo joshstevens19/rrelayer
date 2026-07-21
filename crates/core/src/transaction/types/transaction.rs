@@ -113,6 +113,12 @@ pub struct Transaction {
 
     #[serde(rename = "cancelledByTransactionId", skip_serializing_if = "Option::is_none", default)]
     pub cancelled_by_transaction_id: Option<TransactionId>,
+
+    /// Set when the node permanently rejected this transaction's payload and the queue
+    /// replaced it with a same-nonce no-op; once that no-op mines the transaction
+    /// resolves to FAILED (instead of MINED/EXPIRED) carrying this reason.
+    #[serde(rename = "failedReason", skip_serializing_if = "Option::is_none", default)]
+    pub failed_reason: Option<String>,
 }
 
 impl Display for Transaction {

@@ -149,12 +149,6 @@ pub enum ProcessPendingTransactionError {
         EvmAddress,
         MovePendingTransactionToInmempoolError,
     ),
-
-    #[error("Relayer id {0} / address {1} - Transaction estimate gas error: {2}")]
-    TransactionEstimateGasError(RelayerId, EvmAddress, RpcError<TransportErrorKind>),
-
-    #[error("Relayer id {0} / address {1} - Transaction could not be updated in DB: {2}")]
-    DbError(RelayerId, EvmAddress, PostgresError),
 }
 
 #[derive(Error, Debug)]

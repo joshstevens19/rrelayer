@@ -32,6 +32,15 @@ pub enum ProcessPendingStatus {
     GasPriceTooHigh,
     GasCalculationUnavailable,
     NonceSynchronized,
+    /// The send attempt failed with a condition that is transient or operator-fixable
+    /// (insufficient funds, RPC outage, signer outage). The transaction keeps its
+    /// reserved nonce and stays at the head of the pending queue: dropping it would
+    /// permanently strand the nonce and wedge every transaction queued behind it.
+    SendRetrying,
+    /// The node permanently rejected the payload (would revert, intrinsic gas too low,
+    /// over the block gas cap). The transaction was marked failed and converted in
+    /// place to a same-nonce no-op so its reserved nonce is still consumed on-chain.
+    ClosedOutWithNoop,
 }
 
 impl ProcessResultSuccess for ProcessPendingStatus {
