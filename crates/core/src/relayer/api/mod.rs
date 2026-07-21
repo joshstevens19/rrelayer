@@ -19,7 +19,9 @@ mod unpause_relayer;
 mod update_relay_eip1559_status;
 mod update_relay_max_gas_price;
 
+pub(crate) use clone_relayer::clone_relayer_core;
 pub use clone_relayer::CloneRelayerRequest;
+pub(crate) use create_relayer::create_relayer_core;
 pub use create_relayer::{CreateRelayerRequest, CreateRelayerResult};
 pub use get_relayer::GetRelayerResult;
 pub use get_relayers::GetRelayersQuery;

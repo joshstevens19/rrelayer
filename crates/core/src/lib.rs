@@ -20,9 +20,9 @@ pub use yaml::{
     SigningProvider, UserRateLimitConfig,
 };
 mod shared;
-pub use shared::{common_types, utils::get_chain_id};
+pub use shared::{common_types, utils::get_chain_id, HttpError};
 mod startup;
-pub use startup::{start, StartError};
+pub use startup::{build, start, Relayer, StartError};
 mod docker;
 mod environment;
 mod file;
