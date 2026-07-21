@@ -6,6 +6,33 @@
 
 ### Features
 
+---
+
+### Bug fixes
+
+---
+
+### Breaking changes
+
+---
+
+## Releases
+---
+
+all release branches are deployed through `release/VERSION_NUMBER` branches
+
+## 0.13.0 - 21st July 2026
+-------------------------------------------------
+
+github branch - https://github.com/joshstevens19/rrelayer/tree/release/0.13.0
+
+- linux binary - https://github.com/joshstevens19/rrelayer/releases/download/v0.13.1/rrelayer_linux-amd64.tar.gz
+- mac apple silicon binary - https://github.com/joshstevens19/rrelayer/releases/download/v0.13.1/rrelayer-arm64.tar.gz
+- mac apple intel binary - https://github.com/joshstevens19/rrelayer/releases/download/v0.13.1/rrelayer-amd64.tar.gz
+- windows binary - https://github.com/joshstevens19/rrelayer/releases/download/v0.13.1/rrelayer-amd64.zip
+
+### Features
+
 - feat: add YAML-driven cron jobs for recurring relayer transactions and contract calls, with persisted last-run state across restarts
 - feat: run raw provider e2e tests in CI for pull requests and pushes
 - feat: expose failedReason on transactions so API and SDK consumers can read why a payload was permanently rejected
@@ -26,17 +53,6 @@
 - fix: close out permanently rejected payloads as FAILED via a same-nonce no-op so the reserved nonce is always consumed
 - fix: check the transaction's own receipt before reassigning a nonce during desync recovery and treat already-known responses as a live broadcast, preventing duplicate execution
 - fix: classify node send errors centrally so revert reasons mentioning balance and geth's gas-allowance wording are routed correctly
-
----
-
-### Breaking changes
-
----
-
-## Releases
----
-
-all release branches are deployed through `release/VERSION_NUMBER` branches
 
 ## 0.12.1 - 15th July 2026
 -------------------------------------------------
