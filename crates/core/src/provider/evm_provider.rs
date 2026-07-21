@@ -316,6 +316,16 @@ impl EvmProvider {
         self.wallet_manager.get_address(wallet_index, self.chain_id.into()).await
     }
 
+    /// Derives the address the CURRENTLY configured signing provider produces
+    /// for a relayer's wallet index — the address signing would actually use.
+    /// Embedders verify imported relayers against this (a relayer created
+    /// under a different signing provider derives a different address).
+    pub async fn derived_address(&self, relayer: &Relayer) -> Result<EvmAddress, WalletError> {
+        self.wallet_manager
+            .get_address(relayer.wallet_index(), relayer.wallet_manager_chain_id())
+            .await
+    }
+
     pub fn can_clone(&self) -> bool {
         self.can_clone
     }

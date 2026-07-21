@@ -655,4 +655,31 @@ impl Relayer {
 
         Ok(relayer.map(|relayer| relayer.address))
     }
+
+    /// Derives the address the CURRENTLY configured signing provider produces
+    /// for a relayer's wallet index — what signing would actually use.
+    /// `None` when the relayer id is unknown. Embedders compare this against
+    /// the relayer's stored address to verify an imported relayer was created
+    /// under the same signing provider (a mismatch means simulations would
+    /// run as one address while signatures come from another key).
+    pub async fn get_relayer_derived_address(
+        &self,
+        relayer_id: &RelayerId,
+    ) -> Result<Option<EvmAddress>, HttpError> {
+        let relayer = get_relayer(&self.app_state.db, &self.app_state.cache, relayer_id).await?;
+        let Some(relayer) = relayer else {
+            return Ok(None);
+        };
+
+        let provider = find_provider_for_chain_id(&self.app_state.evm_providers, &relayer.chain_id)
+            .await
+            .ok_or(not_found("Could not find provider for the chain id".to_string()))?;
+
+        let address = provider
+            .derived_address(&relayer)
+            .await
+            .map_err(|e| bad_request(format!("Could not derive the relayer address: {e}")))?;
+
+        Ok(Some(address))
+    }
 }
