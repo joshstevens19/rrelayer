@@ -7,6 +7,7 @@ mod gas_estimation;
 mod get;
 mod list;
 mod nonce_management;
+mod nonce_stuck;
 mod replace;
 mod send_blob;
 mod send_contract_interaction;
@@ -120,6 +121,26 @@ impl TestModule for TransactionTests {
                 "transaction_nonce_management",
                 "Transaction nonce management",
                 |runner| Box::pin(runner.transaction_nonce_management()),
+            ),
+            TestDefinition::new(
+                "transaction_insufficient_funds_at_send_retries",
+                "Send-time insufficient funds retries until topped up (no stranded nonce)",
+                |runner| Box::pin(runner.transaction_insufficient_funds_at_send_retries()),
+            ),
+            TestDefinition::new(
+                "transaction_cancel_noop_low_balance_retries",
+                "Cancel no-op retries on drained balance (no stranded nonce)",
+                |runner| Box::pin(runner.transaction_cancel_noop_low_balance_retries()),
+            ),
+            TestDefinition::new(
+                "transaction_external_nonce_displacement_recovers",
+                "External nonce displacement recovers with a fresh nonce (no stranded nonce)",
+                |runner| Box::pin(runner.transaction_external_nonce_displacement_recovers()),
+            ),
+            TestDefinition::new(
+                "transaction_onchain_revert_does_not_strand_nonce",
+                "On-chain revert resolves FAILED and consumes its nonce (no stranded nonce)",
+                |runner| Box::pin(runner.transaction_onchain_revert_does_not_strand_nonce()),
             ),
             TestDefinition::new(
                 "transaction_concurrent",

@@ -94,6 +94,27 @@ impl TestRunner {
                     anyhow::bail!("Expired no-op should have empty data");
                 }
 
+                // The expiry no-op consumed the reserved nonce - a fresh transaction
+                // must mine straight away (no gap left behind)
+                let _expiration_reset =
+                    EnvVarGuard::set("RRELAYER_TRANSACTION_EXPIRATION_SECONDS", "3600");
+                let continuity_request = RelayTransactionRequest {
+                    to: self.config.anvil_accounts[1],
+                    value: alloy::primitives::utils::parse_ether("0.05")?.into(),
+                    data: TransactionData::empty(),
+                    speed: Some(TransactionSpeed::FAST),
+                    external_id: Some("test-expired-continuity".to_string()),
+                    blobs: None,
+                };
+                let continuity_tx = relayer
+                    .transaction()
+                    .send(&continuity_request, None)
+                    .await
+                    .context("Failed to queue continuity transaction")?;
+                self.wait_for_transaction_completion(&continuity_tx.id)
+                    .await
+                    .context("Continuity transaction stuck behind expired nonce")?;
+
                 info!("[SUCCESS] Transaction reached Expired state");
                 return Ok(());
             }

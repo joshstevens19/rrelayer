@@ -432,6 +432,7 @@ export interface Transaction {
   isNoop: boolean; // cancelled transaction
   externalId?: string | null;
   cancelledByTransactionId?: string | null;
+  failedReason?: string | null; // node's rejection reason when the payload was permanently rejected
 }
 ```
 

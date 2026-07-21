@@ -38,5 +38,6 @@ pub fn build_transaction_from_transaction_view(row: &Row) -> Transaction {
         is_noop: to == from,
         external_id: row.get("external_id"),
         cancelled_by_transaction_id: row.get("cancelled_by_transaction_id"),
+        failed_reason: row.get("failed_reason"),
     }
 }

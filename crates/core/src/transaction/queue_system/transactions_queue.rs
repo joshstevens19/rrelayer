@@ -33,12 +33,85 @@ use alloy::network::{AnyTransactionReceipt, ReceiptResponse};
 use alloy::{
     consensus::{SignableTransaction, TypedTransaction},
     hex,
+    primitives::Signature,
     transports::{RpcError, TransportErrorKind},
 };
 use chrono::Utc;
 use tokio::sync::Mutex;
 use tracing::error;
 use tracing::info;
+
+/// How the queue must react to a node's send/estimate error. Classification is
+/// centralised here so the pending loop, the gas-bump loop, and broadcast-hash
+/// recording can never drift apart on the same error string.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SendErrorClass {
+    /// Operator-fixable: the relayer cannot pay for the transaction right now.
+    /// Retry in place until it is topped up - the reserved nonce must not be dropped.
+    InsufficientFunds,
+    /// The node says this payload can never execute (would revert, intrinsic gas too
+    /// low, over the block gas cap). Close out: mark FAILED and consume the reserved
+    /// nonce with a same-nonce no-op.
+    PermanentRejection,
+    /// The identical signed payload is already live in the node's mempool - an earlier
+    /// broadcast succeeded. Never reassign this nonce; keep polling until it resolves.
+    AlreadyKnown,
+    /// The nonce was consumed by some broadcast. Check our own receipts before
+    /// concluding it was external and reassigning.
+    NonceConflict,
+    /// A same-nonce replacement was rejected for insufficient fee bump. The existing
+    /// broadcast is still live; retry with backoff.
+    Underpriced,
+    /// Transport failures and unrecognised wording - the outcome is unknown, retry.
+    Transient,
+}
+
+/// Classifies a lowercased node error message. Match order matters: permanent
+/// rejections are checked first because a revert reason can quote any wording -
+/// 'execution reverted: ERC20: transfer amount exceeds balance' must not be read
+/// as relayer-insufficient-funds, and 'execution reverted: invalid nonce' (common
+/// in forwarder/meta-tx contracts) must not trigger nonce resynchronisation -
+/// while genuine node-level nonce/mempool/funds errors never contain 'execution
+/// reverted'. geth's 'gas required exceeds allowance' is a balance-capped
+/// estimation (operator-fixable), not a payload defect.
+pub fn classify_send_error(error_msg: &str) -> SendErrorClass {
+    if error_msg.contains("execution reverted")
+        || error_msg.contains("invalid opcode")
+        || error_msg.contains("intrinsic gas too low")
+        || error_msg.contains("exceeds block gas limit")
+        || error_msg.contains("oversized data")
+        || error_msg.contains("max initcode size exceeded")
+        || error_msg.contains("maxtxsizeexceeded")
+    {
+        return SendErrorClass::PermanentRejection;
+    }
+    if error_msg.contains("already known")
+        || error_msg.contains("alreadyknown")
+        || error_msg.contains("known transaction")
+        || error_msg.contains("already imported")
+    {
+        return SendErrorClass::AlreadyKnown;
+    }
+    if error_msg.contains("nonce too low")
+        || error_msg.contains("nonce is too low")
+        || error_msg.contains("invalid nonce")
+        || error_msg.contains("nonce has already been used")
+        || error_msg.contains("oldnonce")
+    {
+        return SendErrorClass::NonceConflict;
+    }
+    if error_msg.contains("insufficient funds")
+        || error_msg.contains("insufficientfunds")
+        || error_msg.contains("gas required exceeds allowance")
+        || error_msg.contains("overshot")
+    {
+        return SendErrorClass::InsufficientFunds;
+    }
+    if error_msg.contains("underpriced") || error_msg.contains("feetoolow") {
+        return SendErrorClass::Underpriced;
+    }
+    SendErrorClass::Transient
+}
 
 fn bump_u128_by_at_least_one(value: u128) -> u128 {
     value + std::cmp::max(value / 20, 1)
@@ -306,22 +379,6 @@ impl TransactionsQueue {
         }
     }
 
-    pub async fn move_next_pending_to_failed(&mut self) {
-        let mut transactions = self.pending_transactions.lock().await;
-        if let Some(tx) = transactions.front() {
-            info!(
-                "Moving pending transaction {} to failed for relayer: {}",
-                tx.id, self.relayer.name
-            );
-        }
-        transactions.pop_front();
-        info!(
-            "Remaining pending transactions for relayer {}: {}",
-            self.relayer.name,
-            transactions.len()
-        );
-    }
-
     pub async fn remove_pending_transaction_by_id(
         &mut self,
         transaction_id: &TransactionId,
@@ -543,11 +600,21 @@ impl TransactionsQueue {
                     // is_noop is derived as to == from when rehydrating from the database,
                     // so also require the noop shape (zero value, empty data) to avoid
                     // misclassifying a genuine user self-send as expired after a restart
-                    let winner_status = if receipt.status()
-                        && comp_tx.competitive.is_none()
-                        && comp_tx.original.is_noop
+                    let noop_payload_shape = comp_tx.original.is_noop
                         && comp_tx.original.value.is_zero()
-                        && comp_tx.original.data == TransactionData::empty()
+                        && comp_tx.original.data == TransactionData::empty();
+                    let winner_status = if receipt.status()
+                        && noop_payload_shape
+                        && comp_tx.original.failed_reason.is_some()
+                    {
+                        // The payload was permanently rejected at send time and replaced
+                        // with this no-op purely to consume the reserved nonce - surface
+                        // the transaction to the caller as FAILED, not MINED. This holds
+                        // even when a cancel/replace competitor lost the race to it.
+                        TransactionStatus::FAILED
+                    } else if receipt.status()
+                        && noop_payload_shape
+                        && comp_tx.competitive.is_none()
                         && Self::has_expired(&comp_tx.original)
                     {
                         TransactionStatus::EXPIRED
@@ -1083,6 +1150,16 @@ impl TransactionsQueue {
 
         let signature = self.evm_provider.sign_transaction(&self.relayer, transaction).await?;
 
+        let tx_hash = Self::signed_transaction_hash(transaction, signature);
+        info!("Computed transaction hash {} for relayer: {}", tx_hash, self.relayer.name);
+        Ok(tx_hash)
+    }
+
+    /// Computes the on-chain hash of an already-signed payload without re-signing.
+    fn signed_transaction_hash(
+        transaction: &TypedTransaction,
+        signature: Signature,
+    ) -> TransactionHash {
         let hash = match transaction {
             TypedTransaction::Legacy(tx) => {
                 let signed = tx.clone().into_signed(signature);
@@ -1106,9 +1183,7 @@ impl TransactionsQueue {
             }
         };
 
-        let tx_hash = TransactionHash::from_alloy_hash(&hash);
-        info!("Computed transaction hash {} for relayer: {}", tx_hash, self.relayer.name);
-        Ok(tx_hash)
+        TransactionHash::from_alloy_hash(&hash)
     }
 
     pub async fn estimate_gas(
@@ -1173,23 +1248,81 @@ impl TransactionsQueue {
         Ok(estimated_gas_result)
     }
 
-    async fn validate_gas_limit_within_block_cap(
+    /// Advisory only: the cached block gas limit can be stale (or the RPC briefly
+    /// down), and a false positive here would burn a reserved nonce on a transaction
+    /// the chain would accept. The node's own send rejection ('exceeds block gas
+    /// limit') is the authoritative permanent signal.
+    async fn warn_if_gas_limit_over_block_cap(&self, gas_limit: GasLimit) {
+        match self.evm_provider.get_block_gas_limit().await {
+            Ok(block_gas_limit) => {
+                if gas_limit > block_gas_limit {
+                    error!(
+                        "Transaction gas limit {} exceeds latest block gas limit {} for relayer: {} - the node is expected to reject this send",
+                        gas_limit.into_inner(),
+                        block_gas_limit.into_inner(),
+                        self.relayer.name
+                    );
+                }
+            }
+            Err(e) => {
+                info!(
+                    "Could not fetch block gas limit for advisory check on relayer {}: {}",
+                    self.relayer.name, e
+                );
+            }
+        }
+    }
+
+    /// True when the node's send error proves the submitted payload was rejected and is
+    /// definitively not in the mempool - as opposed to transport failures, where the
+    /// broadcast may have been accepted with the response lost.
+    fn send_error_rules_out_broadcast(error_msg: &str) -> bool {
+        matches!(
+            classify_send_error(error_msg),
+            SendErrorClass::InsufficientFunds
+                | SendErrorClass::PermanentRejection
+                | SendErrorClass::NonceConflict
+                | SendErrorClass::Underpriced
+        ) || error_msg.contains("invalid signature")
+    }
+
+    /// Records the hash of a signed payload whose broadcast outcome is unknown, in both
+    /// the in-memory pending entry and the database, so a later 'nonce too low' receipt
+    /// check can recognise the broadcast as our own instead of reassigning its nonce.
+    async fn record_broadcast_attempt_hash(
         &self,
-        gas_limit: GasLimit,
-    ) -> Result<(), RpcError<TransportErrorKind>> {
-        let block_gas_limit = self.evm_provider.get_block_gas_limit().await?;
-        if gas_limit > block_gas_limit {
-            return Err(RpcError::Transport(TransportErrorKind::Custom(
-                format!(
-                    "Transaction gas limit {} exceeds latest block gas limit {}",
-                    gas_limit.into_inner(),
-                    block_gas_limit.into_inner()
-                )
-                .into(),
-            )));
+        db: &mut PostgresClient,
+        transaction: &mut Transaction,
+        attempt_hash: TransactionHash,
+    ) {
+        if transaction.known_transaction_hash == Some(attempt_hash) {
+            return;
         }
 
-        Ok(())
+        info!(
+            "Recording broadcast attempt hash {} for transaction {} on relayer: {} (send outcome unknown)",
+            attempt_hash, transaction.id, self.relayer.name
+        );
+
+        transaction.known_transaction_hash = Some(attempt_hash);
+
+        {
+            let mut transactions = self.pending_transactions.lock().await;
+            if let Some(stored) = transactions.iter_mut().find(|tx| tx.id == transaction.id) {
+                stored.known_transaction_hash = Some(attempt_hash);
+            }
+        }
+
+        if let Err(db_error) =
+            db.transaction_update_known_hash(&transaction.id, &attempt_hash).await
+        {
+            // In-memory state is already updated; worst case a crash falls back to the
+            // previously recorded candidate hash
+            error!(
+                "Failed to persist broadcast attempt hash for transaction {}: {}",
+                transaction.id, db_error
+            );
+        }
     }
 
     pub async fn send_transaction(
@@ -1378,9 +1511,7 @@ impl TransactionsQueue {
             );
         }
 
-        self.validate_gas_limit_within_block_cap(estimated_gas_limit)
-            .await
-            .map_err(TransactionQueueSendTransactionError::TransactionEstimateGasError)?;
+        self.warn_if_gas_limit_over_block_cap(estimated_gas_limit).await;
 
         working_transaction.gas_limit = Some(estimated_gas_limit);
         transaction.gas_limit = Some(estimated_gas_limit);
@@ -1535,11 +1666,26 @@ impl TransactionsQueue {
                 })?;
         }
 
-        let transaction_hash = self
-            .evm_provider
-            .send_signed_transaction(transaction_request, signature)
-            .await
-            .map_err(TransactionQueueSendTransactionError::TransactionSendError)?;
+        let attempt_hash = Self::signed_transaction_hash(&transaction_request, signature);
+
+        let transaction_hash =
+            match self.evm_provider.send_signed_transaction(transaction_request, signature).await {
+                Ok(hash) => hash,
+                Err(error) => {
+                    // A transport-level failure is ambiguous: the node may have accepted the
+                    // broadcast even though the response was lost ('already known' proves it
+                    // did). Record the hash of the exact signed payload we attempted so the
+                    // 'nonce too low' receipt check can recognise the broadcast as our own if
+                    // it mines. A definitive node rejection means this payload is NOT in the
+                    // mempool, so the previously recorded candidate must be kept.
+                    if !was_previously_sent
+                        && !Self::send_error_rules_out_broadcast(&error.to_string().to_lowercase())
+                    {
+                        self.record_broadcast_attempt_hash(db, transaction, attempt_hash).await;
+                    }
+                    return Err(TransactionQueueSendTransactionError::TransactionSendError(error));
+                }
+            };
 
         let transaction_sent = TransactionSentWithRelayer {
             id: transaction.id,
@@ -1665,6 +1811,81 @@ impl TransactionsQueue {
             if let Some(transaction) = competitive_tx.get_transaction_by_id_mut(transaction_id) {
                 transaction.nonce = new_nonce;
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{classify_send_error, SendErrorClass};
+
+    #[test]
+    fn classify_send_error_covers_node_wordings() {
+        let cases: Vec<(&str, SendErrorClass)> = vec![
+            // Permanent rejections - checked before funds because revert reasons
+            // routinely contain the word 'balance'
+            (
+                "execution reverted: erc20: transfer amount exceeds balance",
+                SendErrorClass::PermanentRejection,
+            ),
+            (
+                "execution reverted: ownable: caller is not the owner",
+                SendErrorClass::PermanentRejection,
+            ),
+            ("execution reverted", SendErrorClass::PermanentRejection),
+            // Revert reasons quoting nonce/mempool wording must NOT be mistaken
+            // for node-level nonce conflicts - resynchronising would re-broadcast
+            // a permanently reverting payload forever
+            ("execution reverted: invalid nonce", SendErrorClass::PermanentRejection),
+            ("execution reverted: fwd: nonce too low", SendErrorClass::PermanentRejection),
+            ("invalid opcode: opcode 0xfe not defined", SendErrorClass::PermanentRejection),
+            ("intrinsic gas too low", SendErrorClass::PermanentRejection),
+            ("exceeds block gas limit", SendErrorClass::PermanentRejection),
+            // Size-cap rejections (geth's oversized data / EIP-3860 initcode cap,
+            // nethermind's MaxTxSizeExceeded) can never succeed on resend
+            ("oversized data", SendErrorClass::PermanentRejection),
+            ("max initcode size exceeded", SendErrorClass::PermanentRejection),
+            ("maxtxsizeexceeded", SendErrorClass::PermanentRejection),
+            // Operator-fixable funding conditions - including geth's balance-capped
+            // estimation wording, which must NOT be treated as a payload defect
+            ("insufficient funds for gas * price + value", SendErrorClass::InsufficientFunds),
+            ("gas required exceeds allowance (21000)", SendErrorClass::InsufficientFunds),
+            ("insufficient funds for transfer", SendErrorClass::InsufficientFunds),
+            ("insufficientfunds, balance is too low", SendErrorClass::InsufficientFunds),
+            ("overshot 5000", SendErrorClass::InsufficientFunds),
+            // Mempool-presence signals across client wordings
+            ("already known", SendErrorClass::AlreadyKnown),
+            ("alreadyknown", SendErrorClass::AlreadyKnown),
+            ("known transaction: 0xabc", SendErrorClass::AlreadyKnown),
+            (
+                "transaction with the same hash was already imported",
+                SendErrorClass::AlreadyKnown,
+            ),
+            // Nonce conflicts across client wordings
+            ("nonce too low", SendErrorClass::NonceConflict),
+            ("nonce is too low", SendErrorClass::NonceConflict),
+            ("invalid nonce", SendErrorClass::NonceConflict),
+            ("nonce has already been used", SendErrorClass::NonceConflict),
+            ("oldnonce", SendErrorClass::NonceConflict),
+            // Fee-bump rejections keep the existing broadcast alive
+            ("replacement transaction underpriced", SendErrorClass::Underpriced),
+            ("transaction underpriced", SendErrorClass::Underpriced),
+            ("feetoolow", SendErrorClass::Underpriced),
+            ("feetoolowtocompete", SendErrorClass::Underpriced),
+            // Unknown wording / transport failures must stay retryable - never
+            // close out (which burns the nonce) on an unrecognised string
+            ("connection refused", SendErrorClass::Transient),
+            ("request timed out", SendErrorClass::Transient),
+            ("load balancer error 502", SendErrorClass::Transient),
+            ("txpool is full", SendErrorClass::Transient),
+        ];
+
+        for (message, expected) in cases {
+            assert_eq!(
+                classify_send_error(message),
+                expected,
+                "misclassified node error: {message}"
+            );
         }
     }
 }

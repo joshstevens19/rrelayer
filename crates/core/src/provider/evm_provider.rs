@@ -52,7 +52,7 @@ use tracing::info;
 
 pub type RelayerProvider = Box<dyn Provider<AnyNetwork> + Send + Sync>;
 
-const BLOCK_GAS_LIMIT_CACHE_TTL: Duration = Duration::from_secs(30);
+const BLOCK_GAS_LIMIT_CACHE_TTL: Duration = Duration::from_secs(600);
 
 #[derive(Clone)]
 struct BlockGasLimitCache {
@@ -479,11 +479,25 @@ impl EvmProvider {
             }
         }
 
-        let block = self.rpc_client().get_block_by_number(BlockNumberOrTag::Latest).await?.ok_or(
-            RpcError::Transport(TransportErrorKind::Custom(
-                "Latest block not found".to_string().into(),
-            )),
-        )?;
+        let block_result = self.rpc_client().get_block_by_number(BlockNumberOrTag::Latest).await;
+        let block = match block_result {
+            Ok(Some(block)) => block,
+            Ok(None) | Err(_) => {
+                // Serve the expired cached value on a transient RPC failure - the block
+                // gas limit moves slowly, and failing here would bubble up into the send
+                // path for a transaction that already holds a reserved nonce.
+                let cache = self.block_gas_limit_cache.lock().await;
+                if let Some(cached) = cache.as_ref() {
+                    return Ok(cached.gas_limit);
+                }
+                return match block_result {
+                    Err(e) => Err(e),
+                    _ => Err(RpcError::Transport(TransportErrorKind::Custom(
+                        "Latest block not found".to_string().into(),
+                    ))),
+                };
+            }
+        };
 
         let gas_limit = GasLimit::new(block.header.gas_limit as u128);
         let mut cache = self.block_gas_limit_cache.lock().await;
@@ -659,6 +673,7 @@ mod tests {
             rpc_clients: Vec::new(),
             wallet_manager,
             gas_estimator: Arc::new(UnusedGasEstimator),
+            block_gas_limit_cache: Arc::new(Mutex::new(None)),
             chain_id: ChainId::new(31337),
             name: "destination".to_string(),
             provider_urls: Vec::new(),

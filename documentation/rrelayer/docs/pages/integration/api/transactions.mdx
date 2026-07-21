@@ -201,6 +201,23 @@ For transactions with status `CANCELLED`, additional fields are included:
 }
 ```
 
+#### Additional Fields for Failed Transactions
+
+When the node permanently rejects a transaction's payload (for example it would
+always revert), the relayer marks it `FAILED` and consumes its reserved nonce with
+a same-nonce no-op so the queue is never blocked. `failedReason` carries the node's
+rejection reason:
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440003",
+  "status": "FAILED",
+  "isNoop": true,
+  "failedReason": "execution reverted: ERC20: transfer amount exceeds balance",
+  ...
+}
+```
+
 ### Example
 
 ```bash

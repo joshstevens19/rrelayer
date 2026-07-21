@@ -100,6 +100,9 @@ async fn continuously_process_pending_transactions(
                             }
                             _ => {
                                 error!("Relayer id {} - PENDING QUEUE ERROR: {}", relayer_id, e);
+                                // Back off instead of hot-looping against a failing
+                                // node/signer - errors leave the transaction queued
+                                processes_next_break(&1000).await;
                             }
                         }
                     }
@@ -145,6 +148,9 @@ async fn continuously_process_inmempool_transactions(
                             }
                             _ => {
                                 error!("Relayer id {} - INMEMPOOL QUEUE ERROR: {}", relayer_id, e);
+                                // Back off instead of hot-looping against a failing
+                                // node/signer - errors leave the transaction queued
+                                processes_next_break(&1000).await;
                             }
                         }
                     }
@@ -190,6 +196,9 @@ async fn continuously_process_mined_transactions(
                             }
                             _ => {
                                 error!("Relayer id {} - MINED QUEUE ERROR: {}", relayer_id, e);
+                                // Back off instead of hot-looping against a failing
+                                // node/signer - errors leave the transaction queued
+                                processes_next_break(&1000).await;
                             }
                         }
                     }

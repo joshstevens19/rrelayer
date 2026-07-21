@@ -417,6 +417,43 @@ impl ContractInteractor {
         Err(anyhow::anyhow!("Could not find deployed contract address in forge output"))
     }
 
+    pub async fn approve_tokens(
+        &self,
+        spender: &Address,
+        amount: U256,
+        from_private_key: &str,
+    ) -> Result<()> {
+        let token_address = self.token_address.context("Token not deployed yet")?;
+
+        let signer: PrivateKeySigner = from_private_key.parse().context("Invalid private key")?;
+        let wallet = EthereumWallet::from(signer);
+
+        let provider_url_str = "http://localhost:8545"; // Use default URL
+        let approve_provider = ProviderBuilder::new()
+            .wallet(wallet)
+            .connect(provider_url_str)
+            .await
+            .context("Failed to connect to provider")?;
+
+        let token_contract = TestToken::new(token_address.into(), &approve_provider);
+        let approve_call = token_contract.approve(*spender, amount);
+        let pending_tx = approve_call.send().await.context("Failed to approve tokens")?;
+
+        info!("Approved {} tokens for {:?}, tx: {:?}", amount, spender, pending_tx.tx_hash());
+
+        Ok(())
+    }
+
+    pub fn encode_token_transfer_from(
+        &self,
+        from: &Address,
+        to: &Address,
+        amount: U256,
+    ) -> Vec<u8> {
+        use alloy::sol_types::SolCall;
+        TestToken::transferFromCall { from: *from, to: *to, amount }.abi_encode()
+    }
+
     pub async fn transfer_tokens(
         &self,
         to_address: &Address,
