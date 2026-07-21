@@ -1857,10 +1857,7 @@ mod tests {
             ("already known", SendErrorClass::AlreadyKnown),
             ("alreadyknown", SendErrorClass::AlreadyKnown),
             ("known transaction: 0xabc", SendErrorClass::AlreadyKnown),
-            (
-                "transaction with the same hash was already imported",
-                SendErrorClass::AlreadyKnown,
-            ),
+            ("transaction with the same hash was already imported", SendErrorClass::AlreadyKnown),
             // Nonce conflicts across client wordings
             ("nonce too low", SendErrorClass::NonceConflict),
             ("nonce is too low", SendErrorClass::NonceConflict),
