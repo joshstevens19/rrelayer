@@ -14,7 +14,7 @@ use crate::{
     relayer::get_relayer,
     transaction::{
         get_transaction_by_id,
-        types::{TransactionHash, TransactionId, TransactionStatus},
+        types::{Transaction, TransactionHash, TransactionId, TransactionStatus},
     },
 };
 
@@ -39,15 +39,26 @@ pub async fn get_transaction_status(
 
     state.validate_auth_basic_or_api_key(&headers, &transaction.from, &transaction.chain_id)?;
 
+    let result = transaction_status_result(&state, transaction).await?;
+
+    Ok(Json(result))
+}
+
+/// Builds the status result for a transaction, fetching the receipt when available.
+/// Shared by the HTTP endpoint and the embedded [`crate::Relayer`] handle.
+pub(crate) async fn transaction_status_result(
+    state: &Arc<AppState>,
+    transaction: Transaction,
+) -> Result<RelayTransactionStatusResult, HttpError> {
     if matches!(
         transaction.status,
         TransactionStatus::PENDING | TransactionStatus::INMEMPOOL | TransactionStatus::EXPIRED
     ) {
-        return Ok(Json(RelayTransactionStatusResult {
+        return Ok(RelayTransactionStatusResult {
             hash: transaction.known_transaction_hash,
             status: transaction.status,
             receipt: None,
-        }));
+        });
     }
 
     let relayer = get_relayer(&state.db, &state.cache, &transaction.relayer_id)
@@ -57,11 +68,11 @@ pub async fn get_transaction_status(
     let hash = match transaction.known_transaction_hash {
         Some(hash) => hash,
         None => {
-            return Ok(Json(RelayTransactionStatusResult {
+            return Ok(RelayTransactionStatusResult {
                 hash: None,
                 status: transaction.status,
                 receipt: None,
-            }));
+            });
         }
     };
 
@@ -74,5 +85,5 @@ pub async fn get_transaction_status(
         .await
         .map_err(|e| internal_server_error(Some(e.to_string())))?;
 
-    Ok(Json(RelayTransactionStatusResult { hash: Some(hash), status: transaction.status, receipt }))
+    Ok(RelayTransactionStatusResult { hash: Some(hash), status: transaction.status, receipt })
 }

@@ -7,7 +7,9 @@ use super::{
     SendTransactionGasPriceError, TransactionQueueSendTransactionError, TransactionSentWithRelayer,
 };
 use crate::common_types::EvmAddress;
-use crate::shared::{bad_request, forbidden, internal_server_error, not_found, HttpError};
+use crate::shared::{
+    bad_request, conflict, forbidden, internal_server_error, not_found, HttpError,
+};
 use crate::transaction::types::TransactionConversionError;
 use crate::{
     postgres::PostgresError,
@@ -56,6 +58,12 @@ pub enum AddTransactionError {
     #[error("Transaction could not be saved in DB: {0}")]
     CouldNotSaveTransactionDb(PostgresError),
 
+    #[error("Transaction with external id {1} already exists for relayer {0}")]
+    DuplicateExternalId(RelayerId, String),
+
+    #[error("Could not read external id from db: {0}")]
+    CouldNotReadExternalIdFromDb(PostgresError),
+
     #[error("Relayer could not be found: {0}")]
     RelayerNotFound(RelayerId),
 
@@ -96,6 +104,10 @@ impl From<AddTransactionError> for HttpError {
 
         if matches!(value, AddTransactionError::UnsupportedTransactionType { .. }) {
             return bad_request(value.to_string());
+        }
+
+        if matches!(value, AddTransactionError::DuplicateExternalId(_, _)) {
+            return conflict(value.to_string());
         }
 
         internal_server_error(Some(value.to_string()))

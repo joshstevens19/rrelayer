@@ -392,6 +392,26 @@ impl TransactionsQueues {
             });
         }
 
+        // Reject duplicate external ids before a nonce is reserved: the unique index
+        // (idx_transaction_relayer_external_id) is the authoritative guard on save, but by
+        // then the nonce manager has already been incremented and the rejected transaction
+        // would strand its reserved nonce. The per-relayer queue lock is held here, so the
+        // check cannot race other inserts for this relayer within this process.
+        if let Some(external_id) = &transaction_to_send.external_id {
+            let existing = self
+                .db
+                .get_transaction_by_relayer_and_external_id(relayer_id, external_id)
+                .await
+                .map_err(AddTransactionError::CouldNotReadExternalIdFromDb)?;
+
+            if existing.is_some() {
+                return Err(AddTransactionError::DuplicateExternalId(
+                    *relayer_id,
+                    external_id.clone(),
+                ));
+            }
+        }
+
         // Sync nonce manager with on-chain nonce to ensure consistency
         let current_onchain_nonce = transactions_queue
             .get_nonce()
@@ -481,10 +501,16 @@ impl TransactionsQueues {
         transaction.known_transaction_hash =
             Some(transactions_queue.compute_tx_hash(&transaction_request).await?);
 
-        self.db
-            .save_transaction(relayer_id, &transaction)
-            .await
-            .map_err(AddTransactionError::CouldNotSaveTransactionDb)?;
+        self.db.save_transaction(relayer_id, &transaction).await.map_err(|e| {
+            if e.is_unique_violation_on("idx_transaction_relayer_external_id") {
+                return AddTransactionError::DuplicateExternalId(
+                    *relayer_id,
+                    transaction.external_id.clone().unwrap_or_default(),
+                );
+            }
+
+            AddTransactionError::CouldNotSaveTransactionDb(e)
+        })?;
 
         transactions_queue.add_pending_transaction(transaction.clone()).await;
         self.invalidate_transaction_cache(&transaction.id).await;
