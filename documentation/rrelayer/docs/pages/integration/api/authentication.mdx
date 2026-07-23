@@ -138,6 +138,37 @@ curl https://your-rrelayer.com/health
 
 This endpoint does not require authentication and returns a simple "healthy" string when the server is operational.
 
+## Server Info
+
+Get server info like the build commit, build timestamp, uptime, etc.
+
+### Endpoint
+
+```
+GET /server/info
+```
+
+### Response
+
+```json
+{
+  "startedAtTimestampIso": "2026-07-22T16:40:34Z",
+  "uptimeSeconds": 49,
+  "commitHash": "645fbf4b56f51774619d59360f5525988e7af073",
+  "commitTimestampIso": "2026-07-02T12:06:48Z",
+  "commitLabels": ["branch:master"],
+  "buildTimestampIso": "2026-07-22T16:40:07Z"
+}
+```
+
+### Example
+
+```bash
+curl https://your-rrelayer.com/server/info
+```
+
+This endpoint does not require authentication.
+
 ## Rate Limiting Headers
 
 When using rate limiting, include the rate limit key header:

@@ -4,6 +4,7 @@ use crate::background_tasks::run_background_tasks;
 use crate::common_types::EvmAddress;
 use crate::gas::{BlobGasOracleCache, GasOracleCache};
 use crate::network::{create_network_routes, ChainId};
+use crate::server::create_server_routes;
 use crate::shared::HttpError;
 use crate::webhooks::WebhookManager;
 use crate::yaml::{AllOrOneOrManyAddresses, ApiKey, NetworkPermissionsConfig, ReadYamlError};
@@ -37,6 +38,7 @@ use axum::{
     routing::get,
     Json, Router,
 };
+use chrono::Utc;
 use dotenv::dotenv;
 use rustls::crypto::ring::default_provider;
 use rustls::crypto::CryptoProvider;
@@ -207,6 +209,7 @@ async fn start_api(
         .collect();
 
     let app_state = Arc::new(AppState {
+        started_at: Utc::now(),
         db: db.clone(),
         evm_providers: providers,
         gas_oracle_cache,
@@ -250,6 +253,7 @@ async fn start_api(
         .nest("/networks", create_network_routes())
         .nest("/relayers", create_relayer_routes())
         .nest("/transactions", create_transactions_routes())
+        .nest("/server", create_server_routes())
         .nest("/signing", create_signing_routes());
 
     let app = Router::new()

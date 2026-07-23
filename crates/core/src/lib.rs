@@ -13,6 +13,7 @@ mod provider;
 pub use provider::create_retry_client;
 pub mod relayer;
 pub mod safe_proxy;
+pub mod server;
 pub use safe_proxy::{SafeProxyError, SafeProxyManager, SafeTransaction};
 pub use yaml::{
     read, ApiConfig, AwsKmsSigningProviderConfig, GasProviders, NetworkSetupConfig,
