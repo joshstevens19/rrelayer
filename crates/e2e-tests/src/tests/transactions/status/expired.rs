@@ -48,6 +48,7 @@ impl TestRunner {
         relayer.update_max_gas_price(1).await?;
 
         let tx_request = RelayTransactionRequest {
+            authorization_list: None,
             to: self.config.anvil_accounts[1],
             value: alloy::primitives::utils::parse_ether("0.1")?.into(),
             data: TransactionData::empty(),
@@ -99,6 +100,7 @@ impl TestRunner {
                 let _expiration_reset =
                     EnvVarGuard::set("RRELAYER_TRANSACTION_EXPIRATION_SECONDS", "3600");
                 let continuity_request = RelayTransactionRequest {
+                    authorization_list: None,
                     to: self.config.anvil_accounts[1],
                     value: alloy::primitives::utils::parse_ether("0.05")?.into(),
                     data: TransactionData::empty(),

@@ -367,6 +367,7 @@ fn build_transaction_to_send(
     };
 
     Ok(TransactionToSend::new(
+        None,
         transaction.to,
         value,
         data,
