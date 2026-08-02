@@ -658,7 +658,7 @@ impl PostgresClient {
                         cancelled_by_transaction_id = $24,
                         blobs = $25,
                         failed_reason = $26,
-                        failed_at = CASE WHEN $27::TEXT IS NULL THEN failed_at ELSE NOW() END
+                        failed_at = CASE WHEN $26::TEXT IS NULL THEN failed_at ELSE NOW() END
                     WHERE id = $1
                 ",
                 &[
