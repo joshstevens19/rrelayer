@@ -283,9 +283,17 @@ export class RelayerClient {
        */
       waitForTransactionHashById: async (
         transactionId: string,
-        tryEveryMs: number = 100
+        tryEveryMs: number = 100,
+        maxAttempts: number = 1200
       ): Promise<`0x${string}`> => {
-        while (true) {
+        if (!Number.isInteger(tryEveryMs) || tryEveryMs <= 0) {
+          throw new Error('tryEveryMs must be a positive integer');
+        }
+        if (!Number.isInteger(maxAttempts) || maxAttempts <= 0) {
+          throw new Error('maxAttempts must be a positive integer');
+        }
+
+        for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
           const result = await this.transaction.get(transactionId);
           if (!result) {
             throw new Error('Transaction not found');
@@ -297,6 +305,11 @@ export class RelayerClient {
           switch (result.status.toUpperCase()) {
             case TransactionStatus.PENDING:
             case TransactionStatus.INMEMPOOL:
+              if (attempt === maxAttempts) {
+                throw new Error(
+                  `Timed out waiting for transaction ${transactionId} hash after ${maxAttempts} attempts`
+                );
+              }
               await new Promise((resolve) => setTimeout(resolve, tryEveryMs));
               break;
             case TransactionStatus.MINED:
@@ -324,6 +337,10 @@ export class RelayerClient {
               throw new Error(`Unknown transaction status ${result.status}`);
           }
         }
+
+        throw new Error(
+          `Timed out waiting for transaction ${transactionId} hash after ${maxAttempts} attempts`
+        );
       },
       waitForTransactionReceiptById: async (
         transactionId: string,

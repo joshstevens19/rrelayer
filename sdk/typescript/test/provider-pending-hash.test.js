@@ -81,9 +81,50 @@ test('relayer client polls the transaction read route until a hash is durable', 
 
     const result = await client.transaction.waitForTransactionHashById(
       'accepted-id',
-      0
+      1
     );
     assert.equal(result, HASH);
+    assert.equal(reads, 2);
+    await assert.rejects(
+      client.transaction.waitForTransactionHashById('accepted-id', 0, 2),
+      /tryEveryMs must be a positive integer/
+    );
+  } finally {
+    await new Promise((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve()))
+    );
+  }
+});
+
+test('relayer client stops polling after the configured attempt bound', async () => {
+  let reads = 0;
+  const server = http.createServer((_request, response) => {
+    reads += 1;
+    response.setHeader('content-type', 'application/json');
+    response.end(
+      JSON.stringify({
+        id: 'never-hashed',
+        status: 'PENDING',
+        txHash: null,
+      })
+    );
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+
+  try {
+    const address = server.address();
+    assert.notEqual(typeof address, 'string');
+    const client = new RelayerClient({
+      serverUrl: `http://127.0.0.1:${address.port}`,
+      providerUrl: 'http://127.0.0.1:1',
+      relayerId: 'relayer-id',
+      auth: { username: 'test', password: 'test' },
+    });
+
+    await assert.rejects(
+      client.transaction.waitForTransactionHashById('never-hashed', 1, 2),
+      /Timed out waiting for transaction never-hashed hash after 2 attempts/
+    );
     assert.equal(reads, 2);
   } finally {
     await new Promise((resolve, reject) =>
