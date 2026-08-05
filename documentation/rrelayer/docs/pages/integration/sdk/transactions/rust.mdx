@@ -73,9 +73,12 @@ Just so you understand the properties, the properties you get back when you send
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SendTransactionResult {
     pub id: TransactionId,
-    pub hash: TransactionHash,
+    pub hash: Option<TransactionHash>,
 }
 ```
+
+`None` is a successful, durably accepted submission whose broadcast hash is not available yet.
+Poll the transaction by `id`; do not resubmit it.
 
 ### Sending Native Transaction
 
