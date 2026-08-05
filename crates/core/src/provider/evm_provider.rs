@@ -31,7 +31,7 @@ use alloy::{
     eips::{BlockId, BlockNumberOrTag},
     network::Ethereum,
     network::TransactionBuilderError,
-    primitives::Signature,
+    primitives::{Bytes, Signature},
     providers::{Provider, ProviderBuilder},
     rpc::types::TransactionRequest,
     signers::local::LocalSignerError,
@@ -53,6 +53,27 @@ use tracing::info;
 pub type RelayerProvider = Box<dyn Provider<AnyNetwork> + Send + Sync>;
 
 const BLOCK_GAS_LIMIT_CACHE_TTL: Duration = Duration::from_secs(600);
+
+/// The exact EIP-2718 payload prepared for broadcast and its deterministic hash.
+///
+/// Keeping the bytes and hash together prevents recovery evidence from drifting
+/// from the payload handed to the RPC provider.
+#[derive(Clone, Debug)]
+pub struct SignedTransaction {
+    bytes: Bytes,
+    hash: TransactionHash,
+}
+
+impl SignedTransaction {
+    pub fn hash(&self) -> TransactionHash {
+        self.hash
+    }
+
+    #[cfg(test)]
+    pub(crate) fn for_test(hash: TransactionHash) -> Self {
+        Self { bytes: Bytes::new(), hash }
+    }
+}
 
 #[derive(Clone)]
 struct BlockGasLimitCache {
@@ -349,6 +370,16 @@ impl EvmProvider {
         Ok(receipt)
     }
 
+    /// Returns true when any configured RPC knows the transaction, false only
+    /// when every configured RPC conclusively reports it absent, and an error
+    /// when absence cannot be proven.
+    pub async fn transaction_exists(
+        &self,
+        transaction_hash: &TransactionHash,
+    ) -> Result<bool, RpcError<TransportErrorKind>> {
+        transaction_exists_across_clients(&self.rpc_clients, transaction_hash).await
+    }
+
     pub async fn get_nonce(
         &self,
         relayer: &Relayer,
@@ -361,10 +392,7 @@ impl EvmProvider {
                 WalletOrProviderError::InternalError(format!("Failed to get address: {}", e))
             })?;
 
-        let nonce = self
-            .rpc_client()
-            .get_transaction_count(address.into_address())
-            .block_id(BlockId::Number(BlockNumberOrTag::Pending))
+        let nonce = pending_nonce_across_clients(&self.rpc_clients, &address)
             .await
             .map_err(WalletOrProviderError::ProviderError)?;
 
@@ -375,11 +403,7 @@ impl EvmProvider {
         &self,
         address: &EvmAddress,
     ) -> Result<TransactionNonce, RpcError<TransportErrorKind>> {
-        let nonce = self
-            .rpc_client()
-            .get_transaction_count(address.into_address())
-            .block_id(BlockId::Number(BlockNumberOrTag::Pending))
-            .await?;
+        let nonce = pending_nonce_across_clients(&self.rpc_clients, address).await?;
 
         Ok(TransactionNonce::new(nonce))
     }
@@ -389,12 +413,21 @@ impl EvmProvider {
         relayer: &Relayer,
         transaction: TypedTransaction,
     ) -> Result<TransactionHash, SendTransactionError> {
+        let signed = self.prepare_signed_transaction(relayer, &transaction).await?;
+        self.send_raw_transaction(&signed).await
+    }
+
+    pub async fn prepare_signed_transaction(
+        &self,
+        relayer: &Relayer,
+        transaction: &TypedTransaction,
+    ) -> Result<SignedTransaction, SendTransactionError> {
         let signature = self
-            .sign_transaction(relayer, &transaction)
+            .sign_transaction(relayer, transaction)
             .await
             .map_err(|e| SendTransactionError::InternalError(e.to_string()))?;
 
-        self.send_signed_transaction(transaction, signature).await
+        Ok(Self::signed_transaction(transaction.clone(), signature))
     }
 
     pub async fn send_signed_transaction(
@@ -402,6 +435,14 @@ impl EvmProvider {
         transaction: TypedTransaction,
         signature: Signature,
     ) -> Result<TransactionHash, SendTransactionError> {
+        let signed = Self::signed_transaction(transaction, signature);
+        self.send_raw_transaction(&signed).await
+    }
+
+    fn signed_transaction(
+        transaction: TypedTransaction,
+        signature: Signature,
+    ) -> SignedTransaction {
         let tx_envelope = match transaction {
             TypedTransaction::Legacy(tx) => TxEnvelope::Legacy(tx.into_signed(signature)),
             TypedTransaction::Eip2930(tx) => TxEnvelope::Eip2930(tx.into_signed(signature)),
@@ -410,12 +451,22 @@ impl EvmProvider {
             TypedTransaction::Eip7702(tx) => TxEnvelope::Eip7702(tx.into_signed(signature)),
         };
 
-        let provider = self.rpc_client();
-        let tx_bytes = tx_envelope.encoded_2718();
+        // For EIP-4844, the bytes sent over the wire include the blob sidecar,
+        // but the transaction identity is the hash of the signed inner
+        // transaction. Alloy caches that consensus hash on the envelope.
+        let hash = TransactionHash::from_alloy_hash(tx_envelope.hash());
+        let bytes = Bytes::from(tx_envelope.encoded_2718());
 
-        let receipt = provider.send_raw_transaction(&tx_bytes).await?;
+        SignedTransaction { bytes, hash }
+    }
 
-        Ok(TransactionHash::from_alloy_hash(receipt.tx_hash()))
+    pub async fn send_raw_transaction(
+        &self,
+        transaction: &SignedTransaction,
+    ) -> Result<TransactionHash, SendTransactionError> {
+        let _ = self.rpc_client().send_raw_transaction(&transaction.bytes).await?;
+
+        Ok(transaction.hash)
     }
 
     pub async fn sign_transaction(
@@ -569,17 +620,220 @@ impl EvmProvider {
     }
 }
 
+async fn pending_nonce_across_clients(
+    rpc_clients: &[Arc<RelayerProvider>],
+    address: &EvmAddress,
+) -> Result<u64, RpcError<TransportErrorKind>> {
+    if rpc_clients.is_empty() {
+        return Err(RpcError::Transport(TransportErrorKind::Custom(
+            "no RPC providers configured".to_string().into(),
+        )));
+    }
+
+    let mut max_nonce: Option<u64> = None;
+    let mut first_error = None;
+
+    for rpc_client in rpc_clients {
+        match rpc_client
+            .get_transaction_count(address.into_address())
+            .block_id(BlockId::Number(BlockNumberOrTag::Pending))
+            .await
+        {
+            Ok(nonce) => max_nonce = Some(max_nonce.map_or(nonce, |max| max.max(nonce))),
+            Err(error) if first_error.is_none() => first_error = Some(error),
+            Err(_) => {}
+        }
+    }
+
+    if let Some(error) = first_error {
+        return Err(error);
+    }
+
+    max_nonce.ok_or_else(|| {
+        RpcError::Transport(TransportErrorKind::Custom(
+            "no RPC providers configured".to_string().into(),
+        ))
+    })
+}
+
+async fn transaction_exists_across_clients(
+    rpc_clients: &[Arc<RelayerProvider>],
+    transaction_hash: &TransactionHash,
+) -> Result<bool, RpcError<TransportErrorKind>> {
+    if rpc_clients.is_empty() {
+        return Err(RpcError::Transport(TransportErrorKind::Custom(
+            "no RPC providers configured".to_string().into(),
+        )));
+    }
+
+    let mut first_error = None;
+
+    for rpc_client in rpc_clients {
+        match rpc_client.get_transaction_by_hash(transaction_hash.into_alloy_hash()).await {
+            Ok(Some(_)) => return Ok(true),
+            Ok(None) => {}
+            Err(error) if first_error.is_none() => first_error = Some(error),
+            Err(_) => {}
+        }
+    }
+
+    match first_error {
+        Some(error) => Err(error),
+        None => Ok(false),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::relayer::RelayerId;
     use crate::wallet::WalletManagerChainId;
+    use alloy::{
+        consensus::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar},
+        primitives::{keccak256, Address, TxHash, U256},
+        providers::ProviderBuilder,
+        transports::mock::Asserter,
+    };
+    use alloy_eips::{eip4844::BlobTransactionSidecar, eip7594::BlobTransactionSidecarVariant};
     use async_trait::async_trait;
     use chrono::Utc;
+    use serde_json::json;
     use tokio::sync::Mutex;
 
+    fn mock_client(asserter: Asserter) -> Arc<RelayerProvider> {
+        let provider =
+            ProviderBuilder::new().network::<AnyNetwork>().connect_mocked_client(asserter);
+        Arc::new(Box::new(provider))
+    }
+
+    fn rpc_transaction(hash: TxHash) -> serde_json::Value {
+        json!({
+            "blockHash": null,
+            "blockNumber": null,
+            "hash": hash.to_string(),
+            "transactionIndex": null,
+            "type": "0x0",
+            "nonce": "0x0",
+            "input": "0x",
+            "r": "0x3b08715b4403c792b8c7567edea634088bedcd7f60d9352b1f16c69830f3afd5",
+            "s": "0x10b9afb67d2ec8b956f0e1dbc07eb79152904f3a7bf789fc869db56320adfe09",
+            "chainId": "0x1",
+            "v": "0x1c",
+            "gas": "0x5208",
+            "from": "0x32be343b94f860124dc4fee278fdcbd38c102d88",
+            "to": "0xdf190dc7190dfba737d7777a163445b7fff16133",
+            "value": "0x0",
+            "gasPrice": "0x1"
+        })
+    }
+
+    #[test]
+    fn blob_transaction_hash_excludes_the_network_sidecar() {
+        let transaction = TypedTransaction::Eip4844(TxEip4844Variant::TxEip4844WithSidecar(
+            TxEip4844WithSidecar {
+                tx: TxEip4844 {
+                    chain_id: 1,
+                    nonce: 1,
+                    max_priority_fee_per_gas: 1,
+                    max_fee_per_gas: 2,
+                    gas_limit: 100_000,
+                    to: Address::ZERO,
+                    value: U256::ZERO,
+                    access_list: Default::default(),
+                    blob_versioned_hashes: vec![TxHash::repeat_byte(1)],
+                    max_fee_per_blob_gas: 1,
+                    input: Bytes::new(),
+                },
+                sidecar: BlobTransactionSidecarVariant::Eip4844(BlobTransactionSidecar {
+                    blobs: vec![[2; 131_072].into()],
+                    commitments: vec![[3; 48].into()],
+                    proofs: vec![[4; 48].into()],
+                }),
+            },
+        ));
+        let signature = Signature::test_signature().with_parity(true);
+        let expected_envelope = TxEnvelope::Eip4844(match transaction.clone() {
+            TypedTransaction::Eip4844(tx) => tx.into_signed(signature),
+            _ => unreachable!(),
+        });
+        let network_payload_hash = keccak256(expected_envelope.encoded_2718());
+
+        let signed = EvmProvider::signed_transaction(transaction, signature);
+
+        assert_eq!(signed.hash(), TransactionHash::from_alloy_hash(expected_envelope.hash()));
+        assert_ne!(signed.hash(), TransactionHash::from_alloy_hash(&network_payload_hash));
+    }
+
+    #[tokio::test]
+    async fn transaction_absence_requires_every_configured_provider_to_miss() {
+        let hash = TxHash::repeat_byte(1);
+        let first = Asserter::new();
+        first.push_success(&serde_json::Value::Null);
+        let second = Asserter::new();
+        second.push_success(&serde_json::Value::Null);
+        let clients = vec![mock_client(first), mock_client(second)];
+
+        let exists = transaction_exists_across_clients(&clients, &TransactionHash::new(hash)).await;
+
+        assert!(!exists.unwrap());
+    }
+
+    #[tokio::test]
+    async fn transaction_exists_when_any_configured_provider_finds_hash() {
+        let hash = TxHash::repeat_byte(2);
+        let first = Asserter::new();
+        first.push_success(&serde_json::Value::Null);
+        let second = Asserter::new();
+        second.push_success(&rpc_transaction(hash));
+        let clients = vec![mock_client(first), mock_client(second)];
+
+        let exists = transaction_exists_across_clients(&clients, &TransactionHash::new(hash)).await;
+
+        assert!(exists.unwrap());
+    }
+
+    #[tokio::test]
+    async fn transaction_absence_fails_closed_when_any_provider_errors() {
+        let hash = TxHash::repeat_byte(3);
+        let first = Asserter::new();
+        first.push_success(&serde_json::Value::Null);
+        let second = Asserter::new();
+        second.push_failure_msg("backend unavailable");
+        let clients = vec![mock_client(first), mock_client(second)];
+
+        let exists = transaction_exists_across_clients(&clients, &TransactionHash::new(hash)).await;
+
+        assert!(exists.is_err());
+    }
+
+    #[tokio::test]
+    async fn pending_nonce_uses_maximum_only_when_every_provider_responds() {
+        let first = Asserter::new();
+        first.push_success(&"0x7");
+        let second = Asserter::new();
+        second.push_success(&"0x35");
+        let clients = vec![mock_client(first), mock_client(second)];
+
+        let nonce = pending_nonce_across_clients(&clients, &EvmAddress::zero()).await;
+
+        assert_eq!(nonce.unwrap(), 53);
+    }
+
+    #[tokio::test]
+    async fn pending_nonce_fails_closed_when_any_provider_errors() {
+        let first = Asserter::new();
+        first.push_success(&"0x35");
+        let second = Asserter::new();
+        second.push_failure_msg("backend unavailable");
+        let clients = vec![mock_client(first), mock_client(second)];
+
+        let nonce = pending_nonce_across_clients(&clients, &EvmAddress::zero()).await;
+
+        assert!(nonce.is_err());
+    }
+
     struct RecordingWalletManager {
-        last_create_chain: Arc<Mutex<Option<(u64, u64)>>>,
+        last_create_chain: Arc<Mutex<Option<(u32, u64, u64)>>>,
         address: EvmAddress,
     }
 
@@ -587,17 +841,18 @@ mod tests {
     impl WalletManagerTrait for RecordingWalletManager {
         async fn create_wallet(
             &self,
-            _wallet_index: u32,
+            wallet_index: u32,
             chain_id: WalletManagerChainId,
         ) -> Result<EvmAddress, WalletError> {
             match chain_id {
                 WalletManagerChainId::Cloned(chain) => {
                     let mut last_create_chain = self.last_create_chain.lock().await;
-                    *last_create_chain = Some((chain.cloned_from.u64(), chain.cloned_to.u64()));
+                    *last_create_chain =
+                        Some((wallet_index, chain.cloned_from.u64(), chain.cloned_to.u64()));
                 }
                 WalletManagerChainId::ChainId(chain_id) => {
                     let mut last_create_chain = self.last_create_chain.lock().await;
-                    *last_create_chain = Some((chain_id.u64(), chain_id.u64()));
+                    *last_create_chain = Some((wallet_index, chain_id.u64(), chain_id.u64()));
                 }
             }
 
@@ -699,6 +954,6 @@ mod tests {
         let cloned_address = provider.clone_wallet(&source_relayer).await.unwrap();
 
         assert_eq!(cloned_address, address);
-        assert_eq!(*last_create_chain.lock().await, Some((1, 31337)));
+        assert_eq!(*last_create_chain.lock().await, Some((7, 1, 31337)));
     }
 }

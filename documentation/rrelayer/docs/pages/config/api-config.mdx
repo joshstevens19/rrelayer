@@ -58,3 +58,19 @@ api_config:
   authentication_username: "${RRELAYER_AUTH_USERNAME}"
   authentication_password: "${RRELAYER_AUTH_PASSWORD}" // [!code focus]
 ```
+
+### trust_forwarded_for - optional, defaults to false
+
+When false, request IP policies use only the socket peer and ignore
+`X-Forwarded-For`. This is the safe default. Enable it only behind an ingress
+that overwrites client-supplied forwarding headers while preserving the real
+source IP.
+
+When enabled, a missing header falls back to the socket peer, a malformed or
+non-ASCII header leaves the IP unresolved, and a multi-hop value uses only its
+trimmed leftmost entry.
+
+```yaml [rrelayer.yaml]
+api_config:
+  trust_forwarded_for: false
+```

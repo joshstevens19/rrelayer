@@ -16,8 +16,8 @@ use crate::{
         MaxFee, MaxPriorityFee, BLOB_GAS_PER_BLOB,
     },
     network::ChainId,
-    postgres::PostgresClient,
-    provider::{EvmProvider, SendTransactionError},
+    postgres::{PostgresClient, PostgresError},
+    provider::{EvmProvider, SendTransactionError, SignedTransaction},
     relayer::{Relayer, RelayerId},
     safe_proxy::SafeProxyManager,
     shared::common_types::EvmAddress,
@@ -27,15 +27,14 @@ use crate::{
         types::{Transaction, TransactionHash, TransactionId, TransactionSpeed, TransactionStatus},
     },
     yaml::GasBumpBlockConfig,
-    WalletError,
 };
 use alloy::network::{AnyTransactionReceipt, ReceiptResponse};
 use alloy::{
-    consensus::{SignableTransaction, TypedTransaction},
+    consensus::TypedTransaction,
     hex,
-    primitives::Signature,
     transports::{RpcError, TransportErrorKind},
 };
+use async_trait::async_trait;
 use chrono::Utc;
 use tokio::sync::Mutex;
 use tracing::error;
@@ -125,6 +124,118 @@ fn bump_max_priority_fee_by_at_least_one(max_priority_fee: MaxPriorityFee) -> Ma
     MaxPriorityFee::new(bump_u128_by_at_least_one(max_priority_fee.into_u128()))
 }
 
+fn sort_pending_transactions(transactions: &mut VecDeque<Transaction>) {
+    transactions.make_contiguous().sort_by_key(|transaction| transaction.nonce.into_inner());
+}
+
+#[async_trait]
+trait BroadcastAttemptStore {
+    async fn persist_attempt(
+        &mut self,
+        relayer_id: &RelayerId,
+        transaction: &Transaction,
+        transaction_sent: &TransactionSentWithRelayer,
+        legacy_transaction: bool,
+    ) -> Result<(), PostgresError>;
+
+    async fn mark_sent(
+        &mut self,
+        transaction_sent: &TransactionSentWithRelayer,
+        legacy_transaction: bool,
+    ) -> Result<(), PostgresError>;
+}
+
+#[async_trait]
+impl BroadcastAttemptStore for PostgresClient {
+    async fn persist_attempt(
+        &mut self,
+        relayer_id: &RelayerId,
+        transaction: &Transaction,
+        transaction_sent: &TransactionSentWithRelayer,
+        legacy_transaction: bool,
+    ) -> Result<(), PostgresError> {
+        self.transaction_broadcast_attempt(
+            relayer_id,
+            transaction,
+            &transaction_sent.hash,
+            &transaction_sent.sent_with_gas,
+            transaction_sent.sent_with_blob_gas.as_ref(),
+            legacy_transaction,
+        )
+        .await
+    }
+
+    async fn mark_sent(
+        &mut self,
+        transaction_sent: &TransactionSentWithRelayer,
+        legacy_transaction: bool,
+    ) -> Result<(), PostgresError> {
+        self.transaction_sent(
+            &transaction_sent.id,
+            &transaction_sent.hash,
+            &transaction_sent.sent_with_gas,
+            transaction_sent.sent_with_blob_gas.as_ref(),
+            legacy_transaction,
+        )
+        .await
+    }
+}
+
+#[async_trait]
+trait SignedTransactionBroadcaster {
+    async fn broadcast(
+        &self,
+        transaction: &SignedTransaction,
+    ) -> Result<TransactionHash, SendTransactionError>;
+}
+
+#[async_trait]
+impl SignedTransactionBroadcaster for EvmProvider {
+    async fn broadcast(
+        &self,
+        transaction: &SignedTransaction,
+    ) -> Result<TransactionHash, SendTransactionError> {
+        self.send_raw_transaction(transaction).await
+    }
+}
+
+async fn persist_and_broadcast<S: BroadcastAttemptStore, B: SignedTransactionBroadcaster>(
+    store: &mut S,
+    broadcaster: &B,
+    relayer_id: &RelayerId,
+    transaction: &mut Transaction,
+    transaction_sent: &TransactionSentWithRelayer,
+    signed_transaction: &SignedTransaction,
+    legacy_transaction: bool,
+) -> Result<(), TransactionQueueSendTransactionError> {
+    // No signed bytes may reach an RPC endpoint until the exact hash and gas
+    // snapshot are durable.
+    store.persist_attempt(relayer_id, transaction, transaction_sent, legacy_transaction).await?;
+
+    // The persistence above is the source of truth. Only now may memory expose
+    // the attempt, so an ambiguous send keeps the nonce protected and pollable.
+    transaction.known_transaction_hash = Some(transaction_sent.hash);
+    transaction.sent_with_max_fee_per_gas = Some(transaction_sent.sent_with_gas.max_fee);
+    transaction.sent_with_max_priority_fee_per_gas =
+        Some(transaction_sent.sent_with_gas.max_priority_fee);
+    transaction.sent_with_gas = Some(transaction_sent.sent_with_gas.clone());
+    transaction.sent_with_blob_gas = transaction_sent.sent_with_blob_gas.clone();
+    transaction.sent_at = Some(Utc::now());
+
+    broadcaster
+        .broadcast(signed_transaction)
+        .await
+        .map_err(TransactionQueueSendTransactionError::TransactionSendError)?;
+
+    // Status advances only after the database has accepted the terminal send
+    // transition. A failure here leaves the durable attempt in PENDING state for
+    // evidence-based recovery.
+    store.mark_sent(transaction_sent, legacy_transaction).await?;
+    transaction.status = TransactionStatus::INMEMPOOL;
+
+    Ok(())
+}
+
 pub struct TransactionsQueue {
     pending_transactions: Mutex<VecDeque<Transaction>>,
     inmempool_transactions: Mutex<VecDeque<CompetitiveTransaction>>,
@@ -151,8 +262,10 @@ impl TransactionsQueue {
             setup.relayer.id, setup.relayer.name, setup.relayer.chain_id
         );
         let confirmations = setup.evm_provider.confirmations;
+        let mut pending_transactions = setup.pending_transactions;
+        sort_pending_transactions(&mut pending_transactions);
         Self {
-            pending_transactions: Mutex::new(setup.pending_transactions),
+            pending_transactions: Mutex::new(pending_transactions),
             inmempool_transactions: Mutex::new(setup.inmempool_transactions),
             mined_transactions: Mutex::new(setup.mined_transactions),
             evm_provider: setup.evm_provider,
@@ -262,7 +375,11 @@ impl TransactionsQueue {
             transaction.id, self.relayer.name
         );
         let mut transactions = self.pending_transactions.lock().await;
-        transactions.push_back(transaction);
+        let insert_at = transactions
+            .iter()
+            .position(|queued| queued.nonce.into_inner() > transaction.nonce.into_inner())
+            .unwrap_or(transactions.len());
+        transactions.insert(insert_at, transaction);
         info!(
             "Pending transactions count for relayer {}: {}",
             self.relayer.name,
@@ -1142,50 +1259,6 @@ impl TransactionsQueue {
         Ok(blob_gas_price)
     }
 
-    pub async fn compute_tx_hash(
-        &self,
-        transaction: &TypedTransaction,
-    ) -> Result<TransactionHash, WalletError> {
-        info!("Computing transaction hash for relayer: {}", self.relayer.name);
-
-        let signature = self.evm_provider.sign_transaction(&self.relayer, transaction).await?;
-
-        let tx_hash = Self::signed_transaction_hash(transaction, signature);
-        info!("Computed transaction hash {} for relayer: {}", tx_hash, self.relayer.name);
-        Ok(tx_hash)
-    }
-
-    /// Computes the on-chain hash of an already-signed payload without re-signing.
-    fn signed_transaction_hash(
-        transaction: &TypedTransaction,
-        signature: Signature,
-    ) -> TransactionHash {
-        let hash = match transaction {
-            TypedTransaction::Legacy(tx) => {
-                let signed = tx.clone().into_signed(signature);
-                *signed.hash()
-            }
-            TypedTransaction::Eip2930(tx) => {
-                let signed = tx.clone().into_signed(signature);
-                *signed.hash()
-            }
-            TypedTransaction::Eip1559(tx) => {
-                let signed = tx.clone().into_signed(signature);
-                *signed.hash()
-            }
-            TypedTransaction::Eip4844(tx) => {
-                let signed = tx.clone().into_signed(signature);
-                *signed.hash()
-            }
-            TypedTransaction::Eip7702(tx) => {
-                let signed = tx.clone().into_signed(signature);
-                *signed.hash()
-            }
-        };
-
-        TransactionHash::from_alloy_hash(&hash)
-    }
-
     pub async fn estimate_gas(
         &self,
         transaction_request: &TypedTransaction,
@@ -1270,58 +1343,6 @@ impl TransactionsQueue {
                     self.relayer.name, e
                 );
             }
-        }
-    }
-
-    /// True when the node's send error proves the submitted payload was rejected and is
-    /// definitively not in the mempool - as opposed to transport failures, where the
-    /// broadcast may have been accepted with the response lost.
-    fn send_error_rules_out_broadcast(error_msg: &str) -> bool {
-        matches!(
-            classify_send_error(error_msg),
-            SendErrorClass::InsufficientFunds
-                | SendErrorClass::PermanentRejection
-                | SendErrorClass::NonceConflict
-                | SendErrorClass::Underpriced
-        ) || error_msg.contains("invalid signature")
-    }
-
-    /// Records the hash of a signed payload whose broadcast outcome is unknown, in both
-    /// the in-memory pending entry and the database, so a later 'nonce too low' receipt
-    /// check can recognise the broadcast as our own instead of reassigning its nonce.
-    async fn record_broadcast_attempt_hash(
-        &self,
-        db: &mut PostgresClient,
-        transaction: &mut Transaction,
-        attempt_hash: TransactionHash,
-    ) {
-        if transaction.known_transaction_hash == Some(attempt_hash) {
-            return;
-        }
-
-        info!(
-            "Recording broadcast attempt hash {} for transaction {} on relayer: {} (send outcome unknown)",
-            attempt_hash, transaction.id, self.relayer.name
-        );
-
-        transaction.known_transaction_hash = Some(attempt_hash);
-
-        {
-            let mut transactions = self.pending_transactions.lock().await;
-            if let Some(stored) = transactions.iter_mut().find(|tx| tx.id == transaction.id) {
-                stored.known_transaction_hash = Some(attempt_hash);
-            }
-        }
-
-        if let Err(db_error) =
-            db.transaction_update_known_hash(&transaction.id, &attempt_hash).await
-        {
-            // In-memory state is already updated; worst case a crash falls back to the
-            // previously recorded candidate hash
-            error!(
-                "Failed to persist broadcast attempt hash for transaction {}: {}",
-                transaction.id, db_error
-            );
         }
     }
 
@@ -1612,14 +1633,11 @@ impl TransactionsQueue {
             transaction_request, self.relayer.name
         );
 
-        let mut signature =
-            self.evm_provider.sign_transaction(&self.relayer, &transaction_request).await.map_err(
-                |e| {
-                    TransactionQueueSendTransactionError::TransactionSendError(
-                        SendTransactionError::InternalError(e.to_string()),
-                    )
-                },
-            )?;
+        let mut signed_transaction = self
+            .evm_provider
+            .prepare_signed_transaction(&self.relayer, &transaction_request)
+            .await
+            .map_err(TransactionQueueSendTransactionError::TransactionSendError)?;
 
         if !transaction.is_noop && can_replace_with_noop && Self::has_expired(transaction) {
             info!(
@@ -1655,93 +1673,35 @@ impl TransactionsQueue {
                     })?
             };
 
-            signature = self
+            signed_transaction = self
                 .evm_provider
-                .sign_transaction(&self.relayer, &transaction_request)
+                .prepare_signed_transaction(&self.relayer, &transaction_request)
                 .await
-                .map_err(|e| {
-                    TransactionQueueSendTransactionError::TransactionSendError(
-                        SendTransactionError::InternalError(e.to_string()),
-                    )
-                })?;
+                .map_err(TransactionQueueSendTransactionError::TransactionSendError)?;
         }
-
-        let attempt_hash = Self::signed_transaction_hash(&transaction_request, signature);
-
-        let transaction_hash =
-            match self.evm_provider.send_signed_transaction(transaction_request, signature).await {
-                Ok(hash) => hash,
-                Err(error) => {
-                    // A transport-level failure is ambiguous: the node may have accepted the
-                    // broadcast even though the response was lost ('already known' proves it
-                    // did). Record the hash of the exact signed payload we attempted so the
-                    // 'nonce too low' receipt check can recognise the broadcast as our own if
-                    // it mines. A definitive node rejection means this payload is NOT in the
-                    // mempool, so the previously recorded candidate must be kept.
-                    if !was_previously_sent
-                        && !Self::send_error_rules_out_broadcast(&error.to_string().to_lowercase())
-                    {
-                        self.record_broadcast_attempt_hash(db, transaction, attempt_hash).await;
-                    }
-                    return Err(TransactionQueueSendTransactionError::TransactionSendError(error));
-                }
-            };
 
         let transaction_sent = TransactionSentWithRelayer {
             id: transaction.id,
-            hash: transaction_hash,
+            hash: signed_transaction.hash(),
             sent_with_gas: gas_price,
             sent_with_blob_gas,
         };
 
-        transaction.known_transaction_hash = Some(transaction_sent.hash);
-        transaction.sent_with_max_fee_per_gas = Some(transaction_sent.sent_with_gas.max_fee);
-        transaction.sent_with_max_priority_fee_per_gas =
-            Some(transaction_sent.sent_with_gas.max_priority_fee);
-        transaction.sent_with_gas = Some(transaction_sent.sent_with_gas.clone());
-        transaction.sent_with_blob_gas = transaction_sent.sent_with_blob_gas.clone();
-        transaction.sent_at = Some(Utc::now());
-        transaction.status = TransactionStatus::INMEMPOOL;
+        persist_and_broadcast(
+            db,
+            &self.evm_provider,
+            &self.relayer.id,
+            transaction,
+            &transaction_sent,
+            &signed_transaction,
+            self.is_legacy_transactions(),
+        )
+        .await?;
 
         info!(
             "Transaction {} sent successfully with hash {} for relayer: {}",
             transaction_sent.id, transaction_sent.hash, self.relayer.name
         );
-
-        if !was_previously_sent || transaction.is_noop {
-            info!(
-                "Updating database for sent transaction {} on relayer: {}",
-                transaction.id, self.relayer.name
-            );
-            // Persist the no-op fields before marking the transaction as sent so a crash
-            // between the two commits leaves a pending no-op row (safe to resend) rather
-            // than an inmempool row that still carries the original payload
-            if transaction.is_noop {
-                db.update_transaction_noop(
-                    &transaction.id,
-                    &transaction.to,
-                    &transaction.speed,
-                    &transaction.gas_limit.unwrap_or(GasLimit::new(21_000)),
-                )
-                .await?;
-            }
-
-            if !was_previously_sent {
-                db.transaction_sent(
-                    &transaction_sent.id,
-                    &transaction_sent.hash,
-                    &transaction_sent.sent_with_gas,
-                    transaction_sent.sent_with_blob_gas.as_ref(),
-                    self.is_legacy_transactions(),
-                )
-                .await?;
-            }
-        } else {
-            info!(
-                "Skipping DB update for gas bump transaction {} on relayer: {}",
-                transaction.id, self.relayer.name
-            );
-        }
 
         info!(
             "Successfully processed transaction {} for relayer: {}",
@@ -1775,6 +1735,13 @@ impl TransactionsQueue {
         Ok(receipt)
     }
 
+    pub async fn transaction_exists(
+        &self,
+        transaction_hash: &TransactionHash,
+    ) -> Result<bool, RpcError<TransportErrorKind>> {
+        self.evm_provider.transaction_exists(transaction_hash).await
+    }
+
     pub async fn get_nonce(&self) -> Result<TransactionNonce, RpcError<TransportErrorKind>> {
         let nonce = self.evm_provider.get_nonce_from_address(&self.relay_address()).await?;
 
@@ -1796,6 +1763,7 @@ impl TransactionsQueue {
         let mut pending = self.pending_transactions.lock().await;
         if let Some(transaction) = pending.iter_mut().find(|tx| tx.id == *transaction_id) {
             transaction.nonce = new_nonce;
+            sort_pending_transactions(&mut pending);
         }
     }
 
@@ -1817,7 +1785,277 @@ impl TransactionsQueue {
 
 #[cfg(test)]
 mod tests {
-    use super::{classify_send_error, SendErrorClass};
+    use super::{
+        classify_send_error, persist_and_broadcast, sort_pending_transactions,
+        BroadcastAttemptStore, SendErrorClass, SignedTransactionBroadcaster,
+    };
+    use crate::{
+        gas::{GasLimit, GasPriceResult, MaxFee, MaxPriorityFee},
+        network::ChainId,
+        postgres::PostgresError,
+        provider::{SendTransactionError, SignedTransaction},
+        relayer::RelayerId,
+        shared::common_types::EvmAddress,
+        transaction::{
+            queue_system::types::{
+                TransactionQueueSendTransactionError, TransactionSentWithRelayer,
+            },
+            types::{
+                Transaction, TransactionData, TransactionHash, TransactionId, TransactionNonce,
+                TransactionSpeed, TransactionStatus, TransactionValue,
+            },
+        },
+    };
+    use alloy::primitives::TxHash;
+    use async_trait::async_trait;
+    use chrono::Utc;
+    use std::{
+        collections::VecDeque,
+        sync::atomic::{AtomicUsize, Ordering},
+    };
+
+    #[derive(Default)]
+    struct TestBroadcastAttemptStore {
+        attempts: Vec<TransactionHash>,
+        marks: usize,
+        fail_attempt: bool,
+        fail_mark_sent: bool,
+    }
+
+    #[async_trait]
+    impl BroadcastAttemptStore for TestBroadcastAttemptStore {
+        async fn persist_attempt(
+            &mut self,
+            _relayer_id: &RelayerId,
+            _transaction: &Transaction,
+            transaction_sent: &TransactionSentWithRelayer,
+            _legacy_transaction: bool,
+        ) -> Result<(), PostgresError> {
+            if self.fail_attempt {
+                return Err(PostgresError::ConnectionPoolError(bb8::RunError::TimedOut));
+            }
+            self.attempts.push(transaction_sent.hash);
+            Ok(())
+        }
+
+        async fn mark_sent(
+            &mut self,
+            _transaction_sent: &TransactionSentWithRelayer,
+            _legacy_transaction: bool,
+        ) -> Result<(), PostgresError> {
+            if self.fail_mark_sent {
+                return Err(PostgresError::ConnectionPoolError(bb8::RunError::TimedOut));
+            }
+            self.marks += 1;
+            Ok(())
+        }
+    }
+
+    #[derive(Default)]
+    struct TestBroadcaster {
+        calls: AtomicUsize,
+        fail: bool,
+    }
+
+    #[async_trait]
+    impl SignedTransactionBroadcaster for TestBroadcaster {
+        async fn broadcast(
+            &self,
+            transaction: &SignedTransaction,
+        ) -> Result<TransactionHash, SendTransactionError> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            if self.fail {
+                return Err(SendTransactionError::InternalError(
+                    "ambiguous transport failure".to_string(),
+                ));
+            }
+            Ok(transaction.hash())
+        }
+    }
+
+    fn pending_transaction() -> Transaction {
+        let now = Utc::now();
+        Transaction {
+            id: TransactionId::new(),
+            relayer_id: RelayerId::new(),
+            to: EvmAddress::zero(),
+            from: EvmAddress::zero(),
+            value: TransactionValue::zero(),
+            data: TransactionData::empty(),
+            nonce: TransactionNonce::new(7),
+            chain_id: ChainId::new(1),
+            gas_limit: Some(GasLimit::new(21_000)),
+            status: TransactionStatus::PENDING,
+            blobs: None,
+            known_transaction_hash: None,
+            queued_at: now,
+            expires_at: now,
+            sent_at: None,
+            confirmed_at: None,
+            sent_with_gas: None,
+            sent_with_blob_gas: None,
+            mined_at: None,
+            mined_at_block_number: None,
+            speed: TransactionSpeed::FAST,
+            sent_with_max_priority_fee_per_gas: None,
+            sent_with_max_fee_per_gas: None,
+            is_noop: false,
+            external_id: None,
+            cancelled_by_transaction_id: None,
+            failed_reason: None,
+        }
+    }
+
+    fn transaction_sent(
+        transaction: &Transaction,
+        hash: TransactionHash,
+    ) -> TransactionSentWithRelayer {
+        TransactionSentWithRelayer {
+            id: transaction.id,
+            hash,
+            sent_with_gas: GasPriceResult {
+                max_fee: MaxFee::new(2),
+                max_priority_fee: MaxPriorityFee::new(1),
+                min_wait_time_estimate: None,
+                max_wait_time_estimate: None,
+            },
+            sent_with_blob_gas: None,
+        }
+    }
+
+    #[test]
+    fn pending_transactions_remain_nonce_ordered_after_recovery_reassignment() {
+        let mut higher = pending_transaction();
+        higher.nonce = TransactionNonce::new(9);
+        let mut lower = pending_transaction();
+        lower.nonce = TransactionNonce::new(7);
+        let mut pending = VecDeque::from([higher, lower]);
+
+        sort_pending_transactions(&mut pending);
+
+        assert_eq!(pending[0].nonce, TransactionNonce::new(7));
+        assert_eq!(pending[1].nonce, TransactionNonce::new(9));
+    }
+
+    #[tokio::test]
+    async fn attempt_persist_failure_prevents_raw_broadcast_and_memory_mutation() {
+        let mut transaction = pending_transaction();
+        let hash = TransactionHash::new(TxHash::repeat_byte(3));
+        let signed = SignedTransaction::for_test(hash);
+        let sent = transaction_sent(&transaction, hash);
+        let relayer_id = transaction.relayer_id;
+        let mut store = TestBroadcastAttemptStore { fail_attempt: true, ..Default::default() };
+        let broadcaster = TestBroadcaster::default();
+
+        let result = persist_and_broadcast(
+            &mut store,
+            &broadcaster,
+            &relayer_id,
+            &mut transaction,
+            &sent,
+            &signed,
+            false,
+        )
+        .await;
+
+        assert!(matches!(
+            result,
+            Err(TransactionQueueSendTransactionError::CouldNotUpdateTransactionDb(_))
+        ));
+        assert_eq!(broadcaster.calls.load(Ordering::SeqCst), 0);
+        assert_eq!(transaction.known_transaction_hash, None);
+        assert_eq!(transaction.sent_at, None);
+        assert_eq!(transaction.status, TransactionStatus::PENDING);
+    }
+
+    #[tokio::test]
+    async fn ambiguous_broadcast_keeps_durable_hash_and_pending_nonce_protected() {
+        let mut transaction = pending_transaction();
+        let hash = TransactionHash::new(TxHash::repeat_byte(4));
+        let signed = SignedTransaction::for_test(hash);
+        let sent = transaction_sent(&transaction, hash);
+        let relayer_id = transaction.relayer_id;
+        let mut store = TestBroadcastAttemptStore::default();
+        let broadcaster = TestBroadcaster { fail: true, ..Default::default() };
+
+        let result = persist_and_broadcast(
+            &mut store,
+            &broadcaster,
+            &relayer_id,
+            &mut transaction,
+            &sent,
+            &signed,
+            false,
+        )
+        .await;
+
+        assert!(matches!(
+            result,
+            Err(TransactionQueueSendTransactionError::TransactionSendError(_))
+        ));
+        assert_eq!(store.attempts, vec![hash]);
+        assert_eq!(transaction.known_transaction_hash, Some(hash));
+        assert!(transaction.sent_at.is_some());
+        assert_eq!(transaction.nonce, TransactionNonce::new(7));
+        assert_eq!(transaction.status, TransactionStatus::PENDING);
+    }
+
+    #[tokio::test]
+    async fn post_broadcast_db_failure_keeps_durable_attempt_and_pending_memory_state() {
+        let mut transaction = pending_transaction();
+        let hash = TransactionHash::new(TxHash::repeat_byte(5));
+        let signed = SignedTransaction::for_test(hash);
+        let sent = transaction_sent(&transaction, hash);
+        let relayer_id = transaction.relayer_id;
+        let mut store = TestBroadcastAttemptStore { fail_mark_sent: true, ..Default::default() };
+        let broadcaster = TestBroadcaster::default();
+
+        let result = persist_and_broadcast(
+            &mut store,
+            &broadcaster,
+            &relayer_id,
+            &mut transaction,
+            &sent,
+            &signed,
+            false,
+        )
+        .await;
+
+        assert!(matches!(
+            result,
+            Err(TransactionQueueSendTransactionError::CouldNotUpdateTransactionDb(_))
+        ));
+        assert_eq!(broadcaster.calls.load(Ordering::SeqCst), 1);
+        assert_eq!(store.attempts, vec![hash]);
+        assert_eq!(transaction.known_transaction_hash, Some(hash));
+        assert_eq!(transaction.status, TransactionStatus::PENDING);
+    }
+
+    #[tokio::test]
+    async fn sent_state_advances_in_memory_only_after_database_mark_succeeds() {
+        let mut transaction = pending_transaction();
+        let hash = TransactionHash::new(TxHash::repeat_byte(6));
+        let signed = SignedTransaction::for_test(hash);
+        let sent = transaction_sent(&transaction, hash);
+        let relayer_id = transaction.relayer_id;
+        let mut store = TestBroadcastAttemptStore::default();
+        let broadcaster = TestBroadcaster::default();
+
+        persist_and_broadcast(
+            &mut store,
+            &broadcaster,
+            &relayer_id,
+            &mut transaction,
+            &sent,
+            &signed,
+            false,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(store.marks, 1);
+        assert_eq!(transaction.status, TransactionStatus::INMEMPOOL);
+    }
 
     #[test]
     fn classify_send_error_covers_node_wordings() {

@@ -184,6 +184,41 @@ networks: // [!code focus]
           - "0xcfe267de230a234c5937f18f239617b7038ec271" // [!code focus]
 ```
 
+### ip_allowlist and request_verification - optional request controls
+
+Permission entries can require a source IP and a strict HS256 JWT for mutation
+and signing routes. Omission preserves existing behavior;
+an explicit empty IP list denies every source. Matching permission entries
+compose with AND semantics in configuration order, and each entry evaluates IP
+before JWT, so a dual failure returns 403.
+
+```yaml [rrelayer.yaml]
+permissions:
+  - relayers: "*"
+    allowlist: []
+    ip_allowlist:
+      - 192.0.2.10/32
+    request_verification:
+      scheme: jwt_hs256
+      params:
+        secret_env: RRELAYER_REQUEST_SIGNATURE_KEY
+        signature_header: x-appsmith-signature
+```
+
+The token is the raw compact JWT, not a `Bearer` value. It must use HS256 and
+contain an `exp` later than the current time; clock leeway is zero. The signature
+header defaults to `x-appsmith-signature`. Startup validates the IP grammar,
+header, tagged scheme parameters, and referenced non-empty environment variable.
+Only the environment-variable name belongs in YAML.
+
+These checks are additional to basic/API-key authorization and protect direct
+and random transaction submission, replacement, cancellation, text and
+typed-data signing, and deprecated signing aliases. They do not add checks to
+health, transaction reads/status/counts/history, signing history, or relayer
+management. Missing or invalid JWTs return 401; unresolved or disallowed IPs
+return 403. A secret lost after startup produces a sanitized 500 and no protected
+operation proceeds.
+
 ### disable_native_transfer - optional default false
 
 You can config a relayer to never be able to send native transfers.

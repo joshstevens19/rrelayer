@@ -1,4 +1,5 @@
 use crate::app_state::NetworkValidateAction;
+use crate::middleware::policy::PolicyContext;
 use crate::rate_limiting::{RateLimitOperation, RateLimiter};
 use crate::shared::{not_found, unauthorized, HttpError};
 use crate::{
@@ -25,6 +26,7 @@ pub struct CancelTransactionResponse {
 pub async fn cancel_transaction(
     State(state): State<Arc<AppState>>,
     Path(transaction_id): Path<TransactionId>,
+    policy_context: PolicyContext,
     headers: HeaderMap,
 ) -> Result<Json<CancelTransactionResponse>, HttpError> {
     state.validate_allowed_passed_basic_auth(&headers)?;
@@ -38,6 +40,12 @@ pub async fn cancel_transaction(
     }
 
     state.validate_auth_basic_or_api_key(&headers, &transaction.from, &transaction.chain_id)?;
+    state.validate_request_policy(
+        &policy_context,
+        &headers,
+        &transaction.from,
+        &transaction.chain_id,
+    )?;
 
     state.network_permission_validate(
         &transaction.from,

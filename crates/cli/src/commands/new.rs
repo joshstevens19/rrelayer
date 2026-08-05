@@ -83,6 +83,7 @@ pub async fn handle_init(path: &Path) -> Result<(), InitError> {
             allowed_origins: None,
             authentication_username: "${RRELAYER_AUTH_USERNAME}".to_string(),
             authentication_password: "${RRELAYER_AUTH_PASSWORD}".to_string(),
+            trust_forwarded_for: false,
         },
         webhooks: None,
         rate_limits: None,
