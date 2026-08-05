@@ -36,6 +36,22 @@ jobs:
       - name: Run clippy
         run: cargo clippy -- -D warnings -A clippy::uninlined_format_args
 
+  typescript_sdk:
+    name: TypeScript SDK
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdk/typescript
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: sdk/typescript/package-lock.json
+      - run: npm ci
+      - run: npm test
+
   e2e_raw:
     name: E2E Raw Provider
     runs-on: ubuntu-latest

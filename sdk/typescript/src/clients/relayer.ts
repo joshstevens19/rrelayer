@@ -277,6 +277,54 @@ export class RelayerClient {
           this._apiBaseConfig
         );
       },
+      /**
+       * Wait for a durably accepted transaction to receive its broadcast hash.
+       * A null hash in the send response is accepted/pending, not a rejection.
+       */
+      waitForTransactionHashById: async (
+        transactionId: string,
+        tryEveryMs: number = 100
+      ): Promise<`0x${string}`> => {
+        while (true) {
+          const result = await this.transaction.get(transactionId);
+          if (!result) {
+            throw new Error('Transaction not found');
+          }
+          if (result.txHash) {
+            return result.txHash;
+          }
+
+          switch (result.status.toUpperCase()) {
+            case TransactionStatus.PENDING:
+            case TransactionStatus.INMEMPOOL:
+              await new Promise((resolve) => setTimeout(resolve, tryEveryMs));
+              break;
+            case TransactionStatus.MINED:
+            case TransactionStatus.CONFIRMED:
+              throw new Error(
+                'Transaction reached a mined state without a hash'
+              );
+            case TransactionStatus.FAILED:
+              throw new Error('Transaction failed before receiving a hash');
+            case TransactionStatus.EXPIRED:
+              throw new Error('Transaction expired before receiving a hash');
+            case TransactionStatus.CANCELLED:
+              throw new Error(
+                'Transaction was cancelled before receiving a hash'
+              );
+            case TransactionStatus.REPLACED:
+              throw new Error(
+                'Transaction was replaced before receiving a hash'
+              );
+            case TransactionStatus.DROPPED:
+              throw new Error(
+                'Transaction was dropped before receiving a hash'
+              );
+            default:
+              throw new Error(`Unknown transaction status ${result.status}`);
+          }
+        }
+      },
       waitForTransactionReceiptById: async (
         transactionId: string,
         tryEveryMs: number = 100
