@@ -4,7 +4,7 @@ use alloy::dyn_abi::TypedData;
 use alloy::{consensus::TypedTransaction, signers::Signature};
 use async_trait::async_trait;
 
-use crate::wallet::WalletManagerChainId;
+use crate::{relayer::WalletIndex, wallet::WalletManagerChainId};
 use crate::{
     shared::common_types::EvmAddress,
     wallet::{WalletError, WalletManagerTrait},
@@ -27,7 +27,7 @@ impl CompositeWalletManager {
     // TODO: not ideal route but only way i could find for now to work without a big refactor
     /// Determine if a wallet index is for a private key (high range)
     fn is_private_key_index(&self, wallet_index: u32) -> bool {
-        wallet_index >= u32::MAX - 1000
+        WalletIndex::is_private_key_manager_index(wallet_index)
     }
 
     /// Get the appropriate wallet manager for the given index

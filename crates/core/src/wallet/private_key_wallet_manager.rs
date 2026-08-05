@@ -1,5 +1,6 @@
 use crate::common_types::EvmAddress;
 use crate::network::ChainId;
+use crate::relayer::WalletIndex;
 use crate::wallet::{WalletError, WalletManagerChainId, WalletManagerTrait};
 use alloy::consensus::TypedTransaction;
 use alloy::dyn_abi::TypedData;
@@ -23,7 +24,7 @@ impl PrivateKeyWalletManager {
     /// Convert wallet index from WalletIndex system back to internal array index
     fn convert_to_internal_index(&self, wallet_index: u32) -> Result<usize, WalletError> {
         // Check if this is a private key index (high range: >= u32::MAX - 1000)
-        if wallet_index >= u32::MAX - 1000 {
+        if WalletIndex::is_private_key_manager_index(wallet_index) {
             // This is a private key index from the WalletIndex conversion, convert back to array index
             let internal_index = (u32::MAX - wallet_index) as usize;
             if internal_index < self.private_keys.len() {

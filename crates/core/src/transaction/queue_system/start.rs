@@ -1,10 +1,14 @@
 use std::{collections::VecDeque, sync::Arc};
 
+use alloy::transports::{RpcError, TransportErrorKind};
 use thiserror::Error;
 use tokio::sync::Mutex;
 use tracing::{error, info, warn};
 
-use super::{transactions_queues::TransactionsQueues, types::TransactionRelayerSetup};
+use super::{
+    attempts::find_landed_attempt, transactions_queues::TransactionsQueues,
+    types::TransactionRelayerSetup,
+};
 use crate::transaction::queue_system::types::{
     CompetitionType, CompetitiveTransaction, ProcessInmempoolTransactionError,
     ProcessMinedTransactionError, ProcessPendingTransactionError,
@@ -22,7 +26,7 @@ use crate::{
         utils::sleep_ms,
     },
     shutdown::subscribe_to_shutdown,
-    transaction::types::{Transaction, TransactionStatus},
+    transaction::types::{Transaction, TransactionId, TransactionNonce, TransactionStatus},
 };
 
 pub async fn spawn_processing_tasks_for_relayer(
@@ -339,6 +343,187 @@ async fn repopulate_competitive_transaction_queue(
     Ok(competitive_queue)
 }
 
+pub(super) fn effective_startup_nonce(
+    onchain_nonce: TransactionNonce,
+    pending_transactions: &VecDeque<Transaction>,
+    inmempool_transactions: &VecDeque<CompetitiveTransaction>,
+) -> TransactionNonce {
+    let pending_max =
+        pending_transactions.iter().map(|transaction| transaction.nonce.into_inner()).max();
+    let inmempool_max = inmempool_transactions
+        .iter()
+        .map(|transaction| {
+            let original_nonce = transaction.original.nonce.into_inner();
+            transaction
+                .competitive
+                .as_ref()
+                .map(|(competitor, _)| original_nonce.max(competitor.nonce.into_inner()))
+                .unwrap_or(original_nonce)
+        })
+        .max();
+
+    let next_after_actionable = pending_max
+        .into_iter()
+        .chain(inmempool_max)
+        .max()
+        .map(|nonce| nonce.saturating_add(1))
+        .unwrap_or(0);
+
+    TransactionNonce::new(onchain_nonce.into_inner().max(next_after_actionable))
+}
+
+pub(super) fn future_nonce_pending_repair_hash(
+    transaction: &Transaction,
+    chain_nonce: TransactionNonce,
+) -> Option<crate::transaction::types::TransactionHash> {
+    if transaction.status == TransactionStatus::PENDING
+        && transaction.sent_at.is_some()
+        && transaction.nonce.into_inner() > chain_nonce.into_inner()
+    {
+        transaction.known_transaction_hash
+    } else {
+        None
+    }
+}
+
+#[derive(Error, Debug)]
+enum RepairRecordedAttemptsError {
+    #[error("failed to get chain nonce for relayer {0}: {1}")]
+    CouldNotGetChainNonce(RelayerId, WalletOrProviderError),
+
+    #[error("failed to load candidate transactions for relayer {0}: {1}")]
+    CouldNotLoadCandidates(RelayerId, PostgresError),
+
+    #[error("failed to load recorded attempts for transaction {1} on relayer {0}: {2}")]
+    CouldNotLoadAttempts(RelayerId, TransactionId, PostgresError),
+
+    #[error("transaction {1} on relayer {0} has broadcast evidence but no recorded attempts")]
+    MissingAttempts(RelayerId, TransactionId),
+
+    #[error("failed to check recorded attempts for transaction {1} on relayer {0}: {2}")]
+    CouldNotCheckAttempts(RelayerId, TransactionId, RpcError<TransportErrorKind>),
+
+    #[error("landed attempt {2} for transaction {1} on relayer {0} is missing gas evidence")]
+    MissingGasEvidence(RelayerId, TransactionId, crate::transaction::types::TransactionHash),
+
+    #[error("failed to persist landed attempt recovery for transaction {1} on relayer {0}: {2}")]
+    CouldNotRecoverLandedAttempt(RelayerId, TransactionId, PostgresError),
+
+    #[error("transaction {1} on relayer {0} changed before its landed attempt could be recovered")]
+    LandedAttemptStateChanged(RelayerId, TransactionId),
+
+    #[error("failed to terminalize broadcast-absent transactions for relayer {0}: {1}")]
+    CouldNotRepairAbsentAttempts(RelayerId, PostgresError),
+}
+
+async fn repair_recorded_attempts_for_relayer(
+    db: &PostgresClient,
+    relayer: &Relayer,
+    provider: &EvmProvider,
+) -> Result<(), RepairRecordedAttemptsError> {
+    let chain_nonce = provider
+        .get_nonce(relayer)
+        .await
+        .map_err(|error| RepairRecordedAttemptsError::CouldNotGetChainNonce(relayer.id, error))?;
+
+    let mut candidates = Vec::new();
+    let mut paging_context = PagingContext::new(1000, 0);
+    loop {
+        let results = db
+            .get_pending_transactions_with_attempt_evidence_for_relayer(
+                &relayer.id,
+                &paging_context,
+            )
+            .await
+            .map_err(|error| {
+                RepairRecordedAttemptsError::CouldNotLoadCandidates(relayer.id, error)
+            })?;
+        let result_count = results.items.len();
+        candidates.extend(results.items);
+
+        match paging_context.next(result_count) {
+            Some(next) => paging_context = next,
+            None => break,
+        }
+    }
+
+    let mut absent = Vec::new();
+
+    for transaction in candidates {
+        let attempts =
+            db.get_recorded_transaction_attempts(&transaction.id).await.map_err(|error| {
+                RepairRecordedAttemptsError::CouldNotLoadAttempts(relayer.id, transaction.id, error)
+            })?;
+
+        if attempts.is_empty() {
+            return Err(RepairRecordedAttemptsError::MissingAttempts(relayer.id, transaction.id));
+        }
+
+        let landed = find_landed_attempt(provider, &attempts).await.map_err(|error| {
+            RepairRecordedAttemptsError::CouldNotCheckAttempts(relayer.id, transaction.id, error)
+        })?;
+
+        if let Some(attempt) = landed {
+            let sent_with_gas = attempt.sent_with_gas.as_ref().ok_or(
+                RepairRecordedAttemptsError::MissingGasEvidence(
+                    relayer.id,
+                    transaction.id,
+                    attempt.hash,
+                ),
+            )?;
+            let recovered = db
+                .recover_landed_transaction_attempt(
+                    &relayer.id,
+                    &transaction.id,
+                    &attempt.hash,
+                    sent_with_gas,
+                    attempt.sent_with_blob_gas.as_ref(),
+                    !relayer.eip_1559_enabled,
+                )
+                .await
+                .map_err(|error| {
+                    RepairRecordedAttemptsError::CouldNotRecoverLandedAttempt(
+                        relayer.id,
+                        transaction.id,
+                        error,
+                    )
+                })?;
+            if !recovered {
+                return Err(RepairRecordedAttemptsError::LandedAttemptStateChanged(
+                    relayer.id,
+                    transaction.id,
+                ));
+            }
+        } else if future_nonce_pending_repair_hash(&transaction, chain_nonce).is_some() {
+            absent.push((transaction.id, attempts.iter().map(|attempt| attempt.hash).collect()));
+        }
+    }
+
+    let repair_result = db
+        .repair_absent_future_nonce_pending_transactions_for_relayer(
+            &relayer.id,
+            &chain_nonce,
+            &absent,
+            "startup repair: terminalized broadcast-absent future-nonce pending transaction",
+        )
+        .await
+        .map_err(|error| {
+            RepairRecordedAttemptsError::CouldNotRepairAbsentAttempts(relayer.id, error)
+        })?;
+
+    info!(
+        "Startup recorded-attempt reconciliation for relayer {} ({}): chain nonce {}, absent repairs {}, nonce range {:?}..={:?}",
+        relayer.name,
+        relayer.id,
+        chain_nonce.into_inner(),
+        repair_result.count,
+        repair_result.min_nonce.map(|nonce| nonce.into_inner()),
+        repair_result.max_nonce.map(|nonce| nonce.into_inner())
+    );
+
+    Ok(())
+}
+
 /// Loads all relayers from the database.
 async fn load_relayers(db: &PostgresClient) -> Result<Vec<Relayer>, PostgresError> {
     let mut relayers: Vec<Relayer> = Vec::new();
@@ -531,6 +716,50 @@ pub async fn startup_transactions_queues(
 
                 let relayer_id = relayer.id;
 
+                let poisoned_repair = match postgres
+                    .repair_poisoned_pending_transactions_for_relayer(&relayer_id)
+                    .await
+                {
+                    Ok(result) => result,
+                    Err(error) => {
+                        error!(
+                                "Startup is keeping relayer {} ({}) offline because poisoned pending repair could not be persisted: {}",
+                                relayer.name, relayer_id, error
+                            );
+                        continue;
+                    }
+                };
+
+                if poisoned_repair.count > 0 {
+                    info!(
+                        "Startup repaired poisoned unsent pending transactions for relayer {} ({}): count {}, nonce range {:?}..={:?}",
+                        relayer.name,
+                        relayer_id,
+                        poisoned_repair.count,
+                        poisoned_repair.min_nonce.map(|nonce| nonce.into_inner()),
+                        poisoned_repair.max_nonce.map(|nonce| nonce.into_inner())
+                    );
+                }
+
+                if let Err(error) =
+                    repair_recorded_attempts_for_relayer(&postgres, &relayer, &evm_provider).await
+                {
+                    error!(
+                        "Startup is keeping relayer {} ({}) offline because recorded-attempt recovery is unresolved: {}",
+                        relayer.name, relayer_id, error
+                    );
+                    continue;
+                }
+
+                let pending_transactions = repopulate_transaction_queue(
+                    &postgres,
+                    &relayer_id,
+                    &TransactionStatus::PENDING,
+                )
+                .await?;
+                let inmempool_transactions =
+                    repopulate_competitive_transaction_queue(&postgres, &relayer_id).await?;
+
                 let mined_transactions =
                     repopulate_transaction_queue(&postgres, &relayer_id, &TransactionStatus::MINED)
                         .await?;
@@ -548,13 +777,8 @@ pub async fn startup_transactions_queues(
                 transaction_relayer_setups.push(TransactionRelayerSetup::new(
                     relayer,
                     evm_provider,
-                    repopulate_transaction_queue(
-                        &postgres,
-                        &relayer_id,
-                        &TransactionStatus::PENDING,
-                    )
-                    .await?,
-                    repopulate_competitive_transaction_queue(&postgres, &relayer_id).await?,
+                    pending_transactions,
+                    inmempool_transactions,
                     mined_transactions
                         .into_iter()
                         .map(|transaction| (transaction.id, transaction))
@@ -581,4 +805,78 @@ pub async fn startup_transactions_queues(
     spawn_processing_tasks(transactions_queues.clone()).await;
 
     Ok(transactions_queues)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        gas::GasLimit,
+        network::ChainId,
+        shared::common_types::EvmAddress,
+        transaction::types::{
+            TransactionData, TransactionHash, TransactionId, TransactionSpeed, TransactionValue,
+        },
+    };
+    use alloy::primitives::TxHash;
+    use chrono::Utc;
+
+    fn pending_transaction(nonce: u64) -> Transaction {
+        let now = Utc::now();
+        Transaction {
+            id: TransactionId::new(),
+            relayer_id: RelayerId::new(),
+            to: EvmAddress::zero(),
+            from: EvmAddress::zero(),
+            value: TransactionValue::zero(),
+            data: TransactionData::empty(),
+            nonce: TransactionNonce::new(nonce),
+            chain_id: ChainId::new(1),
+            gas_limit: Some(GasLimit::new(21_000)),
+            status: TransactionStatus::PENDING,
+            blobs: None,
+            known_transaction_hash: None,
+            queued_at: now,
+            expires_at: now,
+            sent_at: None,
+            confirmed_at: None,
+            sent_with_gas: None,
+            sent_with_blob_gas: None,
+            mined_at: None,
+            mined_at_block_number: None,
+            speed: TransactionSpeed::FAST,
+            sent_with_max_priority_fee_per_gas: None,
+            sent_with_max_fee_per_gas: None,
+            is_noop: false,
+            external_id: None,
+            cancelled_by_transaction_id: None,
+            failed_reason: None,
+        }
+    }
+
+    #[test]
+    fn startup_nonce_protects_actionable_pending_rows_above_provider_nonce() {
+        let pending = VecDeque::from([pending_transaction(10)]);
+
+        let nonce = effective_startup_nonce(TransactionNonce::new(7), &pending, &VecDeque::new());
+
+        assert_eq!(nonce, TransactionNonce::new(11));
+    }
+
+    #[test]
+    fn future_nonce_terminalization_requires_complete_attempt_markers() {
+        let mut transaction = pending_transaction(9);
+        let hash = TransactionHash::new(TxHash::repeat_byte(9));
+
+        assert_eq!(future_nonce_pending_repair_hash(&transaction, TransactionNonce::new(7)), None);
+
+        transaction.known_transaction_hash = Some(hash);
+        transaction.sent_at = Some(Utc::now());
+
+        assert_eq!(
+            future_nonce_pending_repair_hash(&transaction, TransactionNonce::new(7)),
+            Some(hash)
+        );
+        assert_eq!(future_nonce_pending_repair_hash(&transaction, TransactionNonce::new(10)), None);
+    }
 }

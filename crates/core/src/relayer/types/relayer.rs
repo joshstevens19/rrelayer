@@ -50,11 +50,8 @@ pub struct Relayer {
 impl Relayer {
     /// Get the WalletIndex enum for this relayer
     pub fn wallet_index_type(&self) -> WalletIndex {
-        if self.is_private_key {
-            WalletIndex::PrivateKey(self.wallet_index)
-        } else {
-            WalletIndex::Normal(self.wallet_index as u32)
-        }
+        WalletIndex::from_db_value(self.wallet_index, self.is_private_key)
+            .expect("persisted relayer wallet namespace must be valid")
     }
 
     /// Get the wallet index

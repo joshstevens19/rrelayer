@@ -12,6 +12,7 @@ use crate::gas::GasEstimatorError;
 use crate::wallet::get_mnemonic_from_signing_key;
 pub use evm_provider::{
     create_retry_client, EvmProvider, RelayerProvider, RetryClientError, SendTransactionError,
+    SignedTransaction,
 };
 
 #[derive(Error, Debug)]

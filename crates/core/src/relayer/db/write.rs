@@ -11,6 +11,8 @@ use std::error::Error;
 use thiserror::Error;
 use tracing::log::error;
 
+use super::wallet_index_allocation::next_normal_wallet_index_sql;
+
 #[derive(Error, Debug)]
 pub enum CreateRelayerError {
     #[error("Relayer could not be saved in DB - name: {0}, chainId: {1}: {0}")]
@@ -156,21 +158,24 @@ impl PostgresClient {
                 let new_relayer_id_val = new_relayer_id;
                 let name_val = name.to_string();
                 let chain_id_val = *chain_id;
+                let next_wallet_index_sql = next_normal_wallet_index_sql("$3");
 
                 self.with_transaction(move |tx| {
                     Box::pin(async move {
-                        let query = "
+                        tx.execute("SELECT pg_advisory_xact_lock($1)", &[&chain_id_val])
+                            .await
+                            .map_err(PostgresError::PgError)?;
+
+                        let query = format!("
                             WITH new_wallet_index AS (
-                                SELECT COALESCE(MAX(wallet_index), -1) + 1 AS wallet_index
-                                FROM relayer.record
-                                WHERE chain_id = $3
+                                {next_wallet_index_sql}
                             )
                             INSERT INTO relayer.record (id, name, chain_id, wallet_index, is_private_key)
                             SELECT $1, $2, $3, wallet_index, false
                             FROM new_wallet_index
-                            RETURNING wallet_index";
+                            RETURNING wallet_index");
 
-                        let rows = tx.query(query, &[&new_relayer_id_val, &name_val, &chain_id_val]).await.map_err(PostgresError::PgError)?;
+                        let rows = tx.query(&query, &[&new_relayer_id_val, &name_val, &chain_id_val]).await.map_err(PostgresError::PgError)?;
 
                         let wallet_index: i32 = rows.first()
                             .map(|row| row.get("wallet_index"))
