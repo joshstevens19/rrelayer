@@ -5,9 +5,9 @@ use std::{
 
 use alloy::{
     consensus::TypedTransaction,
-    network::AnyTransactionReceipt,
     transports::{RpcError, TransportErrorKind},
 };
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use thiserror::Error;
 use tokio::sync::Mutex;
@@ -23,7 +23,8 @@ pub enum TransactionsQueuesError {
 }
 
 use super::{
-    start::spawn_processing_tasks_for_relayer,
+    attempts::find_landed_attempt,
+    start::{effective_startup_nonce, spawn_processing_tasks_for_relayer},
     transactions_queue::{classify_send_error, SendErrorClass, TransactionsQueue},
     types::{
         AddTransactionError, CancelTransactionError, CancelTransactionResult, CompetitionType,
@@ -52,10 +53,11 @@ use crate::{
     shutdown::enter_critical_operation,
     transaction::{
         cache::invalidate_transaction_no_state_cache,
+        db::RecordedTransactionAttempt,
         nonce_manager::NonceManager,
         queue_system::types::TransactionQueueSendTransactionError,
         types::{
-            Transaction, TransactionData, TransactionHash, TransactionId, TransactionStatus,
+            Transaction, TransactionData, TransactionId, TransactionNonce, TransactionStatus,
             TransactionValue,
         },
     },
@@ -64,6 +66,38 @@ use crate::{
 
 const SAME_NONCE_BUMP_DIVISOR: u128 = 5;
 const MIN_SAME_NONCE_GAS_BUMP_WEI: u128 = 1_000_000_000;
+
+#[async_trait]
+trait NonceUpdateStore {
+    async fn persist_nonce(
+        &mut self,
+        transaction_id: &TransactionId,
+        nonce: &crate::transaction::types::TransactionNonce,
+    ) -> Result<(), crate::postgres::PostgresError>;
+}
+
+#[async_trait]
+impl NonceUpdateStore for PostgresClient {
+    async fn persist_nonce(
+        &mut self,
+        transaction_id: &TransactionId,
+        nonce: &crate::transaction::types::TransactionNonce,
+    ) -> Result<(), crate::postgres::PostgresError> {
+        self.transaction_update_nonce(transaction_id, nonce).await
+    }
+}
+
+async fn persist_then_advance_transaction_nonce<S: NonceUpdateStore>(
+    store: &mut S,
+    nonce_manager: &NonceManager,
+    transaction: &mut Transaction,
+    new_nonce: crate::transaction::types::TransactionNonce,
+) -> Result<(), crate::postgres::PostgresError> {
+    store.persist_nonce(&transaction.id, &new_nonce).await?;
+    nonce_manager.advance_after_persisted_reservation(new_nonce).await;
+    transaction.nonce = new_nonce;
+    Ok(())
+}
 
 fn bump_u128_for_same_nonce_competitor(value: u128) -> u128 {
     value
@@ -108,11 +142,19 @@ impl TransactionsQueues {
         let mut relayer_block_times_ms = HashMap::new();
 
         for setup in setups {
-            let current_nonce = setup.evm_provider.get_nonce(&setup.relayer).await?;
+            let onchain_nonce = setup.evm_provider.get_nonce(&setup.relayer).await?;
+            let current_nonce = effective_startup_nonce(
+                onchain_nonce,
+                &setup.pending_transactions,
+                &setup.inmempool_transactions,
+            );
 
             info!(
-                "Startup nonce synchronization for relayer {} ({}): synchronizing nonce manager with on-chain nonce {}",
-                setup.relayer.name, setup.relayer.id, current_nonce.into_inner()
+                "Startup nonce synchronization for relayer {} ({}): on-chain nonce {}, protected queue nonce {}",
+                setup.relayer.name,
+                setup.relayer.id,
+                onchain_nonce.into_inner(),
+                current_nonce.into_inner()
             );
 
             relayer_block_times_ms.insert(setup.relayer.id, setup.evm_provider.blocks_every);
@@ -245,7 +287,6 @@ impl TransactionsQueues {
 
     /// Replaces the content of an existing transaction with new parameters.
     fn transaction_replace(
-        &self,
         current_transaction: &mut Transaction,
         replace_with: &RelayTransactionRequest,
     ) {
@@ -267,6 +308,10 @@ impl TransactionsQueues {
         }
         current_transaction.gas_limit = None;
         current_transaction.external_id = replace_with.external_id.clone();
+    }
+
+    fn competitor_nonce(original_transaction: &Transaction) -> TransactionNonce {
+        original_transaction.nonce
     }
 
     /// Computes gas prices for a transaction based on its type.
@@ -470,21 +515,10 @@ impl TransactionsQueues {
         transaction.nonce = assigned_nonce;
         transaction.gas_limit = Some(estimated_gas_limit);
 
-        let transaction_request = Self::create_typed_transaction(
-            &transactions_queue,
-            &transaction,
-            &gas_price,
-            blob_gas_price.as_ref(),
-            estimated_gas_limit,
-        )?;
-
-        transaction.known_transaction_hash =
-            Some(transactions_queue.compute_tx_hash(&transaction_request).await?);
-
-        self.db
-            .save_transaction(relayer_id, &transaction)
-            .await
-            .map_err(AddTransactionError::CouldNotSaveTransactionDb)?;
+        if let Err(error) = self.db.save_transaction(relayer_id, &transaction).await {
+            transactions_queue.nonce_manager.release_unbroadcast_nonce(assigned_nonce).await;
+            return Err(AddTransactionError::CouldNotSaveTransactionDb(error));
+        }
 
         transactions_queue.add_pending_transaction(transaction.clone()).await;
         self.invalidate_transaction_cache(&transaction.id).await;
@@ -535,14 +569,14 @@ impl TransactionsQueues {
                         result.transaction.sent_with_max_priority_fee_per_gas = None;
                         result.transaction.sent_at = None;
                         result.transaction.status = TransactionStatus::PENDING;
-                        transactions_queue
-                            .update_pending_transaction(result.transaction.clone())
-                            .await;
-
                         self.db
                             .transaction_update(&result.transaction)
                             .await
                             .map_err(CancelTransactionError::CouldNotUpdateTransactionDb)?;
+
+                        transactions_queue
+                            .update_pending_transaction(result.transaction.clone())
+                            .await;
 
                         self.invalidate_transaction_cache(&transaction.id).await;
 
@@ -572,7 +606,7 @@ impl TransactionsQueues {
                             value: TransactionValue::zero(),
                             data: TransactionData::empty(),
                             // Use the same nonce as the original transaction to replace it
-                            nonce: result.transaction.nonce,
+                            nonce: Self::competitor_nonce(&result.transaction),
                             gas_limit: Some(GasLimit::new(21_000)),
                             status: TransactionStatus::PENDING,
                             blobs: None,
@@ -649,7 +683,7 @@ impl TransactionsQueues {
                                     if let Err(sync_error) = self
                                         .recover_nonce_synchronization(
                                             &transaction.relayer_id,
-                                            &mut transactions_queue,
+                                            &transactions_queue,
                                         )
                                         .await
                                     {
@@ -681,8 +715,14 @@ impl TransactionsQueues {
                         cancel_transaction.known_transaction_hash = Some(transaction_sent.hash);
                         cancel_transaction.sent_at = Some(Utc::now());
 
+                        // Now we can safely set the foreign key reference and update the original transaction
+                        // For now, we track that a cancellation is pending by setting the cancelled_by_transaction_id
+                        // but keep the original status as INMEMPOOL since it's still competing
+                        result.transaction.cancelled_by_transaction_id =
+                            Some(cancel_transaction_id);
+
                         self.db
-                            .save_transaction(&transaction.relayer_id, &cancel_transaction)
+                            .transaction_update(&result.transaction)
                             .await
                             .map_err(CancelTransactionError::CouldNotUpdateTransactionDb)?;
 
@@ -694,17 +734,6 @@ impl TransactionsQueues {
                             )
                             .await
                             .map_err(CancelTransactionError::SendTransactionError)?;
-
-                        // Now we can safely set the foreign key reference and update the original transaction
-                        // For now, we track that a cancellation is pending by setting the cancelled_by_transaction_id
-                        // but keep the original status as INMEMPOOL since it's still competing
-                        result.transaction.cancelled_by_transaction_id =
-                            Some(cancel_transaction_id);
-
-                        self.db
-                            .transaction_update(&result.transaction)
-                            .await
-                            .map_err(CancelTransactionError::CouldNotUpdateTransactionDb)?;
 
                         self.invalidate_transaction_cache(&transaction.id).await;
 
@@ -771,7 +800,16 @@ impl TransactionsQueues {
                 match result.type_name {
                     EditableTransactionType::Pending => {
                         let original_transaction = result.transaction.clone();
-                        self.transaction_replace(&mut result.transaction, replace_with);
+                        Self::transaction_replace(&mut result.transaction, replace_with);
+
+                        self.db
+                            .transaction_update(&result.transaction)
+                            .await
+                            .map_err(ReplaceTransactionError::CouldNotUpdateTransactionInDb)?;
+                        transactions_queue
+                            .update_pending_transaction(result.transaction.clone())
+                            .await;
+
                         self.invalidate_transaction_cache(&transaction.id).await;
 
                         if let Some(webhook_manager) = &self.webhook_manager {
@@ -807,7 +845,7 @@ impl TransactionsQueues {
                             value: replace_with.value,
                             data: replace_with.data.clone(),
                             // Use the same nonce as the original transaction to replace it
-                            nonce: result.transaction.nonce,
+                            nonce: Self::competitor_nonce(&result.transaction),
                             gas_limit: None, // Will be estimated during send_transaction
                             status: TransactionStatus::PENDING,
                             blobs: replace_with
@@ -927,7 +965,7 @@ impl TransactionsQueues {
                                     if let Err(sync_error) = self
                                         .recover_nonce_synchronization(
                                             &transaction.relayer_id,
-                                            &mut transactions_queue,
+                                            &transactions_queue,
                                         )
                                         .await
                                     {
@@ -955,6 +993,13 @@ impl TransactionsQueues {
                         replace_transaction.known_transaction_hash = Some(transaction_sent.hash);
                         replace_transaction.sent_at = Some(Utc::now());
 
+                        result.transaction.cancelled_by_transaction_id =
+                            Some(replace_transaction_id);
+                        self.db
+                            .transaction_update(&result.transaction)
+                            .await
+                            .map_err(ReplaceTransactionError::CouldNotUpdateTransactionInDb)?;
+
                         transactions_queue
                             .add_competitor_to_inmempool_transaction(
                                 &transaction.id,
@@ -963,18 +1008,6 @@ impl TransactionsQueues {
                             )
                             .await
                             .map_err(ReplaceTransactionError::SendTransactionError)?;
-
-                        self.db
-                            .save_transaction(&transaction.relayer_id, &replace_transaction)
-                            .await
-                            .map_err(ReplaceTransactionError::CouldNotUpdateTransactionInDb)?;
-
-                        result.transaction.cancelled_by_transaction_id =
-                            Some(replace_transaction_id);
-                        self.db
-                            .transaction_update(&result.transaction)
-                            .await
-                            .map_err(ReplaceTransactionError::CouldNotUpdateTransactionInDb)?;
 
                         self.invalidate_transaction_cache(&transaction.id).await;
 
@@ -1014,10 +1047,10 @@ impl TransactionsQueues {
     }
 
     async fn recover_nonce_synchronization(
-        &mut self,
+        &self,
         relayer_id: &RelayerId,
-        transactions_queue: &mut TransactionsQueue,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        transactions_queue: &TransactionsQueue,
+    ) -> Result<TransactionNonce, Box<dyn std::error::Error + Send + Sync>> {
         info!("Attempting nonce recovery for relayer {}", relayer_id);
 
         let current_onchain_nonce = transactions_queue
@@ -1032,16 +1065,16 @@ impl TransactionsQueues {
             relayer_id, current_onchain_nonce.into_inner(), current_internal_nonce.into_inner()
         );
 
-        transactions_queue.nonce_manager.sync_with_onchain_nonce(current_onchain_nonce).await;
-
-        let updated_nonce = transactions_queue.nonce_manager.get_current_nonce().await;
+        let next_recovery_nonce = TransactionNonce::new(
+            current_onchain_nonce.into_inner().max(current_internal_nonce.into_inner()),
+        );
         info!(
-            "Nonce recovery completed for relayer {}: updated internal nonce to {}",
+            "Nonce recovery evidence collected for relayer {}: next candidate nonce {} (memory remains unchanged until database persistence)",
             relayer_id,
-            updated_nonce.into_inner()
+            next_recovery_nonce.into_inner()
         );
 
-        Ok(())
+        Ok(next_recovery_nonce)
     }
 
     /// Closes out a pending transaction whose payload the node has permanently rejected
@@ -1077,17 +1110,18 @@ impl TransactionsQueues {
         transaction.sent_at = None;
         transaction.status = TransactionStatus::PENDING;
         transaction.failed_reason = Some(reason.to_string());
-        transactions_queue.update_pending_transaction(transaction.clone()).await;
 
         // Single atomic write: transaction_update persists the no-op payload together
         // with failed_reason (and the audit row), so a crash can never separate them
-        if let Err(db_error) = self.db.transaction_update(transaction).await {
-            // In-memory queue is consistent; a restart re-runs this close-out.
-            error!(
-                "close_out_pending_transaction_as_noop: failed to persist no-op payload for transaction {}: {}",
-                transaction.id, db_error
-            );
-        }
+        self.db.transaction_update(transaction).await.map_err(|db_error| {
+            ProcessPendingTransactionError::SendTransactionError(
+                transaction.relayer_id,
+                transactions_queue.relay_address(),
+                TransactionQueueSendTransactionError::CouldNotUpdateTransactionDb(db_error),
+            )
+        })?;
+
+        transactions_queue.update_pending_transaction(transaction.clone()).await;
 
         self.invalidate_transaction_cache(&transaction.id).await;
 
@@ -1122,23 +1156,34 @@ impl TransactionsQueues {
         relayer_address: EvmAddress,
         transactions_queue: &mut TransactionsQueue,
         transaction: &Transaction,
-        mined_hash: TransactionHash,
-        receipt: &AnyTransactionReceipt,
+        attempt: &RecordedTransactionAttempt,
     ) -> Result<ProcessResult<ProcessPendingStatus>, ProcessPendingTransactionError> {
-        // Gas fields here are bookkeeping for an already-mined broadcast - take what
-        // the chain actually charged from the receipt instead of quoting the oracle
-        let effective_gas_price = receipt.effective_gas_price;
         let transaction_sent = TransactionSentWithRelayer {
             id: transaction.id,
-            hash: mined_hash,
-            sent_with_gas: GasPriceResult {
-                max_fee: MaxFee::new(effective_gas_price),
-                max_priority_fee: MaxPriorityFee::new(effective_gas_price),
-                min_wait_time_estimate: None,
-                max_wait_time_estimate: None,
-            },
-            sent_with_blob_gas: None,
+            hash: attempt.hash,
+            sent_with_gas: attempt
+                .sent_with_gas
+                .clone()
+                .expect("landed recovery validates gas evidence before resolution"),
+            sent_with_blob_gas: attempt.sent_with_blob_gas.clone(),
         };
+
+        self.db
+            .transaction_sent(
+                &transaction_sent.id,
+                &transaction_sent.hash,
+                &transaction_sent.sent_with_gas,
+                transaction_sent.sent_with_blob_gas.as_ref(),
+                transactions_queue.is_legacy_transactions(),
+            )
+            .await
+            .map_err(|db_error| {
+                ProcessPendingTransactionError::SendTransactionError(
+                    *relayer_id,
+                    relayer_address,
+                    TransactionQueueSendTransactionError::CouldNotUpdateTransactionDb(db_error),
+                )
+            })?;
 
         transactions_queue
             .move_pending_to_inmempool(transaction, &transaction_sent)
@@ -1150,24 +1195,6 @@ impl TransactionsQueues {
                     e,
                 )
             })?;
-
-        if let Err(db_error) = self
-            .db
-            .transaction_sent(
-                &transaction_sent.id,
-                &transaction_sent.hash,
-                &transaction_sent.sent_with_gas,
-                transaction_sent.sent_with_blob_gas.as_ref(),
-                transactions_queue.is_legacy_transactions(),
-            )
-            .await
-        {
-            // The in-memory queue is consistent; a restart replays this resolution.
-            error!(
-                "resolve_pending_transaction_mined: failed to persist mined hash for transaction {}: {}",
-                transaction.id, db_error
-            );
-        }
 
         self.invalidate_transaction_cache(&transaction.id).await;
 
@@ -1342,16 +1369,83 @@ impl TransactionsQueues {
                                 } else if error_class == SendErrorClass::NonceConflict {
                                     warn!("process_single_pending: nonce synchronization issue detected for relayer {}: {}", relayer_id, error);
 
-                                    // Before reassigning a fresh nonce, check whether OUR OWN
-                                    // broadcast of this transaction is what consumed the nonce
-                                    // (a prior lost-response send that mined). Reassigning in
-                                    // that case would execute the payload a second time.
-                                    if let Some(known_hash) = transaction.known_transaction_hash {
-                                        match transactions_queue.get_receipt(&known_hash).await {
-                                            Ok(Some(receipt)) => {
+                                    // Evaluate every durable attempt in recorded order. The live
+                                    // row contains only the latest hash, so checking it alone can
+                                    // miss an earlier attempt that landed before a later retry was
+                                    // definitively rejected.
+                                    let attempts = match self
+                                        .db
+                                        .get_recorded_transaction_attempts(&transaction.id)
+                                        .await
+                                    {
+                                        Ok(attempts) if !attempts.is_empty() => attempts,
+                                        Ok(_) => {
+                                            warn!(
+                                                "process_single_pending: transaction {} has no complete attempt evidence; retrying without touching its nonce",
+                                                transaction.id
+                                            );
+                                            return Ok(
+                                                ProcessResult::<ProcessPendingStatus>::other(
+                                                    ProcessPendingStatus::SendRetrying,
+                                                    Some(&100),
+                                                ),
+                                            );
+                                        }
+                                        Err(attempt_error) => {
+                                            warn!(
+                                                "process_single_pending: could not load attempts for transaction {} ({}); retrying without touching its nonce",
+                                                transaction.id, attempt_error
+                                            );
+                                            return Ok(
+                                                ProcessResult::<ProcessPendingStatus>::other(
+                                                    ProcessPendingStatus::SendRetrying,
+                                                    Some(&100),
+                                                ),
+                                            );
+                                        }
+                                    };
+
+                                    let landed_attempt = match find_landed_attempt(
+                                        &*transactions_queue,
+                                        &attempts,
+                                    )
+                                    .await
+                                    {
+                                        Ok(landed) => landed,
+                                        Err(attempt_error) => {
+                                            warn!(
+                                                "process_single_pending: could not prove attempt state for transaction {} ({}); retrying without touching its nonce",
+                                                transaction.id, attempt_error
+                                            );
+                                            return Ok(
+                                                ProcessResult::<ProcessPendingStatus>::other(
+                                                    ProcessPendingStatus::SendRetrying,
+                                                    Some(&100),
+                                                ),
+                                            );
+                                        }
+                                    };
+
+                                    if let Some(attempt) = landed_attempt {
+                                        let Some(sent_with_gas) = attempt.sent_with_gas.as_ref()
+                                        else {
+                                            warn!(
+                                                "process_single_pending: landed attempt {} for transaction {} has no gas evidence; retrying without touching memory",
+                                                attempt.hash, transaction.id
+                                            );
+                                            return Ok(
+                                                ProcessResult::<ProcessPendingStatus>::other(
+                                                    ProcessPendingStatus::SendRetrying,
+                                                    Some(&100),
+                                                ),
+                                            );
+                                        };
+
+                                        match transactions_queue.get_receipt(&attempt.hash).await {
+                                            Ok(Some(_receipt)) => {
                                                 info!(
                                                     "process_single_pending: transaction {} already mined as {} - handing over to receipt resolution instead of reassigning its nonce",
-                                                    transaction.id, known_hash
+                                                    transaction.id, attempt.hash
                                                 );
                                                 return self
                                                     .resolve_pending_transaction_mined(
@@ -1359,12 +1453,80 @@ impl TransactionsQueues {
                                                         relayer_address,
                                                         &mut transactions_queue,
                                                         &transaction,
-                                                        known_hash,
-                                                        &receipt,
+                                                        attempt,
                                                     )
                                                     .await;
                                             }
-                                            Ok(None) => {}
+                                            Ok(None) => {
+                                                let recovered = match self
+                                                    .db
+                                                    .recover_landed_transaction_attempt(
+                                                        relayer_id,
+                                                        &transaction.id,
+                                                        &attempt.hash,
+                                                        sent_with_gas,
+                                                        attempt.sent_with_blob_gas.as_ref(),
+                                                        transactions_queue.is_legacy_transactions(),
+                                                    )
+                                                    .await
+                                                {
+                                                    Ok(recovered) => recovered,
+                                                    Err(db_error) => {
+                                                        error!(
+                                                            "process_single_pending: failed to persist landed attempt recovery for transaction {}: {}",
+                                                            transaction.id, db_error
+                                                        );
+                                                        return Err(ProcessPendingTransactionError::SendTransactionError(
+                                                            *relayer_id,
+                                                            relayer_address,
+                                                            TransactionQueueSendTransactionError::CouldNotUpdateTransactionDb(db_error),
+                                                        ));
+                                                    }
+                                                };
+
+                                                if !recovered {
+                                                    warn!(
+                                                        "process_single_pending: transaction {} changed before landed attempt recovery; retrying from authoritative state",
+                                                        transaction.id
+                                                    );
+                                                    return Ok(ProcessResult::<
+                                                        ProcessPendingStatus,
+                                                    >::other(
+                                                        ProcessPendingStatus::SendRetrying,
+                                                        Some(&100),
+                                                    ));
+                                                }
+
+                                                let transaction_sent = TransactionSentWithRelayer {
+                                                    id: transaction.id,
+                                                    hash: attempt.hash,
+                                                    sent_with_gas: sent_with_gas.clone(),
+                                                    sent_with_blob_gas: attempt
+                                                        .sent_with_blob_gas
+                                                        .clone(),
+                                                };
+                                                transactions_queue
+                                                    .move_pending_to_inmempool(
+                                                        &transaction,
+                                                        &transaction_sent,
+                                                    )
+                                                    .await
+                                                    .map_err(|move_error| {
+                                                        ProcessPendingTransactionError::MovePendingTransactionToInmempoolError(
+                                                            *relayer_id,
+                                                            relayer_address,
+                                                            move_error,
+                                                        )
+                                                    })?;
+                                                self.invalidate_transaction_cache(&transaction.id)
+                                                    .await;
+                                                return Ok(
+                                                    ProcessResult::<ProcessPendingStatus>::other(
+                                                        ProcessPendingStatus::NonceSynchronized,
+                                                        Some(&100),
+                                                    ),
+                                                );
+                                            }
                                             Err(receipt_error) => {
                                                 // Fail closed: without the receipt we cannot rule
                                                 // out that our own broadcast consumed the nonce,
@@ -1384,24 +1546,39 @@ impl TransactionsQueues {
                                         }
                                     }
 
-                                    if let Err(sync_error) = self
+                                    let new_nonce = match self
                                         .recover_nonce_synchronization(
                                             relayer_id,
-                                            &mut transactions_queue,
+                                            &transactions_queue,
                                         )
                                         .await
                                     {
-                                        error!("Failed to recover nonce synchronization for relayer {}: {}", relayer_id, sync_error);
+                                        Ok(new_nonce) => new_nonce,
+                                        Err(sync_error) => {
+                                            error!("Failed to recover nonce synchronization for relayer {}: {}", relayer_id, sync_error);
+                                            return Err(ProcessPendingTransactionError::SendTransactionError(
+                                                *relayer_id,
+                                                relayer_address,
+                                                TransactionQueueSendTransactionError::TransactionSendError(error),
+                                            ));
+                                        }
+                                    };
+
+                                    if let Err(db_error) = persist_then_advance_transaction_nonce(
+                                        &mut self.db,
+                                        &transactions_queue.nonce_manager,
+                                        &mut transaction,
+                                        new_nonce,
+                                    )
+                                    .await
+                                    {
+                                        error!("Failed to persist nonce update to database for transaction {}: {}", transaction.id, db_error);
                                         return Err(ProcessPendingTransactionError::SendTransactionError(
                                             *relayer_id,
                                             relayer_address,
-                                            TransactionQueueSendTransactionError::TransactionSendError(error),
+                                            TransactionQueueSendTransactionError::CouldNotUpdateTransactionDb(db_error),
                                         ));
                                     }
-
-                                    let new_nonce =
-                                        transactions_queue.nonce_manager.get_and_increment().await;
-                                    transaction.nonce = new_nonce;
 
                                     transactions_queue
                                         .update_pending_transaction_nonce(
@@ -1409,14 +1586,6 @@ impl TransactionsQueues {
                                             new_nonce,
                                         )
                                         .await;
-
-                                    if let Err(db_error) = self
-                                        .db
-                                        .transaction_update_nonce(&transaction.id, &new_nonce)
-                                        .await
-                                    {
-                                        error!("Failed to persist nonce update to database for transaction {}: {}", transaction.id, db_error);
-                                    }
 
                                     info!("Nonce synchronization recovered for relayer {}, updated pending transaction nonce to {} in queue and database", relayer_id, new_nonce.into_inner());
 
@@ -1727,23 +1896,33 @@ impl TransactionsQueues {
                                                     }
                                                 }
 
-                                                if let Err(sync_error) = self.recover_nonce_synchronization(relayer_id, &mut transactions_queue).await {
-                                                    error!("Failed to recover nonce synchronization for relayer {}: {}", relayer_id, sync_error);
+                                                let new_nonce = match self.recover_nonce_synchronization(relayer_id, &transactions_queue).await {
+                                                    Ok(new_nonce) => new_nonce,
+                                                    Err(sync_error) => {
+                                                        error!("Failed to recover nonce synchronization for relayer {}: {}", relayer_id, sync_error);
+                                                        return Err(ProcessInmempoolTransactionError::SendTransactionError(
+                                                            *relayer_id,
+                                                            relayer_address,
+                                                            TransactionQueueSendTransactionError::TransactionSendError(error)
+                                                        ));
+                                                    }
+                                                };
+
+                                                if let Err(db_error) = persist_then_advance_transaction_nonce(
+                                                    &mut self.db,
+                                                    &transactions_queue.nonce_manager,
+                                                    &mut transaction,
+                                                    new_nonce,
+                                                ).await {
+                                                    error!("Failed to persist nonce update to database for transaction {}: {}", transaction.id, db_error);
                                                     return Err(ProcessInmempoolTransactionError::SendTransactionError(
                                                         *relayer_id,
                                                         relayer_address,
-                                                        TransactionQueueSendTransactionError::TransactionSendError(error)
+                                                        TransactionQueueSendTransactionError::CouldNotUpdateTransactionDb(db_error)
                                                     ));
                                                 }
 
-                                                let new_nonce = transactions_queue.nonce_manager.get_and_increment().await;
-                                                transaction.nonce = new_nonce;
-
                                                 transactions_queue.update_inmempool_transaction_nonce(&transaction.id, new_nonce).await;
-
-                                                if let Err(db_error) = self.db.transaction_update_nonce(&transaction.id, &new_nonce).await {
-                                                    error!("Failed to persist nonce update to database for transaction {}: {}", transaction.id, db_error);
-                                                }
 
                                                 info!("Nonce synchronization recovered for relayer {}, updated gas bump transaction nonce {} in queue and database", relayer_id, new_nonce.into_inner());
 
@@ -1776,31 +1955,6 @@ impl TransactionsQueues {
                                                 &transaction_sent,
                                             )
                                             .await;
-                                    }
-
-                                    // Update the local transaction with the new gas values so subsequent bumps work correctly
-                                    transaction.known_transaction_hash =
-                                        Some(transaction_sent.hash);
-                                    transaction.sent_with_max_fee_per_gas =
-                                        Some(transaction_sent.sent_with_gas.max_fee);
-                                    transaction.sent_with_max_priority_fee_per_gas =
-                                        Some(transaction_sent.sent_with_gas.max_priority_fee);
-                                    transaction.sent_with_gas =
-                                        Some(transaction_sent.sent_with_gas.clone());
-                                    transaction.sent_at = Some(Utc::now());
-
-                                    if let Err(db_error) = self
-                                        .db
-                                        .transaction_sent(
-                                            &transaction_sent.id,
-                                            &transaction_sent.hash,
-                                            &transaction_sent.sent_with_gas,
-                                            transaction_sent.sent_with_blob_gas.as_ref(),
-                                            transactions_queue.is_legacy_transactions(),
-                                        )
-                                        .await
-                                    {
-                                        error!("Failed to persist gas bump to database for transaction {}: {}", transaction.id, db_error);
                                     }
 
                                     self.invalidate_transaction_cache(&transaction.id).await;
@@ -1959,5 +2113,136 @@ impl TransactionsQueues {
         } else {
             Err(ProcessMinedTransactionError::RelayerTransactionsQueueNotFound(*relayer_id))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        gas::GasLimit,
+        network::ChainId,
+        postgres::PostgresError,
+        shared::common_types::EvmAddress,
+        transaction::types::{
+            TransactionData, TransactionNonce, TransactionStatus, TransactionValue,
+        },
+    };
+
+    struct TestNonceStore {
+        fail: bool,
+    }
+
+    #[async_trait]
+    impl NonceUpdateStore for TestNonceStore {
+        async fn persist_nonce(
+            &mut self,
+            _transaction_id: &TransactionId,
+            _nonce: &TransactionNonce,
+        ) -> Result<(), PostgresError> {
+            if self.fail {
+                Err(PostgresError::ConnectionPoolError(bb8::RunError::TimedOut))
+            } else {
+                Ok(())
+            }
+        }
+    }
+
+    fn transaction_with_nonce(nonce: u64) -> Transaction {
+        let now = Utc::now();
+        Transaction {
+            id: TransactionId::new(),
+            relayer_id: RelayerId::new(),
+            to: EvmAddress::zero(),
+            from: EvmAddress::zero(),
+            value: TransactionValue::zero(),
+            data: TransactionData::empty(),
+            nonce: TransactionNonce::new(nonce),
+            chain_id: ChainId::new(1),
+            gas_limit: Some(GasLimit::new(21_000)),
+            status: TransactionStatus::PENDING,
+            blobs: None,
+            known_transaction_hash: None,
+            queued_at: now,
+            expires_at: now,
+            sent_at: None,
+            confirmed_at: None,
+            sent_with_gas: None,
+            sent_with_blob_gas: None,
+            mined_at: None,
+            mined_at_block_number: None,
+            speed: TransactionSpeed::FAST,
+            sent_with_max_priority_fee_per_gas: None,
+            sent_with_max_fee_per_gas: None,
+            is_noop: false,
+            external_id: None,
+            cancelled_by_transaction_id: None,
+            failed_reason: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn nonce_persistence_failure_leaves_transaction_and_manager_memory_unchanged() {
+        let manager = NonceManager::new(TransactionNonce::new(7));
+        let mut transaction = transaction_with_nonce(3);
+        let mut store = TestNonceStore { fail: true };
+
+        let result = persist_then_advance_transaction_nonce(
+            &mut store,
+            &manager,
+            &mut transaction,
+            TransactionNonce::new(9),
+        )
+        .await;
+
+        assert!(result.is_err());
+        assert_eq!(transaction.nonce, TransactionNonce::new(3));
+        assert_eq!(manager.get_current_nonce().await, TransactionNonce::new(7));
+    }
+
+    #[tokio::test]
+    async fn persisted_nonce_advances_transaction_then_manager_memory() {
+        let manager = NonceManager::new(TransactionNonce::new(7));
+        let mut transaction = transaction_with_nonce(3);
+        let mut store = TestNonceStore { fail: false };
+
+        persist_then_advance_transaction_nonce(
+            &mut store,
+            &manager,
+            &mut transaction,
+            TransactionNonce::new(9),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(transaction.nonce, TransactionNonce::new(9));
+        assert_eq!(manager.get_current_nonce().await, TransactionNonce::new(10));
+    }
+
+    #[test]
+    fn pending_replacement_preserves_transaction_identity_and_original_nonce() {
+        let mut transaction = transaction_with_nonce(7);
+        let original_id = transaction.id;
+        let replacement = RelayTransactionRequest {
+            to: EvmAddress::zero(),
+            value: TransactionValue::new(alloy::primitives::U256::from(42)),
+            data: TransactionData::empty(),
+            speed: Some(TransactionSpeed::SUPER),
+            external_id: Some("replacement".to_string()),
+            blobs: None,
+        };
+
+        TransactionsQueues::transaction_replace(&mut transaction, &replacement);
+
+        assert_eq!(transaction.id, original_id);
+        assert_eq!(transaction.nonce, TransactionNonce::new(7));
+        assert_eq!(transaction.external_id.as_deref(), Some("replacement"));
+    }
+
+    #[test]
+    fn cancellation_and_replacement_competitors_use_original_nonce() {
+        let original = transaction_with_nonce(11);
+
+        assert_eq!(TransactionsQueues::competitor_nonce(&original), TransactionNonce::new(11));
     }
 }

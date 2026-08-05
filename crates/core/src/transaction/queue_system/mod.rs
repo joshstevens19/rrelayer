@@ -5,5 +5,6 @@ pub use transactions_queues::TransactionsQueues;
 mod types;
 pub use types::{ReplaceTransactionResult, TransactionToSend, TransactionsQueueSetup};
 
+mod attempts;
 mod start;
 pub use start::{startup_transactions_queues, StartTransactionsQueuesError};
