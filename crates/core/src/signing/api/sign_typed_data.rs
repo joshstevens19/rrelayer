@@ -1,5 +1,6 @@
 use crate::app_state::NetworkValidateAction;
 use crate::common_types::EvmAddress;
+use crate::middleware::policy::PolicyContext;
 use crate::rate_limiting::RateLimiter;
 use crate::shared::{bad_request, forbidden, not_found, unauthorized, HttpError};
 use crate::signing::db::RecordSignedTypedDataRequest;
@@ -27,6 +28,7 @@ pub struct SignTypedDataResult {
 pub async fn sign_typed_data(
     State(state): State<Arc<AppState>>,
     Path(relayer_id): Path<RelayerId>,
+    policy_context: PolicyContext,
     headers: HeaderMap,
     Json(typed_data): Json<TypedData>,
 ) -> Result<Json<SignTypedDataResult>, HttpError> {
@@ -42,6 +44,12 @@ pub async fn sign_typed_data(
     .ok_or(not_found("Relayer does not exist".to_string()))?;
 
     state.validate_auth_basic_or_api_key(
+        &headers,
+        &relayer_provider_context.relayer.address,
+        &relayer_provider_context.relayer.chain_id,
+    )?;
+    state.validate_request_policy(
+        &policy_context,
         &headers,
         &relayer_provider_context.relayer.address,
         &relayer_provider_context.relayer.chain_id,

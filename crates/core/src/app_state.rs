@@ -5,7 +5,9 @@ use chrono::{DateTime, Utc};
 use tokio::sync::Mutex;
 
 use crate::common_types::EvmAddress;
+use crate::middleware::policy::PolicyContext;
 use crate::network::ChainId;
+use crate::policy::validate_request_policy_entries;
 use crate::shared::{unauthorized, HttpError};
 use crate::transaction::types::TransactionValue;
 use crate::yaml::{ApiKey, NetworkPermissionsConfig, NetworkSetupConfig};
@@ -290,6 +292,19 @@ impl AppState {
         }
 
         Ok(())
+    }
+
+    pub fn validate_request_policy(
+        &self,
+        context: &PolicyContext,
+        headers: &HeaderMap,
+        relayer: &EvmAddress,
+        chain_id: &ChainId,
+    ) -> Result<(), HttpError> {
+        let Some(permissions) = self.find_network_permission(chain_id) else {
+            return Ok(());
+        };
+        validate_request_policy_entries(permissions, context, headers, relayer)
     }
 
     pub fn network_permission_validate(

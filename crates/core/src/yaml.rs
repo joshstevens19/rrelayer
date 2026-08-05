@@ -1,6 +1,7 @@
 use alloy::json_abi::Function;
 use alloy::primitives::utils::{parse_units, ParseUnits};
 use alloy::primitives::U256;
+use axum::http::HeaderName;
 use regex::{Captures, Regex};
 use serde::de::Visitor;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
@@ -348,6 +349,65 @@ impl SigningProvider {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "scheme", content = "params", rename_all = "snake_case")]
+pub enum SignatureScheme {
+    JwtHs256(JwtHs256Config),
+}
+
+impl SignatureScheme {
+    pub fn validate(&self) -> Result<(), String> {
+        match self {
+            Self::JwtHs256(config) => config.validate(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct JwtHs256Config {
+    /// Name of the environment variable containing the secret, never the secret itself.
+    pub secret_env: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub signature_header: Option<String>,
+}
+
+impl JwtHs256Config {
+    pub fn signature_header(&self) -> &str {
+        self.signature_header.as_deref().unwrap_or("x-appsmith-signature")
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        if self.secret_env.trim().is_empty() {
+            return Err("request_verification.secret_env cannot be empty".to_string());
+        }
+        if let Some(header) = self.signature_header.as_deref() {
+            if header.trim().is_empty() {
+                return Err("request_verification.signature_header cannot be empty".to_string());
+            }
+            HeaderName::from_bytes(header.as_bytes()).map_err(|_| {
+                format!(
+                    "request_verification.signature_header `{}` is not a valid HTTP header name",
+                    header
+                )
+            })?;
+        }
+
+        let secret = env::var(&self.secret_env).map_err(|_| {
+            format!(
+                "request_verification secret environment variable `{}` is not set",
+                self.secret_env
+            )
+        })?;
+        if secret.trim().is_empty() {
+            return Err(format!(
+                "request_verification secret environment variable `{}` is empty",
+                self.secret_env
+            ));
+        }
+        Ok(())
+    }
+}
+
 impl SigningProvider {
     pub fn validate(&self) -> Result<(), String> {
         let configured_methods = [
@@ -386,6 +446,11 @@ pub struct NetworkPermissionsConfig {
     pub disable_typed_data_sign: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub disable_transactions: Option<bool>,
+    /// Omitted means no source-IP restriction. An explicit empty list denies all sources.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub ip_allowlist: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub request_verification: Option<SignatureScheme>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -510,6 +575,8 @@ pub struct ApiConfig {
     pub allowed_origins: Option<Vec<String>>,
     pub authentication_username: String,
     pub authentication_password: String,
+    #[serde(default)]
+    pub trust_forwarded_for: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -1117,6 +1184,9 @@ pub enum ReadYamlError {
     #[error("Signing provider yaml bad format: {0}")]
     SigningProviderYamlError(String),
 
+    #[error("Request policy yaml bad format: {0}")]
+    RequestPolicyYamlError(String),
+
     #[error("Network {0} provider urls not defined")]
     NetworkProviderUrlsNotDefined(String),
 
@@ -1147,6 +1217,19 @@ pub fn read(file_path: &PathBuf, raw_yaml: bool) -> Result<SetupConfig, ReadYaml
 
         if let Some(signing_key) = &network.signing_provider {
             signing_key.validate().map_err(ReadYamlError::SigningProviderYamlError)?;
+        }
+
+        if let Some(permissions) = &network.permissions {
+            for permission in permissions {
+                if let Some(rules) = &permission.ip_allowlist {
+                    crate::policy::validate_ip_allowlist(rules).map_err(|error| {
+                        ReadYamlError::RequestPolicyYamlError(error.to_string())
+                    })?;
+                }
+                if let Some(verification) = &permission.request_verification {
+                    verification.validate().map_err(ReadYamlError::RequestPolicyYamlError)?;
+                }
+            }
         }
     }
 
@@ -1190,6 +1273,91 @@ pub fn read(file_path: &PathBuf, raw_yaml: bool) -> Result<SetupConfig, ReadYaml
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use uuid::Uuid;
+
+    fn read_policy(permission_fields: &str) -> Result<SetupConfig, ReadYamlError> {
+        let path =
+            std::env::temp_dir().join(format!("rrelayer-request-policy-{}.yml", Uuid::new_v4()));
+        let yaml = format!(
+            "name: test\nnetworks:\n- name: ethereum\n  chain_id: 1\n  provider_urls:\n  - http://127.0.0.1:8545\n  permissions:\n  - relayers: '*'\n    allowlist: []\n{permission_fields}api_config:\n  port: 8000\n  authentication_username: test\n  authentication_password: test\n"
+        );
+        fs::write(&path, yaml).expect("write policy fixture");
+        let result = read(&path, true);
+        let _ = fs::remove_file(path);
+        result
+    }
+
+    #[test]
+    fn omitted_controls_remain_omitted_and_forwarding_defaults_false() {
+        let config = read_policy("").unwrap();
+        let permission = &config.networks[0].permissions.as_ref().unwrap()[0];
+        assert!(permission.ip_allowlist.is_none());
+        assert!(permission.request_verification.is_none());
+        assert!(!config.api_config.trust_forwarded_for);
+    }
+
+    #[test]
+    fn explicit_empty_ip_allowlist_is_preserved() {
+        let config = read_policy("    ip_allowlist: []\n").unwrap();
+        assert!(config.networks[0].permissions.as_ref().unwrap()[0]
+            .ip_allowlist
+            .as_ref()
+            .is_some_and(Vec::is_empty));
+    }
+
+    #[test]
+    fn rejects_malformed_ip_scheme_params_and_header() {
+        for fields in [
+            "    ip_allowlist:\n    - not-an-ip\n",
+            "    ip_allowlist: 192.0.2.1\n",
+            "    request_verification:\n      scheme: jwt_rs256\n      params:\n        secret_env: UNUSED\n",
+            "    request_verification:\n      params:\n        secret_env: UNUSED\n",
+            "    request_verification:\n      scheme: jwt_hs256\n      params: not-an-object\n",
+            "    request_verification:\n      scheme: jwt_hs256\n      params:\n        secret_env: UNUSED\n        signature_header: invalid header\n",
+        ] {
+            assert!(read_policy(fields).is_err(), "fields must fail: {fields}");
+        }
+    }
+
+    #[test]
+    fn rejects_missing_and_empty_startup_secrets() {
+        const MISSING: &str = "RRELAYER_TEST_POLICY_SECRET_MUST_NOT_EXIST";
+        const EMPTY: &str = "RRELAYER_TEST_POLICY_SECRET_EMPTY";
+        // SAFETY: this test owns both unique environment variables.
+        unsafe {
+            std::env::remove_var(MISSING);
+            std::env::set_var(EMPTY, "   ");
+        }
+
+        for environment in [MISSING, EMPTY] {
+            assert!(
+                read_policy(&format!(
+                    "    request_verification:\n      scheme: jwt_hs256\n      params:\n        secret_env: {environment}\n"
+                ))
+                .is_err()
+            );
+        }
+    }
+
+    #[test]
+    fn tagged_policy_round_trip_serializes_only_the_secret_name() {
+        const ENV: &str = "RRELAYER_TEST_POLICY_RENDER_SECRET";
+        const SECRET: &str = "must-never-appear-in-yaml";
+        // SAFETY: this test owns a unique environment variable.
+        unsafe { std::env::set_var(ENV, SECRET) };
+        let config = read_policy(&format!(
+            "    request_verification:\n      scheme: jwt_hs256\n      params:\n        secret_env: {ENV}\n        signature_header: x-custom-signature\n"
+        ))
+        .unwrap();
+        let rendered = serde_yaml::to_string(&config).unwrap();
+
+        assert!(rendered.contains("scheme: jwt_hs256"));
+        assert!(rendered.contains("params:"));
+        assert!(rendered.contains(&format!("secret_env: {ENV}")));
+        assert!(rendered.contains("signature_header: x-custom-signature"));
+        assert!(!rendered.contains(SECRET));
+    }
 
     #[test]
     fn parses_cron_job_intervals() {

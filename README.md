@@ -85,6 +85,58 @@ rrelayer and all the commands available to you.
 - CLI: rrelayer is CLI first, so you can do everything with the command line tool.
 - Full transactions support: rrelayer can send blob transactions and any kind of EVM transaction.
 
+## Request policies
+
+Network permission entries can add source-IP and strict HS256 JWT checks.
+These checks are additional to basic/API-key
+authorization: existing authorization runs first, then matching permission
+entries are evaluated in configuration order. Within each entry the IP rule is
+evaluated before JWT verification, and every matching entry must pass (AND
+semantics).
+
+```yaml
+api_config:
+  trust_forwarded_for: false
+networks:
+  - name: ethereum
+    permissions:
+      - relayers: "*"
+        allowlist: []
+        ip_allowlist:
+          - 192.0.2.10/32
+        request_verification:
+          scheme: jwt_hs256
+          params:
+            secret_env: RRELAYER_REQUEST_SIGNATURE_KEY
+            signature_header: x-appsmith-signature
+```
+
+Omitting either control preserves existing behavior. An explicitly empty
+`ip_allowlist` denies every source. JWTs must be raw compact HS256 tokens (no
+`Bearer` prefix), include `exp`, and remain unexpired with zero clock leeway.
+The header defaults to `x-appsmith-signature`. Configuration validates IP rules,
+header names, schemes, parameters, and the named non-empty secret before the
+server starts; YAML contains the environment-variable name, never the secret.
+If that secret disappears after startup, protected operations stop with a
+sanitized HTTP 500 operator error and no mutation or signing is performed.
+
+The policy protects direct/random transaction submission, replacement,
+cancellation, message signing, typed-data signing, and both deprecated signing
+aliases. It does not add checks to health, transaction reads/status/counts/history,
+signing history, or relayer-management routes. Missing or invalid JWTs return
+401. Unresolved or disallowed client IPs return 403. When both fail, IP-first
+evaluation returns 403.
+
+`trust_forwarded_for` defaults to false, which always uses the socket peer and
+ignores spoofed forwarding headers. Enable it only behind an ingress that
+overwrites client-supplied `X-Forwarded-For`. In trusted mode, an absent header
+falls back to the peer, a malformed/non-ASCII header is unresolved, and only the
+trimmed leftmost value of a multi-hop list is used.
+
+Random submission orders available candidates by wallet index and then relayer
+ID before policy evaluation. It selects only among passing candidates; if none
+passes, it returns the first candidate's policy error in that stable order.
+
 ## What can I use rrelayer for?
 
 - Session key relayers: Assign session keys to your backend to do stuff on behalf of users

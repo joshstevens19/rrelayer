@@ -1,4 +1,5 @@
 use super::types::TransactionSpeed;
+use crate::middleware::policy::PolicyContext;
 use crate::rate_limiting::RateLimiter;
 use crate::relayer::{get_relayer, Relayer};
 use crate::shared::utils::convert_blob_strings_to_blobs;
@@ -55,6 +56,7 @@ pub struct SendTransactionResult {
 pub async fn handle_send_transaction(
     State(state): State<Arc<AppState>>,
     Path(relayer_id): Path<RelayerId>,
+    policy_context: PolicyContext,
     headers: HeaderMap,
     Json(transaction): Json<RelayTransactionRequest>,
 ) -> Result<Json<SendTransactionResult>, HttpError> {
@@ -64,7 +66,7 @@ pub async fn handle_send_transaction(
         .await?
         .ok_or(not_found("Relayer does not exist".to_string()))?;
 
-    let result = send_transaction(relayer, transaction, &state, &headers).await?;
+    let result = send_transaction(relayer, transaction, &state, &headers, &policy_context).await?;
 
     Ok(Json(result))
 }
@@ -74,8 +76,10 @@ pub async fn send_transaction(
     transaction: RelayTransactionRequest,
     state: &Arc<AppState>,
     headers: &HeaderMap,
+    policy_context: &PolicyContext,
 ) -> Result<SendTransactionResult, HttpError> {
     state.validate_auth_basic_or_api_key(headers, &relayer.address, &relayer.chain_id)?;
+    state.validate_request_policy(policy_context, headers, &relayer.address, &relayer.chain_id)?;
 
     if state.relayer_internal_only.restricted(&relayer.address, &relayer.chain_id) {
         return Err(unauthorized(Some("Relayer can only be used internally".to_string())));

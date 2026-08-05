@@ -65,6 +65,7 @@ cryptoki = "0.10"
 secrecy = "0.8"
 jsonwebtoken = "9.3"
 rsa = "0.9"
+ipnet = "2.9"
 
 [build-dependencies]
 chrono = "0.4.19"
