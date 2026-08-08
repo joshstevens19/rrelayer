@@ -62,10 +62,12 @@ impl TestRunner {
                 let hash = status.hash.unwrap();
                 info!("Transaction hash: {:?}", hash);
                 info!("Expected hash: {:?}", send_result.hash);
-                if hash != send_result.hash {
-                    return Err(anyhow::anyhow!(
-                        "Mined transaction should match the sent transaction hash"
-                    ));
+                if let Some(expected_hash) = send_result.hash {
+                    if hash != expected_hash {
+                        return Err(anyhow::anyhow!(
+                            "Mined transaction should match the sent transaction hash"
+                        ));
+                    }
                 }
 
                 if status.receipt.is_none() {

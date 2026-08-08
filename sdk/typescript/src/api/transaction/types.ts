@@ -65,5 +65,6 @@ export interface TransactionToSend {
 
 export interface TransactionSent {
   id: string;
-  hash: `0x${string}`;
+  /** Null means the transaction was durably accepted and is awaiting broadcast. */
+  hash: `0x${string}` | null;
 }

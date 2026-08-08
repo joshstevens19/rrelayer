@@ -47,9 +47,12 @@ Just so you understand the properties, the properties you get back when you send
 ```ts
 export interface TransactionSent {
   id: string;
-  hash: `0x${string}`;
+  hash: `0x${string}` | null;
 }
 ```
+
+`null` is a successful, durably accepted submission whose broadcast hash is not available yet.
+Poll the transaction by `id`; do not resubmit it.
 
 ### Sending Native Transaction
 

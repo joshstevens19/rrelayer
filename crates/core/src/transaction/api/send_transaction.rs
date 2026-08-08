@@ -48,7 +48,7 @@ impl FromStr for RelayTransactionRequest {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SendTransactionResult {
     pub id: TransactionId,
-    pub hash: TransactionHash,
+    pub hash: Option<TransactionHash>,
 }
 
 /// API endpoint to send a new transaction through a relayer.
@@ -127,16 +127,59 @@ pub async fn send_transaction(
         .add_transaction(&relayer.id, &transaction_to_send)
         .await?;
 
-    let result = SendTransactionResult {
-        id: transaction.id,
-        hash: transaction.known_transaction_hash.ok_or(internal_server_error(Some(
-            "should always have a known transaction hash".to_string(),
-        )))?,
-    };
+    let result =
+        SendTransactionResult { id: transaction.id, hash: transaction.known_transaction_hash };
 
     if let Some(reservation) = rate_limit_reservation {
         reservation.commit();
     }
 
     Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::{body::to_bytes, http::StatusCode, response::IntoResponse};
+    use serde_json::json;
+
+    fn transaction_id() -> TransactionId {
+        TransactionId::from_str("11111111-1111-4111-8111-111111111111").unwrap()
+    }
+
+    #[tokio::test]
+    async fn direct_submission_returns_http_200_with_explicit_null_hash_when_pending() {
+        let response =
+            Json(SendTransactionResult { id: transaction_id(), hash: None }).into_response();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&body).unwrap(),
+            json!({
+                "id": "11111111-1111-4111-8111-111111111111",
+                "hash": null
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn direct_submission_returns_http_200_with_known_hash() {
+        let hash = TransactionHash::from_str(
+            "0x2222222222222222222222222222222222222222222222222222222222222222",
+        )
+        .unwrap();
+        let response =
+            Json(SendTransactionResult { id: transaction_id(), hash: Some(hash) }).into_response();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&body).unwrap(),
+            json!({
+                "id": "11111111-1111-4111-8111-111111111111",
+                "hash": "0x2222222222222222222222222222222222222222222222222222222222222222"
+            })
+        );
+    }
 }

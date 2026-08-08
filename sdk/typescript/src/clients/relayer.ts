@@ -277,6 +277,71 @@ export class RelayerClient {
           this._apiBaseConfig
         );
       },
+      /**
+       * Wait for a durably accepted transaction to receive its broadcast hash.
+       * A null hash in the send response is accepted/pending, not a rejection.
+       */
+      waitForTransactionHashById: async (
+        transactionId: string,
+        tryEveryMs: number = 100,
+        maxAttempts: number = 1200
+      ): Promise<`0x${string}`> => {
+        if (!Number.isInteger(tryEveryMs) || tryEveryMs <= 0) {
+          throw new Error('tryEveryMs must be a positive integer');
+        }
+        if (!Number.isInteger(maxAttempts) || maxAttempts <= 0) {
+          throw new Error('maxAttempts must be a positive integer');
+        }
+
+        for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+          const result = await this.transaction.get(transactionId);
+          if (!result) {
+            throw new Error('Transaction not found');
+          }
+          if (result.txHash) {
+            return result.txHash;
+          }
+
+          switch (result.status.toUpperCase()) {
+            case TransactionStatus.PENDING:
+            case TransactionStatus.INMEMPOOL:
+              if (attempt === maxAttempts) {
+                throw new Error(
+                  `Timed out waiting for transaction ${transactionId} hash after ${maxAttempts} attempts`
+                );
+              }
+              await new Promise((resolve) => setTimeout(resolve, tryEveryMs));
+              break;
+            case TransactionStatus.MINED:
+            case TransactionStatus.CONFIRMED:
+              throw new Error(
+                'Transaction reached a mined state without a hash'
+              );
+            case TransactionStatus.FAILED:
+              throw new Error('Transaction failed before receiving a hash');
+            case TransactionStatus.EXPIRED:
+              throw new Error('Transaction expired before receiving a hash');
+            case TransactionStatus.CANCELLED:
+              throw new Error(
+                'Transaction was cancelled before receiving a hash'
+              );
+            case TransactionStatus.REPLACED:
+              throw new Error(
+                'Transaction was replaced before receiving a hash'
+              );
+            case TransactionStatus.DROPPED:
+              throw new Error(
+                'Transaction was dropped before receiving a hash'
+              );
+            default:
+              throw new Error(`Unknown transaction status ${result.status}`);
+          }
+        }
+
+        throw new Error(
+          `Timed out waiting for transaction ${transactionId} hash after ${maxAttempts} attempts`
+        );
+      },
       waitForTransactionReceiptById: async (
         transactionId: string,
         tryEveryMs: number = 100
