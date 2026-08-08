@@ -23,6 +23,7 @@ impl TestRunner {
         relayer.update_max_gas_price(1).await?;
 
         let tx_request = RelayTransactionRequest {
+            authorization_list: None,
             to: self.config.anvil_accounts[1],
             value: alloy::primitives::utils::parse_ether("0.5")?.into(),
             data: TransactionData::empty(),
@@ -37,6 +38,7 @@ impl TestRunner {
             .context("Failed to queue head transaction")?;
 
         let follow_up_request = RelayTransactionRequest {
+            authorization_list: None,
             to: self.config.anvil_accounts[1],
             value: alloy::primitives::utils::parse_ether("0.3")?.into(),
             data: TransactionData::empty(),
@@ -95,6 +97,7 @@ impl TestRunner {
 
         // Nonce continuity: a fresh transaction must also mine (no gap was created)
         let continuity_request = RelayTransactionRequest {
+            authorization_list: None,
             to: self.config.anvil_accounts[1],
             value: alloy::primitives::utils::parse_ether("0.1")?.into(),
             data: TransactionData::empty(),
@@ -132,6 +135,7 @@ impl TestRunner {
         relayer.update_max_gas_price(1).await?;
 
         let tx_request = RelayTransactionRequest {
+            authorization_list: None,
             to: self.config.anvil_accounts[1],
             value: alloy::primitives::utils::parse_ether("0.5")?.into(),
             data: TransactionData::empty(),
@@ -146,6 +150,7 @@ impl TestRunner {
             .context("Failed to queue head transaction")?;
 
         let follow_up_request = RelayTransactionRequest {
+            authorization_list: None,
             to: self.config.anvil_accounts[1],
             value: alloy::primitives::utils::parse_ether("0.3")?.into(),
             data: TransactionData::empty(),
@@ -229,6 +234,7 @@ impl TestRunner {
         relayer.update_max_gas_price(1).await?;
 
         let head_request = RelayTransactionRequest {
+            authorization_list: None,
             to: self.config.anvil_accounts[1],
             value: alloy::primitives::utils::parse_ether("0.2")?.into(),
             data: TransactionData::empty(),
@@ -243,6 +249,7 @@ impl TestRunner {
             .context("Failed to queue head transaction")?;
 
         let follow_up_request = RelayTransactionRequest {
+            authorization_list: None,
             to: self.config.anvil_accounts[1],
             value: alloy::primitives::utils::parse_ether("0.1")?.into(),
             data: TransactionData::empty(),
@@ -278,6 +285,7 @@ impl TestRunner {
             .context("Follow-up transaction stuck after external nonce displacement")?;
 
         let continuity_request = RelayTransactionRequest {
+            authorization_list: None,
             to: self.config.anvil_accounts[1],
             value: alloy::primitives::utils::parse_ether("0.05")?.into(),
             data: TransactionData::empty(),
@@ -334,6 +342,7 @@ impl TestRunner {
             amount,
         );
         let revert_request = RelayTransactionRequest {
+            authorization_list: None,
             to: token,
             value: alloy::primitives::U256::ZERO.into(),
             data: TransactionData::new(calldata.into()),
@@ -348,6 +357,7 @@ impl TestRunner {
             .context("Failed to queue transferFrom transaction")?;
 
         let follow_up_request = RelayTransactionRequest {
+            authorization_list: None,
             to: self.config.anvil_accounts[1],
             value: alloy::primitives::utils::parse_ether("0.1")?.into(),
             data: TransactionData::empty(),

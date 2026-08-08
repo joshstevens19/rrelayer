@@ -10,6 +10,9 @@ pub fn build_transaction_from_transaction_view(row: &Row) -> Transaction {
     Transaction {
         id: row.get("id"),
         relayer_id: row.get("relayer_id"),
+        authorization_list: row
+            .get::<_, Option<serde_json::Value>>("authorization_list")
+            .and_then(|v| serde_json::from_value(v).ok()),
         to,
         from,
         value: row.get("value"),

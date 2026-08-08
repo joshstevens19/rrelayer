@@ -10,7 +10,10 @@ use crate::{
     shared::common_types::EvmAddress,
     transaction::{
         queue_system::TransactionToSend,
-        types::{TransactionData, TransactionHash, TransactionId, TransactionValue},
+        types::{
+            TransactionAuthorization, TransactionData, TransactionHash, TransactionId,
+            TransactionValue,
+        },
     },
 };
 use axum::{
@@ -24,6 +27,8 @@ use std::sync::Arc;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct RelayTransactionRequest {
+    #[serde(rename = "authorizationList", skip_serializing_if = "Option::is_none", default)]
+    pub authorization_list: Option<Vec<TransactionAuthorization>>,
     pub to: EvmAddress,
     #[serde(default)]
     pub value: TransactionValue,
@@ -112,6 +117,7 @@ pub async fn send_transaction(
     .await?;
 
     let transaction_to_send = TransactionToSend::new(
+        transaction.authorization_list,
         transaction.to,
         transaction.value,
         transaction.data.clone(),

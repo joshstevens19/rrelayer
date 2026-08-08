@@ -19,6 +19,7 @@ impl TestRunner {
         info!("Created relayer: {:?}", relayer);
 
         let tx_request = RelayTransactionRequest {
+            authorization_list: None,
             to: self.config.anvil_accounts[1],
             value: alloy::primitives::utils::parse_ether("0.5")?.into(),
             data: TransactionData::empty(),

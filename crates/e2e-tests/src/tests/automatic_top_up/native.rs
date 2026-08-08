@@ -53,6 +53,7 @@ impl TestRunner {
 
         if initial_balance1 > drain_amount {
             let tx_request = RelayTransactionRequest {
+                authorization_list: None,
                 to: self.config.anvil_accounts[4],
                 value: drain_amount.into(),
                 data: TransactionData::empty(),
@@ -66,6 +67,7 @@ impl TestRunner {
 
         if initial_balance2 > drain_amount {
             let tx_request = RelayTransactionRequest {
+                authorization_list: None,
                 to: self.config.anvil_accounts[4],
                 value: drain_amount.into(),
                 data: TransactionData::empty(),

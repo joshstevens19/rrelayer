@@ -19,6 +19,7 @@ impl TestRunner {
         info!("Created relayer: {:?}", relayer);
 
         let tx_request = RelayTransactionRequest {
+            authorization_list: None,
             to: self.config.anvil_accounts[1],
             value: alloy::primitives::utils::parse_ether("0.1")?.into(),
             data: TransactionData::empty(),
@@ -34,6 +35,7 @@ impl TestRunner {
             .context("Failed to send transaction")?;
 
         let next_tx_request = RelayTransactionRequest {
+            authorization_list: None,
             to: self.config.anvil_accounts[2],
             value: alloy::primitives::utils::parse_ether("0.1")?.into(),
             data: TransactionData::empty(),

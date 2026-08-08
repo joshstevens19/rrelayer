@@ -1,7 +1,7 @@
 # 🦀 rrelayer 🦀
 
 Note rrelayer is brand new and actively underdevelopment, things will change and bugs will exist—if you find any bugs or have any
-feature requests, please open an issue on [github](https://github.com/joshstevens19/rrelayer/issues). 
+feature requests, please open an issue on [github](https://github.com/joshstevens19/rrelayer/issues).
 
 rrelayer is an opensource powerful, high-performance blockchain transaction relay service built in Rust, designed for seamless integration with any EVM-compatible network.
 This tool transforms complex blockchain interactions into simple REST API calls, eliminating the need for applications to manage wallets, transaction queuing, or nonce management.

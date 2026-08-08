@@ -337,6 +337,9 @@ impl<P> RelayerProvider<P> {
         };
 
         Ok(RelayTransactionRequest {
+            authorization_list: tx_request.authorization_list.as_ref().map(|authorization_list| {
+                authorization_list.iter().map(|auth| auth.into()).collect()
+            }),
             to,
             value,
             data,
