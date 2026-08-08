@@ -88,8 +88,8 @@ jobs:
           platforms: linux/amd64
           provenance: mode=max
           sbom: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=docker-amd64
+          cache-to: type=gha,scope=docker-amd64,mode=max,ignore-error=true
 
   build-arm64:
     name: Build ARM64 Docker Image
@@ -158,8 +158,8 @@ jobs:
           platforms: linux/arm64
           provenance: mode=max
           sbom: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=docker-arm64
+          cache-to: type=gha,scope=docker-arm64,mode=max,ignore-error=true
 
   create-manifest:
     name: Create Multi-Arch Manifest
