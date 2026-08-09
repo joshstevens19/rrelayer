@@ -10,6 +10,7 @@
 
 ### Bug fixes
 
+- fix: remove all panic/unwrap/expect paths from production code, replacing them with proper error propagation, and enforce the ban going forward with workspace-level clippy deny lints
 - fix: deploy documentation through github pages
 - fix: prevent docker cache export failures from blocking arm64 image publishing
 
