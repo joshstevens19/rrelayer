@@ -25,6 +25,7 @@ impl TestRunner {
             speed: Some(TransactionSpeed::SLOW),
             external_id: Some("test-status-op".to_string()),
             blobs: None,
+            gas_price_ceiling: None,
         };
 
         let send_result = relayer

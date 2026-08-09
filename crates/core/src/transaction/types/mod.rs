@@ -1,3 +1,6 @@
+mod gas_price_ceiling;
+pub use gas_price_ceiling::{GasPriceCeiling, GasPriceCeilingBehavior, GasPriceCeilingOutcome};
+
 mod transaction_data;
 pub use transaction_data::TransactionData;
 

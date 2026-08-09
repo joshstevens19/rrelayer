@@ -43,6 +43,7 @@ impl TestRunner {
                 speed: Some(TransactionSpeed::FAST),
                 external_id: Some(format!("test-counts-{}", i)),
                 blobs: None,
+                gas_price_ceiling: None,
             };
 
             let send_result = relayer

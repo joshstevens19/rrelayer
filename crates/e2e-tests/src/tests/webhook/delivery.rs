@@ -33,6 +33,7 @@ impl TestRunner {
             speed: Some(TransactionSpeed::FAST),
             external_id: Some("webhook-eth-transfer".to_string()),
             blobs: None,
+            gas_price_ceiling: None,
         };
 
         let send_result = relayer.transaction().send(&tx_request, None).await?;
@@ -83,6 +84,7 @@ impl TestRunner {
             speed: Some(TransactionSpeed::FAST),
             external_id: Some("webhook-contract-call".to_string()),
             blobs: None,
+            gas_price_ceiling: None,
         };
 
         let contract_send_result = relayer.transaction().send(&contract_tx_request, None).await?;
@@ -233,6 +235,7 @@ impl TestRunner {
             speed: Some(TransactionSpeed::SLOW),
             external_id: Some("test-original".to_string()),
             blobs: None,
+            gas_price_ceiling: None,
         };
 
         let send_result = relayer
@@ -270,6 +273,7 @@ impl TestRunner {
             speed: Some(TransactionSpeed::SLOW),
             external_id: Some("test-replacement-base".to_string()),
             blobs: None,
+            gas_price_ceiling: None,
         };
 
         let _ = relayer
@@ -287,6 +291,7 @@ impl TestRunner {
             speed: Some(TransactionSpeed::SLOW),
             external_id: Some("test-replacement-base".to_string()),
             blobs: None,
+            gas_price_ceiling: None,
         };
 
         match relayer.transaction().send(&duplicate_request, None).await {

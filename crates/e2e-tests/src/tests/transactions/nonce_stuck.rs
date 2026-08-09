@@ -29,6 +29,7 @@ impl TestRunner {
             speed: Some(TransactionSpeed::FAST),
             external_id: Some("test-insufficient-funds-head".to_string()),
             blobs: None,
+            gas_price_ceiling: None,
         };
         let head_tx = relayer
             .transaction()
@@ -43,6 +44,7 @@ impl TestRunner {
             speed: Some(TransactionSpeed::FAST),
             external_id: Some("test-insufficient-funds-followup".to_string()),
             blobs: None,
+            gas_price_ceiling: None,
         };
         let follow_up_tx = relayer
             .transaction()
@@ -101,6 +103,7 @@ impl TestRunner {
             speed: Some(TransactionSpeed::FAST),
             external_id: Some("test-insufficient-funds-continuity".to_string()),
             blobs: None,
+            gas_price_ceiling: None,
         };
         let continuity_tx = relayer
             .transaction()
@@ -138,6 +141,7 @@ impl TestRunner {
             speed: Some(TransactionSpeed::FAST),
             external_id: Some("test-cancel-noop-head".to_string()),
             blobs: None,
+            gas_price_ceiling: None,
         };
         let head_tx = relayer
             .transaction()
@@ -152,6 +156,7 @@ impl TestRunner {
             speed: Some(TransactionSpeed::FAST),
             external_id: Some("test-cancel-noop-followup".to_string()),
             blobs: None,
+            gas_price_ceiling: None,
         };
         let follow_up_tx = relayer
             .transaction()
@@ -235,6 +240,7 @@ impl TestRunner {
             speed: Some(TransactionSpeed::FAST),
             external_id: Some("test-displacement-head".to_string()),
             blobs: None,
+            gas_price_ceiling: None,
         };
         let head_tx = relayer
             .transaction()
@@ -249,6 +255,7 @@ impl TestRunner {
             speed: Some(TransactionSpeed::FAST),
             external_id: Some("test-displacement-followup".to_string()),
             blobs: None,
+            gas_price_ceiling: None,
         };
         let follow_up_tx = relayer
             .transaction()
@@ -284,6 +291,7 @@ impl TestRunner {
             speed: Some(TransactionSpeed::FAST),
             external_id: Some("test-displacement-continuity".to_string()),
             blobs: None,
+            gas_price_ceiling: None,
         };
         let continuity_tx = relayer
             .transaction()
@@ -340,6 +348,7 @@ impl TestRunner {
             speed: Some(TransactionSpeed::FAST),
             external_id: Some("test-mined-revert".to_string()),
             blobs: None,
+            gas_price_ceiling: None,
         };
         let revert_tx = relayer
             .transaction()
@@ -354,6 +363,7 @@ impl TestRunner {
             speed: Some(TransactionSpeed::FAST),
             external_id: Some("test-mined-revert-followup".to_string()),
             blobs: None,
+            gas_price_ceiling: None,
         };
         let follow_up_tx = relayer
             .transaction()

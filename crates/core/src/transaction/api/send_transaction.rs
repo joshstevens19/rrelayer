@@ -10,7 +10,9 @@ use crate::{
     shared::common_types::EvmAddress,
     transaction::{
         queue_system::TransactionToSend,
-        types::{TransactionData, TransactionHash, TransactionId, TransactionValue},
+        types::{
+            GasPriceCeiling, TransactionData, TransactionHash, TransactionId, TransactionValue,
+        },
     },
 };
 use axum::{
@@ -35,6 +37,14 @@ pub struct RelayTransactionRequest {
     pub external_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub blobs: Option<Vec<String>>, // will overflow the stack if you use the Blob type directly
+    /// Optional absolute gas price ceiling honored on the initial send and through the
+    /// gas bump loop. It bounds `max_fee_per_gas` and, since the legacy gas price is
+    /// derived from the max fee, legacy transactions identically (blob gas is not
+    /// covered). With `freeze` behavior a first bid already above the ceiling is
+    /// rejected up front instead of queued; with `cap` it is clamped to exactly the
+    /// ceiling.
+    #[serde(rename = "gasPriceCeiling", skip_serializing_if = "Option::is_none", default)]
+    pub gas_price_ceiling: Option<GasPriceCeiling>,
 }
 
 impl FromStr for RelayTransactionRequest {
@@ -118,6 +128,7 @@ pub async fn send_transaction(
         transaction.speed.clone(),
         convert_blob_strings_to_blobs(transaction.blobs)?,
         transaction.external_id,
+        transaction.gas_price_ceiling,
     );
 
     let transaction = state

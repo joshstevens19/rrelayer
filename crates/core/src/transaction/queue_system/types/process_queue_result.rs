@@ -41,6 +41,11 @@ pub enum ProcessPendingStatus {
     /// over the block gas cap). The transaction was marked failed and converted in
     /// place to a same-nonce no-op so its reserved nonce is still consumed on-chain.
     ClosedOutWithNoop,
+    /// The transaction's per-transaction gas price ceiling (freeze behavior) refused
+    /// the first bid because the market is above the ceiling. The transaction keeps
+    /// its reserved nonce and is re-checked every block until the market drops below
+    /// the ceiling or the transaction expires through the normal no-op machinery.
+    GasPriceCeilingReached,
 }
 
 impl ProcessResultSuccess for ProcessPendingStatus {

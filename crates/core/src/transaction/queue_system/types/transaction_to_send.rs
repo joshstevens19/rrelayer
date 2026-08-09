@@ -1,4 +1,4 @@
-use crate::transaction::types::TransactionBlob;
+use crate::transaction::types::{GasPriceCeiling, TransactionBlob};
 use crate::{
     shared::common_types::EvmAddress,
     transaction::types::{TransactionData, TransactionId, TransactionSpeed, TransactionValue},
@@ -13,9 +13,11 @@ pub struct TransactionToSend {
     pub data: TransactionData,
     pub blobs: Option<Vec<TransactionBlob>>,
     pub external_id: Option<String>,
+    pub gas_price_ceiling: Option<GasPriceCeiling>,
 }
 
 impl TransactionToSend {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         to: EvmAddress,
         value: TransactionValue,
@@ -23,6 +25,7 @@ impl TransactionToSend {
         speed: Option<TransactionSpeed>,
         blobs: Option<Vec<TransactionBlob>>,
         external_id: Option<String>,
+        gas_price_ceiling: Option<GasPriceCeiling>,
     ) -> Self {
         Self {
             id: TransactionId::new(),
@@ -32,6 +35,7 @@ impl TransactionToSend {
             data,
             blobs,
             external_id,
+            gas_price_ceiling,
         }
     }
 }

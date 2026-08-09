@@ -343,6 +343,7 @@ impl<P> RelayerProvider<P> {
             speed: None, // Use relayer's default speed
             external_id: None,
             blobs: None, // EIP-4844 blobs not supported yet
+            gas_price_ceiling: None,
         })
     }
 }

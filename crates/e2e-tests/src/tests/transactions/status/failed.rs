@@ -31,6 +31,7 @@ impl TestRunner {
             speed: Some(TransactionSpeed::FAST),
             external_id: Some("test-failed".to_string()),
             blobs: None,
+            gas_price_ceiling: None,
         };
 
         let send_result = relayer.transaction().send(&tx_request, None).await;

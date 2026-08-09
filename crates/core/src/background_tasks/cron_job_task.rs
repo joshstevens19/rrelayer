@@ -373,6 +373,7 @@ fn build_transaction_to_send(
         transaction.speed.clone(),
         None,
         transaction.external_id.clone(),
+        None,
     ))
 }
 

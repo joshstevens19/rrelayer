@@ -9,7 +9,7 @@ use super::types::{
     SendTransactionGasPriceError, TransactionQueueSendTransactionError, TransactionSentWithRelayer,
     TransactionsQueueSetup,
 };
-use crate::transaction::types::{TransactionNonce, TransactionValue};
+use crate::transaction::types::{GasPriceCeilingOutcome, TransactionNonce, TransactionValue};
 use crate::{
     gas::{
         BlobGasOracleCache, BlobGasPriceResult, GasLimit, GasOracleCache, GasPrice, GasPriceResult,
@@ -507,6 +507,7 @@ impl TransactionsQueue {
                 transaction.is_noop = true;
                 transaction.speed = TransactionSpeed::FAST;
                 transaction.sent_with_blob_gas = None;
+                transaction.gas_price_ceiling = None;
                 transaction.known_transaction_hash = Some(transaction_sent.hash);
                 transaction.sent_at = Some(Utc::now());
             }
@@ -551,6 +552,8 @@ impl TransactionsQueue {
                     replacement_transaction.sent_with_max_priority_fee_per_gas;
                 transaction.is_noop = replacement_transaction.is_noop;
                 transaction.external_id = replacement_transaction.external_id.clone();
+                transaction.gas_price_ceiling = replacement_transaction.gas_price_ceiling;
+                transaction.gas_price_ceiling_hit = replacement_transaction.gas_price_ceiling_hit;
             }
         }
     }
@@ -873,6 +876,10 @@ impl TransactionsQueue {
         transaction.is_noop = true;
         transaction.speed = TransactionSpeed::FAST;
         transaction.sent_with_blob_gas = None;
+        // The close-out no-op must always be broadcastable: the reserved nonce is
+        // consumed at market price, so the original payload's ceiling no longer applies
+        // (gas_price_ceiling_hit is kept so callers can still see the ceiling bound it)
+        transaction.gas_price_ceiling = None;
     }
 
     pub async fn compute_gas_price_for_transaction(
@@ -1325,6 +1332,45 @@ impl TransactionsQueue {
         }
     }
 
+    /// Persists that a transaction's gas price ceiling bound a bid, in both the
+    /// in-memory queues and the database, so the flag is visible to status readers
+    /// while the transaction is still in flight and survives a restart.
+    async fn record_gas_price_ceiling_hit(
+        &self,
+        db: &mut PostgresClient,
+        transaction: &Transaction,
+    ) {
+        info!(
+            "Recording gas price ceiling hit for transaction {} on relayer: {}",
+            transaction.id, self.relayer.name
+        );
+
+        {
+            let mut pending = self.pending_transactions.lock().await;
+            if let Some(stored) = pending.iter_mut().find(|tx| tx.id == transaction.id) {
+                stored.gas_price_ceiling_hit = true;
+            }
+        }
+
+        {
+            let mut inmempool = self.inmempool_transactions.lock().await;
+            for comp_tx in inmempool.iter_mut() {
+                if let Some(stored) = comp_tx.get_transaction_by_id_mut(&transaction.id) {
+                    stored.gas_price_ceiling_hit = true;
+                }
+            }
+        }
+
+        if let Err(db_error) = db.transaction_update_gas_price_ceiling_hit(&transaction.id).await {
+            // In-memory state is already updated; worst case a crash loses the flag
+            // until the ceiling binds a bid again after the restart
+            error!(
+                "Failed to persist gas price ceiling hit for transaction {}: {}",
+                transaction.id, db_error
+            );
+        }
+    }
+
     pub async fn send_transaction(
         &mut self,
         db: &mut PostgresClient,
@@ -1339,12 +1385,42 @@ impl TransactionsQueue {
 
         info!("Sending transaction {:?} for relayer: {}", transaction, self.relayer.name);
 
-        let gas_price = self
+        let mut gas_price = self
             .compute_gas_price_for_transaction(
                 &transaction.speed,
                 transaction.sent_with_gas.as_ref(),
             )
             .await?;
+
+        // The per-transaction ceiling is not applied to no-ops - including an expired
+        // transaction about to be converted below - because the same-nonce close-out
+        // MUST be able to broadcast at market price or the reserved nonce would wedge
+        // the relayer.
+        if !transaction.is_noop && !Self::has_expired(transaction) {
+            let ceiling_already_hit = transaction.gas_price_ceiling_hit;
+            match transaction.apply_gas_price_ceiling(&mut gas_price) {
+                GasPriceCeilingOutcome::WithinCeiling => {}
+                outcome => {
+                    if !ceiling_already_hit {
+                        self.record_gas_price_ceiling_hit(db, transaction).await;
+                    }
+
+                    if outcome == GasPriceCeilingOutcome::BlockedByCeiling {
+                        info!(
+                            "Transaction {} gas price ceiling reached - keeping the last compliant bid for relayer: {}",
+                            transaction.id, self.relayer.name
+                        );
+                        return Err(TransactionQueueSendTransactionError::GasPriceCeilingReached);
+                    }
+
+                    info!(
+                        "Transaction {} bid clamped to its gas price ceiling for relayer: {}",
+                        transaction.id, self.relayer.name
+                    );
+                }
+            }
+        }
+        let gas_price = gas_price;
 
         if !self.within_gas_price_bounds(&gas_price) {
             info!(

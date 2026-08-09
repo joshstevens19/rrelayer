@@ -22,6 +22,11 @@ use crate::{
 pub struct RelayTransactionStatusResult {
     pub hash: Option<TransactionHash>,
     pub status: TransactionStatus,
+    /// True when the transaction's per-transaction gas price ceiling bound a bid -
+    /// lets callers distinguish "expired because the ceiling held the price down"
+    /// from a plain expiry.
+    #[serde(rename = "gasPriceCeilingHit", default)]
+    pub gas_price_ceiling_hit: bool,
     pub receipt: Option<AnyTransactionReceipt>,
 }
 
@@ -57,6 +62,7 @@ pub(crate) async fn transaction_status_result(
         return Ok(RelayTransactionStatusResult {
             hash: transaction.known_transaction_hash,
             status: transaction.status,
+            gas_price_ceiling_hit: transaction.gas_price_ceiling_hit,
             receipt: None,
         });
     }
@@ -71,6 +77,7 @@ pub(crate) async fn transaction_status_result(
             return Ok(RelayTransactionStatusResult {
                 hash: None,
                 status: transaction.status,
+                gas_price_ceiling_hit: transaction.gas_price_ceiling_hit,
                 receipt: None,
             });
         }
@@ -85,5 +92,10 @@ pub(crate) async fn transaction_status_result(
         .await
         .map_err(|e| internal_server_error(Some(e.to_string())))?;
 
-    Ok(RelayTransactionStatusResult { hash: Some(hash), status: transaction.status, receipt })
+    Ok(RelayTransactionStatusResult {
+        hash: Some(hash),
+        status: transaction.status,
+        gas_price_ceiling_hit: transaction.gas_price_ceiling_hit,
+        receipt,
+    })
 }

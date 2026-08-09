@@ -36,7 +36,9 @@ use super::{
 };
 use crate::transaction::api::RelayTransactionRequest;
 use crate::transaction::queue_system::types::SendTransactionGasPriceError;
-use crate::transaction::types::{TransactionBlob, TransactionConversionError, TransactionSpeed};
+use crate::transaction::types::{
+    GasPriceCeilingOutcome, TransactionBlob, TransactionConversionError, TransactionSpeed,
+};
 use crate::{
     gas::{
         BlobGasOracleCache, BlobGasPriceResult, GasLimit, GasOracleCache, GasPriceResult, MaxFee,
@@ -267,6 +269,9 @@ impl TransactionsQueues {
         }
         current_transaction.gas_limit = None;
         current_transaction.external_id = replace_with.external_id.clone();
+        // The replacement carries its own ceiling terms - a previous hit no longer applies
+        current_transaction.gas_price_ceiling = replace_with.gas_price_ceiling;
+        current_transaction.gas_price_ceiling_hit = false;
     }
 
     /// Computes gas prices for a transaction based on its type.
@@ -448,14 +453,30 @@ impl TransactionsQueues {
             external_id: transaction_to_send.external_id.clone(),
             cancelled_by_transaction_id: None,
             failed_reason: None,
+            gas_price_ceiling: transaction_to_send.gas_price_ceiling,
+            gas_price_ceiling_hit: false,
         };
 
-        let (gas_price, blob_gas_price) = Self::compute_transaction_gas_prices(
+        let (mut gas_price, blob_gas_price) = Self::compute_transaction_gas_prices(
             &transactions_queue,
             &transaction,
             &transaction_to_send.speed,
         )
         .await?;
+
+        // Honest first-bid handling for the per-transaction gas price ceiling: freeze
+        // rejects a request whose first market bid is already above the ceiling
+        // (queueing it would only park a nonce we are not willing to bid), while cap
+        // clamps the estimation bid exactly like the send path will.
+        if transaction.apply_gas_price_ceiling(&mut gas_price)
+            == GasPriceCeilingOutcome::BlockedByCeiling
+        {
+            return Err(AddTransactionError::GasPriceCeilingBelowMarket(
+                *relayer_id,
+                gas_price.max_fee,
+            ));
+        }
+        let gas_price = gas_price;
 
         let estimated_gas_limit = Self::estimate_and_validate_gas(
             &mut transactions_queue,
@@ -620,6 +641,9 @@ impl TransactionsQueues {
                             external_id: Some(format!("cancel_{}", transaction.id)),
                             cancelled_by_transaction_id: None,
                             failed_reason: None,
+                            // A cancel must be able to outbid the original - never ceiling it
+                            gas_price_ceiling: None,
+                            gas_price_ceiling_hit: false,
                         };
 
                         info!("cancel_transaction: creating higher gas cancel transaction for inmempool tx with same nonce {:?}", cancel_transaction.nonce);
@@ -873,6 +897,8 @@ impl TransactionsQueues {
                                 .or_else(|| Some(format!("replace_{}", transaction.id))),
                             cancelled_by_transaction_id: None,
                             failed_reason: None,
+                            gas_price_ceiling: replace_with.gas_price_ceiling,
+                            gas_price_ceiling_hit: false,
                         };
 
                         info!("replace_transaction: creating competitive replace transaction for inmempool tx with same nonce {:?}", replace_transaction.nonce);
@@ -1272,6 +1298,18 @@ impl TransactionsQueues {
                                 Ok(ProcessResult::<ProcessPendingStatus>::other(
                                     ProcessPendingStatus::GasPriceTooHigh,
                                     self.relayer_block_times_ms.get(relayer_id), // gas to high check back on the next block - do not do the / 10 part
+                                ))
+                            }
+                            TransactionQueueSendTransactionError::GasPriceCeilingReached => {
+                                // Freeze semantics on the first bid: never broadcast above
+                                // the per-transaction ceiling. The nonce is reserved, so
+                                // stay queued and re-check next block; if the market never
+                                // comes back down the transaction expires through the
+                                // normal no-op machinery with gas_price_ceiling_hit set.
+                                self.invalidate_transaction_cache(&transaction.id).await;
+                                Ok(ProcessResult::<ProcessPendingStatus>::other(
+                                    ProcessPendingStatus::GasPriceCeilingReached,
+                                    self.relayer_block_times_ms.get(relayer_id),
                                 ))
                             }
                             TransactionQueueSendTransactionError::GasCalculationError => {
@@ -1705,6 +1743,21 @@ impl TransactionsQueues {
                                         .await
                                     {
                                         Ok(tx_sent) => tx_sent,
+                                        Err(TransactionQueueSendTransactionError::GasPriceCeilingReached) => {
+                                            // The per-transaction ceiling bound this bump
+                                            // (freeze keeps the last compliant bid live; cap is
+                                            // already bidding exactly the ceiling). Leave the
+                                            // live bid to race until it mines or expires.
+                                            info!(
+                                                "Transaction {} gas price ceiling reached during bump for relayer: {} - keeping current bid",
+                                                transaction.id, transactions_queue.relayer_name()
+                                            );
+                                            self.invalidate_transaction_cache(&transaction.id).await;
+                                            return Ok(ProcessResult::<ProcessInmempoolStatus>::other(
+                                                ProcessInmempoolStatus::StillInmempool,
+                                                self.relayer_block_times_ms.get(relayer_id),
+                                            ));
+                                        }
                                         Err(TransactionQueueSendTransactionError::TransactionSendError(error)) => {
                                             let error_msg = error.to_string().to_lowercase();
                                             let error_class = classify_send_error(&error_msg);

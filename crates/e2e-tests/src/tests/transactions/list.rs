@@ -27,6 +27,7 @@ impl TestRunner {
                 speed: Some(TransactionSpeed::FAST),
                 external_id: Some(format!("test-list-{}", i)),
                 blobs: None,
+                gas_price_ceiling: None,
             };
 
             let _ = relayer

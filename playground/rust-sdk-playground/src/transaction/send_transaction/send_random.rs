@@ -29,6 +29,7 @@ async fn example() -> Result<()> {
         speed: Some(TransactionSpeed::FAST),
         external_id: None,
         blobs: None,
+        gas_price_ceiling: None,
     };
 
     let transaction = client.transaction();

@@ -132,6 +132,7 @@ impl E2ERelayerClient {
             speed: Some(TransactionSpeed::FAST),
             external_id: None,
             blobs: None,
+            gas_price_ceiling: None,
         };
 
         info!("Transaction request: {:?}", request);

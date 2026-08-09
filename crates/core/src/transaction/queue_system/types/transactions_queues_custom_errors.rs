@@ -7,6 +7,7 @@ use super::{
     SendTransactionGasPriceError, TransactionQueueSendTransactionError, TransactionSentWithRelayer,
 };
 use crate::common_types::EvmAddress;
+use crate::gas::MaxFee;
 use crate::shared::{
     bad_request, conflict, forbidden, internal_server_error, not_found, HttpError,
 };
@@ -90,12 +91,19 @@ pub enum AddTransactionError {
 
     #[error("Unsupported transaction type: {message}")]
     UnsupportedTransactionType { message: String },
+
+    #[error("Current market gas price {} exceeds the transaction gas price ceiling for relayer {} and the ceiling behavior is freeze - refusing to queue a transaction it would never bid", .1.into_u128(), .0)]
+    GasPriceCeilingBelowMarket(RelayerId, MaxFee),
 }
 
 impl From<AddTransactionError> for HttpError {
     fn from(value: AddTransactionError) -> Self {
         if matches!(value, AddTransactionError::RelayerIsPaused(_)) {
             return forbidden(value.to_string());
+        }
+
+        if matches!(value, AddTransactionError::GasPriceCeilingBelowMarket(_, _)) {
+            return bad_request(value.to_string());
         }
 
         if matches!(value, AddTransactionError::RelayerNotFound(_)) {

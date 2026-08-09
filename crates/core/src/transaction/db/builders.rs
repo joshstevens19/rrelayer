@@ -1,11 +1,23 @@
 use serde_json;
 use tokio_postgres::Row;
 
-use crate::{shared::common_types::EvmAddress, transaction::types::Transaction};
+use crate::{
+    gas::GasPrice,
+    shared::common_types::EvmAddress,
+    transaction::types::{GasPriceCeiling, GasPriceCeilingBehavior, Transaction},
+};
 
 pub fn build_transaction_from_transaction_view(row: &Row) -> Transaction {
     let to: EvmAddress = row.get("to");
     let from: EvmAddress = row.get("from");
+
+    let gas_price_ceiling =
+        row.get::<_, Option<GasPrice>>("gas_price_ceiling").map(|max_price| GasPriceCeiling {
+            max_price,
+            behavior: row
+                .get::<_, Option<GasPriceCeilingBehavior>>("gas_price_ceiling_behavior")
+                .unwrap_or_default(),
+        });
 
     Transaction {
         id: row.get("id"),
@@ -39,5 +51,7 @@ pub fn build_transaction_from_transaction_view(row: &Row) -> Transaction {
         external_id: row.get("external_id"),
         cancelled_by_transaction_id: row.get("cancelled_by_transaction_id"),
         failed_reason: row.get("failed_reason"),
+        gas_price_ceiling,
+        gas_price_ceiling_hit: row.get("gas_price_ceiling_hit"),
     }
 }

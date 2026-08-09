@@ -28,6 +28,7 @@ impl TestRunner {
                 speed: Some(TransactionSpeed::FAST),
                 external_id: Some(format!("concurrent-test-{}", i)),
                 blobs: None,
+                gas_price_ceiling: None,
             };
             tx_requests.push(tx_request);
         }
