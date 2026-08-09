@@ -24,20 +24,24 @@ pub enum TransactionsQueuesError {
 
 use super::{
     start::spawn_processing_tasks_for_relayer,
-    transactions_queue::{classify_send_error, SendErrorClass, TransactionsQueue},
+    transactions_queue::{
+        classify_send_error, InflightNonceHolder, SendErrorClass, TransactionsQueue,
+    },
     types::{
         AddTransactionError, CancelTransactionError, CancelTransactionResult, CompetitionType,
         EditableTransactionType, ProcessInmempoolStatus, ProcessInmempoolTransactionError,
         ProcessMinedStatus, ProcessMinedTransactionError, ProcessPendingStatus,
         ProcessPendingTransactionError, ProcessResult, ReplaceTransactionError,
-        ReplaceTransactionResult, TransactionRelayerSetup, TransactionSentWithRelayer,
-        TransactionToSend, TransactionsQueueSetup,
+        ReplaceTransactionResult, SendTransactionAtNonceError, SendTransactionAtNonceResult,
+        TransactionRelayerSetup, TransactionSentWithRelayer, TransactionToSend,
+        TransactionsQueueSetup,
     },
 };
 use crate::transaction::api::RelayTransactionRequest;
 use crate::transaction::queue_system::types::SendTransactionGasPriceError;
 use crate::transaction::types::{
-    GasPriceCeilingOutcome, TransactionBlob, TransactionConversionError, TransactionSpeed,
+    GasPriceCeilingOutcome, TransactionBlob, TransactionConversionError, TransactionNonce,
+    TransactionSpeed,
 };
 use crate::{
     gas::{
@@ -80,6 +84,45 @@ fn bump_max_priority_fee_for_same_nonce_competitor(
     max_priority_fee: MaxPriorityFee,
 ) -> MaxPriorityFee {
     MaxPriorityFee::new(bump_u128_for_same_nonce_competitor(max_priority_fee.into_u128()))
+}
+
+/// True when a send-at-nonce payload is the canonical cancel shape - a value-0
+/// self-send with no calldata and no blobs - and should clear the nonce through the
+/// cancel machinery rather than replace it.
+fn is_cancel_shaped(request: &RelayTransactionRequest, relayer_address: &EvmAddress) -> bool {
+    request.to == *relayer_address
+        && request.value.is_zero()
+        && request.data == TransactionData::empty()
+        && request.blobs.as_ref().is_none_or(|blobs| blobs.is_empty())
+}
+
+/// Guard rails for send-at-nonce: the nonce must still be in flight (not yet consumed
+/// on chain) and held by a transaction a same-nonce replacement can act on. Returns
+/// the holder to replace.
+fn validate_exact_nonce_target(
+    relayer_id: &RelayerId,
+    nonce: TransactionNonce,
+    onchain_nonce: TransactionNonce,
+    holder: InflightNonceHolder,
+) -> Result<Transaction, SendTransactionAtNonceError> {
+    if nonce.into_inner() < onchain_nonce.into_inner() {
+        return Err(SendTransactionAtNonceError::NonceAlreadyUsedOnchain(
+            nonce,
+            *relayer_id,
+            onchain_nonce,
+        ));
+    }
+
+    match holder {
+        InflightNonceHolder::Pending(transaction)
+        | InflightNonceHolder::InmempoolHead(transaction) => Ok(transaction),
+        InflightNonceHolder::InmempoolBehindHead(_) => {
+            Err(SendTransactionAtNonceError::NonceBehindInmempoolHead(nonce, *relayer_id))
+        }
+        InflightNonceHolder::NotFound => {
+            Err(SendTransactionAtNonceError::NonceNotPending(nonce, *relayer_id))
+        }
+    }
 }
 
 /// Container for managing multiple transaction queues across different relayers.
@@ -1065,6 +1108,83 @@ impl TransactionsQueues {
         }
     }
 
+    /// Submits a transaction at an explicit nonce already held by an in-flight
+    /// transaction for the relayer, bypassing nonce allocation - the break-glass
+    /// primitive for clearing a wedged nonce. A value-0 self-send with empty calldata
+    /// goes through the cancel machinery (the holder resolves CANCELLED); any other
+    /// payload goes through the replace machinery (the holder resolves REPLACED).
+    /// Both bid a competitive fee above the holder's live bid and are signed,
+    /// broadcast and tracked exactly like any other transaction.
+    ///
+    /// Guard rails: nonces below the relayer's current on-chain nonce are rejected
+    /// (already consumed), as are nonces not held by an in-flight transaction -
+    /// out-of-band broadcasts the queue is not tracking cannot be targeted. Inmempool
+    /// nonces queued behind the head are rejected too: nonces resolve in order, so
+    /// only the head can be wedging the relayer.
+    pub async fn send_transaction_at_nonce(
+        &mut self,
+        relayer_id: &RelayerId,
+        nonce: TransactionNonce,
+        replace_with: &RelayTransactionRequest,
+    ) -> Result<SendTransactionAtNonceResult, SendTransactionAtNonceError> {
+        let queue_arc = self
+            .get_transactions_queue(relayer_id)
+            .ok_or(SendTransactionAtNonceError::RelayerNotFound(*relayer_id))?;
+
+        // Read everything needed under the queue lock, then drop it - the cancel and
+        // replace paths below re-take it themselves.
+        let (relayer_address, onchain_nonce, holder) = {
+            let transactions_queue = queue_arc.lock().await;
+
+            if transactions_queue.is_paused() {
+                return Err(SendTransactionAtNonceError::RelayerIsPaused(*relayer_id));
+            }
+
+            let onchain_nonce = transactions_queue.get_nonce().await.map_err(|e| {
+                SendTransactionAtNonceError::CouldNotGetCurrentOnChainNonce(*relayer_id, e)
+            })?;
+
+            (
+                transactions_queue.relay_address(),
+                onchain_nonce,
+                transactions_queue.find_inflight_transaction_by_nonce(&nonce).await,
+            )
+        };
+
+        let holder = validate_exact_nonce_target(relayer_id, nonce, onchain_nonce, holder)?;
+
+        info!(
+            "send_transaction_at_nonce: replacing transaction {} holding nonce {} for relayer {}",
+            holder.id,
+            nonce.into_inner(),
+            relayer_id
+        );
+
+        if is_cancel_shaped(replace_with, &relayer_address) {
+            let result = self.cancel_transaction(&holder).await?;
+            if !result.success {
+                return Err(SendTransactionAtNonceError::HolderNoLongerInFlight(nonce));
+            }
+
+            Ok(SendTransactionAtNonceResult {
+                replaced_transaction_id: holder.id,
+                transaction_id: result.cancel_transaction_id.unwrap_or(holder.id),
+                hash: None,
+            })
+        } else {
+            let result = self.replace_transaction(&holder, replace_with).await?;
+            if !result.success {
+                return Err(SendTransactionAtNonceError::HolderNoLongerInFlight(nonce));
+            }
+
+            Ok(SendTransactionAtNonceResult {
+                replaced_transaction_id: holder.id,
+                transaction_id: result.replace_transaction_id.unwrap_or(holder.id),
+                hash: result.replace_transaction_hash,
+            })
+        }
+    }
+
     async fn recover_nonce_synchronization(
         &mut self,
         relayer_id: &RelayerId,
@@ -2038,5 +2158,136 @@ impl TransactionsQueues {
         } else {
             Err(ProcessMinedTransactionError::RelayerTransactionsQueueNotFound(*relayer_id))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SendTransactionAtNonceError;
+    use super::{is_cancel_shaped, validate_exact_nonce_target, InflightNonceHolder};
+    use crate::relayer::RelayerId;
+    use crate::shared::common_types::EvmAddress;
+    use crate::transaction::api::RelayTransactionRequest;
+    use crate::transaction::types::{
+        test_fixtures::test_transaction, TransactionData, TransactionNonce, TransactionStatus,
+        TransactionValue,
+    };
+
+    fn relayer_address() -> EvmAddress {
+        EvmAddress::from(alloy::primitives::Address::repeat_byte(0x11))
+    }
+
+    fn request(to: EvmAddress, value: u128, data: TransactionData) -> RelayTransactionRequest {
+        RelayTransactionRequest {
+            to,
+            value: TransactionValue::new(alloy::primitives::U256::from(value)),
+            data,
+            speed: None,
+            external_id: None,
+            blobs: None,
+            gas_price_ceiling: None,
+        }
+    }
+
+    #[test]
+    fn a_value_zero_self_send_with_no_calldata_is_cancel_shaped() {
+        let address = relayer_address();
+        assert!(is_cancel_shaped(&request(address, 0, TransactionData::empty()), &address));
+
+        let mut with_empty_blobs = request(address, 0, TransactionData::empty());
+        with_empty_blobs.blobs = Some(vec![]);
+        assert!(is_cancel_shaped(&with_empty_blobs, &address));
+    }
+
+    #[test]
+    fn other_payloads_are_not_cancel_shaped() {
+        let address = relayer_address();
+        let other = EvmAddress::from(alloy::primitives::Address::repeat_byte(0x22));
+
+        // Not a self-send
+        assert!(!is_cancel_shaped(&request(other, 0, TransactionData::empty()), &address));
+        // Carries value
+        assert!(!is_cancel_shaped(&request(address, 1, TransactionData::empty()), &address));
+        // Carries calldata
+        assert!(!is_cancel_shaped(
+            &request(address, 0, TransactionData::new(vec![0x01].into())),
+            &address
+        ));
+        // Carries blobs
+        let mut with_blobs = request(address, 0, TransactionData::empty());
+        with_blobs.blobs = Some(vec!["0x01".to_string()]);
+        assert!(!is_cancel_shaped(&with_blobs, &address));
+    }
+
+    #[test]
+    fn exact_nonce_send_rejects_nonces_already_used_on_chain() {
+        let relayer_id = RelayerId::new();
+        let holder = test_transaction(4, TransactionStatus::INMEMPOOL);
+
+        let result = validate_exact_nonce_target(
+            &relayer_id,
+            TransactionNonce::new(4),
+            TransactionNonce::new(5),
+            InflightNonceHolder::InmempoolHead(holder),
+        );
+
+        assert!(matches!(
+            result,
+            Err(SendTransactionAtNonceError::NonceAlreadyUsedOnchain(_, _, _))
+        ));
+    }
+
+    #[test]
+    fn exact_nonce_send_rejects_nonces_not_held_by_an_inflight_transaction() {
+        let relayer_id = RelayerId::new();
+
+        let result = validate_exact_nonce_target(
+            &relayer_id,
+            TransactionNonce::new(9),
+            TransactionNonce::new(5),
+            InflightNonceHolder::NotFound,
+        );
+
+        assert!(matches!(result, Err(SendTransactionAtNonceError::NonceNotPending(_, _))));
+    }
+
+    #[test]
+    fn exact_nonce_send_rejects_inmempool_nonces_behind_the_head() {
+        let relayer_id = RelayerId::new();
+        let holder = test_transaction(6, TransactionStatus::INMEMPOOL);
+
+        let result = validate_exact_nonce_target(
+            &relayer_id,
+            TransactionNonce::new(6),
+            TransactionNonce::new(5),
+            InflightNonceHolder::InmempoolBehindHead(holder),
+        );
+
+        assert!(matches!(result, Err(SendTransactionAtNonceError::NonceBehindInmempoolHead(_, _))));
+    }
+
+    #[test]
+    fn exact_nonce_send_accepts_pending_and_inmempool_head_holders() {
+        let relayer_id = RelayerId::new();
+
+        let pending = test_transaction(5, TransactionStatus::PENDING);
+        let resolved = validate_exact_nonce_target(
+            &relayer_id,
+            TransactionNonce::new(5),
+            TransactionNonce::new(5),
+            InflightNonceHolder::Pending(pending.clone()),
+        )
+        .expect("a pending holder at the current nonce should be replaceable");
+        assert_eq!(resolved.id, pending.id);
+
+        let head = test_transaction(5, TransactionStatus::INMEMPOOL);
+        let resolved = validate_exact_nonce_target(
+            &relayer_id,
+            TransactionNonce::new(5),
+            TransactionNonce::new(5),
+            InflightNonceHolder::InmempoolHead(head.clone()),
+        )
+        .expect("the inmempool head should be replaceable");
+        assert_eq!(resolved.id, head.id);
     }
 }

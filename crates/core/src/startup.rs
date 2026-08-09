@@ -30,8 +30,10 @@ use crate::{
             RelayTransactionRequest, RelayTransactionStatusResult, SendTransactionResult,
         },
         get_transaction_by_id,
-        queue_system::{startup_transactions_queues, StartTransactionsQueuesError},
-        types::{Transaction, TransactionId},
+        queue_system::{
+            startup_transactions_queues, SendTransactionAtNonceResult, StartTransactionsQueuesError,
+        },
+        types::{Transaction, TransactionId, TransactionNonce},
     },
     ApiConfig, SafeProxyConfig,
 };
@@ -654,6 +656,51 @@ impl Relayer {
         let relayer = get_relayer(&self.app_state.db, &self.app_state.cache, relayer_id).await?;
 
         Ok(relayer.map(|relayer| relayer.address))
+    }
+
+    /// Lists the transactions currently occupying nonces for a relayer: the live
+    /// pending queue (nonce reserved, not yet broadcast) followed by the inmempool
+    /// queue (broadcast, awaiting receipt), including same-nonce cancel/replace
+    /// competitors. Read straight from the in-process queues, so it reflects what
+    /// the engine is actually tracking right now.
+    pub async fn get_relayer_inflight_transactions(
+        &self,
+        relayer_id: &RelayerId,
+    ) -> Result<Vec<Transaction>, HttpError> {
+        let queue_arc = {
+            let transactions_queues = self.app_state.transactions_queues.lock().await;
+            transactions_queues.get_transactions_queue(relayer_id)
+        }
+        .ok_or(not_found("Relayer does not exist".to_string()))?;
+
+        let transactions_queue = queue_arc.lock().await;
+
+        Ok(transactions_queue.get_inflight_transactions().await)
+    }
+
+    /// Submits a transaction at an explicit nonce currently held by one of the
+    /// relayer's in-flight transactions, bypassing nonce allocation - the break-glass
+    /// primitive for clearing a wedged nonce. A value-0 self-send with empty calldata
+    /// cancels the holder; any other payload replaces it. Either way the send goes
+    /// through the normal sign/broadcast/tracking path with a competitive fee above
+    /// the holder's live bid. Nonces below the current on-chain nonce and nonces not
+    /// held by an in-flight transaction are rejected. Mirrors the cancel/replace
+    /// endpoints with authentication excluded - the embedder is trusted.
+    pub async fn send_transaction_at_nonce(
+        &self,
+        relayer_id: &RelayerId,
+        nonce: u64,
+        request: &RelayTransactionRequest,
+    ) -> Result<SendTransactionAtNonceResult, HttpError> {
+        let result = self
+            .app_state
+            .transactions_queues
+            .lock()
+            .await
+            .send_transaction_at_nonce(relayer_id, TransactionNonce::new(nonce), request)
+            .await?;
+
+        Ok(result)
     }
 
     /// Derives the address the CURRENTLY configured signing provider produces

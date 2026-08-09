@@ -23,6 +23,8 @@ mod transaction_status;
 pub use transaction_status::TransactionStatus;
 
 mod transaction;
+#[cfg(test)]
+pub(crate) use transaction::test_fixtures;
 pub use transaction::{Transaction, TransactionConversionError};
 
 mod transaction_blob;

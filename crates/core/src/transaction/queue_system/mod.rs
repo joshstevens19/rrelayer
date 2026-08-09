@@ -3,7 +3,10 @@ mod transactions_queues;
 pub use transactions_queues::TransactionsQueues;
 
 mod types;
-pub use types::{ReplaceTransactionResult, TransactionToSend, TransactionsQueueSetup};
+pub use types::{
+    ReplaceTransactionResult, SendTransactionAtNonceError, SendTransactionAtNonceResult,
+    TransactionToSend, TransactionsQueueSetup,
+};
 
 mod start;
 pub use start::{startup_transactions_queues, StartTransactionsQueuesError};

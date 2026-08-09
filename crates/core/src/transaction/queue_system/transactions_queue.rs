@@ -125,6 +125,66 @@ fn bump_max_priority_fee_by_at_least_one(max_priority_fee: MaxPriorityFee) -> Ma
     MaxPriorityFee::new(bump_u128_by_at_least_one(max_priority_fee.into_u128()))
 }
 
+/// Where (if anywhere) a nonce currently sits in a relayer's in-flight queues.
+#[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
+pub enum InflightNonceHolder {
+    /// Held by a queued transaction whose nonce is reserved but not broadcast yet.
+    Pending(Transaction),
+    /// Held by the head of the inmempool queue - the only broadcast transaction a
+    /// same-nonce competitor can be attached to.
+    InmempoolHead(Transaction),
+    /// Held by a broadcast transaction queued behind the inmempool head; the head
+    /// nonce has to resolve first.
+    InmempoolBehindHead(Transaction),
+    /// Not held by any in-flight transaction for this relayer.
+    NotFound,
+}
+
+/// Pure snapshot of the live queues - pending first (queue order), then inmempool
+/// originals with their same-nonce competitors. Kept free of `TransactionsQueue`
+/// so the listing shape stays unit-testable without a provider.
+fn snapshot_inflight_transactions(
+    pending: &VecDeque<Transaction>,
+    inmempool: &VecDeque<CompetitiveTransaction>,
+) -> Vec<Transaction> {
+    let mut transactions: Vec<Transaction> = pending.iter().cloned().collect();
+
+    for comp_tx in inmempool {
+        transactions.push(comp_tx.original.clone());
+        if let Some((competitor, _)) = &comp_tx.competitive {
+            transactions.push(competitor.clone());
+        }
+    }
+
+    transactions
+}
+
+/// Pure lookup of which in-flight transaction holds a nonce. Inmempool matches are
+/// resolved against the ORIGINAL transaction (competitors share its nonce) since the
+/// cancel/replace machinery is keyed by the original's id.
+fn find_inflight_transaction_by_nonce(
+    pending: &VecDeque<Transaction>,
+    inmempool: &VecDeque<CompetitiveTransaction>,
+    nonce: &TransactionNonce,
+) -> InflightNonceHolder {
+    if let Some(transaction) = pending.iter().find(|tx| tx.nonce == *nonce) {
+        return InflightNonceHolder::Pending(transaction.clone());
+    }
+
+    for (position, comp_tx) in inmempool.iter().enumerate() {
+        if comp_tx.original.nonce == *nonce {
+            return if position == 0 {
+                InflightNonceHolder::InmempoolHead(comp_tx.original.clone())
+            } else {
+                InflightNonceHolder::InmempoolBehindHead(comp_tx.original.clone())
+            };
+        }
+    }
+
+    InflightNonceHolder::NotFound
+}
+
 pub struct TransactionsQueue {
     pending_transactions: Mutex<VecDeque<Transaction>>,
     inmempool_transactions: Mutex<VecDeque<CompetitiveTransaction>>,
@@ -281,6 +341,29 @@ impl TransactionsQueue {
         let count = transactions.len();
         info!("Current pending transaction count for relayer {}: {}", self.relayer.name, count);
         count
+    }
+
+    /// Snapshot of every transaction currently occupying a nonce for this relayer:
+    /// pending transactions (nonce reserved, not yet broadcast) in queue order,
+    /// followed by inmempool transactions (broadcast, awaiting receipt) including any
+    /// same-nonce cancel/replace competitors.
+    pub async fn get_inflight_transactions(&self) -> Vec<Transaction> {
+        let pending = self.pending_transactions.lock().await;
+        let inmempool = self.inmempool_transactions.lock().await;
+
+        snapshot_inflight_transactions(&pending, &inmempool)
+    }
+
+    /// Locates the in-flight transaction currently holding a nonce, classifying where
+    /// it sits so callers know whether a same-nonce replacement can act on it.
+    pub async fn find_inflight_transaction_by_nonce(
+        &self,
+        nonce: &TransactionNonce,
+    ) -> InflightNonceHolder {
+        let pending = self.pending_transactions.lock().await;
+        let inmempool = self.inmempool_transactions.lock().await;
+
+        find_inflight_transaction_by_nonce(&pending, &inmempool, nonce)
     }
 
     pub async fn get_editable_transaction_by_id(
@@ -1893,7 +1976,16 @@ impl TransactionsQueue {
 
 #[cfg(test)]
 mod tests {
-    use super::{classify_send_error, SendErrorClass};
+    use std::collections::VecDeque;
+
+    use super::{
+        classify_send_error, find_inflight_transaction_by_nonce, snapshot_inflight_transactions,
+        CompetitiveTransaction, InflightNonceHolder, SendErrorClass,
+    };
+    use crate::transaction::queue_system::types::CompetitionType;
+    use crate::transaction::types::{
+        test_fixtures::test_transaction, TransactionNonce, TransactionStatus,
+    };
 
     #[test]
     fn classify_send_error_covers_node_wordings() {
@@ -1960,5 +2052,74 @@ mod tests {
                 "misclassified node error: {message}"
             );
         }
+    }
+
+    #[test]
+    fn inflight_snapshot_lists_pending_then_inmempool_with_competitors() {
+        let pending_first = test_transaction(12, TransactionStatus::PENDING);
+        let pending_second = test_transaction(13, TransactionStatus::PENDING);
+        let inmempool_original = test_transaction(10, TransactionStatus::INMEMPOOL);
+        let mut competitive = CompetitiveTransaction::new(inmempool_original.clone());
+        let competitor = test_transaction(10, TransactionStatus::INMEMPOOL);
+        competitive.add_competitor(competitor.clone(), CompetitionType::Cancel);
+        let inmempool_plain =
+            CompetitiveTransaction::new(test_transaction(11, TransactionStatus::INMEMPOOL));
+
+        let pending: VecDeque<_> = vec![pending_first.clone(), pending_second.clone()].into();
+        let inmempool: VecDeque<_> = vec![competitive, inmempool_plain.clone()].into();
+
+        let snapshot = snapshot_inflight_transactions(&pending, &inmempool);
+
+        let ids: Vec<_> = snapshot.iter().map(|tx| tx.id).collect();
+        assert_eq!(
+            ids,
+            vec![
+                pending_first.id,
+                pending_second.id,
+                inmempool_original.id,
+                competitor.id,
+                inmempool_plain.original.id
+            ]
+        );
+
+        let nonces: Vec<u64> = snapshot.iter().map(|tx| tx.nonce.into_inner()).collect();
+        assert_eq!(nonces, vec![12, 13, 10, 10, 11]);
+    }
+
+    #[test]
+    fn inflight_snapshot_of_empty_queues_is_empty() {
+        let snapshot = snapshot_inflight_transactions(&VecDeque::new(), &VecDeque::new());
+        assert!(snapshot.is_empty());
+    }
+
+    #[test]
+    fn find_by_nonce_classifies_pending_head_and_behind_head() {
+        let pending_tx = test_transaction(12, TransactionStatus::PENDING);
+        let head = CompetitiveTransaction::new(test_transaction(10, TransactionStatus::INMEMPOOL));
+        let behind =
+            CompetitiveTransaction::new(test_transaction(11, TransactionStatus::INMEMPOOL));
+
+        let pending: VecDeque<_> = vec![pending_tx.clone()].into();
+        let inmempool: VecDeque<_> = vec![head.clone(), behind.clone()].into();
+
+        match find_inflight_transaction_by_nonce(&pending, &inmempool, &TransactionNonce::new(12)) {
+            InflightNonceHolder::Pending(tx) => assert_eq!(tx.id, pending_tx.id),
+            other => panic!("nonce 12 should be pending, got {other:?}"),
+        }
+
+        match find_inflight_transaction_by_nonce(&pending, &inmempool, &TransactionNonce::new(10)) {
+            InflightNonceHolder::InmempoolHead(tx) => assert_eq!(tx.id, head.original.id),
+            other => panic!("nonce 10 should be the inmempool head, got {other:?}"),
+        }
+
+        match find_inflight_transaction_by_nonce(&pending, &inmempool, &TransactionNonce::new(11)) {
+            InflightNonceHolder::InmempoolBehindHead(tx) => assert_eq!(tx.id, behind.original.id),
+            other => panic!("nonce 11 should be behind the head, got {other:?}"),
+        }
+
+        assert!(matches!(
+            find_inflight_transaction_by_nonce(&pending, &inmempool, &TransactionNonce::new(99)),
+            InflightNonceHolder::NotFound
+        ));
     }
 }

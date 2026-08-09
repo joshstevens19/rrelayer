@@ -31,7 +31,7 @@ pub use transactions_queues_custom_errors::{
     AddTransactionError, CancelTransactionError, CompetitionResolutionResult,
     MoveInmempoolTransactionToMinedError, MovePendingTransactionToInmempoolError,
     ProcessInmempoolTransactionError, ProcessMinedTransactionError, ProcessPendingTransactionError,
-    ReplaceTransactionError,
+    ReplaceTransactionError, SendTransactionAtNonceError,
 };
 
 mod competitive_transaction;
@@ -39,3 +39,6 @@ pub use competitive_transaction::{CompetitionType, CompetitiveTransaction};
 
 mod replace_transaction_result;
 pub use replace_transaction_result::ReplaceTransactionResult;
+
+mod send_transaction_at_nonce_result;
+pub use send_transaction_at_nonce_result::SendTransactionAtNonceResult;
