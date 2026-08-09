@@ -273,23 +273,36 @@ async fn start_api(
 
     let shutdown_signal = async {
         let ctrl_c = async {
-            tokio::signal::ctrl_c().await.expect("failed to install Ctrl+C handler");
+            if let Err(e) = tokio::signal::ctrl_c().await {
+                error!("failed to install Ctrl+C handler: {}", e);
+                std::future::pending::<()>().await;
+            }
         };
 
         #[cfg(unix)]
         let terminate = async {
-            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-                .expect("failed to install signal handler")
-                .recv()
-                .await;
+            match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+                Ok(mut signal) => {
+                    signal.recv().await;
+                }
+                Err(e) => {
+                    error!("failed to install signal handler: {}", e);
+                    std::future::pending::<()>().await;
+                }
+            }
         };
 
         #[cfg(windows)]
         let terminate = async {
-            tokio::signal::windows::ctrl_break()
-                .expect("failed to install Ctrl+Break handler")
-                .recv()
-                .await;
+            match tokio::signal::windows::ctrl_break() {
+                Ok(mut signal) => {
+                    signal.recv().await;
+                }
+                Err(e) => {
+                    error!("failed to install Ctrl+Break handler: {}", e);
+                    std::future::pending::<()>().await;
+                }
+            }
         };
 
         #[cfg(not(any(unix, windows)))]
@@ -365,6 +378,9 @@ pub enum StartError {
 
     #[error("To run rrelayer you need to define at least one network in the yaml file")]
     NoNetworksDefinedInYaml,
+
+    #[error("Could not install default Crypto Provider. Are you already using it?")]
+    CryptoProviderInstallError,
 }
 
 pub async fn start(project_path: &Path) -> Result<(), StartError> {
@@ -393,7 +409,7 @@ pub async fn start(project_path: &Path) -> Result<(), StartError> {
     info!("Applied database schema");
 
     CryptoProvider::install_default(default_provider())
-        .expect("Could not install default Crypto Provider. Are you already using it?");
+        .map_err(|_| StartError::CryptoProviderInstallError)?;
 
     let cache = Arc::new(Cache::new().await);
 

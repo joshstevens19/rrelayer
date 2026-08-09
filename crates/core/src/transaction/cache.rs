@@ -11,7 +11,8 @@ fn build_transaction_cache_key(id: &TransactionId) -> String {
 
 pub async fn get_transaction_cache(cache: &Arc<Cache>, id: &TransactionId) -> Option<Transaction> {
     if let Some(cached_result) = cache.get(&build_transaction_cache_key(id).to_string()).await {
-        return cached_result.to_transaction();
+        // flatten: a cached `None` transaction and an unexpected cache variant both yield `None`
+        return cached_result.to_transaction().flatten();
     }
 
     None

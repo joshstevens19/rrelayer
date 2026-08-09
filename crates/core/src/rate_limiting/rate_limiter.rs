@@ -497,7 +497,16 @@ impl RateLimiter {
     }
 
     fn calculate_window_start(&self, current_time: SystemTime, window_seconds: u32) -> SystemTime {
-        let current_timestamp = current_time.duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let current_timestamp = match current_time.duration_since(UNIX_EPOCH) {
+            Ok(duration) => duration.as_secs(),
+            Err(e) => {
+                error!(
+                    "System time is before UNIX_EPOCH ({}); defaulting rate limit window start to epoch",
+                    e
+                );
+                0
+            }
+        };
         let window_start_timestamp =
             (current_timestamp / window_seconds as u64) * window_seconds as u64;
         UNIX_EPOCH + std::time::Duration::from_secs(window_start_timestamp)

@@ -58,7 +58,9 @@ impl TransactionApi {
         if let Some(rate_limit_key) = rate_limit_key.as_ref() {
             headers.insert(
                 RATE_LIMIT_HEADER_NAME,
-                HeaderValue::from_str(rate_limit_key).expect("Invalid rate limit key"),
+                HeaderValue::from_str(rate_limit_key).map_err(|e| {
+                    ApiSdkError::ConfigError(format!("Invalid rate limit key: {}", e))
+                })?,
             );
         }
         self.client
@@ -80,7 +82,9 @@ impl TransactionApi {
         if let Some(rate_limit_key) = rate_limit_key.as_ref() {
             headers.insert(
                 RATE_LIMIT_HEADER_NAME,
-                HeaderValue::from_str(rate_limit_key).expect("Invalid rate limit key"),
+                HeaderValue::from_str(rate_limit_key).map_err(|e| {
+                    ApiSdkError::ConfigError(format!("Invalid rate limit key: {}", e))
+                })?,
             );
         }
         self.client
@@ -101,7 +105,9 @@ impl TransactionApi {
         if let Some(rate_limit_key) = rate_limit_key.as_ref() {
             headers.insert(
                 RATE_LIMIT_HEADER_NAME,
-                HeaderValue::from_str(rate_limit_key).expect("Invalid rate limit key"),
+                HeaderValue::from_str(rate_limit_key).map_err(|e| {
+                    ApiSdkError::ConfigError(format!("Invalid rate limit key: {}", e))
+                })?,
             );
         }
 
@@ -120,7 +126,9 @@ impl TransactionApi {
         if let Some(rate_limit_key) = rate_limit_key.as_ref() {
             headers.insert(
                 RATE_LIMIT_HEADER_NAME,
-                HeaderValue::from_str(rate_limit_key).expect("Invalid rate limit key"),
+                HeaderValue::from_str(rate_limit_key).map_err(|e| {
+                    ApiSdkError::ConfigError(format!("Invalid rate limit key: {}", e))
+                })?,
             );
         }
 

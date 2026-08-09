@@ -26,7 +26,7 @@ impl HttpClient {
         )
     }
 
-    fn build_headers(&self, additional_headers: Option<HeaderMap>) -> HeaderMap {
+    fn build_headers(&self, additional_headers: Option<HeaderMap>) -> ApiResult<HeaderMap> {
         let mut headers = HeaderMap::new();
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
 
@@ -36,12 +36,19 @@ impl HttpClient {
                 let encoded = general_purpose::STANDARD.encode(credentials);
                 headers.insert(
                     AUTHORIZATION,
-                    HeaderValue::from_str(&format!("Basic {}", encoded)).unwrap(),
+                    HeaderValue::from_str(&format!("Basic {}", encoded)).map_err(|e| {
+                        ApiSdkError::ConfigError(format!("Invalid basic auth header value: {}", e))
+                    })?,
                 );
             }
             AuthConfig::ApiKey { api_key } => {
                 let header_name = HeaderName::from_static("x-rrelayer-api-key");
-                headers.insert(header_name, HeaderValue::from_str(api_key).unwrap());
+                headers.insert(
+                    header_name,
+                    HeaderValue::from_str(api_key).map_err(|e| {
+                        ApiSdkError::ConfigError(format!("Invalid API key header value: {}", e))
+                    })?,
+                );
             }
         }
 
@@ -53,7 +60,7 @@ impl HttpClient {
             }
         }
 
-        headers
+        Ok(headers)
     }
 
     fn handle_response_status(&self, response: &reqwest::Response) -> ApiResult<()> {
@@ -70,7 +77,7 @@ impl HttpClient {
         T: DeserializeOwned,
     {
         let url = self.build_url(endpoint);
-        let headers = self.build_headers(None);
+        let headers = self.build_headers(None)?;
 
         let response = self.client.get(&url).headers(headers).send().await?;
         self.handle_response_status(&response)?;
@@ -84,7 +91,7 @@ impl HttpClient {
         T: DeserializeOwned,
     {
         let url = self.build_url(endpoint);
-        let headers = self.build_headers(None);
+        let headers = self.build_headers(None)?;
 
         let response = self.client.get(&url).headers(headers).send().await?;
 
@@ -104,7 +111,7 @@ impl HttpClient {
         Q: Serialize,
     {
         let url = self.build_url(endpoint);
-        let headers = self.build_headers(None);
+        let headers = self.build_headers(None)?;
 
         let mut request = self.client.get(&url).headers(headers);
         if let Some(q) = query {
@@ -123,7 +130,7 @@ impl HttpClient {
         B: Serialize,
     {
         let url = self.build_url(endpoint);
-        let headers = self.build_headers(None);
+        let headers = self.build_headers(None)?;
 
         let response = self.client.post(&url).headers(headers).json(body).send().await?;
         self.handle_response_status(&response)?;
@@ -143,7 +150,7 @@ impl HttpClient {
         B: Serialize,
     {
         let url = self.build_url(endpoint);
-        let headers = self.build_headers(Some(headers));
+        let headers = self.build_headers(Some(headers))?;
 
         let response = self.client.post(&url).headers(headers).json(body).send().await?;
         self.handle_response_status(&response)?;
@@ -157,7 +164,7 @@ impl HttpClient {
         B: Serialize,
     {
         let url = self.build_url(endpoint);
-        let headers = self.build_headers(None);
+        let headers = self.build_headers(None)?;
 
         let response = self.client.post(&url).headers(headers).json(body).send().await?;
         self.handle_response_status(&response)?;
@@ -172,7 +179,7 @@ impl HttpClient {
         B: Serialize,
     {
         let url = self.build_url(endpoint);
-        let headers = self.build_headers(None);
+        let headers = self.build_headers(None)?;
 
         let response = self.client.put(&url).headers(headers).json(body).send().await?;
         self.handle_response_status(&response)?;
@@ -192,7 +199,7 @@ impl HttpClient {
         B: Serialize,
     {
         let url = self.build_url(endpoint);
-        let headers = self.build_headers(Some(headers));
+        let headers = self.build_headers(Some(headers))?;
 
         let response = self.client.put(&url).headers(headers).json(body).send().await?;
         self.handle_response_status(&response)?;
@@ -206,7 +213,7 @@ impl HttpClient {
         B: Serialize,
     {
         let url = self.build_url(endpoint);
-        let headers = self.build_headers(None);
+        let headers = self.build_headers(None)?;
 
         let response = self.client.put(&url).headers(headers).json(body).send().await?;
         self.handle_response_status(&response)?;
@@ -220,7 +227,7 @@ impl HttpClient {
         T: DeserializeOwned,
     {
         let url = self.build_url(endpoint);
-        let headers = self.build_headers(None);
+        let headers = self.build_headers(None)?;
 
         let response = self.client.delete(&url).headers(headers).send().await?;
         self.handle_response_status(&response)?;
@@ -231,7 +238,7 @@ impl HttpClient {
 
     pub async fn delete_status(&self, endpoint: &str) -> ApiResult<()> {
         let url = self.build_url(endpoint);
-        let headers = self.build_headers(None);
+        let headers = self.build_headers(None)?;
 
         let response = self.client.delete(&url).headers(headers).send().await?;
         self.handle_response_status(&response)?;
@@ -246,7 +253,7 @@ impl HttpClient {
         B: Serialize,
     {
         let url = self.build_url(endpoint);
-        let headers = self.build_headers(None);
+        let headers = self.build_headers(None)?;
 
         let response = self.client.delete(&url).headers(headers).json(body).send().await?;
         self.handle_response_status(&response)?;
@@ -257,7 +264,7 @@ impl HttpClient {
 
     pub async fn get_status(&self, endpoint: &str) -> ApiResult<()> {
         let url = self.build_url(endpoint);
-        let headers = self.build_headers(None);
+        let headers = self.build_headers(None)?;
 
         let response = self.client.get(&url).headers(headers).send().await?;
         self.handle_response_status(&response)?;

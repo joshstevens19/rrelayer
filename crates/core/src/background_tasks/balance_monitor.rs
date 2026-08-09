@@ -1,4 +1,4 @@
-use alloy::primitives::utils::{format_ether, parse_ether};
+use alloy::primitives::utils::{format_ether, parse_ether, UnitsError};
 use alloy::primitives::U256;
 use std::{sync::Arc, time::Duration};
 use tokio::sync::Mutex;
@@ -10,11 +10,11 @@ use crate::{
     shutdown::subscribe_to_shutdown, webhooks::WebhookManager,
 };
 
-fn get_minimum_balance_threshold(chain_id: &ChainId) -> U256 {
+fn get_minimum_balance_threshold(chain_id: &ChainId) -> Result<U256, UnitsError> {
     if chain_id.u64() == 1 {
-        parse_ether("0.005").expect("Failed to parse native token threshold")
+        parse_ether("0.005")
     } else {
-        parse_ether("0.001").expect("Failed to parse native token threshold")
+        parse_ether("0.001")
     }
 }
 
@@ -59,7 +59,8 @@ async fn check_balances_for_chain(
     webhook_manager: &Option<Arc<Mutex<WebhookManager>>>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let chain_id = provider.chain_id;
-    let min_balance = get_minimum_balance_threshold(&chain_id);
+    let min_balance = get_minimum_balance_threshold(&chain_id)
+        .map_err(|e| format!("Failed to parse native token threshold: {}", e))?;
     let min_balance_formatted = format_ether(min_balance);
 
     info!("Checking balances for chain {} (minimum: {} ETH)", chain_id, min_balance_formatted);

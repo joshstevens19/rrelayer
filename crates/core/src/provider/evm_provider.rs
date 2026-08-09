@@ -652,7 +652,7 @@ mod tests {
             &self,
             _chain_id: &ChainId,
         ) -> Result<GasEstimatorResult, GasEstimatorError> {
-            unreachable!("clone_wallet does not estimate gas")
+            panic!("clone_wallet does not estimate gas")
         }
 
         fn is_chain_supported(&self, _chain_id: &ChainId) -> bool {
