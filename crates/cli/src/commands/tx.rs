@@ -395,7 +395,9 @@ async fn handle_fund(
         .into();
 
     let network = client.network().get_all().await?;
-    let network = network.into_iter().find(|n| n.chain_id == chain_id).expect("Network not found");
+    let network = network.into_iter().find(|n| n.chain_id == chain_id).ok_or_else(|| {
+        TransactionError::CommandFailed(format!("Network not found: {}", chain_id))
+    })?;
 
     println!("┌─────────────────────────────────────────────────────────────────────");
     println!("│ FUNDING RELAYER");
@@ -445,7 +447,16 @@ async fn handle_fund(
 
     let wallet = EthereumWallet::from(signer);
 
-    let rpc_url = network.provider_urls.first().expect("Providers not found").to_string();
+    let rpc_url = network
+        .provider_urls
+        .first()
+        .ok_or_else(|| {
+            TransactionError::CommandFailed(format!(
+                "Providers not found for network {}",
+                network.name
+            ))
+        })?
+        .to_string();
     let provider =
         ProviderBuilder::new().wallet(wallet).connect(&rpc_url).await.map_err(|e| {
             TransactionError::CommandFailed(format!("Failed to connect to RPC: {}", e))

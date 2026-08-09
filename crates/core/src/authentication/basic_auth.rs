@@ -7,7 +7,7 @@ use axum::response::Response;
 use axum::{
     async_trait,
     extract::FromRequestParts,
-    http::{request::Parts, HeaderMap, StatusCode},
+    http::{request::Parts, HeaderMap, HeaderValue, StatusCode},
 };
 use base64::{engine::general_purpose, Engine as _};
 use subtle::ConstantTimeEq;
@@ -128,9 +128,9 @@ pub async fn inject_basic_auth_status(
     let basic_auth_valid = validate_basic_auth(req.headers()).is_ok();
 
     if basic_auth_valid {
-        req.headers_mut().insert("x-rrelayer-basic-auth-valid", "true".parse().unwrap());
+        req.headers_mut().insert("x-rrelayer-basic-auth-valid", HeaderValue::from_static("true"));
     } else {
-        req.headers_mut().insert("x-rrelayer-basic-auth-valid", "false".parse().unwrap());
+        req.headers_mut().insert("x-rrelayer-basic-auth-valid", HeaderValue::from_static("false"));
     }
 
     Ok(next.run(req).await)

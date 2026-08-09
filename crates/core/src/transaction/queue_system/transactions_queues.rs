@@ -248,25 +248,35 @@ impl TransactionsQueues {
         &self,
         current_transaction: &mut Transaction,
         replace_with: &RelayTransactionRequest,
-    ) {
-        current_transaction.to = replace_with.to;
-        current_transaction.data = replace_with.data.clone();
-        current_transaction.value = replace_with.value;
-        current_transaction.is_noop = current_transaction.from == current_transaction.to;
-
-        if let Some(ref blob_strings) = replace_with.blobs {
-            current_transaction.blobs = Some(
+    ) -> Result<(), ReplaceTransactionError> {
+        let blobs = replace_with
+            .blobs
+            .as_ref()
+            .map(|blob_strings| {
                 blob_strings
                     .iter()
                     .map(|blob_hex| TransactionBlob::from_hex(blob_hex))
                     .collect::<Result<Vec<_>, _>>()
-                    .expect("Failed to convert blob hex strings to TransactionBlob"),
-            );
-        } else {
-            current_transaction.blobs = None;
-        }
+            })
+            .transpose()
+            .map_err(|e| {
+                ReplaceTransactionError::SendTransactionError(
+                    TransactionQueueSendTransactionError::TransactionConversionError(format!(
+                        "Failed to convert blob hex strings to TransactionBlob: {}",
+                        e
+                    )),
+                )
+            })?;
+
+        current_transaction.to = replace_with.to;
+        current_transaction.data = replace_with.data.clone();
+        current_transaction.value = replace_with.value;
+        current_transaction.is_noop = current_transaction.from == current_transaction.to;
+        current_transaction.blobs = blobs;
         current_transaction.gas_limit = None;
         current_transaction.external_id = replace_with.external_id.clone();
+
+        Ok(())
     }
 
     /// Computes gas prices for a transaction based on its type.
@@ -771,7 +781,7 @@ impl TransactionsQueues {
                 match result.type_name {
                     EditableTransactionType::Pending => {
                         let original_transaction = result.transaction.clone();
-                        self.transaction_replace(&mut result.transaction, replace_with);
+                        self.transaction_replace(&mut result.transaction, replace_with)?;
                         self.invalidate_transaction_cache(&transaction.id).await;
 
                         if let Some(webhook_manager) = &self.webhook_manager {

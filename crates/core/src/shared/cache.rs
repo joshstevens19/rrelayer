@@ -5,6 +5,7 @@ use std::{
 };
 
 use tokio::{sync::Mutex, time::sleep};
+use tracing::warn;
 
 use crate::{network::Network, relayer::Relayer, transaction::types::Transaction};
 
@@ -29,41 +30,56 @@ impl CacheValue {
         }
     }
 
-    pub fn to_networks(&self) -> Vec<Network> {
+    pub fn to_networks(&self) -> Option<Vec<Network>> {
         match self {
-            CacheValue::Networks(networks) => networks.clone(),
-            _ => panic!("CacheValue name '{}' not supported on to_networks", self.name()),
+            CacheValue::Networks(networks) => Some(networks.clone()),
+            _ => {
+                warn!("CacheValue name '{}' not supported on to_networks", self.name());
+                None
+            }
         }
     }
 
-    pub fn to_relayer(&self) -> Option<Relayer> {
+    pub fn to_relayer(&self) -> Option<Option<Relayer>> {
         match self {
-            CacheValue::Relayer(relayer) => relayer.clone(),
-            _ => panic!("CacheValue name '{}' not supported on to_relayer", self.name()),
+            CacheValue::Relayer(relayer) => Some(relayer.clone()),
+            _ => {
+                warn!("CacheValue name '{}' not supported on to_relayer", self.name());
+                None
+            }
         }
     }
 
-    pub fn to_is_relayer_api_key(&self) -> bool {
+    pub fn to_is_relayer_api_key(&self) -> Option<bool> {
         match self {
-            CacheValue::IsRelayerApiKey(result) => *result,
-            _ => panic!("CacheValue name '{}' not supported on to_is_relayer_api_key", self.name()),
+            CacheValue::IsRelayerApiKey(result) => Some(*result),
+            _ => {
+                warn!("CacheValue name '{}' not supported on to_is_relayer_api_key", self.name());
+                None
+            }
         }
     }
 
-    pub fn to_transaction(&self) -> Option<Transaction> {
+    pub fn to_transaction(&self) -> Option<Option<Transaction>> {
         match self {
-            CacheValue::Transaction(transaction) => transaction.clone(),
-            _ => panic!("CacheValue name '{}' not supported on to_transaction", self.name()),
+            CacheValue::Transaction(transaction) => Some(transaction.clone()),
+            _ => {
+                warn!("CacheValue name '{}' not supported on to_transaction", self.name());
+                None
+            }
         }
     }
 
-    pub fn to_authentication_challenge(&self) -> String {
+    pub fn to_authentication_challenge(&self) -> Option<String> {
         match self {
-            CacheValue::AuthenticationChallenge(challenge) => challenge.clone(),
-            _ => panic!(
-                "CacheValue name '{}' not supported on to_authentication_challenge",
-                self.name()
-            ),
+            CacheValue::AuthenticationChallenge(challenge) => Some(challenge.clone()),
+            _ => {
+                warn!(
+                    "CacheValue name '{}' not supported on to_authentication_challenge",
+                    self.name()
+                );
+                None
+            }
         }
     }
 }

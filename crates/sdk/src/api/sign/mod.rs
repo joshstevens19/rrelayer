@@ -1,4 +1,7 @@
-use crate::api::{http::HttpClient, types::ApiResult};
+use crate::api::{
+    http::HttpClient,
+    types::{ApiResult, ApiSdkError},
+};
 use reqwest::header::{HeaderMap, HeaderValue};
 use rrelayer_core::RATE_LIMIT_HEADER_NAME;
 use rrelayer_core::common_types::{PagingContext, PagingResult};
@@ -27,7 +30,9 @@ impl SignApi {
         if let Some(rate_limit_key) = rate_limit_key.as_ref() {
             headers.insert(
                 RATE_LIMIT_HEADER_NAME,
-                HeaderValue::from_str(rate_limit_key).expect("Invalid rate limit key"),
+                HeaderValue::from_str(rate_limit_key).map_err(|e| {
+                    ApiSdkError::ConfigError(format!("Invalid rate limit key: {}", e))
+                })?,
             );
         }
 
@@ -50,7 +55,9 @@ impl SignApi {
         if let Some(rate_limit_key) = rate_limit_key.as_ref() {
             headers.insert(
                 RATE_LIMIT_HEADER_NAME,
-                HeaderValue::from_str(rate_limit_key).expect("Invalid rate limit key"),
+                HeaderValue::from_str(rate_limit_key).map_err(|e| {
+                    ApiSdkError::ConfigError(format!("Invalid rate limit key: {}", e))
+                })?,
             );
         }
 

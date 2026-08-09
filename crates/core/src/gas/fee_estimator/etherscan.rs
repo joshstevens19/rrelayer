@@ -59,7 +59,7 @@ impl EtherscanGasOracleResult {
 
         // Calculate priority fees by subtracting base fee from total
         // Ensure priority fee is at least 1 gwei to avoid zero or negative values
-        let min_priority_fee = parse_units("1", "gwei").unwrap().try_into().unwrap(); // 1 gwei minimum
+        let min_priority_fee = Self::parse_gwei_to_wei("1")?; // 1 gwei minimum
 
         let safe_priority = std::cmp::max(safe_total.saturating_sub(base_fee), min_priority_fee);
         let propose_priority =

@@ -51,6 +51,22 @@ impl FallbackGasFeeEstimator {
                 .into(),
         };
 
+        let default_priority_fee: u128 = if ethereum_or_ethereum_testnet {
+            // 2 gwei default for Ethereum
+            u128::try_from(
+                parse_units("2", "gwei")
+                    .map_err(|e| GasEstimatorError::CustomError(e.to_string()))?,
+            )
+            .map_err(|e| GasEstimatorError::CustomError(e.to_string()))?
+        } else {
+            // 0.01 gwei default for other chains
+            u128::try_from(
+                parse_units("0.01", "gwei")
+                    .map_err(|e| GasEstimatorError::CustomError(e.to_string()))?,
+            )
+            .map_err(|e| GasEstimatorError::CustomError(e.to_string()))?
+        };
+
         let priority_fee = if let Some(rewards) = &fee_history.reward {
             if !rewards.is_empty() {
                 let mut all_rewards: Vec<u128> = rewards
@@ -62,20 +78,14 @@ impl FallbackGasFeeEstimator {
                     all_rewards.sort();
                     let median_idx = all_rewards.len() / 2;
                     all_rewards[median_idx]
-                } else if ethereum_or_ethereum_testnet {
-                    parse_units("2", "gwei").unwrap().try_into().unwrap() // 2 gwei default for Ethereum
                 } else {
-                    parse_units("0.01", "gwei").unwrap().try_into().unwrap()
+                    default_priority_fee
                 }
-            } else if ethereum_or_ethereum_testnet {
-                parse_units("2", "gwei").unwrap().try_into().unwrap() // 2 gwei default for Ethereum
             } else {
-                parse_units("0.01", "gwei").unwrap().try_into().unwrap() // 0.01 gwei default for other chains
+                default_priority_fee
             }
-        } else if ethereum_or_ethereum_testnet {
-            parse_units("2", "gwei").unwrap().try_into().unwrap() // 2 gwei default for Ethereum
         } else {
-            parse_units("0.01", "gwei").unwrap().try_into().unwrap() // 0.01 gwei default for other chains
+            default_priority_fee
         };
 
         let max_fee = if chain_id.u64() == 1 {

@@ -58,8 +58,11 @@ fn branch_name_from_ref(branch_ref: &str) -> Option<&str> {
     }
 }
 
-fn epoch_to_iso_timestamp(epoch: i64) -> String {
-    Utc.timestamp_opt(epoch, 0).unwrap().to_rfc3339_opts(SecondsFormat::Secs, true)
+fn epoch_to_iso_timestamp(epoch: i64) -> Result<String, String> {
+    Utc.timestamp_opt(epoch, 0)
+        .single()
+        .map(|timestamp| timestamp.to_rfc3339_opts(SecondsFormat::Secs, true))
+        .ok_or_else(|| format!("invalid epoch timestamp: {epoch}"))
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -79,8 +82,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     set_env_if_needed(
         "BUILD_COMMIT_TIMESTAMP_ISO",
-        &command_output("git", &["log", "-1", "--format=%ct"])
-            .map(|epoch| epoch_to_iso_timestamp(epoch.parse().unwrap())),
+        &command_output("git", &["log", "-1", "--format=%ct"]).and_then(|epoch| {
+            let epoch = epoch
+                .parse()
+                .map_err(|e| format!("could not parse commit timestamp `{epoch}`: {e}"))?;
+            epoch_to_iso_timestamp(epoch)
+        }),
     );
 
     // TODO: get commit labels
@@ -136,11 +143,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // https://reproducible-builds.org/docs/source-date-epoch/#rust
-    let build_timestamp_iso = epoch_to_iso_timestamp(
-        option_env!("SOURCE_DATE_EPOCH")
-            .map(|epoch| epoch.parse().unwrap())
-            .unwrap_or_else(|| Utc::now().timestamp()),
-    );
+    let build_epoch = match option_env!("SOURCE_DATE_EPOCH") {
+        Some(epoch) => epoch
+            .parse()
+            .map_err(|e| format!("could not parse SOURCE_DATE_EPOCH `{epoch}`: {e}"))?,
+        None => Utc::now().timestamp(),
+    };
+    let build_timestamp_iso = epoch_to_iso_timestamp(build_epoch)?;
     println!("cargo:rustc-env=BUILD_TIMESTAMP_ISO={build_timestamp_iso}");
 
     Ok(())
