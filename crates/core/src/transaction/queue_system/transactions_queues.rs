@@ -288,35 +288,6 @@ impl TransactionsQueues {
         Utc::now() + expiration
     }
 
-    /// Replaces the content of an existing transaction with new parameters.
-    fn transaction_replace(
-        &self,
-        current_transaction: &mut Transaction,
-        replace_with: &RelayTransactionRequest,
-    ) {
-        current_transaction.to = replace_with.to;
-        current_transaction.data = replace_with.data.clone();
-        current_transaction.value = replace_with.value;
-        current_transaction.is_noop = current_transaction.from == current_transaction.to;
-
-        if let Some(ref blob_strings) = replace_with.blobs {
-            current_transaction.blobs = Some(
-                blob_strings
-                    .iter()
-                    .map(|blob_hex| TransactionBlob::from_hex(blob_hex))
-                    .collect::<Result<Vec<_>, _>>()
-                    .expect("Failed to convert blob hex strings to TransactionBlob"),
-            );
-        } else {
-            current_transaction.blobs = None;
-        }
-        current_transaction.gas_limit = None;
-        current_transaction.external_id = replace_with.external_id.clone();
-        // The replacement carries its own ceiling terms - a previous hit no longer applies
-        current_transaction.gas_price_ceiling = replace_with.gas_price_ceiling;
-        current_transaction.gas_price_ceiling_hit = false;
-    }
-
     /// Computes gas prices for a transaction based on its type.
     async fn compute_transaction_gas_prices(
         transactions_queue: &TransactionsQueue,
@@ -864,12 +835,29 @@ impl TransactionsQueues {
                 match result.type_name {
                     EditableTransactionType::Pending => {
                         let original_transaction = result.transaction.clone();
-                        self.transaction_replace(&mut result.transaction, replace_with);
+
+                        // Swap the payload in the queue entry itself - editing only the
+                        // looked-up clone would leave the ORIGINAL payload queued for
+                        // broadcast while reporting success
+                        let updated_transaction = transactions_queue
+                            .replace_pending_transaction_payload(&transaction.id, replace_with)
+                            .await;
+
+                        let Some(updated_transaction) = updated_transaction else {
+                            // Left the pending queue between lookup and edit
+                            return Ok(ReplaceTransactionResult::failed());
+                        };
+
+                        self.db
+                            .transaction_update(&updated_transaction)
+                            .await
+                            .map_err(ReplaceTransactionError::CouldNotUpdateTransactionInDb)?;
+
                         self.invalidate_transaction_cache(&transaction.id).await;
 
                         if let Some(webhook_manager) = &self.webhook_manager {
                             let webhook_manager = webhook_manager.clone();
-                            let new_transaction = result.transaction.clone();
+                            let new_transaction = updated_transaction.clone();
                             let original_transaction_clone = original_transaction.clone();
                             tokio::spawn(async move {
                                 let webhook_manager = webhook_manager.lock().await;
@@ -884,8 +872,10 @@ impl TransactionsQueues {
 
                         Ok(ReplaceTransactionResult {
                             success: true,
-                            replace_transaction_id: Some(result.transaction.id),
-                            replace_transaction_hash: result.transaction.known_transaction_hash,
+                            replace_transaction_id: Some(updated_transaction.id),
+                            // The precomputed hash belonged to the old payload; the real
+                            // hash exists once the replacement broadcasts
+                            replace_transaction_hash: updated_transaction.known_transaction_hash,
                         })
                     }
                     EditableTransactionType::Inmempool => {

@@ -9,7 +9,10 @@ use super::types::{
     SendTransactionGasPriceError, TransactionQueueSendTransactionError, TransactionSentWithRelayer,
     TransactionsQueueSetup,
 };
-use crate::transaction::types::{GasPriceCeilingOutcome, TransactionNonce, TransactionValue};
+use crate::transaction::api::RelayTransactionRequest;
+use crate::transaction::types::{
+    GasPriceCeilingOutcome, TransactionBlob, TransactionNonce, TransactionValue,
+};
 use crate::{
     gas::{
         BlobGasOracleCache, BlobGasPriceResult, GasLimit, GasOracleCache, GasPrice, GasPriceResult,
@@ -158,6 +161,54 @@ fn snapshot_inflight_transactions(
     }
 
     transactions
+}
+
+/// Rewrites a transaction's payload with the replacement request. The gas limit is
+/// cleared so the send path re-estimates for the new payload, and `is_noop` is
+/// recomputed from the new destination. The replacement carries its own gas price
+/// ceiling terms, so a previous ceiling hit no longer applies.
+fn apply_replacement_payload(
+    transaction: &mut Transaction,
+    replace_with: &RelayTransactionRequest,
+) {
+    transaction.to = replace_with.to;
+    transaction.data = replace_with.data.clone();
+    transaction.value = replace_with.value;
+    transaction.is_noop = transaction.from == transaction.to;
+
+    if let Some(ref blob_strings) = replace_with.blobs {
+        transaction.blobs = Some(
+            blob_strings
+                .iter()
+                .map(|blob_hex| TransactionBlob::from_hex(blob_hex))
+                .collect::<Result<Vec<_>, _>>()
+                .expect("Failed to convert blob hex strings to TransactionBlob"),
+        );
+    } else {
+        transaction.blobs = None;
+    }
+    transaction.gas_limit = None;
+    transaction.external_id = replace_with.external_id.clone();
+    transaction.gas_price_ceiling = replace_with.gas_price_ceiling;
+    transaction.gas_price_ceiling_hit = false;
+}
+
+/// Swaps a PENDING transaction's payload in the queue itself, returning the updated
+/// transaction for persistence, or `None` when the id is no longer pending. The
+/// precomputed hash is cleared - it belongs to the old payload; the send path
+/// computes the real hash when the replacement broadcasts. Kept free of
+/// `TransactionsQueue` so the in-place swap stays unit-testable without a provider.
+fn replace_pending_transaction_payload_in_queue(
+    pending: &mut VecDeque<Transaction>,
+    transaction_id: &TransactionId,
+    replace_with: &RelayTransactionRequest,
+) -> Option<Transaction> {
+    let transaction = pending.iter_mut().find(|tx| tx.id == *transaction_id)?;
+
+    apply_replacement_payload(transaction, replace_with);
+    transaction.known_transaction_hash = None;
+
+    Some(transaction.clone())
 }
 
 /// Pure lookup of which in-flight transaction holds a nonce. Inmempool matches are
@@ -352,6 +403,32 @@ impl TransactionsQueue {
         let inmempool = self.inmempool_transactions.lock().await;
 
         snapshot_inflight_transactions(&pending, &inmempool)
+    }
+
+    /// Swaps a PENDING transaction's payload for the replacement request IN THE QUEUE
+    /// ITSELF and returns the updated transaction for the caller to persist. Returns
+    /// `None` when the transaction is no longer pending (it broadcast or was removed
+    /// between lookup and edit).
+    pub async fn replace_pending_transaction_payload(
+        &mut self,
+        transaction_id: &TransactionId,
+        replace_with: &RelayTransactionRequest,
+    ) -> Option<Transaction> {
+        let mut pending = self.pending_transactions.lock().await;
+        let replaced = replace_pending_transaction_payload_in_queue(
+            &mut pending,
+            transaction_id,
+            replace_with,
+        );
+
+        if replaced.is_some() {
+            info!(
+                "Replaced pending transaction {} payload in place for relayer: {}",
+                transaction_id, self.relayer.name
+            );
+        }
+
+        replaced
     }
 
     /// Locates the in-flight transaction currently holding a nonce, classifying where
@@ -1979,8 +2056,9 @@ mod tests {
     use std::collections::VecDeque;
 
     use super::{
-        classify_send_error, find_inflight_transaction_by_nonce, snapshot_inflight_transactions,
-        CompetitiveTransaction, InflightNonceHolder, SendErrorClass,
+        classify_send_error, find_inflight_transaction_by_nonce,
+        replace_pending_transaction_payload_in_queue, snapshot_inflight_transactions,
+        CompetitiveTransaction, InflightNonceHolder, RelayTransactionRequest, SendErrorClass,
     };
     use crate::transaction::queue_system::types::CompetitionType;
     use crate::transaction::types::{
@@ -2121,5 +2199,69 @@ mod tests {
             find_inflight_transaction_by_nonce(&pending, &inmempool, &TransactionNonce::new(99)),
             InflightNonceHolder::NotFound
         ));
+    }
+
+    // Regression test: replacing a PENDING transaction must swap the payload in the
+    // queue entry itself - editing only a looked-up clone left the original payload
+    // queued for broadcast while the replace reported success.
+    #[test]
+    fn pending_replace_swaps_the_payload_in_the_queue_itself() {
+        use crate::gas::GasLimit;
+        use crate::shared::common_types::EvmAddress;
+        use crate::transaction::types::{TransactionData, TransactionHash, TransactionValue};
+        use std::str::FromStr;
+
+        let mut original = test_transaction(7, TransactionStatus::PENDING);
+        original.gas_limit = Some(GasLimit::new(21_000));
+        original.known_transaction_hash = Some(
+            TransactionHash::from_str(
+                "0x1111111111111111111111111111111111111111111111111111111111111111",
+            )
+            .expect("valid test hash"),
+        );
+
+        let new_to = EvmAddress::from(alloy::primitives::Address::repeat_byte(0x33));
+        let replace_with = RelayTransactionRequest {
+            to: new_to,
+            value: TransactionValue::new(alloy::primitives::U256::from(42u64)),
+            data: TransactionData::new(vec![0xde, 0xad].into()),
+            speed: None,
+            external_id: Some("replaced".to_string()),
+            blobs: None,
+            gas_price_ceiling: None,
+        };
+
+        let mut pending: VecDeque<_> = vec![original.clone()].into();
+
+        let updated =
+            replace_pending_transaction_payload_in_queue(&mut pending, &original.id, &replace_with)
+                .expect("the pending holder should be replaceable");
+
+        // Only one transaction remains queued at the nonce - nothing extra broadcasts
+        assert_eq!(pending.len(), 1);
+
+        // THE QUEUE'S OWN ENTRY carries the replacement payload, not just the returned copy
+        let queued = pending.front().expect("queue should still hold the transaction");
+        assert_eq!(queued.id, original.id);
+        assert_eq!(queued.nonce, original.nonce);
+        assert_eq!(queued.to, new_to);
+        assert_eq!(queued.value, replace_with.value);
+        assert_eq!(queued.data, replace_with.data);
+        assert_eq!(queued.external_id, Some("replaced".to_string()));
+        // Gas limit re-estimates and the stale precomputed hash is dropped
+        assert_eq!(queued.gas_limit, None);
+        assert_eq!(queued.known_transaction_hash, None);
+
+        // The returned transaction is the persisted shape - identical to the queue entry
+        assert_eq!(updated.to, queued.to);
+        assert_eq!(updated.known_transaction_hash, None);
+
+        // Unknown ids leave the queue untouched
+        let missing = replace_pending_transaction_payload_in_queue(
+            &mut pending,
+            &test_transaction(8, TransactionStatus::PENDING).id,
+            &replace_with,
+        );
+        assert!(missing.is_none());
     }
 }
