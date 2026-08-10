@@ -5,20 +5,31 @@ use alloy::{
 use std::{
     future::Future,
     pin::Pin,
+    sync::Arc,
     task::{Context, Poll},
     time::Instant,
 };
 use tower::{Layer, Service};
 use tracing::{error, info};
 
+use super::endpoint_health::{now_ms, EndpointHealth};
+
 #[derive(Clone)]
 pub struct RpcLoggingLayer {
     rpc_url: String,
+    health: Option<Arc<EndpointHealth>>,
 }
 
 impl RpcLoggingLayer {
     pub fn new(rpc_url: String) -> Self {
-        Self { rpc_url }
+        Self { rpc_url, health: None }
+    }
+
+    /// Feeds every call outcome (success/failure + latency) into the endpoint's
+    /// health state, so all consumers of the client instrument selection for free.
+    pub(crate) fn with_health(mut self, health: Arc<EndpointHealth>) -> Self {
+        self.health = Some(health);
+        self
     }
 }
 
@@ -26,7 +37,7 @@ impl<S> Layer<S> for RpcLoggingLayer {
     type Service = RpcLoggingService<S>;
 
     fn layer(&self, inner: S) -> Self::Service {
-        RpcLoggingService { inner, rpc_url: self.rpc_url.clone() }
+        RpcLoggingService { inner, rpc_url: self.rpc_url.clone(), health: self.health.clone() }
     }
 }
 
@@ -34,6 +45,7 @@ impl<S> Layer<S> for RpcLoggingLayer {
 pub struct RpcLoggingService<S> {
     inner: S,
     rpc_url: String,
+    health: Option<Arc<EndpointHealth>>,
 }
 
 impl<S> Service<RequestPacket> for RpcLoggingService<S>
@@ -52,6 +64,7 @@ where
     fn call(&mut self, req: RequestPacket) -> Self::Future {
         let start_time = Instant::now();
         let rpc_url = self.rpc_url.clone();
+        let health = self.health.clone();
 
         let method_name = match &req {
             RequestPacket::Single(r) => r.method().to_string(),
@@ -73,6 +86,10 @@ where
                 Ok(response) => {
                     let duration = start_time.elapsed();
 
+                    if let Some(health) = &health {
+                        health.record_success(duration);
+                    }
+
                     if duration.as_secs() >= 10 {
                         info!(
                             "SLOW RPC call - method: {}, duration: {:?}, url: {}",
@@ -85,6 +102,10 @@ where
                 Err(err) => {
                     let duration = start_time.elapsed();
                     let error_str = err.to_string();
+
+                    if let Some(health) = &health {
+                        health.record_failure(now_ms());
+                    }
 
                     if error_str.contains("timeout") || error_str.contains("timed out") {
                         error!("RPC TIMEOUT (free public nodes do this a lot consider a using a paid node) - method: {}, duration: {:?}, url: {}, error: {}",

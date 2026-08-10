@@ -4,10 +4,11 @@ use thiserror::Error;
 
 use crate::{gas::get_gas_estimator, network::ChainId, SetupConfig, SigningProvider, WalletError};
 
+mod endpoint_health;
 mod evm_provider;
 mod layer_extensions;
 
-use self::evm_provider::EvmProviderNewError;
+use self::evm_provider::{connect_endpoints, EvmProviderNewError};
 use crate::gas::GasEstimatorError;
 use crate::wallet::get_mnemonic_from_signing_key;
 pub use evm_provider::{
@@ -28,6 +29,9 @@ pub enum LoadProvidersError {
     #[error("{0}")]
     EvmProviderNewError(#[from] EvmProviderNewError),
 
+    #[error("{0}")]
+    RetryClientError(#[from] RetryClientError),
+
     #[error(transparent)]
     GasEstimatorError(#[from] GasEstimatorError),
 }
@@ -47,6 +51,11 @@ pub async fn load_providers(
         if config.provider_urls.is_empty() {
             return Err(LoadProvidersError::ProvidersRequired);
         }
+
+        // One health-tracked client pool per network, shared by the provider, the
+        // gas estimator and the background prober - a failure seen anywhere steers
+        // every consumer away from that endpoint
+        let endpoints = connect_endpoints(&config.provider_urls)?;
 
         let signing_key: &SigningProvider = if let Some(ref signing_key) = config.signing_provider {
             signing_key
@@ -79,6 +88,7 @@ pub async fn load_providers(
                     config,
                     private_keys.clone(),
                     get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                    endpoints.clone(),
                 )
                 .await?;
 
@@ -102,6 +112,7 @@ pub async fn load_providers(
                     privy_manager,
                     private_key_strings,
                     get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                    endpoints.clone(),
                 )
                 .await?
             } else {
@@ -110,6 +121,7 @@ pub async fn load_providers(
                     privy.app_id.clone(),
                     privy.app_secret.clone(),
                     get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                    endpoints.clone(),
                 )
                 .await?
             }
@@ -123,6 +135,7 @@ pub async fn load_providers(
                     aws_manager,
                     private_key_strings,
                     get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                    endpoints.clone(),
                 )
                 .await?
             } else {
@@ -130,6 +143,7 @@ pub async fn load_providers(
                     config,
                     aws_kms.clone(),
                     get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                    endpoints.clone(),
                 )
                 .await?
             }
@@ -144,6 +158,7 @@ pub async fn load_providers(
                     turnkey_manager,
                     private_key_strings,
                     get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                    endpoints.clone(),
                 )
                 .await?
             } else {
@@ -151,6 +166,7 @@ pub async fn load_providers(
                     config,
                     turnkey.clone(),
                     get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                    endpoints.clone(),
                 )
                 .await?
             }
@@ -163,6 +179,7 @@ pub async fn load_providers(
                     pkcs11_manager,
                     private_key_strings,
                     get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                    endpoints.clone(),
                 )
                 .await?
             } else {
@@ -170,6 +187,7 @@ pub async fn load_providers(
                     config,
                     pkcs11.clone(),
                     get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                    endpoints.clone(),
                 )
                 .await?
             }
@@ -183,6 +201,7 @@ pub async fn load_providers(
                     fireblocks_manager,
                     private_key_strings,
                     get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                    endpoints.clone(),
                 )
                 .await?
             } else {
@@ -190,6 +209,7 @@ pub async fn load_providers(
                     config,
                     fireblocks.clone(),
                     get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                    endpoints.clone(),
                 )
                 .await?
             }
@@ -205,6 +225,7 @@ pub async fn load_providers(
                     mnemonic_manager,
                     private_key_strings,
                     get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                    endpoints.clone(),
                 )
                 .await?
             } else {
@@ -212,6 +233,7 @@ pub async fn load_providers(
                     config,
                     &mnemonic,
                     get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                    endpoints.clone(),
                 )
                 .await?
             }
