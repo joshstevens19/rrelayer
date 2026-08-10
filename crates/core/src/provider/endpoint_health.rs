@@ -210,6 +210,18 @@ impl EndpointSelector {
         (index, self.endpoints[index].client.clone())
     }
 
+    /// Prefers a specific endpoint (read-your-writes stickiness) while it is still
+    /// healthy, otherwise falls back to normal selection.
+    pub(crate) fn client_preferring(&self, index: usize) -> Arc<RelayerProvider> {
+        if let Some(endpoint) = self.endpoints.get(index) {
+            if endpoint.health.is_selectable(now_ms()) {
+                return endpoint.client.clone();
+            }
+        }
+
+        self.client()
+    }
+
     fn pick_index(&self, roll: f64) -> usize {
         let now = now_ms();
         let candidates: Vec<EndpointCandidate> = self
@@ -223,6 +235,48 @@ impl EndpointSelector {
             .collect();
 
         pick_endpoint(&candidates, roll)
+    }
+}
+
+/// How many recently broadcast transaction hashes keep their broadcasting endpoint
+/// pinned for receipt polls.
+const STICKY_BROADCAST_CAPACITY: usize = 512;
+
+/// Bounded map of recently broadcast transaction hashes to the endpoint that
+/// accepted the broadcast. Receipt polls prefer that endpoint until the receipt is
+/// first sighted (health permitting) so a LAGGING endpoint answering `Ok(None)` for
+/// a transaction another endpoint already holds cannot trigger premature same-nonce
+/// gas bumps. Entries are dropped on first sighting or evicted oldest-first.
+#[derive(Debug, Default)]
+pub(crate) struct StickyBroadcasts {
+    by_hash: std::collections::HashMap<alloy::primitives::B256, usize>,
+    order: VecDeque<alloy::primitives::B256>,
+}
+
+impl StickyBroadcasts {
+    pub(crate) fn new() -> Self {
+        Self::default()
+    }
+
+    pub(crate) fn record(&mut self, hash: alloy::primitives::B256, endpoint_index: usize) {
+        if self.by_hash.insert(hash, endpoint_index).is_none() {
+            self.order.push_back(hash);
+        }
+
+        while self.by_hash.len() > STICKY_BROADCAST_CAPACITY {
+            let Some(oldest) = self.order.pop_front() else {
+                break;
+            };
+            self.by_hash.remove(&oldest);
+        }
+    }
+
+    pub(crate) fn endpoint_for(&self, hash: &alloy::primitives::B256) -> Option<usize> {
+        self.by_hash.get(hash).copied()
+    }
+
+    pub(crate) fn forget(&mut self, hash: &alloy::primitives::B256) {
+        self.by_hash.remove(hash);
     }
 }
 
@@ -475,6 +529,73 @@ mod tests {
         assert!(!lagging);
         assert!(health.is_selectable(now));
         assert_eq!(health.lag_blocks.load(Ordering::Relaxed), 2);
+    }
+
+    #[test]
+    fn sticky_broadcasts_pin_and_forget_and_evict_oldest() {
+        use alloy::primitives::B256;
+
+        let mut sticky = StickyBroadcasts::new();
+        let hash = B256::repeat_byte(0x01);
+
+        sticky.record(hash, 1);
+        assert_eq!(sticky.endpoint_for(&hash), Some(1));
+
+        // Re-recording (a gas bump re-broadcast lands a new hash, but a duplicate
+        // record must not grow the eviction order) just updates the endpoint
+        sticky.record(hash, 0);
+        assert_eq!(sticky.endpoint_for(&hash), Some(0));
+
+        // First sighting drops the pin
+        sticky.forget(&hash);
+        assert_eq!(sticky.endpoint_for(&hash), None);
+
+        // Oldest entries are evicted once over capacity
+        for index in 0..=STICKY_BROADCAST_CAPACITY {
+            let mut bytes = [0u8; 32];
+            bytes[..8].copy_from_slice(&(index as u64).to_be_bytes());
+            sticky.record(B256::from(bytes), index);
+        }
+        let mut first = [0u8; 32];
+        first[..8].copy_from_slice(&0u64.to_be_bytes());
+        assert_eq!(sticky.endpoint_for(&B256::from(first)), None, "oldest pin evicted");
+        let mut last = [0u8; 32];
+        last[..8].copy_from_slice(&(STICKY_BROADCAST_CAPACITY as u64).to_be_bytes());
+        assert_eq!(sticky.endpoint_for(&B256::from(last)), Some(STICKY_BROADCAST_CAPACITY));
+    }
+
+    #[test]
+    fn sticky_preference_respects_endpoint_health() {
+        use super::super::evm_provider::connect_endpoints;
+
+        let selector = connect_endpoints(&[
+            "http://127.0.0.1:1/a".to_string(),
+            "http://127.0.0.1:1/b".to_string(),
+        ])
+        .expect("building clients does not dial the endpoints");
+        for endpoint in selector.endpoints() {
+            endpoint.health.mark_chain_verified();
+        }
+
+        // Healthy preferred endpoint wins regardless of weights
+        let picked = selector.client_preferring(1);
+        assert!(Arc::ptr_eq(&picked, &selector.endpoints()[1].client));
+
+        // A cooled-down preferred endpoint falls back to normal selection
+        for _ in 0..3 {
+            selector.endpoints()[1].health.record_failure(now_ms());
+        }
+        for _ in 0..25 {
+            let picked = selector.client_preferring(1);
+            assert!(
+                Arc::ptr_eq(&picked, &selector.endpoints()[0].client),
+                "stickiness must not pin to an unhealthy endpoint"
+            );
+        }
+
+        // As does an out-of-range index
+        let picked = selector.client_preferring(99);
+        assert!(Arc::ptr_eq(&picked, &selector.endpoints()[0].client));
     }
 
     #[test]

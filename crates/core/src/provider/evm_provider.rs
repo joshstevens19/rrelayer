@@ -1,6 +1,6 @@
 use crate::gas::BLOB_GAS_PER_BLOB;
 use crate::provider::endpoint_health::{
-    spawn_endpoint_prober, EndpointClient, EndpointHealth, EndpointSelector,
+    spawn_endpoint_prober, EndpointClient, EndpointHealth, EndpointSelector, StickyBroadcasts,
 };
 use crate::provider::layer_extensions::RpcLoggingLayer;
 use crate::relayer::Relayer;
@@ -65,6 +65,9 @@ struct BlockGasLimitCache {
 #[derive(Clone)]
 pub struct EvmProvider {
     endpoints: EndpointSelector,
+    /// Recently broadcast tx hashes pinned to their broadcasting endpoint for
+    /// receipt polls (read-your-writes) - shared across clones on purpose.
+    sticky_broadcasts: Arc<std::sync::Mutex<StickyBroadcasts>>,
     wallet_manager: Arc<dyn WalletManagerTrait>,
     gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
     block_gas_limit_cache: Arc<Mutex<Option<BlockGasLimitCache>>>,
@@ -415,6 +418,7 @@ impl EvmProvider {
         Ok(EvmProvider {
             blocks_every,
             endpoints,
+            sticky_broadcasts: Arc::new(std::sync::Mutex::new(StickyBroadcasts::new())),
             wallet_manager,
             gas_estimator,
             block_gas_limit_cache: Arc::new(Mutex::new(None)),
@@ -489,8 +493,26 @@ impl EvmProvider {
         &self,
         transaction_hash: &TransactionHash,
     ) -> Result<Option<AnyTransactionReceipt>, RpcError<TransportErrorKind>> {
-        let receipt =
-            self.rpc_client().get_transaction_receipt(transaction_hash.into_alloy_hash()).await?;
+        let hash = transaction_hash.into_alloy_hash();
+
+        // Read-your-writes stickiness: until the receipt is first sighted, poll the
+        // endpoint that accepted the broadcast (health permitting) - a lagging
+        // endpoint answering Ok(None) for a transaction another endpoint already
+        // holds would otherwise trigger premature same-nonce gas bumps
+        let sticky_endpoint =
+            self.sticky_broadcasts.lock().ok().and_then(|sticky| sticky.endpoint_for(&hash));
+        let provider = match sticky_endpoint {
+            Some(index) => self.endpoints.client_preferring(index),
+            None => self.rpc_client(),
+        };
+
+        let receipt = provider.get_transaction_receipt(hash).await?;
+
+        if receipt.is_some() {
+            if let Ok(mut sticky) = self.sticky_broadcasts.lock() {
+                sticky.forget(&hash);
+            }
+        }
 
         Ok(receipt)
     }
@@ -573,10 +595,16 @@ impl EvmProvider {
             TypedTransaction::Eip7702(tx) => TxEnvelope::Eip7702(tx.into_signed(signature)),
         };
 
-        let provider = self.rpc_client();
+        let (endpoint_index, provider) = self.endpoints.pick();
         let tx_bytes = tx_envelope.encoded_2718();
 
         let receipt = provider.send_raw_transaction(&tx_bytes).await?;
+
+        // Pin this hash's receipt polls to the endpoint that accepted the broadcast
+        // until the receipt is first sighted
+        if let Ok(mut sticky) = self.sticky_broadcasts.lock() {
+            sticky.record(*receipt.tx_hash(), endpoint_index);
+        }
 
         Ok(TransactionHash::from_alloy_hash(receipt.tx_hash()))
     }
@@ -834,6 +862,7 @@ mod tests {
 
         let provider = EvmProvider {
             endpoints: EndpointSelector::from_endpoints(Vec::new()),
+            sticky_broadcasts: Arc::new(std::sync::Mutex::new(StickyBroadcasts::new())),
             wallet_manager,
             gas_estimator: Arc::new(UnusedGasEstimator),
             block_gas_limit_cache: Arc::new(Mutex::new(None)),
