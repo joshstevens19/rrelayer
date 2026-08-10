@@ -403,6 +403,15 @@ impl StickyBroadcasts {
 
     pub(crate) fn forget(&mut self, hash: &alloy::primitives::B256) {
         self.by_hash.remove(hash);
+
+        // Forgotten hashes linger in the order list until capacity eviction, which
+        // never runs while the live map stays small - a relayer that continually
+        // broadcasts and mines would grow the list forever. Compact once the list
+        // clearly outgrows the live map; amortized O(1) per forget.
+        if self.order.len() > STICKY_BROADCAST_CAPACITY && self.order.len() > 2 * self.by_hash.len()
+        {
+            self.order.retain(|ordered| self.by_hash.contains_key(ordered));
+        }
     }
 }
 
@@ -466,15 +475,37 @@ pub(crate) fn spawn_endpoint_prober(
     network: String,
     expected_chain_id: ChainId,
 ) {
-    tokio::spawn(async move {
-        let mut ticker = tokio::time::interval(ENDPOINT_PROBE_INTERVAL);
-        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    tokio::spawn(run_endpoint_prober(
+        selector,
+        network,
+        expected_chain_id,
+        crate::shutdown::subscribe_to_shutdown(),
+    ));
+}
 
-        loop {
-            ticker.tick().await;
-            probe_endpoints_once(&selector, &network, expected_chain_id).await;
+/// The prober loop proper, stopping on the same shutdown broadcast every other
+/// long-running background task listens to - embedded runtimes must not keep
+/// probing after a graceful shutdown.
+async fn run_endpoint_prober(
+    selector: EndpointSelector,
+    network: String,
+    expected_chain_id: ChainId,
+    mut shutdown_rx: tokio::sync::broadcast::Receiver<()>,
+) {
+    let mut ticker = tokio::time::interval(ENDPOINT_PROBE_INTERVAL);
+    ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+
+    loop {
+        tokio::select! {
+            _ = shutdown_rx.recv() => {
+                info!("Shutdown signal received, stopping endpoint prober for network {}", network);
+                break;
+            }
+            _ = ticker.tick() => {
+                probe_endpoints_once(&selector, &network, expected_chain_id).await;
+            }
         }
-    });
+    }
 }
 
 async fn probe_endpoints_once(
@@ -514,8 +545,15 @@ async fn probe_endpoints_once(
                     tips.push(None);
                     continue;
                 }
-                _ => {
-                    // Still unreachable; unverified endpoints stay unselectable
+                Ok(Err(_)) => {
+                    // Still unreachable (the logging layer recorded the failure);
+                    // unverified endpoints stay unselectable
+                    tips.push(None);
+                    continue;
+                }
+                Err(_) => {
+                    // Probe-deadline timeout never reaches the logging layer
+                    endpoint.health.record_failure(now_ms());
                     tips.push(None);
                     continue;
                 }
@@ -527,8 +565,16 @@ async fn probe_endpoints_once(
                 .await
             {
                 Ok(Ok(block_number)) => Some(block_number),
-                // Call failures already fed the health state through the logging layer
-                _ => None,
+                // The call itself failed - the logging layer already recorded it
+                Ok(Err(_)) => None,
+                // Timed out at the PROBE deadline: the dropped future never reached
+                // the logging layer, so record the failure here - a blackholed
+                // endpoint must reach cooldown from probes alone, before user
+                // traffic burns through it
+                Err(_) => {
+                    endpoint.health.record_failure(now_ms());
+                    None
+                }
             };
         tips.push(tip);
     }
@@ -786,6 +832,99 @@ mod tests {
         assert_eq!(snapshot.last_block, Some(50));
         assert_eq!(snapshot.lag, Some(50));
         assert!(snapshot.cooldown_until.is_some());
+    }
+
+    // Regression test: a blackholed endpoint (accepts connections, never answers)
+    // must reach cooldown from probe timeouts alone - the dropped probe future
+    // never reaches the logging layer, so the timeout arm has to record failures.
+    #[tokio::test(start_paused = true)]
+    async fn hung_endpoint_reaches_cooldown_from_probes_alone() {
+        use super::super::evm_provider::connect_endpoints;
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("binding an ephemeral localhost port");
+        let address = listener.local_addr().expect("listener has a local address");
+
+        // Accept connections but never respond - requests hang until a timeout
+        tokio::spawn(async move {
+            let mut open_sockets = Vec::new();
+            while let Ok((socket, _)) = listener.accept().await {
+                open_sockets.push(socket);
+            }
+        });
+
+        let selector = connect_endpoints(&[format!("http://{address}/")])
+            .expect("building clients does not dial the endpoints");
+        let endpoint = &selector.endpoints()[0];
+        endpoint.health.mark_chain_verified();
+        assert!(endpoint.health.is_selectable(now_ms()));
+
+        for _ in 0..3 {
+            probe_endpoints_once(&selector, "test", ChainId::new(31337)).await;
+        }
+
+        assert!(
+            endpoint.health.consecutive_failures.load(Ordering::Relaxed) >= 3,
+            "every timed-out probe must count as a failure"
+        );
+        assert!(
+            !endpoint.health.is_selectable(now_ms()),
+            "a hung endpoint must be cooled down by probes alone"
+        );
+    }
+
+    // Regression test: forget() used to leave hashes in the order list forever
+    // while the live map stayed small, growing it unboundedly on a relayer that
+    // continually broadcasts and mines.
+    #[test]
+    fn sticky_order_list_stays_bounded_across_record_forget_cycles() {
+        use alloy::primitives::B256;
+
+        let mut sticky = StickyBroadcasts::new();
+
+        for index in 0..(STICKY_BROADCAST_CAPACITY * 4) {
+            let mut bytes = [0u8; 32];
+            bytes[..8].copy_from_slice(&(index as u64).to_be_bytes());
+            let hash = B256::from(bytes);
+
+            sticky.record(hash, 0);
+            sticky.forget(&hash);
+        }
+
+        assert!(sticky.by_hash.is_empty());
+        assert!(
+            sticky.order.len() <= STICKY_BROADCAST_CAPACITY + 1,
+            "the order list must stay bounded, found {} entries",
+            sticky.order.len()
+        );
+    }
+
+    // Regression test: the prober must stop on the same graceful-shutdown
+    // broadcast every other background task listens to.
+    #[tokio::test]
+    async fn prober_stops_on_shutdown_signal() {
+        use super::super::evm_provider::connect_endpoints;
+
+        let selector = connect_endpoints(&["http://127.0.0.1:1/".to_string()])
+            .expect("building clients does not dial the endpoints");
+
+        // A private channel mirrors what spawn_endpoint_prober wires up from the
+        // global shutdown coordinator, without touching process-global state
+        let (shutdown_tx, shutdown_rx) = tokio::sync::broadcast::channel(1);
+        let prober = tokio::spawn(run_endpoint_prober(
+            selector,
+            "test".to_string(),
+            ChainId::new(1),
+            shutdown_rx,
+        ));
+
+        shutdown_tx.send(()).expect("the prober holds the receiver");
+
+        tokio::time::timeout(Duration::from_secs(30), prober)
+            .await
+            .expect("the prober must exit once the shutdown broadcast fires")
+            .expect("the prober task must not panic");
     }
 
     #[test]

@@ -65,3 +65,7 @@ cryptoki = "0.10"
 secrecy = "0.8"
 jsonwebtoken = "9.3"
 rsa = "0.9"
+
+[dev-dependencies]
+# test-util enables tokio::test(start_paused) so timeout-path tests run instantly
+tokio = { version = "1", features = ["full", "test-util"] }
