@@ -2032,6 +2032,16 @@ impl TransactionsQueue {
         Ok(nonce)
     }
 
+    /// The MINED nonce (`latest` tag, never counting mempool contents) - the honest
+    /// answer to "was this nonce consumed on chain". [`Self::get_nonce`] uses the
+    /// `pending` tag, which counts this relayer's own broadcast-but-unmined
+    /// transactions, so it must never gate replacing/cancelling one of them.
+    pub async fn get_mined_nonce(&self) -> Result<TransactionNonce, RpcError<TransportErrorKind>> {
+        let nonce = self.evm_provider.get_mined_nonce_from_address(&self.relay_address()).await?;
+
+        Ok(nonce)
+    }
+
     pub async fn get_balance(
         &self,
     ) -> Result<alloy::primitives::U256, RpcError<TransportErrorKind>> {

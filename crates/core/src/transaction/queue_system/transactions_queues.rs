@@ -1166,7 +1166,11 @@ impl TransactionsQueues {
                 return Err(SendTransactionAtNonceError::RelayerIsPaused(*relayer_id));
             }
 
-            let onchain_nonce = transactions_queue.get_nonce().await.map_err(|e| {
+            // The MINED nonce (`latest` tag): the `pending` tag counts this
+            // relayer's own broadcast-but-unmined transactions, which would make
+            // every INMEMPOOL holder look "already used on chain" and refuse the
+            // exact replace/cancel this endpoint exists for.
+            let onchain_nonce = transactions_queue.get_mined_nonce().await.map_err(|e| {
                 SendTransactionAtNonceError::CouldNotGetCurrentOnChainNonce(*relayer_id, e)
             })?;
 
@@ -2260,6 +2264,39 @@ mod tests {
             InflightNonceHolder::InmempoolHead(holder),
         );
 
+        assert!(matches!(
+            result,
+            Err(SendTransactionAtNonceError::NonceAlreadyUsedOnchain(_, _, _))
+        ));
+    }
+
+    // Regression test: the guard must compare against the MINED (latest-tag) nonce.
+    // The pending tag counts the relayer's own broadcast-but-unmined transactions -
+    // it reads N+1 for an inmempool holder at nonce N, which made every exact-nonce
+    // cancel/replace of a stuck broadcast trip NonceAlreadyUsedOnchain.
+    #[test]
+    fn exact_nonce_send_allows_replacing_a_broadcast_but_unmined_holder() {
+        let relayer_id = RelayerId::new();
+
+        // Broadcast but unmined: the mined nonce is still 7 (the pending-tag nonce
+        // would already read 8 and wrongly reject the holder)
+        let holder = test_transaction(7, TransactionStatus::INMEMPOOL);
+        let resolved = validate_exact_nonce_target(
+            &relayer_id,
+            TransactionNonce::new(7),
+            TransactionNonce::new(7),
+            InflightNonceHolder::InmempoolHead(holder.clone()),
+        )
+        .expect("a broadcast-but-unmined holder must stay replaceable at its nonce");
+        assert_eq!(resolved.id, holder.id);
+
+        // Genuinely mined past the nonce: the mined nonce moved to 8, the slot is gone
+        let result = validate_exact_nonce_target(
+            &relayer_id,
+            TransactionNonce::new(7),
+            TransactionNonce::new(8),
+            InflightNonceHolder::InmempoolHead(test_transaction(7, TransactionStatus::INMEMPOOL)),
+        );
         assert!(matches!(
             result,
             Err(SendTransactionAtNonceError::NonceAlreadyUsedOnchain(_, _, _))

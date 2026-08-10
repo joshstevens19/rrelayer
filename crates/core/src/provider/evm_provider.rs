@@ -394,6 +394,23 @@ impl EvmProvider {
         Ok(TransactionNonce::new(nonce))
     }
 
+    /// The MINED transaction count (`latest` tag) - unlike [`Self::get_nonce_from_address`]
+    /// this never counts transactions still sitting in the node's mempool, so it is the
+    /// right comparison for "was this nonce consumed on chain": a broadcast-but-unmined
+    /// holder must still be replaceable/cancellable at its nonce.
+    pub async fn get_mined_nonce_from_address(
+        &self,
+        address: &EvmAddress,
+    ) -> Result<TransactionNonce, RpcError<TransportErrorKind>> {
+        let nonce = self
+            .rpc_client()
+            .get_transaction_count(address.into_address())
+            .block_id(BlockId::Number(BlockNumberOrTag::Latest))
+            .await?;
+
+        Ok(TransactionNonce::new(nonce))
+    }
+
     pub async fn send_transaction(
         &self,
         relayer: &Relayer,
