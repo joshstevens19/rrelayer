@@ -13,6 +13,8 @@
 - feat: embedded relayer handle can list a relayer's live in-flight queue and send a transaction at an exact pending nonce (cancel/replace primitive for wedged nonces)
 
 - feat: optional per-transaction expiry in seconds on the send request, overriding the global transaction expiration but clamped to never exceed it
+
+- feat: every provider url is verified against the configured chain id at boot - a wrong-chain url fails startup naming the url, while an unreachable url only warns instead of killing boot
 ---
 
 ### Bug fixes

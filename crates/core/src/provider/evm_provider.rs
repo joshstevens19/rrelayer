@@ -48,7 +48,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use thiserror::Error;
 use tokio::sync::Mutex;
-use tracing::info;
+use tracing::{info, warn};
 
 pub type RelayerProvider = Box<dyn Provider<AnyNetwork> + Send + Sync>;
 
@@ -167,6 +167,52 @@ pub enum EvmProviderNewError {
 
     #[error("{0}")]
     ProviderError(RpcError<TransportErrorKind>),
+
+    #[error("provider url {url} for network {network} serves chain id {got} but the config expects {expected} - refusing to start with a wrong-chain endpoint")]
+    ChainIdMismatch { network: String, url: String, expected: u64, got: u64 },
+
+    #[error("no provider url for network {0} responded at boot - cannot verify the chain or measure block time")]
+    NoResponsiveProviderUrls(String),
+}
+
+/// Boot policy for per-url chain verification. Serving the WRONG chain is a
+/// configuration bug and fails boot naming the url (silently relaying funds-bearing
+/// transactions into another chain's mempool is never acceptable). An endpoint that
+/// is merely UNREACHABLE at boot only warns and is reported not-verified - it must
+/// not take traffic yet but may recover later, so a dead endpoint (even url[0])
+/// cannot kill the whole server while healthy ones exist.
+///
+/// Returns one flag per url: true when the endpoint answered with the expected
+/// chain id.
+fn verify_endpoint_chain_ids(
+    network: &str,
+    checks: &[(String, Result<u64, String>)],
+    expected: ChainId,
+) -> Result<Vec<bool>, EvmProviderNewError> {
+    let mut verified = Vec::with_capacity(checks.len());
+
+    for (url, result) in checks {
+        match result {
+            Ok(got) if *got == expected.u64() => verified.push(true),
+            Ok(got) => {
+                return Err(EvmProviderNewError::ChainIdMismatch {
+                    network: network.to_string(),
+                    url: url.clone(),
+                    expected: expected.u64(),
+                    got: *got,
+                });
+            }
+            Err(error) => {
+                warn!(
+                    "Provider url {} for network {} is unreachable at boot ({}) - continuing without it until it recovers",
+                    url, network, error
+                );
+                verified.push(false);
+            }
+        }
+    }
+
+    Ok(verified)
 }
 
 impl EvmProvider {
@@ -258,34 +304,65 @@ impl EvmProvider {
         gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
         can_clone: bool,
     ) -> Result<Self, EvmProviderNewError> {
-        let provider =
-            create_retry_client(&network_setup_config.provider_urls[0]).await.map_err(|e| {
-                EvmProviderNewError::HttpProviderCantBeCreated(
-                    network_setup_config.provider_urls[0].clone(),
-                    e.to_string(),
-                )
-            })?;
-
-        let chain_id = ChainId::new(
-            provider.get_chain_id().await.map_err(EvmProviderNewError::ProviderError)?,
-        );
-
-        let mut providers: Vec<Arc<RelayerProvider>> = vec![provider.clone()];
-        for url in network_setup_config.provider_urls.iter().skip(1) {
+        let mut providers: Vec<Arc<RelayerProvider>> =
+            Vec::with_capacity(network_setup_config.provider_urls.len());
+        for url in &network_setup_config.provider_urls {
             providers.push(create_retry_client(url).await.map_err(|e| {
                 EvmProviderNewError::HttpProviderCantBeCreated(url.clone(), e.to_string())
             })?);
         }
 
+        // Verify EVERY url serves the configured chain before it can take traffic -
+        // wrong-chain fails boot, unreachable-at-boot only warns (see
+        // verify_endpoint_chain_ids for the policy)
+        let mut chain_checks: Vec<(String, Result<u64, String>)> =
+            Vec::with_capacity(providers.len());
+        for (url, provider) in network_setup_config.provider_urls.iter().zip(providers.iter()) {
+            chain_checks
+                .push((url.clone(), provider.get_chain_id().await.map_err(|e| e.to_string())));
+        }
+        let verified = verify_endpoint_chain_ids(
+            &network_setup_config.name,
+            &chain_checks,
+            network_setup_config.chain_id,
+        )?;
+
+        // Measure block time on the first VERIFIED endpoint that answers - pinning
+        // this to url[0] would make a dead primary kill boot even with healthy
+        // fallbacks configured
+        let mut blocks_every = None;
+        for (index, provider) in providers.iter().enumerate() {
+            if !verified[index] {
+                continue;
+            }
+            match calculate_block_time_difference(provider).await {
+                Ok(block_time_ms) => {
+                    blocks_every = Some(block_time_ms);
+                    break;
+                }
+                Err(error) => {
+                    warn!(
+                        "Could not measure block time on provider url {} for network {}: {} - trying the next url",
+                        network_setup_config.provider_urls[index], network_setup_config.name, error
+                    );
+                }
+            }
+        }
+        let Some(blocks_every) = blocks_every else {
+            return Err(EvmProviderNewError::NoResponsiveProviderUrls(
+                network_setup_config.name.to_string(),
+            ));
+        };
+
         Ok(EvmProvider {
-            blocks_every: calculate_block_time_difference(&provider)
-                .await
-                .map_err(EvmProviderNewError::ProviderError)?,
+            blocks_every,
             rpc_clients: providers,
             wallet_manager,
             gas_estimator,
             block_gas_limit_cache: Arc::new(Mutex::new(None)),
-            chain_id,
+            // The chain id comes from the CONFIG (each url was verified against it
+            // above) - never from whatever url[0] happens to answer
+            chain_id: network_setup_config.chain_id,
             name: network_setup_config.name.to_string(),
             provider_urls: network_setup_config.provider_urls.to_owned(),
             confirmations: network_setup_config.confirmations.unwrap_or(12),
@@ -727,5 +804,64 @@ mod tests {
 
         assert_eq!(cloned_address, address);
         assert_eq!(*last_create_chain.lock().await, Some((1, 31337)));
+    }
+
+    #[test]
+    fn wrong_chain_url_fails_boot_naming_url_and_chain_ids() {
+        let checks = vec![
+            ("https://one.example".to_string(), Ok(1)),
+            ("https://two.example".to_string(), Ok(137)),
+        ];
+
+        let result = verify_endpoint_chain_ids("ethereum", &checks, ChainId::new(1));
+
+        match result {
+            Err(EvmProviderNewError::ChainIdMismatch { network, url, expected, got }) => {
+                assert_eq!(network, "ethereum");
+                assert_eq!(url, "https://two.example");
+                assert_eq!(expected, 1);
+                assert_eq!(got, 137);
+            }
+            other => panic!("expected a chain id mismatch, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn unreachable_url_at_boot_warns_instead_of_failing() {
+        let checks = vec![
+            ("https://dead.example".to_string(), Err("connection refused".to_string())),
+            ("https://alive.example".to_string(), Ok(1)),
+        ];
+
+        let verified = verify_endpoint_chain_ids("ethereum", &checks, ChainId::new(1))
+            .expect("an unreachable endpoint must not fail boot");
+
+        assert_eq!(verified, vec![false, true]);
+    }
+
+    #[test]
+    fn all_matching_urls_verify() {
+        let checks = vec![
+            ("https://one.example".to_string(), Ok(31337)),
+            ("https://two.example".to_string(), Ok(31337)),
+        ];
+
+        let verified = verify_endpoint_chain_ids("anvil", &checks, ChainId::new(31337))
+            .expect("matching endpoints must verify");
+
+        assert_eq!(verified, vec![true, true]);
+    }
+
+    #[test]
+    fn wrong_chain_takes_precedence_over_unreachable_urls() {
+        // A wrong-chain url is a config bug even when other urls are down
+        let checks = vec![
+            ("https://dead.example".to_string(), Err("timeout".to_string())),
+            ("https://wrong.example".to_string(), Ok(10)),
+        ];
+
+        let result = verify_endpoint_chain_ids("ethereum", &checks, ChainId::new(1));
+
+        assert!(matches!(result, Err(EvmProviderNewError::ChainIdMismatch { .. })));
     }
 }
