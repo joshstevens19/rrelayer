@@ -1,6 +1,8 @@
 export {
   CreateRelayerResult,
   GasEstimatorResult,
+  GasPriceCeiling,
+  GasPriceCeilingBehavior,
   Network,
   Relayer,
   SignTextResult,

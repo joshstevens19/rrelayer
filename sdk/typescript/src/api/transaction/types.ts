@@ -19,6 +19,24 @@ export enum TransactionSpeed {
   SUPER = 'SUPER',
 }
 
+/**
+ * How the queue reacts when a bid for the transaction would exceed its gas price
+ * ceiling: 'freeze' never bids above the ceiling (the last compliant bid stays live
+ * until it mines or expires), 'cap' clamps the bid at exactly the ceiling.
+ */
+export type GasPriceCeilingBehavior = 'freeze' | 'cap';
+
+/**
+ * An absolute per-transaction gas price ceiling (wei) honored on the initial send
+ * and through the gas bump loop. Bounds maxFeePerGas - and legacy gas price, which
+ * derives from it; blob gas is not covered.
+ */
+export interface GasPriceCeiling {
+  maxPrice: number;
+  /** Defaults to 'freeze' when omitted. */
+  behavior?: GasPriceCeilingBehavior;
+}
+
 export interface Transaction {
   id: string;
   relayerId: string;
@@ -52,6 +70,12 @@ export interface Transaction {
    * resolves to FAILED carrying this reason.
    */
   failedReason?: string | null;
+  gasPriceCeiling?: GasPriceCeiling | null;
+  /**
+   * True once the gas price ceiling actually bound a bid - distinguishes "expired
+   * because the ceiling held the price down" from a plain expiry.
+   */
+  gasPriceCeilingHit: boolean;
 }
 
 export interface TransactionToSend {
@@ -61,6 +85,7 @@ export interface TransactionToSend {
   speed?: TransactionSpeed | null;
   blobs?: `0x${string}`[];
   externalId?: string;
+  gasPriceCeiling?: GasPriceCeiling;
 }
 
 export interface TransactionSent {
