@@ -8,7 +8,7 @@ mod endpoint_health;
 mod evm_provider;
 mod layer_extensions;
 
-pub use endpoint_health::EndpointSelector;
+pub use endpoint_health::{EndpointHealthSnapshot, EndpointSelector};
 
 pub(crate) use self::evm_provider::connect_endpoints;
 use self::evm_provider::EvmProviderNewError;

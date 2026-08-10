@@ -16,7 +16,9 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use chrono::{DateTime, Utc};
 use rand::{thread_rng, Rng};
+use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
 
 use super::evm_provider::RelayerProvider;
@@ -210,6 +212,12 @@ impl EndpointSelector {
         (index, self.endpoints[index].client.clone())
     }
 
+    /// Point-in-time health snapshots for every endpoint in the pool, with urls
+    /// credential-redacted at the source.
+    pub fn health_snapshots(&self) -> Vec<EndpointHealthSnapshot> {
+        self.endpoints.iter().map(|endpoint| endpoint.health.snapshot(&endpoint.url)).collect()
+    }
+
     /// Prefers a specific endpoint (read-your-writes stickiness) while it is still
     /// healthy, otherwise falls back to normal selection.
     pub(crate) fn client_preferring(&self, index: usize) -> Arc<RelayerProvider> {
@@ -235,6 +243,124 @@ impl EndpointSelector {
             .collect();
 
         pick_endpoint(&candidates, roll)
+    }
+}
+
+/// Point-in-time health view of one RPC endpoint. The url is REDACTED AT THE
+/// SOURCE - provider urls routinely embed API keys (path, query or userinfo), so
+/// only scheme + host + a stable fingerprint of the sensitive remainder ever
+/// leaves the process.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EndpointHealthSnapshot {
+    /// Credential-redacted endpoint identity.
+    pub url: String,
+    /// Selectable right now: verified for the right chain, not disabled, not
+    /// lagging the best tip and not in failure cooldown.
+    pub healthy: bool,
+    /// Exponentially weighted error rate over recent calls (0.0 - 1.0).
+    #[serde(rename = "errorRate")]
+    pub error_rate: f64,
+    /// Median latency over the recent successful-call window.
+    #[serde(rename = "latencyP50Ms", skip_serializing_if = "Option::is_none", default)]
+    pub latency_p50_ms: Option<u64>,
+    /// 95th percentile latency over the recent successful-call window.
+    #[serde(rename = "latencyP95Ms", skip_serializing_if = "Option::is_none", default)]
+    pub latency_p95_ms: Option<u64>,
+    /// Last tip the prober observed on this endpoint.
+    #[serde(rename = "lastBlock", skip_serializing_if = "Option::is_none", default)]
+    pub last_block: Option<u64>,
+    /// Blocks behind the best tip across the network's endpoints at the last probe.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub lag: Option<u64>,
+    /// When the current failure cooldown ends; `None` when not cooling down.
+    #[serde(rename = "cooldownUntil", skip_serializing_if = "Option::is_none", default)]
+    pub cooldown_until: Option<DateTime<Utc>>,
+}
+
+/// Redacts credentials from a provider url for surfacing outside the process.
+/// Keeps scheme + host + port for identification; userinfo, path and query - the
+/// places API keys live - are replaced with a short stable fingerprint so distinct
+/// endpoints on the same host stay distinguishable without exposing the key.
+pub(crate) fn redact_provider_url(url: &str) -> String {
+    let Ok(parsed) = reqwest::Url::parse(url) else {
+        return "<unparseable-url-redacted>".to_string();
+    };
+
+    let mut redacted = format!("{}://", parsed.scheme());
+    if let Some(host) = parsed.host_str() {
+        redacted.push_str(host);
+    }
+    if let Some(port) = parsed.port() {
+        redacted.push_str(&format!(":{port}"));
+    }
+
+    let path = parsed.path();
+    let has_sensitive_remainder = (!path.is_empty() && path != "/")
+        || parsed.query().is_some()
+        || !parsed.username().is_empty()
+        || parsed.password().is_some();
+
+    if has_sensitive_remainder {
+        let fingerprint_input = format!(
+            "{}:{}@{}?{}",
+            parsed.username(),
+            parsed.password().unwrap_or_default(),
+            path,
+            parsed.query().unwrap_or_default()
+        );
+        let digest = alloy::primitives::keccak256(fingerprint_input.as_bytes());
+        redacted.push_str(&format!("/[redacted-{}]", alloy::hex::encode(&digest[..4])));
+    }
+
+    redacted
+}
+
+impl EndpointHealth {
+    fn snapshot(&self, url: &str) -> EndpointHealthSnapshot {
+        let now = now_ms();
+
+        let (error_rate, latency_p50_ms, latency_p95_ms) = match self.stats.lock() {
+            Ok(stats) => {
+                let percentiles = if stats.latency_window_ms.is_empty() {
+                    (None, None)
+                } else {
+                    let mut samples: Vec<u64> = stats.latency_window_ms.iter().copied().collect();
+                    samples.sort_unstable();
+                    let percentile = |p: f64| {
+                        let index = ((samples.len() - 1) as f64 * p).round() as usize;
+                        samples[index.min(samples.len() - 1)]
+                    };
+                    (Some(percentile(0.50)), Some(percentile(0.95)))
+                };
+                (stats.error_ewma, percentiles.0, percentiles.1)
+            }
+            Err(_) => (1.0, None, None),
+        };
+
+        let cooldown_until_ms = self.cooldown_until_ms.load(Ordering::Relaxed);
+        let cooldown_until = (cooldown_until_ms > now)
+            .then(|| DateTime::<Utc>::from_timestamp_millis(cooldown_until_ms as i64))
+            .flatten();
+
+        let last_block = match self.last_block.load(Ordering::Relaxed) {
+            0 => None,
+            block => Some(block),
+        };
+        let lag = match self.lag_blocks.load(Ordering::Relaxed) {
+            u64::MAX => None,
+            lag => Some(lag),
+        };
+
+        EndpointHealthSnapshot {
+            url: redact_provider_url(url),
+            healthy: self.is_selectable(now),
+            error_rate,
+            latency_p50_ms,
+            latency_p95_ms,
+            last_block,
+            lag,
+            cooldown_until,
+        }
     }
 }
 
@@ -596,6 +722,70 @@ mod tests {
         // As does an out-of-range index
         let picked = selector.client_preferring(99);
         assert!(Arc::ptr_eq(&picked, &selector.endpoints()[0].client));
+    }
+
+    #[test]
+    fn redaction_strips_api_keys_from_provider_urls() {
+        // Alchemy/Infura style: the key lives in the path
+        let redacted = redact_provider_url("https://eth-mainnet.g.alchemy.com/v2/SUPERSECRETKEY");
+        assert!(redacted.starts_with("https://eth-mainnet.g.alchemy.com/[redacted-"));
+        assert!(!redacted.contains("SUPERSECRETKEY"));
+
+        // Key in the query string
+        let redacted = redact_provider_url("https://rpc.example.com/?apikey=SECRET123");
+        assert!(!redacted.contains("SECRET123"));
+        assert!(redacted.starts_with("https://rpc.example.com/[redacted-"));
+
+        // Userinfo credentials
+        let redacted = redact_provider_url("https://user:hunter2@rpc.example.com/");
+        assert!(!redacted.contains("user"));
+        assert!(!redacted.contains("hunter2"));
+
+        // A bare host with no secrets stays readable, with a non-default port kept
+        assert_eq!(redact_provider_url("http://localhost:8545/"), "http://localhost:8545");
+        assert_eq!(redact_provider_url("https://rpc.example.com/"), "https://rpc.example.com");
+
+        // Distinct keys on the same host stay distinguishable via the fingerprint
+        let one = redact_provider_url("https://rpc.example.com/v2/KEY-ONE");
+        let two = redact_provider_url("https://rpc.example.com/v2/KEY-TWO");
+        assert_ne!(one, two);
+
+        // Stable across calls
+        assert_eq!(one, redact_provider_url("https://rpc.example.com/v2/KEY-ONE"));
+
+        // Garbage never leaks through
+        assert_eq!(redact_provider_url("not a url"), "<unparseable-url-redacted>");
+    }
+
+    #[test]
+    fn health_snapshot_reports_state_with_a_redacted_url() {
+        let health = EndpointHealth::new();
+        health.mark_chain_verified();
+        health.record_success(Duration::from_millis(10));
+        health.record_success(Duration::from_millis(20));
+        health.record_success(Duration::from_millis(30));
+
+        let snapshot = health.snapshot("https://eth.example.com/v2/SECRETKEY");
+        assert!(!snapshot.url.contains("SECRETKEY"));
+        assert!(snapshot.healthy);
+        assert!(snapshot.error_rate < 0.01);
+        assert_eq!(snapshot.latency_p50_ms, Some(20));
+        assert_eq!(snapshot.latency_p95_ms, Some(30));
+        assert_eq!(snapshot.last_block, None);
+        assert_eq!(snapshot.lag, None);
+        assert_eq!(snapshot.cooldown_until, None);
+
+        // Cooldown + probe state surface too
+        health.record_probe(50, 100);
+        for _ in 0..3 {
+            health.record_failure(now_ms());
+        }
+        let snapshot = health.snapshot("https://eth.example.com/v2/SECRETKEY");
+        assert!(!snapshot.healthy);
+        assert!(snapshot.error_rate > 0.0);
+        assert_eq!(snapshot.last_block, Some(50));
+        assert_eq!(snapshot.lag, Some(50));
+        assert!(snapshot.cooldown_until.is_some());
     }
 
     #[test]

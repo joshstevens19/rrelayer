@@ -4,6 +4,7 @@ use crate::background_tasks::run_background_tasks;
 use crate::common_types::{EvmAddress, PagingContext, PagingResult};
 use crate::gas::{BlobGasOracleCache, GasOracleCache};
 use crate::network::{create_network_routes, ChainId};
+use crate::provider::EndpointHealthSnapshot;
 use crate::rate_limiting::RATE_LIMIT_HEADER_NAME;
 use crate::shared::{bad_request, not_found, HttpError};
 use crate::webhooks::WebhookManager;
@@ -49,6 +50,7 @@ use axum::{
 use dotenv::dotenv;
 use rustls::crypto::ring::default_provider;
 use rustls::crypto::CryptoProvider;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 use std::{
@@ -499,6 +501,16 @@ pub async fn start(project_path: &Path) -> Result<(), StartError> {
     relayer.serve_api().await
 }
 
+/// RPC endpoint health snapshots for one configured network.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NetworkEndpointHealth {
+    #[serde(rename = "chainId")]
+    pub chain_id: u64,
+    /// The network name from the yaml config.
+    pub name: String,
+    pub endpoints: Vec<EndpointHealthSnapshot>,
+}
+
 /// A fully built rrelayer instance.
 ///
 /// Created via [`build`], it owns every component the server needs. Call [`Relayer::serve_api`]
@@ -701,6 +713,22 @@ impl Relayer {
             .await?;
 
         Ok(result)
+    }
+
+    /// Point-in-time RPC endpoint health for every configured network: per
+    /// endpoint the healthy flag, error rate, latency p50/p95, last observed tip,
+    /// lag behind the network's best tip and any active cooldown. Endpoint urls
+    /// are credential-redacted at the source - safe to log or display.
+    pub fn get_endpoint_health(&self) -> Vec<NetworkEndpointHealth> {
+        self.app_state
+            .evm_providers
+            .iter()
+            .map(|provider| NetworkEndpointHealth {
+                chain_id: provider.chain_id.u64(),
+                name: provider.name.clone(),
+                endpoints: provider.endpoint_health(),
+            })
+            .collect()
     }
 
     /// Derives the address the CURRENTLY configured signing provider produces

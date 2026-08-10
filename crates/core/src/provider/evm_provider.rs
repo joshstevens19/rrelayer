@@ -1,6 +1,7 @@
 use crate::gas::BLOB_GAS_PER_BLOB;
 use crate::provider::endpoint_health::{
-    spawn_endpoint_prober, EndpointClient, EndpointHealth, EndpointSelector, StickyBroadcasts,
+    spawn_endpoint_prober, EndpointClient, EndpointHealth, EndpointHealthSnapshot,
+    EndpointSelector, StickyBroadcasts,
 };
 use crate::provider::layer_extensions::RpcLoggingLayer;
 use crate::relayer::Relayer;
@@ -757,6 +758,15 @@ impl EvmProvider {
 
     pub fn supports_blobs(&self) -> bool {
         self.wallet_manager.supports_blobs()
+    }
+
+    /// Point-in-time health snapshots for every configured RPC endpoint of this
+    /// network - healthy flag, error rate, latency percentiles, last observed tip,
+    /// lag behind the best tip and any active cooldown. Urls are
+    /// credential-redacted at the source: provider urls embed API keys and must
+    /// never leave the process intact.
+    pub fn endpoint_health(&self) -> Vec<EndpointHealthSnapshot> {
+        self.endpoints.health_snapshots()
     }
 }
 
