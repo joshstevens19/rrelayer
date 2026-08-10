@@ -19,6 +19,8 @@
 
 ### Breaking changes
 
+- in the rust sdk `RelayTransactionRequest` gained a new `gas_price_ceiling: Option<GasPriceCeiling>` field - code constructing the struct with a literal must now add `gas_price_ceiling: None` (the HTTP API and JSON payloads are unaffected: the field is optional and defaulted)
+
 ---
 
 ## Releases
