@@ -86,6 +86,13 @@ export interface TransactionToSend {
   blobs?: `0x${string}`[];
   externalId?: string;
   gasPriceCeiling?: GasPriceCeiling;
+  /**
+   * Per-transaction expiry in seconds from queueing. Overrides the server's
+   * global expiration (default 12 hours) but can only tighten it - longer
+   * values clamp to the global window. Once the deadline passes the
+   * transaction expires through the normal same-nonce no-op machinery.
+   */
+  expiresInSeconds?: number;
 }
 
 export interface TransactionSent {
