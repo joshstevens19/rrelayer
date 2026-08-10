@@ -29,6 +29,7 @@ impl TestRunner {
                 external_id: Some(format!("concurrent-test-{}", i)),
                 blobs: None,
                 gas_price_ceiling: None,
+                expires_in_seconds: None,
             };
             tx_requests.push(tx_request);
         }

@@ -53,6 +53,7 @@ async fn example() -> Result<()> {
         external_id: None,
         blobs: None,
         gas_price_ceiling: None,
+        expires_in_seconds: None,
     };
 
     let result: SendTransactionResult = relayer_client.transaction().send(&request, None).await?;

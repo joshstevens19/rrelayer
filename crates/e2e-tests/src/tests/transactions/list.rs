@@ -28,6 +28,7 @@ impl TestRunner {
                 external_id: Some(format!("test-list-{}", i)),
                 blobs: None,
                 gas_price_ceiling: None,
+                expires_in_seconds: None,
             };
 
             let _ = relayer

@@ -11,6 +11,8 @@
 - feat: optional per-transaction gas price ceiling (freeze or cap behavior) honored on the initial send and through the gas bump loop, with a gas price ceiling hit flag on transaction status
 
 - feat: embedded relayer handle can list a relayer's live in-flight queue and send a transaction at an exact pending nonce (cancel/replace primitive for wedged nonces)
+
+- feat: optional per-transaction expiry in seconds on the send request, overriding the global transaction expiration but clamped to never exceed it
 ---
 
 ### Bug fixes
@@ -20,6 +22,8 @@
 ### Breaking changes
 
 - in the rust sdk `RelayTransactionRequest` gained a new `gas_price_ceiling: Option<GasPriceCeiling>` field - code constructing the struct with a literal must now add `gas_price_ceiling: None` (the HTTP API and JSON payloads are unaffected: the field is optional and defaulted)
+
+- in the rust sdk `RelayTransactionRequest` gained a new `expires_in_seconds: Option<u64>` field - code constructing the struct with a literal must now add `expires_in_seconds: None` (the HTTP API and JSON payloads are unaffected: the field is optional and defaulted)
 
 ---
 

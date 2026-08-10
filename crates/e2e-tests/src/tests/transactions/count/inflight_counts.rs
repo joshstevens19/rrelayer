@@ -44,6 +44,7 @@ impl TestRunner {
                 external_id: Some(format!("test-counts-{}", i)),
                 blobs: None,
                 gas_price_ceiling: None,
+                expires_in_seconds: None,
             };
 
             let send_result = relayer

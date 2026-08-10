@@ -60,6 +60,7 @@ impl TestRunner {
                 external_id: Some("drain-tx-1".to_string()),
                 blobs: None,
                 gas_price_ceiling: None,
+                expires_in_seconds: None,
             };
 
             relayer1.transaction().send(&tx_request, None).await?;
@@ -74,6 +75,7 @@ impl TestRunner {
                 external_id: Some("drain-tx-2".to_string()),
                 blobs: None,
                 gas_price_ceiling: None,
+                expires_in_seconds: None,
             };
 
             relayer2.transaction().send(&tx_request, None).await?;

@@ -96,6 +96,26 @@ fn is_cancel_shaped(request: &RelayTransactionRequest, relayer_address: &EvmAddr
         && request.blobs.as_ref().is_none_or(|blobs| blobs.is_empty())
 }
 
+/// Resolves the expiry window for a transaction: the operator's global expiration
+/// unless the request carries a SHORTER per-transaction expiry. The global setting
+/// stays the operator ceiling - a per-transaction value can only tighten the window,
+/// never extend it (longer or unrepresentable values clamp to the global window).
+fn resolve_expiry_duration(
+    global_expiration: chrono::Duration,
+    expires_in_seconds: Option<u64>,
+) -> chrono::Duration {
+    let Some(seconds) = expires_in_seconds else {
+        return global_expiration;
+    };
+
+    let per_transaction = i64::try_from(seconds).ok().and_then(chrono::Duration::try_seconds);
+
+    match per_transaction {
+        Some(duration) if duration < global_expiration => duration,
+        _ => global_expiration,
+    }
+}
+
 /// Guard rails for send-at-nonce: the nonce must still be in flight (not yet consumed
 /// on chain) and held by a transaction a same-nonce replacement can act on. Returns
 /// the holder to replace.
@@ -276,16 +296,23 @@ impl TransactionsQueues {
         Ok(())
     }
 
-    fn expires_at(&self) -> DateTime<Utc> {
-        let expiration = std::env::var("RRELAYER_TRANSACTION_EXPIRATION_SECONDS")
+    /// The operator-wide expiration window: RRELAYER_TRANSACTION_EXPIRATION_SECONDS,
+    /// defaulting to 12 hours. This is the CEILING for every transaction - a
+    /// per-transaction expiry can only tighten it.
+    fn global_expiration() -> chrono::Duration {
+        std::env::var("RRELAYER_TRANSACTION_EXPIRATION_SECONDS")
             .ok()
             .and_then(|value| value.parse::<i64>().ok())
             .filter(|seconds| *seconds > 0)
             // try_seconds guards against values chrono::Duration::seconds would panic on
             .and_then(chrono::Duration::try_seconds)
-            .unwrap_or_else(|| chrono::Duration::hours(12));
+            .unwrap_or_else(|| chrono::Duration::hours(12))
+    }
 
-        Utc::now() + expiration
+    /// Deadline for a transaction queued now: the global expiration unless the request
+    /// carries a shorter per-transaction expiry.
+    fn expires_at(&self, expires_in_seconds: Option<u64>) -> DateTime<Utc> {
+        Utc::now() + resolve_expiry_duration(Self::global_expiration(), expires_in_seconds)
     }
 
     /// Computes gas prices for a transaction based on its type.
@@ -391,7 +418,7 @@ impl TransactionsQueues {
         relayer_id: &RelayerId,
         transaction_to_send: &TransactionToSend,
     ) -> Result<Transaction, AddTransactionError> {
-        let expires_at = self.expires_at();
+        let expires_at = self.expires_at(transaction_to_send.expires_in_seconds);
 
         let queue_arc = self
             .get_transactions_queue(relayer_id)
@@ -622,7 +649,7 @@ impl TransactionsQueues {
                     }
                     EditableTransactionType::Inmempool => {
                         let cancel_transaction_id = TransactionId::new();
-                        let expires_at = self.expires_at();
+                        let expires_at = self.expires_at(None);
 
                         let mut cancel_transaction = Transaction {
                             id: cancel_transaction_id,
@@ -838,9 +865,18 @@ impl TransactionsQueues {
 
                         // Swap the payload in the queue entry itself - editing only the
                         // looked-up clone would leave the ORIGINAL payload queued for
-                        // broadcast while reporting success
+                        // broadcast while reporting success. A replacement declaring its
+                        // own expiry gets a fresh deadline from now (still clamped to
+                        // the global window); otherwise the slot keeps its deadline.
+                        let new_expires_at = replace_with
+                            .expires_in_seconds
+                            .map(|_| self.expires_at(replace_with.expires_in_seconds));
                         let updated_transaction = transactions_queue
-                            .replace_pending_transaction_payload(&transaction.id, replace_with)
+                            .replace_pending_transaction_payload(
+                                &transaction.id,
+                                replace_with,
+                                new_expires_at,
+                            )
                             .await;
 
                         let Some(updated_transaction) = updated_transaction else {
@@ -880,7 +916,7 @@ impl TransactionsQueues {
                     }
                     EditableTransactionType::Inmempool => {
                         let replace_transaction_id = TransactionId::new();
-                        let expires_at = self.expires_at();
+                        let expires_at = self.expires_at(replace_with.expires_in_seconds);
 
                         let mut replace_transaction = Transaction {
                             id: replace_transaction_id,
@@ -2154,7 +2190,9 @@ impl TransactionsQueues {
 #[cfg(test)]
 mod tests {
     use super::SendTransactionAtNonceError;
-    use super::{is_cancel_shaped, validate_exact_nonce_target, InflightNonceHolder};
+    use super::{
+        is_cancel_shaped, resolve_expiry_duration, validate_exact_nonce_target, InflightNonceHolder,
+    };
     use crate::relayer::RelayerId;
     use crate::shared::common_types::EvmAddress;
     use crate::transaction::api::RelayTransactionRequest;
@@ -2176,6 +2214,7 @@ mod tests {
             external_id: None,
             blobs: None,
             gas_price_ceiling: None,
+            expires_in_seconds: None,
         }
     }
 
@@ -2279,5 +2318,36 @@ mod tests {
         )
         .expect("the inmempool head should be replaceable");
         assert_eq!(resolved.id, head.id);
+    }
+
+    #[test]
+    fn per_transaction_expiry_overrides_the_global_default() {
+        let global = chrono::Duration::hours(12);
+
+        let resolved = resolve_expiry_duration(global, Some(300));
+
+        assert_eq!(resolved, chrono::Duration::seconds(300));
+    }
+
+    #[test]
+    fn per_transaction_expiry_longer_than_global_clamps_to_global() {
+        let global = chrono::Duration::hours(12);
+
+        let thirteen_hours = 13 * 60 * 60;
+        assert_eq!(resolve_expiry_duration(global, Some(thirteen_hours)), global);
+
+        // Equal to the global window is the global window
+        let twelve_hours = 12 * 60 * 60;
+        assert_eq!(resolve_expiry_duration(global, Some(twelve_hours)), global);
+
+        // Values chrono cannot represent clamp to the operator ceiling too
+        assert_eq!(resolve_expiry_duration(global, Some(u64::MAX)), global);
+    }
+
+    #[test]
+    fn absent_per_transaction_expiry_keeps_the_global_window() {
+        let global = chrono::Duration::hours(12);
+
+        assert_eq!(resolve_expiry_duration(global, None), global);
     }
 }

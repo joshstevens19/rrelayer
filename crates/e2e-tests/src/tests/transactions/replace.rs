@@ -26,6 +26,7 @@ impl TestRunner {
             external_id: Some("test-original".to_string()),
             blobs: None,
             gas_price_ceiling: None,
+            expires_in_seconds: None,
         };
 
         let send_result = relayer
@@ -44,6 +45,7 @@ impl TestRunner {
             external_id: Some("test-replacement".to_string()),
             blobs: None,
             gas_price_ceiling: None,
+            expires_in_seconds: None,
         };
 
         let replace_result = relayer

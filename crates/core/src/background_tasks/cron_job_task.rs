@@ -374,6 +374,7 @@ fn build_transaction_to_send(
         None,
         transaction.external_id.clone(),
         None,
+        None,
     ))
 }
 

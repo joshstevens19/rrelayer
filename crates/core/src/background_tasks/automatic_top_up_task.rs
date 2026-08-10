@@ -524,6 +524,7 @@ impl AutomaticTopUpTask {
             None,
             Some(format!("automatic_top_up_native_{}_{}", from_address, relayer_address)),
             None,
+            None,
         );
 
         let relayer_id = if let Some(relayer) =
@@ -974,6 +975,7 @@ impl AutomaticTopUpTask {
                 "automatic_top_up_erc20_{}_{}_{}",
                 token_config.address, from_address, relayer_address
             )),
+            None,
             None,
         );
 

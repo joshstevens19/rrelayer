@@ -28,6 +28,7 @@ async fn rate_limit_example() -> Result<()> {
         external_id: None,
         blobs: None,
         gas_price_ceiling: None,
+        expires_in_seconds: None,
     };
 
     // Passing in the user doing the transaction as an example, this rate limit key will be limited based on what is configured

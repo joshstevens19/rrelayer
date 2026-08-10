@@ -202,13 +202,37 @@ fn replace_pending_transaction_payload_in_queue(
     pending: &mut VecDeque<Transaction>,
     transaction_id: &TransactionId,
     replace_with: &RelayTransactionRequest,
+    new_expires_at: Option<chrono::DateTime<Utc>>,
 ) -> Option<Transaction> {
     let transaction = pending.iter_mut().find(|tx| tx.id == *transaction_id)?;
 
     apply_replacement_payload(transaction, replace_with);
     transaction.known_transaction_hash = None;
+    // Only a replacement that declares its own expiry moves the deadline - otherwise
+    // the queued slot keeps the deadline the original request was admitted with
+    if let Some(expires_at) = new_expires_at {
+        transaction.expires_at = expires_at;
+    }
 
     Some(transaction.clone())
+}
+
+/// Converts a transaction into the same-nonce close-out no-op: a value-0 empty-data
+/// self-send that consumes the reserved nonce (used when a transaction expires or its
+/// payload is permanently rejected). The close-out must always be broadcastable, so
+/// the original payload's gas price ceiling no longer applies - the reserved nonce is
+/// consumed at market price - while `gas_price_ceiling_hit` is kept so callers can
+/// still see the ceiling bound the original payload.
+fn convert_transaction_to_noop(transaction: &mut Transaction, relayer_address: EvmAddress) {
+    transaction.to = relayer_address;
+    transaction.value = TransactionValue::zero();
+    transaction.data = TransactionData::empty();
+    transaction.blobs = None;
+    transaction.gas_limit = Some(GasLimit::new(21_000));
+    transaction.is_noop = true;
+    transaction.speed = TransactionSpeed::FAST;
+    transaction.sent_with_blob_gas = None;
+    transaction.gas_price_ceiling = None;
 }
 
 /// Pure lookup of which in-flight transaction holds a nonce. Inmempool matches are
@@ -413,12 +437,14 @@ impl TransactionsQueue {
         &mut self,
         transaction_id: &TransactionId,
         replace_with: &RelayTransactionRequest,
+        new_expires_at: Option<chrono::DateTime<Utc>>,
     ) -> Option<Transaction> {
         let mut pending = self.pending_transactions.lock().await;
         let replaced = replace_pending_transaction_payload_in_queue(
             &mut pending,
             transaction_id,
             replace_with,
+            new_expires_at,
         );
 
         if replaced.is_some() {
@@ -1028,18 +1054,7 @@ impl TransactionsQueue {
     }
 
     pub fn transaction_to_noop(&self, transaction: &mut Transaction) {
-        transaction.to = self.relay_address();
-        transaction.value = TransactionValue::zero();
-        transaction.data = TransactionData::empty();
-        transaction.blobs = None;
-        transaction.gas_limit = Some(GasLimit::new(21_000));
-        transaction.is_noop = true;
-        transaction.speed = TransactionSpeed::FAST;
-        transaction.sent_with_blob_gas = None;
-        // The close-out no-op must always be broadcastable: the reserved nonce is
-        // consumed at market price, so the original payload's ceiling no longer applies
-        // (gas_price_ceiling_hit is kept so callers can still see the ceiling bound it)
-        transaction.gas_price_ceiling = None;
+        convert_transaction_to_noop(transaction, self.relay_address());
     }
 
     pub async fn compute_gas_price_for_transaction(
@@ -2229,13 +2244,18 @@ mod tests {
             external_id: Some("replaced".to_string()),
             blobs: None,
             gas_price_ceiling: None,
+            expires_in_seconds: None,
         };
 
         let mut pending: VecDeque<_> = vec![original.clone()].into();
 
-        let updated =
-            replace_pending_transaction_payload_in_queue(&mut pending, &original.id, &replace_with)
-                .expect("the pending holder should be replaceable");
+        let updated = replace_pending_transaction_payload_in_queue(
+            &mut pending,
+            &original.id,
+            &replace_with,
+            None,
+        )
+        .expect("the pending holder should be replaceable");
 
         // Only one transaction remains queued at the nonce - nothing extra broadcasts
         assert_eq!(pending.len(), 1);
@@ -2261,7 +2281,51 @@ mod tests {
             &mut pending,
             &test_transaction(8, TransactionStatus::PENDING).id,
             &replace_with,
+            None,
         );
         assert!(missing.is_none());
+    }
+
+    // A transaction expired by its per-transaction expiry goes through the normal
+    // same-nonce no-op close-out, and the close-out stays exempt from the gas price
+    // ceiling (cleared) while the hit flag survives for status readers.
+    #[test]
+    fn per_transaction_expiry_closes_out_through_the_noop_machinery() {
+        use super::convert_transaction_to_noop;
+        use crate::gas::GasPrice;
+        use crate::shared::common_types::EvmAddress;
+        use crate::transaction::types::{
+            GasPriceCeiling, GasPriceCeilingBehavior, TransactionData,
+        };
+        use chrono::Utc;
+
+        let relayer_address = EvmAddress::from(alloy::primitives::Address::repeat_byte(0x11));
+
+        let mut transaction = test_transaction(5, TransactionStatus::INMEMPOOL);
+        // Queued 10 minutes ago with a 300 second per-transaction expiry - the
+        // deadline passed 5 minutes ago even though the 12h global window has not
+        transaction.queued_at = Utc::now() - chrono::Duration::minutes(10);
+        transaction.expires_at = transaction.queued_at + chrono::Duration::seconds(300);
+        transaction.gas_price_ceiling = Some(GasPriceCeiling {
+            max_price: GasPrice::new(100),
+            behavior: GasPriceCeilingBehavior::Freeze,
+        });
+        transaction.gas_price_ceiling_hit = true;
+
+        // The expiry sweep sees it as stale...
+        assert!(super::TransactionsQueue::has_expired(&transaction));
+
+        // ...and the close-out converts it to the same-nonce no-op
+        convert_transaction_to_noop(&mut transaction, relayer_address);
+
+        assert!(transaction.is_noop);
+        assert_eq!(transaction.to, relayer_address);
+        assert!(transaction.value.is_zero());
+        assert_eq!(transaction.data, TransactionData::empty());
+        assert_eq!(transaction.blobs, None);
+        // The ceiling is exempt for the close-out so the nonce always clears at
+        // market price, while the hit flag survives to mark the ceiling-bound expiry
+        assert_eq!(transaction.gas_price_ceiling, None);
+        assert!(transaction.gas_price_ceiling_hit);
     }
 }

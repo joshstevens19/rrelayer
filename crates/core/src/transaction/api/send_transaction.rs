@@ -45,6 +45,13 @@ pub struct RelayTransactionRequest {
     /// ceiling.
     #[serde(rename = "gasPriceCeiling", skip_serializing_if = "Option::is_none", default)]
     pub gas_price_ceiling: Option<GasPriceCeiling>,
+    /// Optional per-transaction expiry in seconds from queueing. Overrides the
+    /// operator-wide expiration (RRELAYER_TRANSACTION_EXPIRATION_SECONDS, default 12
+    /// hours) but can only TIGHTEN it - values longer than the global window clamp to
+    /// it. Once the deadline passes the transaction expires through the normal
+    /// same-nonce no-op machinery.
+    #[serde(rename = "expiresInSeconds", skip_serializing_if = "Option::is_none", default)]
+    pub expires_in_seconds: Option<u64>,
 }
 
 impl FromStr for RelayTransactionRequest {
@@ -129,6 +136,7 @@ pub async fn send_transaction(
         convert_blob_strings_to_blobs(transaction.blobs)?,
         transaction.external_id,
         transaction.gas_price_ceiling,
+        transaction.expires_in_seconds,
     );
 
     let transaction = state

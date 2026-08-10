@@ -14,6 +14,7 @@ pub struct TransactionToSend {
     pub blobs: Option<Vec<TransactionBlob>>,
     pub external_id: Option<String>,
     pub gas_price_ceiling: Option<GasPriceCeiling>,
+    pub expires_in_seconds: Option<u64>,
 }
 
 impl TransactionToSend {
@@ -26,6 +27,7 @@ impl TransactionToSend {
         blobs: Option<Vec<TransactionBlob>>,
         external_id: Option<String>,
         gas_price_ceiling: Option<GasPriceCeiling>,
+        expires_in_seconds: Option<u64>,
     ) -> Self {
         Self {
             id: TransactionId::new(),
@@ -36,6 +38,7 @@ impl TransactionToSend {
             blobs,
             external_id,
             gas_price_ceiling,
+            expires_in_seconds,
         }
     }
 }
