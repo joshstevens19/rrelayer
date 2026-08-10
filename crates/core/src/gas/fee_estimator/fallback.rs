@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use alloy::{eips::BlockNumberOrTag, primitives::utils::parse_units};
 use async_trait::async_trait;
 
@@ -7,16 +5,19 @@ use super::base::{BaseGasFeeEstimator, GasEstimatorError, GasEstimatorResult, Ga
 use crate::{
     gas::types::{MaxFee, MaxPriorityFee},
     network::ChainId,
-    provider::RelayerProvider,
+    provider::EndpointSelector,
 };
 
+/// Chain-generic gas estimator backed by the network's health-aware endpoint pool -
+/// each estimation picks a live endpoint instead of being pinned to url[0], so a
+/// dead primary can no longer silently freeze gas pricing.
 #[derive(Clone)]
 pub struct FallbackGasFeeEstimator {
-    provider: Arc<RelayerProvider>,
+    endpoints: EndpointSelector,
 }
 impl FallbackGasFeeEstimator {
-    pub fn new(provider: Arc<RelayerProvider>) -> Self {
-        FallbackGasFeeEstimator { provider }
+    pub fn new(endpoints: EndpointSelector) -> Self {
+        FallbackGasFeeEstimator { endpoints }
     }
 
     async fn estimate_with_fee_history(
@@ -27,16 +28,15 @@ impl FallbackGasFeeEstimator {
         let past_blocks = if ethereum_or_ethereum_testnet { 20 } else { 60 };
         let reward_percentile = if ethereum_or_ethereum_testnet { 60.0 } else { 25.0 };
 
-        let fee_history = self
-            .provider
+        let provider = self.endpoints.client();
+        let fee_history = provider
             .get_fee_history(past_blocks, BlockNumberOrTag::Latest, &[reward_percentile])
             .await
             .map_err(|e| GasEstimatorError::CustomError(e.to_string()))?;
 
         let base_fee_per_gas = match fee_history.latest_block_base_fee() {
             Some(base_fee) if base_fee != 0 => base_fee,
-            _ => self
-                .provider
+            _ => provider
                 .get_block_by_number(BlockNumberOrTag::Latest)
                 .await
                 .map_err(|e| GasEstimatorError::CustomError(e.to_string()))?
@@ -99,7 +99,8 @@ impl BaseGasFeeEstimator for FallbackGasFeeEstimator {
                 Ok(fees) => fees,
                 Err(_) => {
                     let suggested = self
-                        .provider
+                        .endpoints
+                        .client()
                         .estimate_eip1559_fees()
                         .await
                         .map_err(|e| GasEstimatorError::CustomError(e.to_string()))?;
@@ -116,7 +117,8 @@ impl BaseGasFeeEstimator for FallbackGasFeeEstimator {
 
         // Get current base fee to ensure max_fee is never below it
         let current_base_fee = self
-            .provider
+            .endpoints
+            .client()
             .get_block_by_number(BlockNumberOrTag::Latest)
             .await
             .map_err(|e| GasEstimatorError::CustomError(e.to_string()))?
@@ -160,5 +162,50 @@ impl BaseGasFeeEstimator for FallbackGasFeeEstimator {
 
     fn is_chain_supported(&self, _: &ChainId) -> bool {
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use super::*;
+    use crate::provider::connect_endpoints;
+
+    // Regression test for the url[0] pin: the estimator now draws its client from
+    // the shared health-aware pool, so a dead primary cannot freeze gas pricing.
+    #[test]
+    fn estimator_selection_follows_endpoint_health() {
+        let selector = connect_endpoints(&[
+            "http://127.0.0.1:1/primary".to_string(),
+            "http://127.0.0.1:1/fallback".to_string(),
+        ])
+        .expect("building clients does not dial the endpoints");
+
+        for endpoint in selector.endpoints() {
+            endpoint.health.mark_chain_verified();
+        }
+
+        // Cool the primary down the same way three straight call failures would
+        // (real wall-clock time: selection checks the cooldown against it)
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64;
+        for _ in 0..3 {
+            selector.endpoints()[0].health.record_failure(now);
+        }
+
+        let estimator = FallbackGasFeeEstimator::new(selector.clone());
+
+        // Every pick the estimator makes lands on the healthy fallback, never the
+        // cooled-down primary
+        for _ in 0..25 {
+            let picked = estimator.endpoints.client();
+            assert!(
+                Arc::ptr_eq(&picked, &selector.endpoints()[1].client),
+                "estimation must avoid the cooled-down endpoint"
+            );
+        }
     }
 }

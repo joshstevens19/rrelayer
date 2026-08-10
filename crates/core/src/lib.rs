@@ -10,7 +10,7 @@ pub mod network;
 mod postgres;
 pub use postgres::{PostgresClient, PostgresConnectionError};
 mod provider;
-pub use provider::create_retry_client;
+pub use provider::{create_retry_client, EndpointSelector, RelayerProvider};
 pub mod relayer;
 pub mod safe_proxy;
 pub use safe_proxy::{SafeProxyError, SafeProxyManager, SafeTransaction};
