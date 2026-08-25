@@ -68,7 +68,12 @@ export class Provider {
           speed: this._relayer.fallbackSpeed,
         });
 
-        return result.hash;
+        return (
+          result.hash ??
+          (await this._relayer.transaction.waitForTransactionHashById(
+            result.id
+          ))
+        );
       }
 
       if (args.method === 'eth_signTypedData_v4') {

@@ -14,7 +14,8 @@ use rrelayer_core::{
     common_types::EvmAddress,
     relayer::RelayerId,
     transaction::types::{
-        Transaction, TransactionData, TransactionId, TransactionSpeed, TransactionValue,
+        Transaction, TransactionData, TransactionHash, TransactionId, TransactionSpeed,
+        TransactionValue,
     },
 };
 use std::io::{self, Write};
@@ -218,7 +219,7 @@ async fn handle_withdraw(
 
             println!("ERC-20 token withdrawal transaction sent..");
             println!("Transaction id: {}", tx.id);
-            println!("Transaction hash: {}", tx.hash);
+            println!("Transaction hash: {}", format_transaction_hash(tx.hash));
         }
         None => {
             let tx = client
@@ -238,7 +239,7 @@ async fn handle_withdraw(
 
             println!("ETH withdrawal transaction sent..");
             println!("Transaction id: {}", tx.id);
-            println!("Transaction hash: {}", tx.hash);
+            println!("Transaction hash: {}", format_transaction_hash(tx.hash));
         }
     }
 
@@ -369,9 +370,23 @@ async fn handle_send(
 
     println!("Transaction sent..");
     println!("Transaction id: {}", tx.id);
-    println!("Transaction hash: {}", tx.hash);
+    println!("Transaction hash: {}", format_transaction_hash(tx.hash));
 
     Ok(())
+}
+
+fn format_transaction_hash(hash: Option<TransactionHash>) -> String {
+    hash.map_or_else(|| "<pending>".to_string(), |hash| hash.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::format_transaction_hash;
+
+    #[test]
+    fn accepted_submission_without_hash_is_printed_as_pending() {
+        assert_eq!(format_transaction_hash(None), "<pending>");
+    }
 }
 
 async fn handle_fund(
