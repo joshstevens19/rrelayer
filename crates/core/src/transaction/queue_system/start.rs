@@ -511,6 +511,11 @@ pub async fn startup_transactions_queues(
     )
     .await?;
 
+    postgres
+        .wait_for_transaction_admissions()
+        .await
+        .map_err(StartTransactionsQueuesError::CouldNotLoadRelayersFromDatabase)?;
+
     // has to load them ALL to populate their queues
     let relays = load_relayers(&postgres)
         .await

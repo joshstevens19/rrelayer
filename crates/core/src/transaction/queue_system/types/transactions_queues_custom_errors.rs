@@ -56,6 +56,17 @@ impl From<ReplaceTransactionError> for HttpError {
 
 #[derive(Error, Debug)]
 pub enum AddTransactionError {
+    #[error("Caller cancelled transaction {0} before persistence began")]
+    AdmissionCallerCancelled(TransactionId),
+
+    #[error("Transaction admission task failed; relayer remains fenced until restart: {0}")]
+    AdmissionTaskFailed(#[from] tokio::task::JoinError),
+
+    #[error(
+        "Shutdown interrupted settlement of transaction {0}; restart to recover the admission"
+    )]
+    AdmissionInterrupted(TransactionId),
+
     #[error("Transaction could not be saved in DB: {0}")]
     CouldNotSaveTransactionDb(PostgresError),
 
