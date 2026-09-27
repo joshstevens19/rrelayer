@@ -17,14 +17,70 @@ use serde_json;
 
 const TRANSACTION_TABLES: [&str; 2] = ["relayer.transaction", "relayer.transaction_audit_log"];
 
+#[derive(Debug)]
+pub(crate) enum SaveTransactionError {
+    BeforeCommit(PostgresError),
+    CommitOutcomeUnknown(PostgresError),
+}
+
+impl From<PostgresError> for SaveTransactionError {
+    fn from(error: PostgresError) -> Self {
+        Self::BeforeCommit(error)
+    }
+}
+
+impl From<tokio_postgres::Error> for SaveTransactionError {
+    fn from(error: tokio_postgres::Error) -> Self {
+        Self::BeforeCommit(error.into())
+    }
+}
+
+// The two-int advisory-lock namespace is distinct from bigint leadership locks.
+// Hash collisions only serialize unrelated admissions; they cannot skip a save.
+pub(super) async fn lock_transaction_admission(
+    transaction: &tokio_postgres::Transaction<'_>,
+    id: &TransactionId,
+) -> Result<(), PostgresError> {
+    transaction
+        .query_one("SELECT pg_advisory_xact_lock(1919249505, hashtext($1))", &[&id.to_string()])
+        .await?;
+    Ok(())
+}
+
 impl PostgresClient {
     pub async fn save_transaction(
         &mut self,
         relayer_id: &RelayerId,
         transaction: &Transaction,
     ) -> Result<(), PostgresError> {
-        let mut conn = self.pool.get().await?;
+        self.save_transaction_for_admission(relayer_id, transaction, None)
+            .await
+            .map(|_| ())
+            .map_err(|error| match error {
+                SaveTransactionError::BeforeCommit(error)
+                | SaveTransactionError::CommitOutcomeUnknown(error) => error,
+            })
+    }
+
+    pub(crate) async fn save_transaction_for_admission(
+        &mut self,
+        relayer_id: &RelayerId,
+        transaction: &Transaction,
+        ready: Option<tokio::sync::oneshot::Sender<()>>,
+    ) -> Result<bool, SaveTransactionError> {
+        let mut conn = self.pool.get().await.map_err(PostgresError::from)?;
         let trans = conn.transaction().await.map_err(PostgresError::PgError)?;
+        // Startup takes the exclusive counterpart before reading durable queues.
+        // A disconnected backend may still be finishing COMMIT after the old
+        // process has exited; it must settle before the next nonce is restored.
+        trans.query_one("SELECT pg_advisory_xact_lock_shared(1919249506, 0)", &[]).await?;
+        lock_transaction_admission(&trans, &transaction.id).await?;
+        // If the caller disappeared before this worker obtained the durable
+        // barrier, do not start saving later behind a replacement process's
+        // startup snapshot. Once notified, the held barrier covers cancellation.
+        if ready.is_some_and(|ready| ready.send(()).is_err()) {
+            return Ok(false);
+        }
 
         let gas_price_ceiling_max_price =
             transaction.gas_price_ceiling.map(|ceiling| ceiling.max_price);
@@ -62,9 +118,11 @@ impl PostgresClient {
                 .await?;
         }
 
-        trans.commit().await?;
+        trans.commit().await.map_err(|error| {
+            SaveTransactionError::CommitOutcomeUnknown(PostgresError::from(error))
+        })?;
 
-        Ok(())
+        Ok(true)
     }
 
     pub async fn transaction_sent(

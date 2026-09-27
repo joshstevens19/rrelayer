@@ -273,6 +273,9 @@ pub struct TransactionsQueue {
     safe_proxy_manager: Arc<SafeProxyManager>,
     gas_bump_config: GasBumpBlockConfig,
     max_gas_price_multiplier: u64,
+    // Kept set if an admission task panics or shutdown interrupts settlement.
+    // An operator unpause cannot make an unresolved nonce safe to reuse.
+    pub(super) admission_pending: bool,
 }
 
 impl TransactionsQueue {
@@ -299,6 +302,7 @@ impl TransactionsQueue {
             safe_proxy_manager: setup.safe_proxy_manager,
             gas_bump_config: setup.gas_bump_config,
             max_gas_price_multiplier: setup.max_gas_price_multiplier,
+            admission_pending: false,
         }
     }
 
@@ -971,7 +975,11 @@ impl TransactionsQueue {
     }
 
     pub fn is_paused(&self) -> bool {
-        self.relayer.paused
+        self.relayer.paused || self.admission_pending
+    }
+
+    pub(crate) fn has_unresolved_admission(&self) -> bool {
+        self.admission_pending
     }
 
     pub fn set_is_paused(&mut self, is_paused: bool) {

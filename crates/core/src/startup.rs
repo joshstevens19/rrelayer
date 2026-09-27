@@ -585,6 +585,20 @@ impl Relayer {
         relayer_id: &RelayerId,
         external_id: &str,
     ) -> Result<Option<Transaction>, HttpError> {
+        // A cancelled caller may have detached a save that still owns this
+        // queue. Do not report absence until it has saved/adopted or rejected;
+        // embedders use absence to decide whether a business action can retry.
+        let queue =
+            self.app_state.transactions_queues.lock().await.get_transactions_queue(relayer_id);
+        let admission = match &queue {
+            Some(queue) => Some(queue.lock().await),
+            None => None,
+        };
+        if admission.as_ref().is_some_and(|queue| queue.has_unresolved_admission()) {
+            return Err(crate::shared::internal_server_error(Some(
+                "Transaction admission is unresolved; restart the relayer to recover before retrying".to_string(),
+            )));
+        }
         let transaction = self
             .app_state
             .db
