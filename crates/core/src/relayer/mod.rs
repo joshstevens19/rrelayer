@@ -1,4 +1,5 @@
 mod api;
+pub(crate) use api::{clone_relayer_core, create_relayer_core};
 pub use api::{
     create_relayer_routes, CloneRelayerRequest, CreateRelayerRequest, CreateRelayerResult,
     GetRelayerResult, GetRelayersQuery, ImportRelayerResult,

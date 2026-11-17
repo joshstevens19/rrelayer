@@ -33,6 +33,8 @@ impl TestRunner {
             speed: Some(TransactionSpeed::FAST),
             external_id: Some("webhook-eth-transfer".to_string()),
             blobs: None,
+            gas_price_ceiling: None,
+            expires_in_seconds: None,
         };
 
         let send_result = relayer.transaction().send(&tx_request, None).await?;
@@ -83,6 +85,8 @@ impl TestRunner {
             speed: Some(TransactionSpeed::FAST),
             external_id: Some("webhook-contract-call".to_string()),
             blobs: None,
+            gas_price_ceiling: None,
+            expires_in_seconds: None,
         };
 
         let contract_send_result = relayer.transaction().send(&contract_tx_request, None).await?;
@@ -233,6 +237,8 @@ impl TestRunner {
             speed: Some(TransactionSpeed::SLOW),
             external_id: Some("test-original".to_string()),
             blobs: None,
+            gas_price_ceiling: None,
+            expires_in_seconds: None,
         };
 
         let send_result = relayer
@@ -261,13 +267,17 @@ impl TestRunner {
 
         info!("Test 7: Transaction replacement webhook");
 
+        // external ids are unique per relayer: "test-original" was consumed by
+        // the cancelled transaction in test 6, so this send uses its own id.
         let tx_request = RelayTransactionRequest {
             to: self.config.anvil_accounts[1],
             value: alloy::primitives::utils::parse_ether("0.1")?.into(),
             data: TransactionData::empty(),
             speed: Some(TransactionSpeed::SLOW),
-            external_id: Some("test-original".to_string()),
+            external_id: Some("test-replacement-base".to_string()),
             blobs: None,
+            gas_price_ceiling: None,
+            expires_in_seconds: None,
         };
 
         let _ = relayer
@@ -275,6 +285,37 @@ impl TestRunner {
             .send(&tx_request, None)
             .await
             .context("Failed to send transaction")?;
+
+        info!("Test 7b: Duplicate external id is rejected");
+
+        let duplicate_request = RelayTransactionRequest {
+            to: self.config.anvil_accounts[1],
+            value: alloy::primitives::utils::parse_ether("0.1")?.into(),
+            data: TransactionData::empty(),
+            speed: Some(TransactionSpeed::SLOW),
+            external_id: Some("test-replacement-base".to_string()),
+            blobs: None,
+            gas_price_ceiling: None,
+            expires_in_seconds: None,
+        };
+
+        match relayer.transaction().send(&duplicate_request, None).await {
+            Ok(result) => {
+                return Err(anyhow!(
+                    "Duplicate external id should be rejected but tx {} was accepted",
+                    result.id
+                ));
+            }
+            Err(e) => {
+                let message = e.to_string();
+                if !message.contains("409") {
+                    return Err(anyhow!(
+                        "Duplicate external id rejected with unexpected error: {message}"
+                    ));
+                }
+                info!("[SUCCESS] Duplicate external id rejected with 409: {message}");
+            }
+        }
 
         // TODO: uncomment when fix nonce issue on webhooks
         // let transaction_id = &send_result.id;

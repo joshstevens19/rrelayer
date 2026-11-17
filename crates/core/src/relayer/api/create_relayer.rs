@@ -35,28 +35,37 @@ pub async fn create_relayer(
 ) -> Result<Json<CreateRelayerResult>, HttpError> {
     state.validate_basic_auth_valid(&headers)?;
 
+    let result = create_relayer_core(&state, &chain_id, &relayer.name).await?;
+
+    Ok(Json(result))
+}
+
+/// Core creation logic shared by the HTTP endpoint and the embedded [`crate::Relayer`] handle.
+pub(crate) async fn create_relayer_core(
+    state: &Arc<AppState>,
+    chain_id: &ChainId,
+    name: &str,
+) -> Result<CreateRelayerResult, HttpError> {
     // Check if this network is configured with only private keys
-    if state.private_key_only_networks.contains(&chain_id) {
+    if state.private_key_only_networks.contains(chain_id) {
         return Err(bad_request("Cannot create new relayers for networks configured with only private_keys. Private keys are imported automatically on startup.".to_string()));
     }
 
-    let provider = find_provider_for_chain_id(&state.evm_providers, &chain_id)
+    let provider = find_provider_for_chain_id(&state.evm_providers, chain_id)
         .await
         .ok_or(not_found("Could not find provider for the chain id".to_string()))?;
 
     // Acquire mutex to prevent concurrent relayer creation deadlocks
     let _lock = state.relayer_creation_mutex.lock().await;
 
-    let relayer = state
-        .db
-        .create_relayer(&relayer.name, &chain_id, provider, CreateRelayerMode::Create)
-        .await?;
+    let relayer =
+        state.db.create_relayer(name, chain_id, provider, CreateRelayerMode::Create).await?;
     invalidate_relayer_cache(&state.cache, &relayer.id).await;
 
     let id = relayer.id;
     let address = relayer.address;
 
-    start_relayer_queue(&state, relayer, provider, &chain_id).await?;
+    start_relayer_queue(state, relayer, provider, chain_id).await?;
 
-    Ok(Json(CreateRelayerResult { id, address }))
+    Ok(CreateRelayerResult { id, address })
 }

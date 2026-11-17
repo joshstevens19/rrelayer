@@ -36,6 +36,8 @@ async fn example() -> Result<()> {
         speed: Some(TransactionSpeed::FAST),
         external_id: None,
         blobs: None,
+        gas_price_ceiling: None,
+        expires_in_seconds: None,
     };
 
     // Using a framework like alloy is recommended here. Look under framework guides > rust > alloy for it.

@@ -9,7 +9,10 @@ use super::types::{
     SendTransactionGasPriceError, TransactionQueueSendTransactionError, TransactionSentWithRelayer,
     TransactionsQueueSetup,
 };
-use crate::transaction::types::{TransactionNonce, TransactionValue};
+use crate::transaction::api::RelayTransactionRequest;
+use crate::transaction::types::{
+    GasPriceCeilingOutcome, TransactionBlob, TransactionNonce, TransactionValue,
+};
 use crate::{
     gas::{
         BlobGasOracleCache, BlobGasPriceResult, GasLimit, GasOracleCache, GasPrice, GasPriceResult,
@@ -123,6 +126,149 @@ fn bump_max_fee_by_at_least_one(max_fee: MaxFee) -> MaxFee {
 
 fn bump_max_priority_fee_by_at_least_one(max_priority_fee: MaxPriorityFee) -> MaxPriorityFee {
     MaxPriorityFee::new(bump_u128_by_at_least_one(max_priority_fee.into_u128()))
+}
+
+/// Where (if anywhere) a nonce currently sits in a relayer's in-flight queues.
+#[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
+pub enum InflightNonceHolder {
+    /// Held by a queued transaction whose nonce is reserved but not broadcast yet.
+    Pending(Transaction),
+    /// Held by the head of the inmempool queue - the only broadcast transaction a
+    /// same-nonce competitor can be attached to.
+    InmempoolHead(Transaction),
+    /// Held by a broadcast transaction queued behind the inmempool head; the head
+    /// nonce has to resolve first.
+    InmempoolBehindHead(Transaction),
+    /// Not held by any in-flight transaction for this relayer.
+    NotFound,
+}
+
+/// Pure snapshot of the live queues - pending first (queue order), then inmempool
+/// originals with their same-nonce competitors. Kept free of `TransactionsQueue`
+/// so the listing shape stays unit-testable without a provider.
+fn snapshot_inflight_transactions(
+    pending: &VecDeque<Transaction>,
+    inmempool: &VecDeque<CompetitiveTransaction>,
+) -> Vec<Transaction> {
+    let mut transactions: Vec<Transaction> = pending.iter().cloned().collect();
+
+    for comp_tx in inmempool {
+        transactions.push(comp_tx.original.clone());
+        if let Some((competitor, _)) = &comp_tx.competitive {
+            transactions.push(competitor.clone());
+        }
+    }
+
+    transactions
+}
+
+/// Decodes a replacement's blobs before any queue entry is touched. Invalid hex
+/// must fail the replace, not panic the process or leave a half-applied payload.
+fn replacement_blobs(
+    replace_with: &RelayTransactionRequest,
+) -> Result<Option<Vec<TransactionBlob>>, String> {
+    match &replace_with.blobs {
+        Some(blob_strings) => blob_strings
+            .iter()
+            .map(|blob_hex| TransactionBlob::from_hex(blob_hex))
+            .collect::<Result<Vec<_>, _>>()
+            .map(Some)
+            .map_err(|e| format!("Failed to convert blob hex strings to TransactionBlob: {e}")),
+        None => Ok(None),
+    }
+}
+
+/// Rewrites a transaction's payload with the replacement request. The gas limit is
+/// cleared so the send path re-estimates for the new payload, and `is_noop` is
+/// recomputed from the new destination. The replacement carries its own gas price
+/// ceiling terms, so a previous ceiling hit no longer applies. `blobs` is decoded
+/// by the caller so a conversion failure cannot mutate the queued transaction.
+fn apply_replacement_payload(
+    transaction: &mut Transaction,
+    replace_with: &RelayTransactionRequest,
+    blobs: Option<Vec<TransactionBlob>>,
+) {
+    transaction.to = replace_with.to;
+    transaction.data = replace_with.data.clone();
+    transaction.value = replace_with.value;
+    transaction.is_noop = transaction.from == transaction.to;
+    transaction.blobs = blobs;
+    transaction.gas_limit = None;
+    transaction.external_id = replace_with.external_id.clone();
+    transaction.gas_price_ceiling = replace_with.gas_price_ceiling;
+    transaction.gas_price_ceiling_hit = false;
+}
+
+/// Swaps a PENDING transaction's payload in the queue itself, returning the updated
+/// transaction for persistence, or `Ok(None)` when the id is no longer pending.
+/// Invalid blob hex is `Err` and leaves the queue untouched. The precomputed hash
+/// is cleared - it belongs to the old payload; the send path computes the real hash
+/// when the replacement broadcasts. Kept free of `TransactionsQueue` so the in-place
+/// swap stays unit-testable without a provider.
+fn replace_pending_transaction_payload_in_queue(
+    pending: &mut VecDeque<Transaction>,
+    transaction_id: &TransactionId,
+    replace_with: &RelayTransactionRequest,
+    new_expires_at: Option<chrono::DateTime<Utc>>,
+) -> Result<Option<Transaction>, String> {
+    let blobs = replacement_blobs(replace_with)?;
+    let Some(transaction) = pending.iter_mut().find(|tx| tx.id == *transaction_id) else {
+        return Ok(None);
+    };
+
+    apply_replacement_payload(transaction, replace_with, blobs);
+    transaction.known_transaction_hash = None;
+    // Only a replacement that declares its own expiry moves the deadline - otherwise
+    // the queued slot keeps the deadline the original request was admitted with
+    if let Some(expires_at) = new_expires_at {
+        transaction.expires_at = expires_at;
+    }
+
+    Ok(Some(transaction.clone()))
+}
+
+/// Converts a transaction into the same-nonce close-out no-op: a value-0 empty-data
+/// self-send that consumes the reserved nonce (used when a transaction expires or its
+/// payload is permanently rejected). The close-out must always be broadcastable, so
+/// the original payload's gas price ceiling no longer applies - the reserved nonce is
+/// consumed at market price - while `gas_price_ceiling_hit` is kept so callers can
+/// still see the ceiling bound the original payload.
+fn convert_transaction_to_noop(transaction: &mut Transaction, relayer_address: EvmAddress) {
+    transaction.to = relayer_address;
+    transaction.value = TransactionValue::zero();
+    transaction.data = TransactionData::empty();
+    transaction.blobs = None;
+    transaction.gas_limit = Some(GasLimit::new(21_000));
+    transaction.is_noop = true;
+    transaction.speed = TransactionSpeed::FAST;
+    transaction.sent_with_blob_gas = None;
+    transaction.gas_price_ceiling = None;
+}
+
+/// Pure lookup of which in-flight transaction holds a nonce. Inmempool matches are
+/// resolved against the ORIGINAL transaction (competitors share its nonce) since the
+/// cancel/replace machinery is keyed by the original's id.
+fn find_inflight_transaction_by_nonce(
+    pending: &VecDeque<Transaction>,
+    inmempool: &VecDeque<CompetitiveTransaction>,
+    nonce: &TransactionNonce,
+) -> InflightNonceHolder {
+    if let Some(transaction) = pending.iter().find(|tx| tx.nonce == *nonce) {
+        return InflightNonceHolder::Pending(transaction.clone());
+    }
+
+    for (position, comp_tx) in inmempool.iter().enumerate() {
+        if comp_tx.original.nonce == *nonce {
+            return if position == 0 {
+                InflightNonceHolder::InmempoolHead(comp_tx.original.clone())
+            } else {
+                InflightNonceHolder::InmempoolBehindHead(comp_tx.original.clone())
+            };
+        }
+    }
+
+    InflightNonceHolder::NotFound
 }
 
 pub struct TransactionsQueue {
@@ -283,6 +429,58 @@ impl TransactionsQueue {
         count
     }
 
+    /// Snapshot of every transaction currently occupying a nonce for this relayer:
+    /// pending transactions (nonce reserved, not yet broadcast) in queue order,
+    /// followed by inmempool transactions (broadcast, awaiting receipt) including any
+    /// same-nonce cancel/replace competitors.
+    pub async fn get_inflight_transactions(&self) -> Vec<Transaction> {
+        let pending = self.pending_transactions.lock().await;
+        let inmempool = self.inmempool_transactions.lock().await;
+
+        snapshot_inflight_transactions(&pending, &inmempool)
+    }
+
+    /// Swaps a PENDING transaction's payload for the replacement request IN THE QUEUE
+    /// ITSELF and returns the updated transaction for the caller to persist. Returns
+    /// `Ok(None)` when the transaction is no longer pending (it broadcast or was
+    /// removed between lookup and edit). Invalid blob hex is `Err` and leaves the
+    /// queued payload unchanged.
+    pub async fn replace_pending_transaction_payload(
+        &mut self,
+        transaction_id: &TransactionId,
+        replace_with: &RelayTransactionRequest,
+        new_expires_at: Option<chrono::DateTime<Utc>>,
+    ) -> Result<Option<Transaction>, String> {
+        let mut pending = self.pending_transactions.lock().await;
+        let replaced = replace_pending_transaction_payload_in_queue(
+            &mut pending,
+            transaction_id,
+            replace_with,
+            new_expires_at,
+        )?;
+
+        if replaced.is_some() {
+            info!(
+                "Replaced pending transaction {} payload in place for relayer: {}",
+                transaction_id, self.relayer.name
+            );
+        }
+
+        Ok(replaced)
+    }
+
+    /// Locates the in-flight transaction currently holding a nonce, classifying where
+    /// it sits so callers know whether a same-nonce replacement can act on it.
+    pub async fn find_inflight_transaction_by_nonce(
+        &self,
+        nonce: &TransactionNonce,
+    ) -> InflightNonceHolder {
+        let pending = self.pending_transactions.lock().await;
+        let inmempool = self.inmempool_transactions.lock().await;
+
+        find_inflight_transaction_by_nonce(&pending, &inmempool, nonce)
+    }
+
     pub async fn get_editable_transaction_by_id(
         &self,
         id: &TransactionId,
@@ -323,6 +521,10 @@ impl TransactionsQueue {
         }
     }
 
+    // Error variants embed a full Transaction. The per-transaction ceiling fields
+    // pushed that over clippy's result_large_err threshold; boxing them would
+    // churn every match site for no behavior change.
+    #[allow(clippy::result_large_err)]
     pub async fn move_pending_to_inmempool(
         &mut self,
         transaction: &Transaction,
@@ -507,6 +709,7 @@ impl TransactionsQueue {
                 transaction.is_noop = true;
                 transaction.speed = TransactionSpeed::FAST;
                 transaction.sent_with_blob_gas = None;
+                transaction.gas_price_ceiling = None;
                 transaction.known_transaction_hash = Some(transaction_sent.hash);
                 transaction.sent_at = Some(Utc::now());
             }
@@ -551,10 +754,13 @@ impl TransactionsQueue {
                     replacement_transaction.sent_with_max_priority_fee_per_gas;
                 transaction.is_noop = replacement_transaction.is_noop;
                 transaction.external_id = replacement_transaction.external_id.clone();
+                transaction.gas_price_ceiling = replacement_transaction.gas_price_ceiling;
+                transaction.gas_price_ceiling_hit = replacement_transaction.gas_price_ceiling_hit;
             }
         }
     }
 
+    #[allow(clippy::result_large_err)]
     pub async fn move_inmempool_to_mining(
         &mut self,
         id: &TransactionId,
@@ -865,14 +1071,7 @@ impl TransactionsQueue {
     }
 
     pub fn transaction_to_noop(&self, transaction: &mut Transaction) {
-        transaction.to = self.relay_address();
-        transaction.value = TransactionValue::zero();
-        transaction.data = TransactionData::empty();
-        transaction.blobs = None;
-        transaction.gas_limit = Some(GasLimit::new(21_000));
-        transaction.is_noop = true;
-        transaction.speed = TransactionSpeed::FAST;
-        transaction.sent_with_blob_gas = None;
+        convert_transaction_to_noop(transaction, self.relay_address());
     }
 
     pub async fn compute_gas_price_for_transaction(
@@ -1325,6 +1524,45 @@ impl TransactionsQueue {
         }
     }
 
+    /// Persists that a transaction's gas price ceiling bound a bid, in both the
+    /// in-memory queues and the database, so the flag is visible to status readers
+    /// while the transaction is still in flight and survives a restart.
+    async fn record_gas_price_ceiling_hit(
+        &self,
+        db: &mut PostgresClient,
+        transaction: &Transaction,
+    ) {
+        info!(
+            "Recording gas price ceiling hit for transaction {} on relayer: {}",
+            transaction.id, self.relayer.name
+        );
+
+        {
+            let mut pending = self.pending_transactions.lock().await;
+            if let Some(stored) = pending.iter_mut().find(|tx| tx.id == transaction.id) {
+                stored.gas_price_ceiling_hit = true;
+            }
+        }
+
+        {
+            let mut inmempool = self.inmempool_transactions.lock().await;
+            for comp_tx in inmempool.iter_mut() {
+                if let Some(stored) = comp_tx.get_transaction_by_id_mut(&transaction.id) {
+                    stored.gas_price_ceiling_hit = true;
+                }
+            }
+        }
+
+        if let Err(db_error) = db.transaction_update_gas_price_ceiling_hit(&transaction.id).await {
+            // In-memory state is already updated; worst case a crash loses the flag
+            // until the ceiling binds a bid again after the restart
+            error!(
+                "Failed to persist gas price ceiling hit for transaction {}: {}",
+                transaction.id, db_error
+            );
+        }
+    }
+
     pub async fn send_transaction(
         &mut self,
         db: &mut PostgresClient,
@@ -1339,12 +1577,42 @@ impl TransactionsQueue {
 
         info!("Sending transaction {:?} for relayer: {}", transaction, self.relayer.name);
 
-        let gas_price = self
+        let mut gas_price = self
             .compute_gas_price_for_transaction(
                 &transaction.speed,
                 transaction.sent_with_gas.as_ref(),
             )
             .await?;
+
+        // The per-transaction ceiling is not applied to no-ops - including an expired
+        // transaction about to be converted below - because the same-nonce close-out
+        // MUST be able to broadcast at market price or the reserved nonce would wedge
+        // the relayer.
+        if !transaction.is_noop && !Self::has_expired(transaction) {
+            let ceiling_already_hit = transaction.gas_price_ceiling_hit;
+            match transaction.apply_gas_price_ceiling(&mut gas_price) {
+                GasPriceCeilingOutcome::WithinCeiling => {}
+                outcome => {
+                    if !ceiling_already_hit {
+                        self.record_gas_price_ceiling_hit(db, transaction).await;
+                    }
+
+                    if outcome == GasPriceCeilingOutcome::BlockedByCeiling {
+                        info!(
+                            "Transaction {} gas price ceiling reached - keeping the last compliant bid for relayer: {}",
+                            transaction.id, self.relayer.name
+                        );
+                        return Err(TransactionQueueSendTransactionError::GasPriceCeilingReached);
+                    }
+
+                    info!(
+                        "Transaction {} bid clamped to its gas price ceiling for relayer: {}",
+                        transaction.id, self.relayer.name
+                    );
+                }
+            }
+        }
+        let gas_price = gas_price;
 
         if !self.within_gas_price_bounds(&gas_price) {
             info!(
@@ -1781,6 +2049,16 @@ impl TransactionsQueue {
         Ok(nonce)
     }
 
+    /// The MINED nonce (`latest` tag, never counting mempool contents) - the honest
+    /// answer to "was this nonce consumed on chain". [`Self::get_nonce`] uses the
+    /// `pending` tag, which counts this relayer's own broadcast-but-unmined
+    /// transactions, so it must never gate replacing/cancelling one of them.
+    pub async fn get_mined_nonce(&self) -> Result<TransactionNonce, RpcError<TransportErrorKind>> {
+        let nonce = self.evm_provider.get_mined_nonce_from_address(&self.relay_address()).await?;
+
+        Ok(nonce)
+    }
+
     pub async fn get_balance(
         &self,
     ) -> Result<alloy::primitives::U256, RpcError<TransportErrorKind>> {
@@ -1817,7 +2095,17 @@ impl TransactionsQueue {
 
 #[cfg(test)]
 mod tests {
-    use super::{classify_send_error, SendErrorClass};
+    use std::collections::VecDeque;
+
+    use super::{
+        classify_send_error, find_inflight_transaction_by_nonce,
+        replace_pending_transaction_payload_in_queue, snapshot_inflight_transactions,
+        CompetitiveTransaction, InflightNonceHolder, RelayTransactionRequest, SendErrorClass,
+    };
+    use crate::transaction::queue_system::types::CompetitionType;
+    use crate::transaction::types::{
+        test_fixtures::test_transaction, TransactionNonce, TransactionStatus,
+    };
 
     #[test]
     fn classify_send_error_covers_node_wordings() {
@@ -1884,5 +2172,227 @@ mod tests {
                 "misclassified node error: {message}"
             );
         }
+    }
+
+    #[test]
+    fn inflight_snapshot_lists_pending_then_inmempool_with_competitors() {
+        let pending_first = test_transaction(12, TransactionStatus::PENDING);
+        let pending_second = test_transaction(13, TransactionStatus::PENDING);
+        let inmempool_original = test_transaction(10, TransactionStatus::INMEMPOOL);
+        let mut competitive = CompetitiveTransaction::new(inmempool_original.clone());
+        let competitor = test_transaction(10, TransactionStatus::INMEMPOOL);
+        competitive.add_competitor(competitor.clone(), CompetitionType::Cancel);
+        let inmempool_plain =
+            CompetitiveTransaction::new(test_transaction(11, TransactionStatus::INMEMPOOL));
+
+        let pending: VecDeque<_> = vec![pending_first.clone(), pending_second.clone()].into();
+        let inmempool: VecDeque<_> = vec![competitive, inmempool_plain.clone()].into();
+
+        let snapshot = snapshot_inflight_transactions(&pending, &inmempool);
+
+        let ids: Vec<_> = snapshot.iter().map(|tx| tx.id).collect();
+        assert_eq!(
+            ids,
+            vec![
+                pending_first.id,
+                pending_second.id,
+                inmempool_original.id,
+                competitor.id,
+                inmempool_plain.original.id
+            ]
+        );
+
+        let nonces: Vec<u64> = snapshot.iter().map(|tx| tx.nonce.into_inner()).collect();
+        assert_eq!(nonces, vec![12, 13, 10, 10, 11]);
+    }
+
+    #[test]
+    fn inflight_snapshot_of_empty_queues_is_empty() {
+        let snapshot = snapshot_inflight_transactions(&VecDeque::new(), &VecDeque::new());
+        assert!(snapshot.is_empty());
+    }
+
+    #[test]
+    fn find_by_nonce_classifies_pending_head_and_behind_head() {
+        let pending_tx = test_transaction(12, TransactionStatus::PENDING);
+        let head = CompetitiveTransaction::new(test_transaction(10, TransactionStatus::INMEMPOOL));
+        let behind =
+            CompetitiveTransaction::new(test_transaction(11, TransactionStatus::INMEMPOOL));
+
+        let pending: VecDeque<_> = vec![pending_tx.clone()].into();
+        let inmempool: VecDeque<_> = vec![head.clone(), behind.clone()].into();
+
+        match find_inflight_transaction_by_nonce(&pending, &inmempool, &TransactionNonce::new(12)) {
+            InflightNonceHolder::Pending(tx) => assert_eq!(tx.id, pending_tx.id),
+            other => panic!("nonce 12 should be pending, got {other:?}"),
+        }
+
+        match find_inflight_transaction_by_nonce(&pending, &inmempool, &TransactionNonce::new(10)) {
+            InflightNonceHolder::InmempoolHead(tx) => assert_eq!(tx.id, head.original.id),
+            other => panic!("nonce 10 should be the inmempool head, got {other:?}"),
+        }
+
+        match find_inflight_transaction_by_nonce(&pending, &inmempool, &TransactionNonce::new(11)) {
+            InflightNonceHolder::InmempoolBehindHead(tx) => assert_eq!(tx.id, behind.original.id),
+            other => panic!("nonce 11 should be behind the head, got {other:?}"),
+        }
+
+        assert!(matches!(
+            find_inflight_transaction_by_nonce(&pending, &inmempool, &TransactionNonce::new(99)),
+            InflightNonceHolder::NotFound
+        ));
+    }
+
+    // Regression test: replacing a PENDING transaction must swap the payload in the
+    // queue entry itself - editing only a looked-up clone left the original payload
+    // queued for broadcast while the replace reported success.
+    #[test]
+    fn pending_replace_swaps_the_payload_in_the_queue_itself() {
+        use crate::gas::GasLimit;
+        use crate::shared::common_types::EvmAddress;
+        use crate::transaction::types::{TransactionData, TransactionHash, TransactionValue};
+        use std::str::FromStr;
+
+        let mut original = test_transaction(7, TransactionStatus::PENDING);
+        original.gas_limit = Some(GasLimit::new(21_000));
+        original.known_transaction_hash = Some(
+            TransactionHash::from_str(
+                "0x1111111111111111111111111111111111111111111111111111111111111111",
+            )
+            .expect("valid test hash"),
+        );
+
+        let new_to = EvmAddress::from(alloy::primitives::Address::repeat_byte(0x33));
+        let replace_with = RelayTransactionRequest {
+            to: new_to,
+            value: TransactionValue::new(alloy::primitives::U256::from(42u64)),
+            data: TransactionData::new(vec![0xde, 0xad].into()),
+            speed: None,
+            external_id: Some("replaced".to_string()),
+            blobs: None,
+            gas_price_ceiling: None,
+            expires_in_seconds: None,
+        };
+
+        let mut pending: VecDeque<_> = vec![original.clone()].into();
+
+        let updated = replace_pending_transaction_payload_in_queue(
+            &mut pending,
+            &original.id,
+            &replace_with,
+            None,
+        )
+        .expect("valid replacement")
+        .expect("the pending holder should be replaceable");
+
+        // Only one transaction remains queued at the nonce - nothing extra broadcasts
+        assert_eq!(pending.len(), 1);
+
+        // THE QUEUE'S OWN ENTRY carries the replacement payload, not just the returned copy
+        let queued = pending.front().expect("queue should still hold the transaction");
+        assert_eq!(queued.id, original.id);
+        assert_eq!(queued.nonce, original.nonce);
+        assert_eq!(queued.to, new_to);
+        assert_eq!(queued.value, replace_with.value);
+        assert_eq!(queued.data, replace_with.data);
+        assert_eq!(queued.external_id, Some("replaced".to_string()));
+        // Gas limit re-estimates and the stale precomputed hash is dropped
+        assert_eq!(queued.gas_limit, None);
+        assert_eq!(queued.known_transaction_hash, None);
+
+        // The returned transaction is the persisted shape - identical to the queue entry
+        assert_eq!(updated.to, queued.to);
+        assert_eq!(updated.known_transaction_hash, None);
+
+        // Unknown ids leave the queue untouched
+        let missing = replace_pending_transaction_payload_in_queue(
+            &mut pending,
+            &test_transaction(8, TransactionStatus::PENDING).id,
+            &replace_with,
+            None,
+        )
+        .expect("valid replacement");
+        assert!(missing.is_none());
+    }
+
+    #[test]
+    fn pending_replace_rejects_invalid_blobs_without_touching_the_queue() {
+        use crate::shared::common_types::EvmAddress;
+        use crate::transaction::types::{TransactionData, TransactionValue};
+
+        let mut original = test_transaction(7, TransactionStatus::PENDING);
+        original.data = TransactionData::new(vec![0x01, 0x02].into());
+        let snapshot = original.clone();
+
+        let replace_with = RelayTransactionRequest {
+            to: EvmAddress::from(alloy::primitives::Address::repeat_byte(0x33)),
+            value: TransactionValue::new(alloy::primitives::U256::from(42u64)),
+            data: TransactionData::new(vec![0xde, 0xad].into()),
+            speed: None,
+            external_id: Some("replaced".to_string()),
+            blobs: Some(vec!["0xnot-a-blob".to_string()]),
+            gas_price_ceiling: None,
+            expires_in_seconds: None,
+        };
+
+        let mut pending: VecDeque<_> = vec![original].into();
+        let error = replace_pending_transaction_payload_in_queue(
+            &mut pending,
+            &snapshot.id,
+            &replace_with,
+            None,
+        )
+        .expect_err("invalid blob hex must not panic");
+
+        assert!(error.contains("TransactionBlob"), "{error}");
+        let queued = pending.front().expect("queue should still hold the transaction");
+        assert_eq!(queued.to, snapshot.to);
+        assert_eq!(queued.data, snapshot.data);
+        assert_eq!(queued.value, snapshot.value);
+        assert_eq!(queued.blobs, snapshot.blobs);
+        assert_eq!(queued.external_id, snapshot.external_id);
+    }
+
+    // A transaction expired by its per-transaction expiry goes through the normal
+    // same-nonce no-op close-out, and the close-out stays exempt from the gas price
+    // ceiling (cleared) while the hit flag survives for status readers.
+    #[test]
+    fn per_transaction_expiry_closes_out_through_the_noop_machinery() {
+        use super::convert_transaction_to_noop;
+        use crate::gas::GasPrice;
+        use crate::shared::common_types::EvmAddress;
+        use crate::transaction::types::{
+            GasPriceCeiling, GasPriceCeilingBehavior, TransactionData,
+        };
+        use chrono::Utc;
+
+        let relayer_address = EvmAddress::from(alloy::primitives::Address::repeat_byte(0x11));
+
+        let mut transaction = test_transaction(5, TransactionStatus::INMEMPOOL);
+        // Queued 10 minutes ago with a 300 second per-transaction expiry - the
+        // deadline passed 5 minutes ago even though the 12h global window has not
+        transaction.queued_at = Utc::now() - chrono::Duration::minutes(10);
+        transaction.expires_at = transaction.queued_at + chrono::Duration::seconds(300);
+        transaction.gas_price_ceiling = Some(GasPriceCeiling {
+            max_price: GasPrice::new(100),
+            behavior: GasPriceCeilingBehavior::Freeze,
+        });
+        transaction.gas_price_ceiling_hit = true;
+
+        // The expiry sweep sees it as stale...
+        assert!(super::TransactionsQueue::has_expired(&transaction));
+
+        // ...and the close-out converts it to the same-nonce no-op
+        convert_transaction_to_noop(&mut transaction, relayer_address);
+
+        assert!(transaction.is_noop);
+        assert_eq!(transaction.to, relayer_address);
+        assert!(transaction.value.is_zero());
+        assert_eq!(transaction.data, TransactionData::empty());
+        assert_eq!(transaction.blobs, None);
+        // The ceiling is exempt for the close-out so the nonce always clears at
+        // market price, while the hit flag survives to mark the ceiling-bound expiry
+        assert_eq!(transaction.gas_price_ceiling, None);
+        assert!(transaction.gas_price_ceiling_hit);
     }
 }

@@ -1,3 +1,6 @@
+mod gas_price_ceiling;
+pub use gas_price_ceiling::{GasPriceCeiling, GasPriceCeilingBehavior, GasPriceCeilingOutcome};
+
 mod transaction_data;
 pub use transaction_data::TransactionData;
 
@@ -20,6 +23,8 @@ mod transaction_status;
 pub use transaction_status::TransactionStatus;
 
 mod transaction;
+#[cfg(test)]
+pub(crate) use transaction::test_fixtures;
 pub use transaction::{Transaction, TransactionConversionError};
 
 mod transaction_blob;

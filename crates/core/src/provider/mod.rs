@@ -4,9 +4,13 @@ use thiserror::Error;
 
 use crate::{gas::get_gas_estimator, network::ChainId, SetupConfig, SigningProvider, WalletError};
 
+mod endpoint_health;
 mod evm_provider;
 mod layer_extensions;
 
+pub use endpoint_health::{EndpointHealthSnapshot, EndpointSelector};
+
+pub(crate) use self::evm_provider::connect_endpoints;
 use self::evm_provider::EvmProviderNewError;
 use crate::gas::GasEstimatorError;
 use crate::wallet::get_mnemonic_from_signing_key;
@@ -28,6 +32,9 @@ pub enum LoadProvidersError {
     #[error("{0}")]
     EvmProviderNewError(#[from] EvmProviderNewError),
 
+    #[error("{0}")]
+    RetryClientError(#[from] RetryClientError),
+
     #[error(transparent)]
     GasEstimatorError(#[from] GasEstimatorError),
 }
@@ -47,6 +54,11 @@ pub async fn load_providers(
         if config.provider_urls.is_empty() {
             return Err(LoadProvidersError::ProvidersRequired);
         }
+
+        // One health-tracked client pool per network, shared by the provider, the
+        // gas estimator and the background prober - a failure seen anywhere steers
+        // every consumer away from that endpoint
+        let endpoints = connect_endpoints(&config.provider_urls)?;
 
         let signing_key: &SigningProvider = if let Some(ref signing_key) = config.signing_provider {
             signing_key
@@ -78,7 +90,8 @@ pub async fn load_providers(
                 let provider = EvmProvider::new_with_private_keys(
                     config,
                     private_keys.clone(),
-                    get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                    get_gas_estimator(&endpoints, setup_config, config).await?,
+                    endpoints.clone(),
                 )
                 .await?;
 
@@ -101,7 +114,8 @@ pub async fn load_providers(
                     config,
                     privy_manager,
                     private_key_strings,
-                    get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                    get_gas_estimator(&endpoints, setup_config, config).await?,
+                    endpoints.clone(),
                 )
                 .await?
             } else {
@@ -109,7 +123,8 @@ pub async fn load_providers(
                     config,
                     privy.app_id.clone(),
                     privy.app_secret.clone(),
-                    get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                    get_gas_estimator(&endpoints, setup_config, config).await?,
+                    endpoints.clone(),
                 )
                 .await?
             }
@@ -122,14 +137,16 @@ pub async fn load_providers(
                     config,
                     aws_manager,
                     private_key_strings,
-                    get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                    get_gas_estimator(&endpoints, setup_config, config).await?,
+                    endpoints.clone(),
                 )
                 .await?
             } else {
                 EvmProvider::new_with_aws_kms(
                     config,
                     aws_kms.clone(),
-                    get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                    get_gas_estimator(&endpoints, setup_config, config).await?,
+                    endpoints.clone(),
                 )
                 .await?
             }
@@ -143,14 +160,16 @@ pub async fn load_providers(
                     config,
                     turnkey_manager,
                     private_key_strings,
-                    get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                    get_gas_estimator(&endpoints, setup_config, config).await?,
+                    endpoints.clone(),
                 )
                 .await?
             } else {
                 EvmProvider::new_with_turnkey(
                     config,
                     turnkey.clone(),
-                    get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                    get_gas_estimator(&endpoints, setup_config, config).await?,
+                    endpoints.clone(),
                 )
                 .await?
             }
@@ -162,14 +181,16 @@ pub async fn load_providers(
                     config,
                     pkcs11_manager,
                     private_key_strings,
-                    get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                    get_gas_estimator(&endpoints, setup_config, config).await?,
+                    endpoints.clone(),
                 )
                 .await?
             } else {
                 EvmProvider::new_with_pkcs11(
                     config,
                     pkcs11.clone(),
-                    get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                    get_gas_estimator(&endpoints, setup_config, config).await?,
+                    endpoints.clone(),
                 )
                 .await?
             }
@@ -182,14 +203,16 @@ pub async fn load_providers(
                     config,
                     fireblocks_manager,
                     private_key_strings,
-                    get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                    get_gas_estimator(&endpoints, setup_config, config).await?,
+                    endpoints.clone(),
                 )
                 .await?
             } else {
                 EvmProvider::new_with_fireblocks(
                     config,
                     fireblocks.clone(),
-                    get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                    get_gas_estimator(&endpoints, setup_config, config).await?,
+                    endpoints.clone(),
                 )
                 .await?
             }
@@ -204,14 +227,16 @@ pub async fn load_providers(
                     config,
                     mnemonic_manager,
                     private_key_strings,
-                    get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                    get_gas_estimator(&endpoints, setup_config, config).await?,
+                    endpoints.clone(),
                 )
                 .await?
             } else {
                 EvmProvider::new_with_mnemonic(
                     config,
                     &mnemonic,
-                    get_gas_estimator(&config.provider_urls, setup_config, config).await?,
+                    get_gas_estimator(&endpoints, setup_config, config).await?,
+                    endpoints.clone(),
                 )
                 .await?
             }

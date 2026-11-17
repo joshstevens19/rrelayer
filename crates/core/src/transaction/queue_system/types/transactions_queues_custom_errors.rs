@@ -7,12 +7,15 @@ use super::{
     SendTransactionGasPriceError, TransactionQueueSendTransactionError, TransactionSentWithRelayer,
 };
 use crate::common_types::EvmAddress;
-use crate::shared::{bad_request, forbidden, internal_server_error, not_found, HttpError};
+use crate::gas::MaxFee;
+use crate::shared::{
+    bad_request, conflict, forbidden, internal_server_error, not_found, HttpError,
+};
 use crate::transaction::types::TransactionConversionError;
 use crate::{
     postgres::PostgresError,
     relayer::RelayerId,
-    transaction::types::{Transaction, TransactionId, TransactionStatus},
+    transaction::types::{Transaction, TransactionId, TransactionNonce, TransactionStatus},
     WalletError,
 };
 
@@ -26,6 +29,9 @@ pub enum ReplaceTransactionError {
 
     #[error("Could not read allowlists from db: {0}")]
     CouldNotReadAllowlistsFromDb(PostgresError),
+
+    #[error("Transaction with external id {1} already exists for relayer {0}")]
+    DuplicateExternalId(RelayerId, String),
 
     #[error("Relayer {0} is paused")]
     RelayerIsPaused(RelayerId),
@@ -47,6 +53,10 @@ impl From<ReplaceTransactionError> for HttpError {
             return forbidden(value.to_string());
         }
 
+        if matches!(value, ReplaceTransactionError::DuplicateExternalId(_, _)) {
+            return conflict(value.to_string());
+        }
+
         internal_server_error(Some(value.to_string()))
     }
 }
@@ -55,6 +65,12 @@ impl From<ReplaceTransactionError> for HttpError {
 pub enum AddTransactionError {
     #[error("Transaction could not be saved in DB: {0}")]
     CouldNotSaveTransactionDb(PostgresError),
+
+    #[error("Transaction with external id {1} already exists for relayer {0}")]
+    DuplicateExternalId(RelayerId, String),
+
+    #[error("Could not read external id from db: {0}")]
+    CouldNotReadExternalIdFromDb(PostgresError),
 
     #[error("Relayer could not be found: {0}")]
     RelayerNotFound(RelayerId),
@@ -82,6 +98,9 @@ pub enum AddTransactionError {
 
     #[error("Unsupported transaction type: {message}")]
     UnsupportedTransactionType { message: String },
+
+    #[error("Current market gas price {} exceeds the transaction gas price ceiling for relayer {} and the ceiling behavior is freeze - refusing to queue a transaction it would never bid", .1.into_u128(), .0)]
+    GasPriceCeilingBelowMarket(RelayerId, MaxFee),
 }
 
 impl From<AddTransactionError> for HttpError {
@@ -90,12 +109,20 @@ impl From<AddTransactionError> for HttpError {
             return forbidden(value.to_string());
         }
 
+        if matches!(value, AddTransactionError::GasPriceCeilingBelowMarket(_, _)) {
+            return bad_request(value.to_string());
+        }
+
         if matches!(value, AddTransactionError::RelayerNotFound(_)) {
             return not_found(value.to_string());
         }
 
         if matches!(value, AddTransactionError::UnsupportedTransactionType { .. }) {
             return bad_request(value.to_string());
+        }
+
+        if matches!(value, AddTransactionError::DuplicateExternalId(_, _)) {
+            return conflict(value.to_string());
         }
 
         internal_server_error(Some(value.to_string()))
@@ -131,6 +158,56 @@ impl From<CancelTransactionError> for HttpError {
         }
 
         internal_server_error(Some(value.to_string()))
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum SendTransactionAtNonceError {
+    #[error("Relayer could not be found: {0}")]
+    RelayerNotFound(RelayerId),
+
+    #[error("Relayer {0} is paused")]
+    RelayerIsPaused(RelayerId),
+
+    #[error("Could not get current on chain nonce for relayer {0} - {1}")]
+    CouldNotGetCurrentOnChainNonce(RelayerId, RpcError<TransportErrorKind>),
+
+    #[error("Nonce {} is already used on chain for relayer {} (current on-chain nonce {}) so can no longer be replaced", .0.into_inner(), .1, .2.into_inner())]
+    NonceAlreadyUsedOnchain(TransactionNonce, RelayerId, TransactionNonce),
+
+    #[error("Nonce {} is not held by any pending or inmempool transaction for relayer {}", .0.into_inner(), .1)]
+    NonceNotPending(TransactionNonce, RelayerId),
+
+    #[error("Nonce {} for relayer {} is queued behind the inmempool head - resolve the head nonce first", .0.into_inner(), .1)]
+    NonceBehindInmempoolHead(TransactionNonce, RelayerId),
+
+    #[error("The transaction holding nonce {} left the queue before it could be replaced - retry", .0.into_inner())]
+    HolderNoLongerInFlight(TransactionNonce),
+
+    #[error("{0}")]
+    CancelTransactionError(#[from] CancelTransactionError),
+
+    #[error("{0}")]
+    ReplaceTransactionError(#[from] ReplaceTransactionError),
+}
+
+impl From<SendTransactionAtNonceError> for HttpError {
+    fn from(value: SendTransactionAtNonceError) -> Self {
+        match value {
+            SendTransactionAtNonceError::CancelTransactionError(error) => error.into(),
+            SendTransactionAtNonceError::ReplaceTransactionError(error) => error.into(),
+            SendTransactionAtNonceError::RelayerNotFound(_) => not_found(value.to_string()),
+            SendTransactionAtNonceError::RelayerIsPaused(_) => forbidden(value.to_string()),
+            SendTransactionAtNonceError::NonceAlreadyUsedOnchain(_, _, _)
+            | SendTransactionAtNonceError::NonceNotPending(_, _)
+            | SendTransactionAtNonceError::NonceBehindInmempoolHead(_, _) => {
+                bad_request(value.to_string())
+            }
+            SendTransactionAtNonceError::HolderNoLongerInFlight(_) => conflict(value.to_string()),
+            SendTransactionAtNonceError::CouldNotGetCurrentOnChainNonce(_, _) => {
+                internal_server_error(Some(value.to_string()))
+            }
+        }
     }
 }
 

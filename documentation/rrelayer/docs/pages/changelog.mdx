@@ -6,17 +6,41 @@
 
 ### Features
 
+- feat: optional per-transaction gas price ceiling (freeze or cap behavior) honored on the initial send and through the gas bump loop, with a gas price ceiling hit flag on transaction status
+
+- feat: embedded relayer handle can list a relayer's live in-flight queue and send a transaction at an exact pending nonce (cancel/replace primitive for wedged nonces)
+
+- feat: optional per-transaction expiry in seconds on the send request, overriding the global transaction expiration but clamped to never exceed it
+
+- feat: every provider url is verified against the configured chain id at boot - a wrong-chain url fails startup naming the url, while an unreachable url only warns instead of killing boot
+
+- feat: health-aware rpc endpoint failover - per-url error/latency/lag tracking with a background probe, selection that skips cooled-down or lagging endpoints (falling back to the full set so a client is always available), gas estimation un-pinned from the first url, and receipt polls sticky to the broadcasting endpoint until first sighting
+
+- feat: per-endpoint rpc health snapshots (healthy, error rate, latency p50/p95, last block, lag, cooldown) with credential-redacted urls, exposed on the embedded relayer handle
+
 ---
 
 ### Bug fixes
 
+- fix: a duplicate external id no longer skips the reserved nonce, a second cancel or replace of the same transaction no longer collides with the first competitor's external id, and databases that already contain duplicate external ids can boot
+
+- fix: a pending replacement with invalid blob data returns an error instead of crashing, and a failed save keeps the original queued payload
+
+- fix: provider urls with embedded credentials are redacted in boot, probe, and rpc error logs
+
 - fix: remove all panic/unwrap/expect paths from production code, replacing them with proper error propagation, and enforce the ban going forward with workspace-level clippy deny lints
+
 - fix: deploy documentation through github pages
+
 - fix: prevent docker cache export failures from blocking arm64 image publishing
 
 ---
 
 ### Breaking changes
+
+- in the rust sdk `RelayTransactionRequest` gained a new `gas_price_ceiling: Option<GasPriceCeiling>` field - code constructing the struct with a literal must now add `gas_price_ceiling: None` (the HTTP API and JSON payloads are unaffected: the field is optional and defaulted)
+
+- in the rust sdk `RelayTransactionRequest` gained a new `expires_in_seconds: Option<u64>` field - code constructing the struct with a literal must now add `expires_in_seconds: None` (the HTTP API and JSON payloads are unaffected: the field is optional and defaulted)
 
 ---
 

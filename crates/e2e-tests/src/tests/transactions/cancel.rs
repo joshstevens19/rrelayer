@@ -25,6 +25,8 @@ impl TestRunner {
             speed: Some(TransactionSpeed::SLOW),
             external_id: Some("test-original".to_string()),
             blobs: None,
+            gas_price_ceiling: None,
+            expires_in_seconds: None,
         };
 
         let send_result = relayer
@@ -40,6 +42,8 @@ impl TestRunner {
             speed: Some(TransactionSpeed::SLOW),
             external_id: Some("test-after-cancel".to_string()),
             blobs: None,
+            gas_price_ceiling: None,
+            expires_in_seconds: None,
         };
 
         let next_send_result = relayer

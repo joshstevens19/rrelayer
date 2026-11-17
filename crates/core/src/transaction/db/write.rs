@@ -26,11 +26,16 @@ impl PostgresClient {
         let mut conn = self.pool.get().await?;
         let trans = conn.transaction().await.map_err(PostgresError::PgError)?;
 
+        let gas_price_ceiling_max_price =
+            transaction.gas_price_ceiling.map(|ceiling| ceiling.max_price);
+        let gas_price_ceiling_behavior =
+            transaction.gas_price_ceiling.map(|ceiling| ceiling.behavior);
+
         for table_name in TRANSACTION_TABLES.iter() {
             trans.execute(
                 format!("
-                INSERT INTO {}(id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit, speed, status, expires_at, queued_at, hash, external_id, cancelled_by_transaction_id)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17);
+                INSERT INTO {}(id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit, speed, status, expires_at, queued_at, hash, external_id, cancelled_by_transaction_id, gas_price_ceiling, gas_price_ceiling_behavior, gas_price_ceiling_hit)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20);
             ", table_name).as_str(),
                 &[&transaction.id,
                     &relayer_id,
@@ -48,7 +53,10 @@ impl PostgresClient {
                     &transaction.queued_at,
                     &transaction.known_transaction_hash,
                     &transaction.external_id,
-                    &transaction.cancelled_by_transaction_id
+                    &transaction.cancelled_by_transaction_id,
+                    &gas_price_ceiling_max_price,
+                    &gas_price_ceiling_behavior,
+                    &transaction.gas_price_ceiling_hit
                 ],
             )
                 .await?;
@@ -115,12 +123,14 @@ impl PostgresClient {
                         id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
                         speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
-                        sent_max_fee_per_gas, gas_price, sent_with_gas, sent_with_blob_gas, external_id
+                        sent_max_fee_per_gas, gas_price, sent_with_gas, sent_with_blob_gas, external_id,
+                        gas_price_ceiling, gas_price_ceiling_behavior, gas_price_ceiling_hit
                     )
                     SELECT
                         id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
                         speed, $2, expires_at, queued_at, NOW(), mined_at, confirmed_at,
-                        failed_at, failed_reason, $3, $4, $5, $6, $7, $8, external_id
+                        failed_at, failed_reason, $3, $4, $5, $6, $7, $8, external_id,
+                        gas_price_ceiling, gas_price_ceiling_behavior, gas_price_ceiling_hit
                     FROM relayer.transaction
                     WHERE id = $1;
                 ",
@@ -151,11 +161,16 @@ impl PostgresClient {
         let mut conn = self.pool.get().await?;
         let trans = conn.transaction().await.map_err(PostgresError::PgError)?;
 
+        let gas_price_ceiling_max_price =
+            transaction.gas_price_ceiling.map(|ceiling| ceiling.max_price);
+        let gas_price_ceiling_behavior =
+            transaction.gas_price_ceiling.map(|ceiling| ceiling.behavior);
+
         for table_name in TRANSACTION_TABLES.iter() {
             trans.execute(
                 format!("
-                INSERT INTO {}(id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, speed, status, expires_at, queued_at, failed_at, failed_reason, external_id)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), $14, $15);
+                INSERT INTO {}(id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, speed, status, expires_at, queued_at, failed_at, failed_reason, external_id, gas_price_ceiling, gas_price_ceiling_behavior, gas_price_ceiling_hit)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), $14, $15, $16, $17, $18);
                 ", table_name).as_str(),
                 &[
                     &transaction.id,
@@ -173,6 +188,9 @@ impl PostgresClient {
                     &transaction.queued_at,
                     &failed_reason.chars().take(2000).collect::<String>(),
                     &transaction.external_id,
+                    &gas_price_ceiling_max_price,
+                    &gas_price_ceiling_behavior,
+                    &transaction.gas_price_ceiling_hit,
                 ],
             )
                 .await
@@ -203,7 +221,9 @@ impl PostgresClient {
                         data = $4,
                         blobs = NULL,
                         gas_limit = $5,
-                        speed = $6
+                        speed = $6,
+                        gas_price_ceiling = NULL,
+                        gas_price_ceiling_behavior = NULL
                     WHERE id = $1;
                 ",
                 &[
@@ -225,13 +245,15 @@ impl PostgresClient {
                         id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
                         speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
-                        sent_max_fee_per_gas, gas_price, external_id
+                        sent_max_fee_per_gas, gas_price, external_id,
+                        gas_price_ceiling, gas_price_ceiling_behavior, gas_price_ceiling_hit
                     )
                     SELECT
                         id, relayer_id, $2, \"from\", nonce, chain_id, $4, $3, NULL, $5,
                         $6, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
-                        sent_max_fee_per_gas, gas_price, external_id
+                        sent_max_fee_per_gas, gas_price, external_id,
+                        gas_price_ceiling, gas_price_ceiling_behavior, gas_price_ceiling_hit
                     FROM relayer.transaction
                     WHERE id = $1;
                 ",
@@ -282,13 +304,15 @@ impl PostgresClient {
                         id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
                         speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
-                        sent_max_fee_per_gas, gas_price, external_id
+                        sent_max_fee_per_gas, gas_price, external_id,
+                        gas_price_ceiling, gas_price_ceiling_behavior, gas_price_ceiling_hit
                     )
                     SELECT
                         id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
                         speed, $2, expires_at, queued_at, sent_at, mined_at, confirmed_at,
                         NOW(), $3, hash, sent_max_priority_fee_per_gas,
-                        sent_max_fee_per_gas, gas_price, external_id
+                        sent_max_fee_per_gas, gas_price, external_id,
+                        gas_price_ceiling, gas_price_ceiling_behavior, gas_price_ceiling_hit
                     FROM relayer.transaction
                     WHERE id = $1;
                 ",
@@ -368,12 +392,14 @@ impl PostgresClient {
                     id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
                     speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
                     failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
-                    sent_max_fee_per_gas, gas_price, block_hash, block_number, external_id
+                    sent_max_fee_per_gas, gas_price, block_hash, block_number, external_id,
+                    gas_price_ceiling, gas_price_ceiling_behavior, gas_price_ceiling_hit
                 )
                 SELECT
                     $1, relayer_id, $3, $4, $7, $8, $6, $5, blobs, $9,
                     $12, $2, expires_at, queued_at, sent_at, NOW(), confirmed_at,
-                    failed_at, failed_reason, $13, $15, $14, gas_price, $10, $11, $16
+                    failed_at, failed_reason, $13, $15, $14, gas_price, $10, $11, $16,
+                    gas_price_ceiling, gas_price_ceiling_behavior, gas_price_ceiling_hit
                 FROM relayer.transaction
                 WHERE id = $1;
             ",
@@ -428,13 +454,15 @@ impl PostgresClient {
                         id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
                         speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
-                        sent_max_fee_per_gas, gas_price, block_hash, block_number, external_id
+                        sent_max_fee_per_gas, gas_price, block_hash, block_number, external_id,
+                        gas_price_ceiling, gas_price_ceiling_behavior, gas_price_ceiling_hit
                     )
                     SELECT
                         id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
                         speed, $2, expires_at, queued_at, sent_at, mined_at, NOW(),
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
-                        sent_max_fee_per_gas, gas_price, block_hash, block_number, external_id
+                        sent_max_fee_per_gas, gas_price, block_hash, block_number, external_id,
+                        gas_price_ceiling, gas_price_ceiling_behavior, gas_price_ceiling_hit
                     FROM relayer.transaction
                     WHERE id = $1;
                 ",
@@ -469,13 +497,15 @@ impl PostgresClient {
                         id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
                         speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
-                        sent_max_fee_per_gas, gas_price, block_hash, block_number, external_id
+                        sent_max_fee_per_gas, gas_price, block_hash, block_number, external_id,
+                        gas_price_ceiling, gas_price_ceiling_behavior, gas_price_ceiling_hit
                     )
                     SELECT
                         id, relayer_id, \"to\", \"from\", $2, chain_id, data, value, blobs, gas_limit,
                         speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
-                        sent_max_fee_per_gas, gas_price, block_hash, block_number, external_id
+                        sent_max_fee_per_gas, gas_price, block_hash, block_number, external_id,
+                        gas_price_ceiling, gas_price_ceiling_behavior, gas_price_ceiling_hit
                     FROM relayer.transaction
                     WHERE id = $1;
                 ",
@@ -513,17 +543,65 @@ impl PostgresClient {
                         id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
                         speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
-                        sent_max_fee_per_gas, gas_price, block_hash, block_number, external_id
+                        sent_max_fee_per_gas, gas_price, block_hash, block_number, external_id,
+                        gas_price_ceiling, gas_price_ceiling_behavior, gas_price_ceiling_hit
                     )
                     SELECT
                         id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
                         speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
                         failed_at, failed_reason, $2, sent_max_priority_fee_per_gas,
-                        sent_max_fee_per_gas, gas_price, block_hash, block_number, external_id
+                        sent_max_fee_per_gas, gas_price, block_hash, block_number, external_id,
+                        gas_price_ceiling, gas_price_ceiling_behavior, gas_price_ceiling_hit
                     FROM relayer.transaction
                     WHERE id = $1;
                 ",
                 &[&transaction_id, &transaction_hash],
+            )
+            .await?;
+
+        trans.commit().await?;
+
+        Ok(())
+    }
+
+    /// Records that a transaction's gas price ceiling bound a bid (a bump was frozen,
+    /// a bid was clamped, or the first bid was refused). The flag is never cleared -
+    /// it lets callers distinguish "expired because the ceiling held the price down"
+    /// from a plain expiry, even across a restart.
+    pub async fn transaction_update_gas_price_ceiling_hit(
+        &mut self,
+        transaction_id: &TransactionId,
+    ) -> Result<(), PostgresError> {
+        let mut conn = self.pool.get().await?;
+        let trans = conn.transaction().await.map_err(PostgresError::PgError)?;
+
+        trans
+            .execute(
+                "UPDATE relayer.transaction SET gas_price_ceiling_hit = TRUE WHERE id = $1",
+                &[&transaction_id],
+            )
+            .await?;
+
+        trans
+            .execute(
+                "
+                    INSERT INTO relayer.transaction_audit_log (
+                        id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
+                        speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
+                        failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
+                        sent_max_fee_per_gas, gas_price, block_hash, block_number, external_id,
+                        gas_price_ceiling, gas_price_ceiling_behavior, gas_price_ceiling_hit
+                    )
+                    SELECT
+                        id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
+                        speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
+                        failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
+                        sent_max_fee_per_gas, gas_price, block_hash, block_number, external_id,
+                        gas_price_ceiling, gas_price_ceiling_behavior, gas_price_ceiling_hit
+                    FROM relayer.transaction
+                    WHERE id = $1;
+                ",
+                &[&transaction_id],
             )
             .await?;
 
@@ -558,13 +636,15 @@ impl PostgresClient {
                         id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
                         speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
-                        sent_max_fee_per_gas, gas_price, block_hash, block_number, expired_at, external_id
+                        sent_max_fee_per_gas, gas_price, block_hash, block_number, expired_at, external_id,
+                        gas_price_ceiling, gas_price_ceiling_behavior, gas_price_ceiling_hit
                     )
                     SELECT
                         id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
                         speed, $2, expires_at, queued_at, sent_at, mined_at, confirmed_at,
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
-                        sent_max_fee_per_gas, gas_price, block_hash, block_number, NOW(), external_id
+                        sent_max_fee_per_gas, gas_price, block_hash, block_number, NOW(), external_id,
+                        gas_price_ceiling, gas_price_ceiling_behavior, gas_price_ceiling_hit
                     FROM relayer.transaction
                     WHERE id = $1;
                 ",
@@ -596,6 +676,11 @@ impl PostgresClient {
             .as_ref()
             .map(|reason| reason.chars().take(2000).collect::<String>());
 
+        let gas_price_ceiling_max_price =
+            transaction.gas_price_ceiling.map(|ceiling| ceiling.max_price);
+        let gas_price_ceiling_behavior =
+            transaction.gas_price_ceiling.map(|ceiling| ceiling.behavior);
+
         trans
             .execute(
                 "
@@ -624,7 +709,10 @@ impl PostgresClient {
                         cancelled_by_transaction_id = $23,
                         blobs = $24,
                         failed_reason = $25,
-                        failed_at = CASE WHEN $25::TEXT IS NULL THEN failed_at ELSE NOW() END
+                        failed_at = CASE WHEN $25::TEXT IS NULL THEN failed_at ELSE NOW() END,
+                        gas_price_ceiling = $26,
+                        gas_price_ceiling_behavior = $27,
+                        gas_price_ceiling_hit = $28
                     WHERE id = $1
                 ",
                 &[
@@ -653,6 +741,9 @@ impl PostgresClient {
                     &transaction.cancelled_by_transaction_id,
                     &transaction.blobs,
                     &truncated_failed_reason,
+                    &gas_price_ceiling_max_price,
+                    &gas_price_ceiling_behavior,
+                    &transaction.gas_price_ceiling_hit,
                 ],
             )
             .await
@@ -666,14 +757,16 @@ impl PostgresClient {
                         speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
                         sent_max_fee_per_gas, gas_price, sent_with_gas, sent_with_blob_gas,
-                        block_hash, block_number, expired_at, external_id
+                        block_hash, block_number, expired_at, external_id,
+                        gas_price_ceiling, gas_price_ceiling_behavior, gas_price_ceiling_hit
                     )
                     SELECT
                         id, relayer_id, \"to\", \"from\", nonce, chain_id, data, value, blobs, gas_limit,
                         speed, status, expires_at, queued_at, sent_at, mined_at, confirmed_at,
                         failed_at, failed_reason, hash, sent_max_priority_fee_per_gas,
                         sent_max_fee_per_gas, gas_price, sent_with_gas, sent_with_blob_gas,
-                        block_hash, block_number, expired_at, external_id
+                        block_hash, block_number, expired_at, external_id,
+                        gas_price_ceiling, gas_price_ceiling_behavior, gas_price_ceiling_hit
                     FROM relayer.transaction
                     WHERE id = $1
                 ",

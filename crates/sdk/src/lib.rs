@@ -19,7 +19,7 @@ pub use alloy::primitives::Signature;
 
 pub use rrelayer_core::{
     common_types::{EvmAddress, PagingContext, PagingResult},
-    gas::GasEstimatorResult,
+    gas::{GasEstimatorResult, GasPrice},
     network::Network,
     relayer::{CreateRelayerResult, GetRelayerResult, Relayer, RelayerId},
     signing::{SignTextResult, SignTypedDataResult, SignedTextHistory, SignedTypedDataHistory},
@@ -30,9 +30,9 @@ pub use rrelayer_core::{
         },
         queue_system::ReplaceTransactionResult,
         types::{
-            Transaction, TransactionBlob, TransactionConversionError, TransactionData,
-            TransactionHash, TransactionId, TransactionNonce, TransactionSpeed, TransactionStatus,
-            TransactionValue,
+            GasPriceCeiling, GasPriceCeilingBehavior, Transaction, TransactionBlob,
+            TransactionConversionError, TransactionData, TransactionHash, TransactionId,
+            TransactionNonce, TransactionSpeed, TransactionStatus, TransactionValue,
         },
     },
     webhooks::{

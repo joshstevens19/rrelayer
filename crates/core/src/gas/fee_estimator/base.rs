@@ -14,13 +14,12 @@ use super::{
 };
 use crate::gas::fee_estimator::fallback::FallbackGasFeeEstimator;
 use crate::{
-    create_retry_client,
     gas::{
         fee_estimator::tenderly::TenderlyGasFeeEstimator,
         types::{GasPrice, GasProvider, MaxFee, MaxPriorityFee},
     },
     network::ChainId,
-    provider::RetryClientError,
+    provider::{EndpointSelector, RetryClientError},
     NetworkSetupConfig, SetupConfig,
 };
 
@@ -111,8 +110,10 @@ pub trait BaseGasFeeEstimator {
 }
 
 /// Creates and returns the appropriate gas fee estimator based on configuration.
+/// The fallback estimator shares the network's health-aware endpoint pool, so gas
+/// pricing follows the same failover as every other RPC consumer.
 pub async fn get_gas_estimator(
-    provider_urls: &[String],
+    endpoints: &EndpointSelector,
     setup_config: &SetupConfig,
     network: &NetworkSetupConfig,
 ) -> Result<Arc<dyn BaseGasFeeEstimator + Send + Sync>, GasEstimatorError> {
@@ -151,6 +152,5 @@ pub async fn get_gas_estimator(
         }
     }
 
-    let provider = create_retry_client(&provider_urls[0]).await?;
-    Ok(Arc::new(FallbackGasFeeEstimator::new(provider.clone())))
+    Ok(Arc::new(FallbackGasFeeEstimator::new(endpoints.clone())))
 }

@@ -6,6 +6,11 @@ import { TransactionStatus } from './types';
 export interface TransactionStatusResult {
   hash?: `0x${string}`;
   status: TransactionStatus;
+  /**
+   * True when the transaction's gas price ceiling bound a bid - distinguishes
+   * "expired because the ceiling held the price down" from a plain expiry.
+   */
+  gasPriceCeilingHit: boolean;
   receipt?: TransactionReceipt;
 }
 

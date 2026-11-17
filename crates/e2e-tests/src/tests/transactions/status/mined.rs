@@ -26,6 +26,8 @@ impl TestRunner {
             speed: Some(TransactionSpeed::FAST),
             external_id: Some("test-mined".to_string()),
             blobs: None,
+            gas_price_ceiling: None,
+            expires_in_seconds: None,
         };
 
         let send_result = relayer.transaction().send(&tx_request, None).await?;

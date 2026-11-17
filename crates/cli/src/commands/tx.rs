@@ -211,6 +211,8 @@ async fn handle_withdraw(
                         speed: Some(TransactionSpeed::FAST),
                         blobs: None,
                         external_id: None,
+                        gas_price_ceiling: None,
+                        expires_in_seconds: None,
                     },
                     None,
                 )
@@ -231,6 +233,8 @@ async fn handle_withdraw(
                         speed: Some(TransactionSpeed::FAST),
                         blobs: None,
                         external_id: None,
+                        gas_price_ceiling: None,
+                        expires_in_seconds: None,
                     },
                     None,
                 )

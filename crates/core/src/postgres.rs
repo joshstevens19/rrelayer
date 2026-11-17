@@ -10,7 +10,8 @@ use postgres_native_tls::MakeTlsConnector;
 use tokio::{task, time::timeout};
 pub use tokio_postgres::types::{ToSql, Type as PgType};
 use tokio_postgres::{
-    config::SslMode, Config, CopyInSink, Error as PgError, Row, Statement, ToStatement,
+    config::SslMode, error::SqlState, Config, CopyInSink, Error as PgError, Row, Statement,
+    ToStatement,
 };
 
 pub fn connection_string() -> Result<String, env::VarError> {
@@ -47,6 +48,22 @@ pub enum PostgresError {
 
     #[error("Connection pool error: {0}")]
     ConnectionPoolError(#[from] RunError<tokio_postgres::Error>),
+}
+
+impl PostgresError {
+    /// Returns true if the error is a PostgreSQL unique violation on the given constraint/index.
+    pub fn is_unique_violation_on(&self, constraint: &str) -> bool {
+        match self {
+            PostgresError::PgError(error) => error
+                .as_db_error()
+                .map(|db_error| {
+                    db_error.code() == &SqlState::UNIQUE_VIOLATION
+                        && db_error.constraint() == Some(constraint)
+                })
+                .unwrap_or(false),
+            PostgresError::ConnectionPoolError(_) => false,
+        }
+    }
 }
 
 pub struct PostgresClient {

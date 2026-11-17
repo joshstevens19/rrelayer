@@ -1,4 +1,8 @@
 use crate::gas::BLOB_GAS_PER_BLOB;
+use crate::provider::endpoint_health::{
+    redact_provider_url, redact_provider_url_in_text, spawn_endpoint_prober, EndpointClient,
+    EndpointHealth, EndpointHealthSnapshot, EndpointSelector, StickyBroadcasts,
+};
 use crate::provider::layer_extensions::RpcLoggingLayer;
 use crate::relayer::Relayer;
 use crate::wallet::{
@@ -42,13 +46,12 @@ use alloy::{
     },
 };
 use alloy_eips::eip2718::Encodable2718;
-use rand::{thread_rng, Rng};
 use reqwest::Url;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use thiserror::Error;
 use tokio::sync::Mutex;
-use tracing::info;
+use tracing::{info, warn};
 
 pub type RelayerProvider = Box<dyn Provider<AnyNetwork> + Send + Sync>;
 
@@ -62,7 +65,10 @@ struct BlockGasLimitCache {
 
 #[derive(Clone)]
 pub struct EvmProvider {
-    rpc_clients: Vec<Arc<RelayerProvider>>,
+    endpoints: EndpointSelector,
+    /// Recently broadcast tx hashes pinned to their broadcasting endpoint for
+    /// receipt polls (read-your-writes) - shared across clones on purpose.
+    sticky_broadcasts: Arc<std::sync::Mutex<StickyBroadcasts>>,
     wallet_manager: Arc<dyn WalletManagerTrait>,
     gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
     block_gas_limit_cache: Arc<Mutex<Option<BlockGasLimitCache>>>,
@@ -123,22 +129,51 @@ pub enum RetryClientError {
     CouldNotBuildClient(#[from] ReqwestError),
 }
 
-pub async fn create_retry_client(rpc_url: &str) -> Result<Arc<RelayerProvider>, RetryClientError> {
+/// Rate-limit retries stay in the single digits ON PURPOSE: with the previous 5000
+/// the retry layer could sit on a dying endpoint for ages and errors never surfaced
+/// to health-aware selection. Persistence across endpoints is selection's job now.
+const MAX_RATE_LIMIT_RETRIES: u32 = 3;
+
+fn build_relayer_provider(
+    rpc_url: &str,
+    logging_layer: RpcLoggingLayer,
+) -> Result<Arc<RelayerProvider>, RetryClientError> {
     let rpc_url = Url::parse(rpc_url).map_err(|e| {
         RetryClientError::HttpProviderCantBeCreated(rpc_url.to_string(), e.to_string())
     })?;
 
     let client_with_auth = Client::builder().timeout(Duration::from_secs(15)).build()?;
 
-    let logging_layer = RpcLoggingLayer::new(rpc_url.to_string());
     let http = Http::with_client(client_with_auth, rpc_url);
-    let retry_layer = RetryBackoffLayer::new(5000, 1000, 660);
+    let retry_layer = RetryBackoffLayer::new(MAX_RATE_LIMIT_RETRIES, 1000, 660);
     let rpc_client =
         RpcClient::builder().layer(retry_layer).layer(logging_layer).transport(http, false);
     let provider =
         ProviderBuilder::new().network::<AnyNetwork>().connect_client(rpc_client.clone());
 
     Ok(Arc::new(Box::new(provider)))
+}
+
+pub async fn create_retry_client(rpc_url: &str) -> Result<Arc<RelayerProvider>, RetryClientError> {
+    build_relayer_provider(rpc_url, RpcLoggingLayer::new(rpc_url.to_string()))
+}
+
+/// Builds one [`EndpointClient`] per url, each with its own health state fed by the
+/// logging layer. No endpoint is contacted here - verification happens at boot in
+/// `new_internal` and afterwards by the prober.
+pub(crate) fn connect_endpoints(
+    provider_urls: &[String],
+) -> Result<EndpointSelector, RetryClientError> {
+    let mut endpoints = Vec::with_capacity(provider_urls.len());
+
+    for url in provider_urls {
+        let health = Arc::new(EndpointHealth::new());
+        let logging_layer = RpcLoggingLayer::new(url.to_string()).with_health(health.clone());
+        let client = build_relayer_provider(url, logging_layer)?;
+        endpoints.push(EndpointClient { client, url: url.clone(), health });
+    }
+
+    Ok(EndpointSelector::from_endpoints(endpoints))
 }
 
 #[derive(Error, Debug)]
@@ -167,6 +202,54 @@ pub enum EvmProviderNewError {
 
     #[error("{0}")]
     ProviderError(RpcError<TransportErrorKind>),
+
+    #[error("provider url {url} for network {network} serves chain id {got} but the config expects {expected} - refusing to start with a wrong-chain endpoint")]
+    ChainIdMismatch { network: String, url: String, expected: u64, got: u64 },
+
+    #[error("no provider url for network {0} responded at boot - cannot verify the chain or measure block time")]
+    NoResponsiveProviderUrls(String),
+}
+
+/// Boot policy for per-url chain verification. Serving the WRONG chain is a
+/// configuration bug and fails boot naming the url (silently relaying funds-bearing
+/// transactions into another chain's mempool is never acceptable). An endpoint that
+/// is merely UNREACHABLE at boot only warns and is reported not-verified - it must
+/// not take traffic yet but may recover later, so a dead endpoint (even url[0])
+/// cannot kill the whole server while healthy ones exist.
+///
+/// Returns one flag per url: true when the endpoint answered with the expected
+/// chain id.
+fn verify_endpoint_chain_ids(
+    network: &str,
+    checks: &[(String, Result<u64, String>)],
+    expected: ChainId,
+) -> Result<Vec<bool>, EvmProviderNewError> {
+    let mut verified = Vec::with_capacity(checks.len());
+
+    for (url, result) in checks {
+        match result {
+            Ok(got) if *got == expected.u64() => verified.push(true),
+            Ok(got) => {
+                return Err(EvmProviderNewError::ChainIdMismatch {
+                    network: network.to_string(),
+                    url: redact_provider_url(url),
+                    expected: expected.u64(),
+                    got: *got,
+                });
+            }
+            Err(error) => {
+                warn!(
+                    "Provider url {} for network {} is unreachable at boot ({}) - continuing without it until it recovers",
+                    redact_provider_url(url),
+                    network,
+                    redact_provider_url_in_text(url, error)
+                );
+                verified.push(false);
+            }
+        }
+    }
+
+    Ok(verified)
 }
 
 impl EvmProvider {
@@ -174,9 +257,11 @@ impl EvmProvider {
         network_setup_config: &NetworkSetupConfig,
         mnemonic: &str,
         gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
+        endpoints: EndpointSelector,
     ) -> Result<Self, EvmProviderNewError> {
         let wallet_manager = Arc::new(MnemonicWalletManager::new(mnemonic));
-        Self::new_internal(network_setup_config, wallet_manager, gas_estimator, true).await
+        Self::new_internal(network_setup_config, wallet_manager, gas_estimator, endpoints, true)
+            .await
     }
 
     pub async fn new_with_privy(
@@ -184,57 +269,69 @@ impl EvmProvider {
         app_id: String,
         app_secret: String,
         gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
+        endpoints: EndpointSelector,
     ) -> Result<Self, EvmProviderNewError> {
         let privy_manager = PrivyWalletManager::new(app_id, app_secret).await?;
         let wallet_manager = Arc::new(privy_manager);
-        Self::new_internal(network_setup_config, wallet_manager, gas_estimator, true).await
+        Self::new_internal(network_setup_config, wallet_manager, gas_estimator, endpoints, true)
+            .await
     }
 
     pub async fn new_with_aws_kms(
         network_setup_config: &NetworkSetupConfig,
         aws_kms_config: AwsKmsSigningProviderConfig,
         gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
+        endpoints: EndpointSelector,
     ) -> Result<Self, EvmProviderNewError> {
         let wallet_manager = Arc::new(AwsKmsWalletManager::new(aws_kms_config));
-        Self::new_internal(network_setup_config, wallet_manager, gas_estimator, true).await
+        Self::new_internal(network_setup_config, wallet_manager, gas_estimator, endpoints, true)
+            .await
     }
 
     pub async fn new_with_turnkey(
         network_setup_config: &NetworkSetupConfig,
         turnkey_config: TurnkeySigningProviderConfig,
         gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
+        endpoints: EndpointSelector,
     ) -> Result<Self, EvmProviderNewError> {
         let turnkey_manager = TurnkeyWalletManager::new(turnkey_config).await?;
         let wallet_manager = Arc::new(turnkey_manager);
-        Self::new_internal(network_setup_config, wallet_manager, gas_estimator, true).await
+        Self::new_internal(network_setup_config, wallet_manager, gas_estimator, endpoints, true)
+            .await
     }
 
     pub async fn new_with_private_keys(
         network_setup_config: &NetworkSetupConfig,
         private_keys: Vec<String>,
         gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
+        endpoints: EndpointSelector,
     ) -> Result<Self, EvmProviderNewError> {
         let wallet_manager = Arc::new(PrivateKeyWalletManager::new(private_keys));
-        Self::new_internal(network_setup_config, wallet_manager, gas_estimator, false).await
+        Self::new_internal(network_setup_config, wallet_manager, gas_estimator, endpoints, false)
+            .await
     }
 
     pub async fn new_with_pkcs11(
         network_setup_config: &NetworkSetupConfig,
         pkcs11_config: Pkcs11SigningProviderConfig,
         gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
+        endpoints: EndpointSelector,
     ) -> Result<Self, EvmProviderNewError> {
         let wallet_manager = Arc::new(Pkcs11WalletManager::new(pkcs11_config)?);
-        Self::new_internal(network_setup_config, wallet_manager, gas_estimator, true).await
+        Self::new_internal(network_setup_config, wallet_manager, gas_estimator, endpoints, true)
+            .await
     }
 
     pub async fn new_with_fireblocks(
         network_setup_config: &NetworkSetupConfig,
         fireblocks_config: FireblocksSigningProviderConfig,
         gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
+        endpoints: EndpointSelector,
     ) -> Result<Self, EvmProviderNewError> {
         let fireblocks_manager = FireblocksWalletManager::new(fireblocks_config).await?;
         let wallet_manager = Arc::new(fireblocks_manager);
-        Self::new_internal(network_setup_config, wallet_manager, gas_estimator, false).await
+        Self::new_internal(network_setup_config, wallet_manager, gas_estimator, endpoints, false)
+            .await
     }
 
     pub async fn new_with_composite(
@@ -242,6 +339,7 @@ impl EvmProvider {
         primary_manager: Arc<dyn WalletManagerTrait>,
         private_keys: Option<Vec<String>>,
         gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
+        endpoints: EndpointSelector,
     ) -> Result<Self, EvmProviderNewError> {
         let private_key_manager = private_keys.map(|private_keys| {
             Arc::new(PrivateKeyWalletManager::new(private_keys)) as Arc<dyn WalletManagerTrait>
@@ -249,43 +347,89 @@ impl EvmProvider {
 
         let wallet_manager =
             Arc::new(CompositeWalletManager::new(primary_manager, private_key_manager));
-        Self::new_internal(network_setup_config, wallet_manager, gas_estimator, true).await
+        Self::new_internal(network_setup_config, wallet_manager, gas_estimator, endpoints, true)
+            .await
     }
 
     async fn new_internal(
         network_setup_config: &NetworkSetupConfig,
         wallet_manager: Arc<dyn WalletManagerTrait>,
         gas_estimator: Arc<dyn BaseGasFeeEstimator + Send + Sync>,
+        endpoints: EndpointSelector,
         can_clone: bool,
     ) -> Result<Self, EvmProviderNewError> {
-        let provider =
-            create_retry_client(&network_setup_config.provider_urls[0]).await.map_err(|e| {
-                EvmProviderNewError::HttpProviderCantBeCreated(
-                    network_setup_config.provider_urls[0].clone(),
-                    e.to_string(),
-                )
-            })?;
+        // Verify EVERY url serves the configured chain before it can take traffic -
+        // wrong-chain fails boot, unreachable-at-boot only warns (see
+        // verify_endpoint_chain_ids for the policy)
+        let mut chain_checks: Vec<(String, Result<u64, String>)> =
+            Vec::with_capacity(endpoints.endpoints().len());
+        for endpoint in endpoints.endpoints() {
+            chain_checks.push((
+                endpoint.url.clone(),
+                endpoint.client.get_chain_id().await.map_err(|e| e.to_string()),
+            ));
+        }
+        let verified = verify_endpoint_chain_ids(
+            &network_setup_config.name,
+            &chain_checks,
+            network_setup_config.chain_id,
+        )?;
 
-        let chain_id = ChainId::new(
-            provider.get_chain_id().await.map_err(EvmProviderNewError::ProviderError)?,
-        );
-
-        let mut providers: Vec<Arc<RelayerProvider>> = vec![provider.clone()];
-        for url in network_setup_config.provider_urls.iter().skip(1) {
-            providers.push(create_retry_client(url).await.map_err(|e| {
-                EvmProviderNewError::HttpProviderCantBeCreated(url.clone(), e.to_string())
-            })?);
+        // Verified endpoints enter rotation; unreachable ones stay unverified and
+        // therefore unselectable until the prober verifies their chain id
+        for (endpoint, verified) in endpoints.endpoints().iter().zip(verified.iter()) {
+            if *verified {
+                endpoint.health.mark_chain_verified();
+            }
         }
 
+        // Measure block time on the first VERIFIED endpoint that answers - pinning
+        // this to url[0] would make a dead primary kill boot even with healthy
+        // fallbacks configured
+        let mut blocks_every = None;
+        for (index, endpoint) in endpoints.endpoints().iter().enumerate() {
+            if !verified[index] {
+                continue;
+            }
+            match calculate_block_time_difference(&endpoint.client).await {
+                Ok(block_time_ms) => {
+                    blocks_every = Some(block_time_ms);
+                    break;
+                }
+                Err(error) => {
+                    warn!(
+                        "Could not measure block time on provider url {} for network {}: {} - trying the next url",
+                        redact_provider_url(&endpoint.url),
+                        network_setup_config.name,
+                        redact_provider_url_in_text(&endpoint.url, &error.to_string())
+                    );
+                }
+            }
+        }
+        let Some(blocks_every) = blocks_every else {
+            return Err(EvmProviderNewError::NoResponsiveProviderUrls(
+                network_setup_config.name.to_string(),
+            ));
+        };
+
+        // Background tip probe: lag detection plus the half-open recovery signal for
+        // cooled-down or boot-unreachable endpoints
+        spawn_endpoint_prober(
+            endpoints.clone(),
+            network_setup_config.name.to_string(),
+            network_setup_config.chain_id,
+        );
+
         Ok(EvmProvider {
-            blocks_every: calculate_block_time_difference(&provider)
-                .await
-                .map_err(EvmProviderNewError::ProviderError)?,
-            rpc_clients: providers,
+            blocks_every,
+            endpoints,
+            sticky_broadcasts: Arc::new(std::sync::Mutex::new(StickyBroadcasts::new())),
             wallet_manager,
             gas_estimator,
             block_gas_limit_cache: Arc::new(Mutex::new(None)),
-            chain_id,
+            // The chain id comes from the CONFIG (each url was verified against it
+            // above) - never from whatever url[0] happens to answer
+            chain_id: network_setup_config.chain_id,
             name: network_setup_config.name.to_string(),
             provider_urls: network_setup_config.provider_urls.to_owned(),
             confirmations: network_setup_config.confirmations.unwrap_or(12),
@@ -293,10 +437,11 @@ impl EvmProvider {
         })
     }
 
+    /// Health-aware client selection: endpoints in cooldown or lagging the best tip
+    /// are skipped and the rest weighted by their record; when everything looks
+    /// unhealthy the whole enabled set is used so a client is always returned.
     pub fn rpc_client(&self) -> Arc<RelayerProvider> {
-        let mut rng = thread_rng();
-        let index = rng.gen_range(0..self.rpc_clients.len());
-        self.rpc_clients[index].clone()
+        self.endpoints.client()
     }
 
     pub async fn clone_wallet(&self, relayer: &Relayer) -> Result<EvmAddress, WalletError> {
@@ -314,6 +459,16 @@ impl EvmProvider {
 
     pub async fn get_address(&self, wallet_index: u32) -> Result<EvmAddress, WalletError> {
         self.wallet_manager.get_address(wallet_index, self.chain_id.into()).await
+    }
+
+    /// Derives the address the CURRENTLY configured signing provider produces
+    /// for a relayer's wallet index — the address signing would actually use.
+    /// Embedders verify imported relayers against this (a relayer created
+    /// under a different signing provider derives a different address).
+    pub async fn derived_address(&self, relayer: &Relayer) -> Result<EvmAddress, WalletError> {
+        self.wallet_manager
+            .get_address(relayer.wallet_index(), relayer.wallet_manager_chain_id())
+            .await
     }
 
     pub fn can_clone(&self) -> bool {
@@ -343,8 +498,26 @@ impl EvmProvider {
         &self,
         transaction_hash: &TransactionHash,
     ) -> Result<Option<AnyTransactionReceipt>, RpcError<TransportErrorKind>> {
-        let receipt =
-            self.rpc_client().get_transaction_receipt(transaction_hash.into_alloy_hash()).await?;
+        let hash = transaction_hash.into_alloy_hash();
+
+        // Read-your-writes stickiness: until the receipt is first sighted, poll the
+        // endpoint that accepted the broadcast (health permitting) - a lagging
+        // endpoint answering Ok(None) for a transaction another endpoint already
+        // holds would otherwise trigger premature same-nonce gas bumps
+        let sticky_endpoint =
+            self.sticky_broadcasts.lock().ok().and_then(|sticky| sticky.endpoint_for(&hash));
+        let provider = match sticky_endpoint {
+            Some(index) => self.endpoints.client_preferring(index),
+            None => self.rpc_client(),
+        };
+
+        let receipt = provider.get_transaction_receipt(hash).await?;
+
+        if receipt.is_some() {
+            if let Ok(mut sticky) = self.sticky_broadcasts.lock() {
+                sticky.forget(&hash);
+            }
+        }
 
         Ok(receipt)
     }
@@ -384,6 +557,23 @@ impl EvmProvider {
         Ok(TransactionNonce::new(nonce))
     }
 
+    /// The MINED transaction count (`latest` tag) - unlike [`Self::get_nonce_from_address`]
+    /// this never counts transactions still sitting in the node's mempool, so it is the
+    /// right comparison for "was this nonce consumed on chain": a broadcast-but-unmined
+    /// holder must still be replaceable/cancellable at its nonce.
+    pub async fn get_mined_nonce_from_address(
+        &self,
+        address: &EvmAddress,
+    ) -> Result<TransactionNonce, RpcError<TransportErrorKind>> {
+        let nonce = self
+            .rpc_client()
+            .get_transaction_count(address.into_address())
+            .block_id(BlockId::Number(BlockNumberOrTag::Latest))
+            .await?;
+
+        Ok(TransactionNonce::new(nonce))
+    }
+
     pub async fn send_transaction(
         &self,
         relayer: &Relayer,
@@ -410,10 +600,16 @@ impl EvmProvider {
             TypedTransaction::Eip7702(tx) => TxEnvelope::Eip7702(tx.into_signed(signature)),
         };
 
-        let provider = self.rpc_client();
+        let (endpoint_index, provider) = self.endpoints.pick();
         let tx_bytes = tx_envelope.encoded_2718();
 
         let receipt = provider.send_raw_transaction(&tx_bytes).await?;
+
+        // Pin this hash's receipt polls to the endpoint that accepted the broadcast
+        // until the receipt is first sighted
+        if let Ok(mut sticky) = self.sticky_broadcasts.lock() {
+            sticky.record(*receipt.tx_hash(), endpoint_index);
+        }
 
         Ok(TransactionHash::from_alloy_hash(receipt.tx_hash()))
     }
@@ -567,6 +763,15 @@ impl EvmProvider {
     pub fn supports_blobs(&self) -> bool {
         self.wallet_manager.supports_blobs()
     }
+
+    /// Point-in-time health snapshots for every configured RPC endpoint of this
+    /// network - healthy flag, error rate, latency percentiles, last observed tip,
+    /// lag behind the best tip and any active cooldown. Urls are
+    /// credential-redacted at the source: provider urls embed API keys and must
+    /// never leave the process intact.
+    pub fn endpoint_health(&self) -> Vec<EndpointHealthSnapshot> {
+        self.endpoints.health_snapshots()
+    }
 }
 
 #[cfg(test)]
@@ -670,7 +875,8 @@ mod tests {
         });
 
         let provider = EvmProvider {
-            rpc_clients: Vec::new(),
+            endpoints: EndpointSelector::from_endpoints(Vec::new()),
+            sticky_broadcasts: Arc::new(std::sync::Mutex::new(StickyBroadcasts::new())),
             wallet_manager,
             gas_estimator: Arc::new(UnusedGasEstimator),
             block_gas_limit_cache: Arc::new(Mutex::new(None)),
@@ -700,5 +906,64 @@ mod tests {
 
         assert_eq!(cloned_address, address);
         assert_eq!(*last_create_chain.lock().await, Some((1, 31337)));
+    }
+
+    #[test]
+    fn wrong_chain_url_fails_boot_naming_url_and_chain_ids() {
+        let checks = vec![
+            ("https://one.example".to_string(), Ok(1)),
+            ("https://two.example".to_string(), Ok(137)),
+        ];
+
+        let result = verify_endpoint_chain_ids("ethereum", &checks, ChainId::new(1));
+
+        match result {
+            Err(EvmProviderNewError::ChainIdMismatch { network, url, expected, got }) => {
+                assert_eq!(network, "ethereum");
+                assert_eq!(url, "https://two.example");
+                assert_eq!(expected, 1);
+                assert_eq!(got, 137);
+            }
+            other => panic!("expected a chain id mismatch, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn unreachable_url_at_boot_warns_instead_of_failing() {
+        let checks = vec![
+            ("https://dead.example".to_string(), Err("connection refused".to_string())),
+            ("https://alive.example".to_string(), Ok(1)),
+        ];
+
+        let verified = verify_endpoint_chain_ids("ethereum", &checks, ChainId::new(1))
+            .expect("an unreachable endpoint must not fail boot");
+
+        assert_eq!(verified, vec![false, true]);
+    }
+
+    #[test]
+    fn all_matching_urls_verify() {
+        let checks = vec![
+            ("https://one.example".to_string(), Ok(31337)),
+            ("https://two.example".to_string(), Ok(31337)),
+        ];
+
+        let verified = verify_endpoint_chain_ids("anvil", &checks, ChainId::new(31337))
+            .expect("matching endpoints must verify");
+
+        assert_eq!(verified, vec![true, true]);
+    }
+
+    #[test]
+    fn wrong_chain_takes_precedence_over_unreachable_urls() {
+        // A wrong-chain url is a config bug even when other urls are down
+        let checks = vec![
+            ("https://dead.example".to_string(), Err("timeout".to_string())),
+            ("https://wrong.example".to_string(), Ok(10)),
+        ];
+
+        let result = verify_endpoint_chain_ids("ethereum", &checks, ChainId::new(1));
+
+        assert!(matches!(result, Err(EvmProviderNewError::ChainIdMismatch { .. })));
     }
 }

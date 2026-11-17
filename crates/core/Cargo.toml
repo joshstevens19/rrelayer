@@ -69,5 +69,9 @@ rsa = "0.9"
 [build-dependencies]
 chrono = "0.4.19"
 
+[dev-dependencies]
+# test-util enables tokio::test(start_paused) so timeout-path tests run instantly
+tokio = { version = "1", features = ["full", "test-util"] }
+
 [lints]
 workspace = true

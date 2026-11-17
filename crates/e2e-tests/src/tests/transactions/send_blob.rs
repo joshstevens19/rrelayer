@@ -28,6 +28,8 @@ impl TestRunner {
             speed: Some(TransactionSpeed::FAST),
             external_id: Some("blob-test".to_string()),
             blobs: Some(vec![hex_blob]),
+            gas_price_ceiling: None,
+            expires_in_seconds: None,
         };
 
         let blob_result = relayer.transaction().send(&tx_request, None).await?;

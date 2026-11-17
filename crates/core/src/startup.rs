@@ -1,20 +1,25 @@
 use crate::app_state::{RelayersAllowedForRandom, RelayersInternalOnly};
 use crate::authentication::{create_basic_auth_routes, inject_basic_auth_status};
 use crate::background_tasks::run_background_tasks;
-use crate::common_types::EvmAddress;
+use crate::common_types::{EvmAddress, PagingContext, PagingResult};
 use crate::gas::{BlobGasOracleCache, GasOracleCache};
 use crate::network::{create_network_routes, ChainId};
+use crate::provider::EndpointHealthSnapshot;
+use crate::rate_limiting::RATE_LIMIT_HEADER_NAME;
 use crate::server::create_server_routes;
-use crate::shared::HttpError;
+use crate::shared::{bad_request, not_found, HttpError};
 use crate::webhooks::WebhookManager;
 use crate::yaml::{AllOrOneOrManyAddresses, ApiKey, NetworkPermissionsConfig, ReadYamlError};
 use crate::{
     app_state::AppState,
     postgres::{PostgresClient, PostgresConnectionError, PostgresError},
-    provider::{load_providers, EvmProvider, LoadProvidersError},
+    provider::{chain_enabled, find_provider_for_chain_id, load_providers, LoadProvidersError},
     rate_limiting::RateLimiter,
     read,
-    relayer::create_relayer_routes,
+    relayer::{
+        clone_relayer_core, create_relayer_core, create_relayer_routes, get_relayer,
+        CreateRelayerResult, GetRelayerResult, RelayerId,
+    },
     safe_proxy::SafeProxyManager,
     schema::apply_schema,
     setup_info_logger,
@@ -22,16 +27,21 @@ use crate::{
     shutdown,
     signing::create_signing_routes,
     transaction::{
-        api::create_transactions_routes,
-        queue_system::{
-            startup_transactions_queues, StartTransactionsQueuesError, TransactionsQueues,
+        api::{
+            create_transactions_routes, send_transaction, transaction_status_result,
+            RelayTransactionRequest, RelayTransactionStatusResult, SendTransactionResult,
         },
+        get_transaction_by_id,
+        queue_system::{
+            startup_transactions_queues, SendTransactionAtNonceResult, StartTransactionsQueuesError,
+        },
+        types::{Transaction, TransactionId, TransactionNonce},
     },
-    ApiConfig, RateLimitConfig, SafeProxyConfig, SetupConfig,
+    ApiConfig, SafeProxyConfig,
 };
 use axum::{
     body::{to_bytes, Body},
-    http::{HeaderValue, Request, StatusCode},
+    http::{HeaderMap, HeaderValue, Request, StatusCode},
     middleware,
     middleware::Next,
     response::Response,
@@ -42,6 +52,7 @@ use chrono::Utc;
 use dotenv::dotenv;
 use rustls::crypto::ring::default_provider;
 use rustls::crypto::CryptoProvider;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 use std::{
@@ -159,76 +170,7 @@ async fn activity_logger(req: Request<Body>, next: Next) -> Result<Response, Sta
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-async fn start_api(
-    api_config: ApiConfig,
-    rate_limit_config: Option<RateLimitConfig>,
-    network_permissions: Vec<(ChainId, Vec<NetworkPermissionsConfig>)>,
-    api_keys: Vec<(ChainId, Vec<ApiKey>)>,
-    gas_oracle_cache: Arc<Mutex<GasOracleCache>>,
-    blob_gas_oracle_cache: Arc<Mutex<BlobGasOracleCache>>,
-    transactions_queues: Arc<Mutex<TransactionsQueues>>,
-    providers: Arc<Vec<EvmProvider>>,
-    cache: Arc<Cache>,
-    webhook_manager: Option<Arc<Mutex<WebhookManager>>>,
-    user_rate_limiter: Option<Arc<RateLimiter>>,
-    db: Arc<PostgresClient>,
-    safe_proxy_manager: Arc<SafeProxyManager>,
-    relayer_internal_only: RelayersInternalOnly,
-    relayers_allowed_for_random: RelayersAllowedForRandom,
-    config: &SetupConfig,
-) -> Result<(), StartApiError> {
-    // Calculate which networks are configured with only private keys
-    let private_key_only_networks: Vec<ChainId> = config
-        .networks
-        .iter()
-        .filter_map(|network_config| {
-            // Determine which signing provider to use (network-level or global)
-            let signing_provider = if let Some(ref signing_key) = network_config.signing_provider {
-                signing_key
-            } else {
-                config.signing_provider.as_ref()?
-            };
-
-            // Check if only private keys are configured
-            if signing_provider.private_keys.is_some()
-                && signing_provider.raw.is_none()
-                && signing_provider.aws_secret_manager.is_none()
-                && signing_provider.gcp_secret_manager.is_none()
-                && signing_provider.privy.is_none()
-                && signing_provider.aws_kms.is_none()
-                && signing_provider.turnkey.is_none()
-                && signing_provider.pkcs11.is_none()
-                && signing_provider.fireblocks.is_none()
-            {
-                Some(network_config.chain_id)
-            } else {
-                None
-            }
-        })
-        .collect();
-
-    let app_state = Arc::new(AppState {
-        started_at: Utc::now(),
-        db: db.clone(),
-        evm_providers: providers,
-        gas_oracle_cache,
-        blob_gas_oracle_cache,
-        transactions_queues,
-        cache,
-        webhook_manager,
-        user_rate_limiter,
-        rate_limit_config,
-        relayer_creation_mutex: Arc::new(Mutex::new(())),
-        safe_proxy_manager,
-        relayer_internal_only: Arc::new(relayer_internal_only),
-        relayers_allowed_for_random: Arc::new(relayers_allowed_for_random),
-        network_permissions: Arc::new(network_permissions),
-        api_keys: Arc::new(api_keys),
-        network_configs: Arc::new(config.networks.clone()),
-        private_key_only_networks: Arc::new(private_key_only_networks),
-    });
-
+async fn start_api(api_config: ApiConfig, app_state: Arc<AppState>) -> Result<(), StartApiError> {
     let cors = CorsLayer::new()
         .allow_origin(
             if api_config.allowed_origins.as_ref().is_none_or(|origins| origins.is_empty()) {
@@ -383,7 +325,9 @@ pub enum StartError {
     CryptoProviderInstallError,
 }
 
-pub async fn start(project_path: &Path) -> Result<(), StartError> {
+/// Builds a full rrelayer instance without binding the HTTP API, returning a [`Relayer`]
+/// handle which can either serve the API or be driven in-process by an embedder.
+pub async fn build(project_path: &Path) -> Result<Relayer, StartError> {
     setup_info_logger();
     dotenv().ok();
 
@@ -408,8 +352,17 @@ pub async fn start(project_path: &Path) -> Result<(), StartError> {
     apply_schema(&postgres).await?;
     info!("Applied database schema");
 
-    CryptoProvider::install_default(default_provider())
-        .map_err(|_| StartError::CryptoProviderInstallError)?;
+    if CryptoProvider::get_default().is_none() {
+        // Embedded hosts may install a rustls provider before boot. Only fail when
+        // install itself fails and no provider is present afterwards — that is the
+        // error master's panic ban introduced, without rejecting a host that already
+        // installed one (including a race between the check and the install).
+        if CryptoProvider::install_default(default_provider()).is_err()
+            && CryptoProvider::get_default().is_none()
+        {
+            return Err(StartError::CryptoProviderInstallError);
+        }
+    }
 
     let cache = Arc::new(Cache::new().await);
 
@@ -515,25 +468,319 @@ pub async fn start(project_path: &Path) -> Result<(), StartError> {
         None
     };
 
-    start_api(
-        config.api_config.clone(),
-        config.rate_limits.clone(),
-        network_permissions,
-        api_keys,
+    // Calculate which networks are configured with only private keys
+    let private_key_only_networks: Vec<ChainId> = config
+        .networks
+        .iter()
+        .filter_map(|network_config| {
+            // Determine which signing provider to use (network-level or global)
+            let signing_provider = if let Some(ref signing_key) = network_config.signing_provider {
+                signing_key
+            } else {
+                config.signing_provider.as_ref()?
+            };
+
+            // Check if only private keys are configured
+            if signing_provider.private_keys.is_some()
+                && signing_provider.raw.is_none()
+                && signing_provider.aws_secret_manager.is_none()
+                && signing_provider.gcp_secret_manager.is_none()
+                && signing_provider.privy.is_none()
+                && signing_provider.aws_kms.is_none()
+                && signing_provider.turnkey.is_none()
+                && signing_provider.pkcs11.is_none()
+                && signing_provider.fireblocks.is_none()
+            {
+                Some(network_config.chain_id)
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    let app_state = Arc::new(AppState {
+        started_at: Utc::now(),
+        db: postgres_client,
+        evm_providers: providers,
         gas_oracle_cache,
         blob_gas_oracle_cache,
-        transaction_queue,
-        providers,
+        transactions_queues: transaction_queue,
         cache,
         webhook_manager,
         user_rate_limiter,
-        postgres_client,
+        rate_limit_config: config.rate_limits.clone(),
+        relayer_creation_mutex: Arc::new(Mutex::new(())),
         safe_proxy_manager,
-        relayer_internal_only,
-        relayers_allowed_for_random,
-        &config,
-    )
-    .await?;
+        relayer_internal_only: Arc::new(relayer_internal_only),
+        relayers_allowed_for_random: Arc::new(relayers_allowed_for_random),
+        network_permissions: Arc::new(network_permissions),
+        api_keys: Arc::new(api_keys),
+        network_configs: Arc::new(config.networks.clone()),
+        private_key_only_networks: Arc::new(private_key_only_networks),
+    });
 
-    Ok(())
+    Ok(Relayer { api_config: config.api_config, app_state })
+}
+
+pub async fn start(project_path: &Path) -> Result<(), StartError> {
+    let relayer = build(project_path).await?;
+    relayer.serve_api().await
+}
+
+/// RPC endpoint health snapshots for one configured network.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NetworkEndpointHealth {
+    #[serde(rename = "chainId")]
+    pub chain_id: u64,
+    /// The network name from the yaml config.
+    pub name: String,
+    pub endpoints: Vec<EndpointHealthSnapshot>,
+}
+
+/// A fully built rrelayer instance.
+///
+/// Created via [`build`], it owns every component the server needs. Call [`Relayer::serve_api`]
+/// to serve the HTTP API (what [`start`] does) or use the in-process methods directly when
+/// embedding rrelayer inside another application - no port has to be bound for those.
+///
+/// The in-process methods mirror the corresponding HTTP endpoints with authentication
+/// excluded - the embedder is trusted.
+pub struct Relayer {
+    api_config: ApiConfig,
+    app_state: Arc<AppState>,
+}
+
+impl Relayer {
+    /// Serves the HTTP API until shutdown, exactly as the standalone server does.
+    pub async fn serve_api(self) -> Result<(), StartError> {
+        start_api(self.api_config, self.app_state).await?;
+
+        Ok(())
+    }
+
+    /// Builds headers marking the request as trusted, mirroring what the HTTP
+    /// basic auth middleware injects for authenticated requests.
+    fn trusted_headers(rate_limit_key: Option<&str>) -> Result<HeaderMap, HttpError> {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-rrelayer-basic-auth-valid", HeaderValue::from_static("true"));
+
+        if let Some(rate_limit_key) = rate_limit_key {
+            let value = HeaderValue::from_str(rate_limit_key)
+                .map_err(|_| bad_request("Invalid rate limit key".to_string()))?;
+            headers.insert(RATE_LIMIT_HEADER_NAME, value);
+        }
+
+        Ok(headers)
+    }
+
+    /// Sends a transaction through the relayer's queue - mirrors the send transaction endpoint.
+    pub async fn send_transaction(
+        &self,
+        relayer_id: &RelayerId,
+        request: &RelayTransactionRequest,
+        rate_limit_key: Option<String>,
+    ) -> Result<SendTransactionResult, HttpError> {
+        let relayer = get_relayer(&self.app_state.db, &self.app_state.cache, relayer_id)
+            .await?
+            .ok_or(not_found("Relayer does not exist".to_string()))?;
+
+        let headers = Self::trusted_headers(rate_limit_key.as_deref())?;
+
+        send_transaction(relayer, request.clone(), &self.app_state, &headers).await
+    }
+
+    /// Gets the status of a transaction - mirrors the transaction status endpoint.
+    pub async fn get_transaction_status(
+        &self,
+        id: &TransactionId,
+    ) -> Result<Option<RelayTransactionStatusResult>, HttpError> {
+        let transaction =
+            get_transaction_by_id(&self.app_state.cache, &self.app_state.db, *id).await?;
+
+        match transaction {
+            None => Ok(None),
+            Some(transaction) => {
+                Ok(Some(transaction_status_result(&self.app_state, transaction).await?))
+            }
+        }
+    }
+
+    /// Gets the latest transaction for a relayer by its external id.
+    pub async fn get_transaction_by_external_id(
+        &self,
+        relayer_id: &RelayerId,
+        external_id: &str,
+    ) -> Result<Option<Transaction>, HttpError> {
+        let transaction = self
+            .app_state
+            .db
+            .get_transaction_by_relayer_and_external_id(relayer_id, external_id)
+            .await?;
+
+        Ok(transaction)
+    }
+
+    /// Creates a new relayer for the specified network - mirrors the create relayer endpoint.
+    pub async fn create_relayer(
+        &self,
+        chain_id: u64,
+        name: &str,
+    ) -> Result<CreateRelayerResult, HttpError> {
+        create_relayer_core(&self.app_state, &ChainId::new(chain_id), name).await
+    }
+
+    /// Clones an existing relayer to a new network - mirrors the clone relayer endpoint.
+    pub async fn clone_relayer(
+        &self,
+        relayer_id: &RelayerId,
+        chain_id: u64,
+        name: &str,
+    ) -> Result<CreateRelayerResult, HttpError> {
+        clone_relayer_core(&self.app_state, relayer_id, &ChainId::new(chain_id), name).await
+    }
+
+    /// Gets a relayer with its provider urls - mirrors the get relayer endpoint.
+    pub async fn get_relayer(
+        &self,
+        relayer_id: &RelayerId,
+    ) -> Result<Option<GetRelayerResult>, HttpError> {
+        let relayer = get_relayer(&self.app_state.db, &self.app_state.cache, relayer_id).await?;
+
+        match relayer {
+            None => Ok(None),
+            Some(relayer) => {
+                let provider =
+                    find_provider_for_chain_id(&self.app_state.evm_providers, &relayer.chain_id)
+                        .await;
+                let provider_urls = provider.map(|p| p.provider_urls.clone()).unwrap_or_default();
+
+                Ok(Some(GetRelayerResult { relayer, provider_urls }))
+            }
+        }
+    }
+
+    /// Gets a paginated list of relayers, optionally filtered by chain id - mirrors the
+    /// get relayers endpoint.
+    pub async fn get_relayers(
+        &self,
+        chain_id: Option<u64>,
+        paging_context: &PagingContext,
+    ) -> Result<PagingResult<crate::relayer::Relayer>, HttpError> {
+        match chain_id {
+            Some(chain_id) => {
+                let chain_id = ChainId::new(chain_id);
+                if !chain_enabled(&self.app_state.evm_providers, &chain_id) {
+                    return Err(bad_request("Chain is not enabled".to_string()));
+                }
+
+                let result =
+                    self.app_state.db.get_relayers_for_chain(&chain_id, paging_context).await?;
+
+                Ok(result)
+            }
+            None => {
+                let result = self.app_state.db.get_relayers(paging_context).await?;
+
+                Ok(result)
+            }
+        }
+    }
+
+    /// Convenience helper returning just the relayer's address.
+    pub async fn get_relayer_address(
+        &self,
+        relayer_id: &RelayerId,
+    ) -> Result<Option<EvmAddress>, HttpError> {
+        let relayer = get_relayer(&self.app_state.db, &self.app_state.cache, relayer_id).await?;
+
+        Ok(relayer.map(|relayer| relayer.address))
+    }
+
+    /// Lists the transactions currently occupying nonces for a relayer: the live
+    /// pending queue (nonce reserved, not yet broadcast) followed by the inmempool
+    /// queue (broadcast, awaiting receipt), including same-nonce cancel/replace
+    /// competitors. Read straight from the in-process queues, so it reflects what
+    /// the engine is actually tracking right now.
+    pub async fn get_relayer_inflight_transactions(
+        &self,
+        relayer_id: &RelayerId,
+    ) -> Result<Vec<Transaction>, HttpError> {
+        let queue_arc = {
+            let transactions_queues = self.app_state.transactions_queues.lock().await;
+            transactions_queues.get_transactions_queue(relayer_id)
+        }
+        .ok_or(not_found("Relayer does not exist".to_string()))?;
+
+        let transactions_queue = queue_arc.lock().await;
+
+        Ok(transactions_queue.get_inflight_transactions().await)
+    }
+
+    /// Submits a transaction at an explicit nonce currently held by one of the
+    /// relayer's in-flight transactions, bypassing nonce allocation - the break-glass
+    /// primitive for clearing a wedged nonce. A value-0 self-send with empty calldata
+    /// cancels the holder; any other payload replaces it. Either way the send goes
+    /// through the normal sign/broadcast/tracking path with a competitive fee above
+    /// the holder's live bid. Nonces below the current on-chain nonce and nonces not
+    /// held by an in-flight transaction are rejected. Mirrors the cancel/replace
+    /// endpoints with authentication excluded - the embedder is trusted.
+    pub async fn send_transaction_at_nonce(
+        &self,
+        relayer_id: &RelayerId,
+        nonce: u64,
+        request: &RelayTransactionRequest,
+    ) -> Result<SendTransactionAtNonceResult, HttpError> {
+        let result = self
+            .app_state
+            .transactions_queues
+            .lock()
+            .await
+            .send_transaction_at_nonce(relayer_id, TransactionNonce::new(nonce), request)
+            .await?;
+
+        Ok(result)
+    }
+
+    /// Point-in-time RPC endpoint health for every configured network: per
+    /// endpoint the healthy flag, error rate, latency p50/p95, last observed tip,
+    /// lag behind the network's best tip and any active cooldown. Endpoint urls
+    /// are credential-redacted at the source - safe to log or display.
+    pub fn get_endpoint_health(&self) -> Vec<NetworkEndpointHealth> {
+        self.app_state
+            .evm_providers
+            .iter()
+            .map(|provider| NetworkEndpointHealth {
+                chain_id: provider.chain_id.u64(),
+                name: provider.name.clone(),
+                endpoints: provider.endpoint_health(),
+            })
+            .collect()
+    }
+
+    /// Derives the address the CURRENTLY configured signing provider produces
+    /// for a relayer's wallet index — what signing would actually use.
+    /// `None` when the relayer id is unknown. Embedders compare this against
+    /// the relayer's stored address to verify an imported relayer was created
+    /// under the same signing provider (a mismatch means simulations would
+    /// run as one address while signatures come from another key).
+    pub async fn get_relayer_derived_address(
+        &self,
+        relayer_id: &RelayerId,
+    ) -> Result<Option<EvmAddress>, HttpError> {
+        let relayer = get_relayer(&self.app_state.db, &self.app_state.cache, relayer_id).await?;
+        let Some(relayer) = relayer else {
+            return Ok(None);
+        };
+
+        let provider = find_provider_for_chain_id(&self.app_state.evm_providers, &relayer.chain_id)
+            .await
+            .ok_or(not_found("Could not find provider for the chain id".to_string()))?;
+
+        let address = provider
+            .derived_address(&relayer)
+            .await
+            .map_err(|e| bad_request(format!("Could not derive the relayer address: {e}")))?;
+
+        Ok(Some(address))
+    }
 }

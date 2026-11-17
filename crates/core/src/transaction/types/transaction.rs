@@ -31,8 +31,8 @@ pub enum TransactionConversionError {
 }
 
 use super::{
-    TransactionBlob, TransactionData, TransactionHash, TransactionId, TransactionNonce,
-    TransactionSpeed, TransactionStatus, TransactionValue,
+    GasPriceCeiling, GasPriceCeilingOutcome, TransactionBlob, TransactionData, TransactionHash,
+    TransactionId, TransactionNonce, TransactionSpeed, TransactionStatus, TransactionValue,
 };
 use crate::common_types::BlockNumber;
 use crate::{
@@ -119,6 +119,18 @@ pub struct Transaction {
     /// resolves to FAILED (instead of MINED/EXPIRED) carrying this reason.
     #[serde(rename = "failedReason", skip_serializing_if = "Option::is_none", default)]
     pub failed_reason: Option<String>,
+
+    /// Optional absolute per-transaction gas price ceiling honored on the initial send
+    /// and through the gas bump loop. Cleared when the transaction is converted to a
+    /// close-out no-op - the reserved nonce must always be consumable at market price.
+    #[serde(rename = "gasPriceCeiling", skip_serializing_if = "Option::is_none", default)]
+    pub gas_price_ceiling: Option<GasPriceCeiling>,
+
+    /// True once the gas price ceiling actually bound a bid (a bump was frozen, a bid
+    /// was clamped, or the first bid was refused). Lets callers distinguish "expired
+    /// because the ceiling held the price down" from a plain expiry.
+    #[serde(rename = "gasPriceCeilingHit", default)]
+    pub gas_price_ceiling_hit: bool,
 }
 
 impl Display for Transaction {
@@ -302,5 +314,150 @@ impl Transaction {
     /// * `bool` - True if the transaction has blob data
     pub fn is_blob_transaction(&self) -> bool {
         self.blobs.is_some()
+    }
+
+    /// Applies this transaction's gas price ceiling (if any) to a freshly computed bid,
+    /// clamping it in place for cap behavior and recording on the transaction when the
+    /// ceiling bound it (`gas_price_ceiling_hit`).
+    pub fn apply_gas_price_ceiling(
+        &mut self,
+        gas_price: &mut GasPriceResult,
+    ) -> GasPriceCeilingOutcome {
+        let Some(ceiling) = self.gas_price_ceiling else {
+            return GasPriceCeilingOutcome::WithinCeiling;
+        };
+
+        let outcome = ceiling.apply(gas_price, self.sent_with_gas.as_ref());
+        if outcome != GasPriceCeilingOutcome::WithinCeiling {
+            self.gas_price_ceiling_hit = true;
+        }
+
+        outcome
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod test_fixtures {
+    use chrono::Utc;
+
+    use super::*;
+    use crate::gas::{MaxFee, MaxPriorityFee};
+
+    /// Bare transaction for queue/ceiling unit tests - no database or network involved.
+    pub(crate) fn test_transaction(nonce: u64, status: TransactionStatus) -> Transaction {
+        Transaction {
+            id: TransactionId::new(),
+            relayer_id: RelayerId::new(),
+            to: EvmAddress::from(alloy::primitives::Address::ZERO),
+            from: EvmAddress::from(alloy::primitives::Address::repeat_byte(0x11)),
+            value: TransactionValue::zero(),
+            data: TransactionData::empty(),
+            nonce: TransactionNonce::new(nonce),
+            chain_id: ChainId::new(31337),
+            gas_limit: None,
+            status,
+            blobs: None,
+            known_transaction_hash: None,
+            queued_at: Utc::now(),
+            expires_at: Utc::now() + chrono::Duration::hours(1),
+            sent_at: None,
+            confirmed_at: None,
+            sent_with_gas: None,
+            sent_with_blob_gas: None,
+            mined_at: None,
+            mined_at_block_number: None,
+            speed: TransactionSpeed::FAST,
+            sent_with_max_priority_fee_per_gas: None,
+            sent_with_max_fee_per_gas: None,
+            is_noop: false,
+            external_id: None,
+            cancelled_by_transaction_id: None,
+            failed_reason: None,
+            gas_price_ceiling: None,
+            gas_price_ceiling_hit: false,
+        }
+    }
+
+    pub(crate) fn test_gas_price(max_fee: u128, max_priority_fee: u128) -> GasPriceResult {
+        GasPriceResult {
+            max_fee: MaxFee::new(max_fee),
+            max_priority_fee: MaxPriorityFee::new(max_priority_fee),
+            min_wait_time_estimate: None,
+            max_wait_time_estimate: None,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::test_fixtures::{test_gas_price, test_transaction};
+    use super::*;
+    use crate::gas::GasPrice;
+    use crate::transaction::types::GasPriceCeilingBehavior;
+
+    fn ceiling(max_price: u128, behavior: GasPriceCeilingBehavior) -> GasPriceCeiling {
+        GasPriceCeiling { max_price: GasPrice::new(max_price), behavior }
+    }
+
+    #[test]
+    fn apply_gas_price_ceiling_without_a_ceiling_is_a_noop() {
+        let mut transaction = test_transaction(0, TransactionStatus::PENDING);
+        let mut bid = test_gas_price(120, 10);
+
+        let outcome = transaction.apply_gas_price_ceiling(&mut bid);
+
+        assert_eq!(outcome, GasPriceCeilingOutcome::WithinCeiling);
+        assert!(!transaction.gas_price_ceiling_hit);
+        assert_eq!(bid.max_fee.into_u128(), 120);
+    }
+
+    #[test]
+    fn ceiling_hit_stays_false_while_bids_are_within_the_ceiling() {
+        let mut transaction = test_transaction(0, TransactionStatus::PENDING);
+        transaction.gas_price_ceiling = Some(ceiling(100, GasPriceCeilingBehavior::Freeze));
+        let mut bid = test_gas_price(90, 5);
+
+        let outcome = transaction.apply_gas_price_ceiling(&mut bid);
+
+        assert_eq!(outcome, GasPriceCeilingOutcome::WithinCeiling);
+        assert!(!transaction.gas_price_ceiling_hit);
+    }
+
+    #[test]
+    fn ceiling_hit_is_recorded_when_freeze_blocks_a_bump() {
+        let mut transaction = test_transaction(0, TransactionStatus::INMEMPOOL);
+        transaction.gas_price_ceiling = Some(ceiling(100, GasPriceCeilingBehavior::Freeze));
+        transaction.sent_with_gas = Some(test_gas_price(95, 5));
+        let mut bid = test_gas_price(120, 10);
+
+        let outcome = transaction.apply_gas_price_ceiling(&mut bid);
+
+        assert_eq!(outcome, GasPriceCeilingOutcome::BlockedByCeiling);
+        assert!(transaction.gas_price_ceiling_hit);
+    }
+
+    #[test]
+    fn ceiling_hit_is_recorded_when_cap_clamps_a_bid() {
+        let mut transaction = test_transaction(0, TransactionStatus::INMEMPOOL);
+        transaction.gas_price_ceiling = Some(ceiling(100, GasPriceCeilingBehavior::Cap));
+        transaction.sent_with_gas = Some(test_gas_price(95, 5));
+        let mut bid = test_gas_price(120, 10);
+
+        let outcome = transaction.apply_gas_price_ceiling(&mut bid);
+
+        assert_eq!(outcome, GasPriceCeilingOutcome::ClampedToCeiling);
+        assert!(transaction.gas_price_ceiling_hit);
+        assert_eq!(bid.max_fee.into_u128(), 100);
+    }
+
+    #[test]
+    fn ceiling_hit_is_surfaced_in_the_serialized_transaction() {
+        let mut transaction = test_transaction(0, TransactionStatus::EXPIRED);
+        transaction.gas_price_ceiling_hit = true;
+
+        let serialized =
+            serde_json::to_value(&transaction).expect("transaction should serialize to json");
+
+        assert_eq!(serialized["gasPriceCeilingHit"], serde_json::Value::Bool(true));
     }
 }

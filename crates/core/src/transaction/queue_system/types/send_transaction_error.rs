@@ -20,6 +20,13 @@ pub enum TransactionQueueSendTransactionError {
     #[error("Gas price too high")]
     GasPriceTooHigh,
 
+    /// The transaction's per-transaction gas price ceiling blocked this bid: freeze
+    /// semantics refused to go above the ceiling, or cap already has the ceiling bid
+    /// live in the mempool. Nothing was broadcast - the last compliant bid (if any)
+    /// stays live and the normal expiry machinery applies.
+    #[error("Gas price ceiling reached")]
+    GasPriceCeilingReached,
+
     #[error("Gas calculation error")]
     GasCalculationError,
 

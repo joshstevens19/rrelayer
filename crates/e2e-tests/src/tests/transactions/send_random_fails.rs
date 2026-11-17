@@ -26,6 +26,8 @@ impl TestRunner {
             speed: Some(TransactionSpeed::FAST),
             external_id: Some("send-random-fails".to_string()),
             blobs: None,
+            gas_price_ceiling: None,
+            expires_in_seconds: None,
         };
 
         let relayer_client = self

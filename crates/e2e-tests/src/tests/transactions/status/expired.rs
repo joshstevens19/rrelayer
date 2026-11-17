@@ -54,6 +54,8 @@ impl TestRunner {
             speed: Some(TransactionSpeed::FAST),
             external_id: Some("test-expired".to_string()),
             blobs: None,
+            gas_price_ceiling: None,
+            expires_in_seconds: None,
         };
 
         let send_result = relayer
@@ -105,6 +107,8 @@ impl TestRunner {
                     speed: Some(TransactionSpeed::FAST),
                     external_id: Some("test-expired-continuity".to_string()),
                     blobs: None,
+                    gas_price_ceiling: None,
+                    expires_in_seconds: None,
                 };
                 let continuity_tx = relayer
                     .transaction()

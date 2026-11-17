@@ -24,19 +24,25 @@ pub enum TransactionsQueuesError {
 
 use super::{
     start::spawn_processing_tasks_for_relayer,
-    transactions_queue::{classify_send_error, SendErrorClass, TransactionsQueue},
+    transactions_queue::{
+        classify_send_error, InflightNonceHolder, SendErrorClass, TransactionsQueue,
+    },
     types::{
         AddTransactionError, CancelTransactionError, CancelTransactionResult, CompetitionType,
         EditableTransactionType, ProcessInmempoolStatus, ProcessInmempoolTransactionError,
         ProcessMinedStatus, ProcessMinedTransactionError, ProcessPendingStatus,
         ProcessPendingTransactionError, ProcessResult, ReplaceTransactionError,
-        ReplaceTransactionResult, TransactionRelayerSetup, TransactionSentWithRelayer,
-        TransactionToSend, TransactionsQueueSetup,
+        ReplaceTransactionResult, SendTransactionAtNonceError, SendTransactionAtNonceResult,
+        TransactionRelayerSetup, TransactionSentWithRelayer, TransactionToSend,
+        TransactionsQueueSetup,
     },
 };
 use crate::transaction::api::RelayTransactionRequest;
 use crate::transaction::queue_system::types::SendTransactionGasPriceError;
-use crate::transaction::types::{TransactionBlob, TransactionConversionError, TransactionSpeed};
+use crate::transaction::types::{
+    GasPriceCeilingOutcome, TransactionBlob, TransactionConversionError, TransactionNonce,
+    TransactionSpeed,
+};
 use crate::{
     gas::{
         BlobGasOracleCache, BlobGasPriceResult, GasLimit, GasOracleCache, GasPriceResult, MaxFee,
@@ -78,6 +84,65 @@ fn bump_max_priority_fee_for_same_nonce_competitor(
     max_priority_fee: MaxPriorityFee,
 ) -> MaxPriorityFee {
     MaxPriorityFee::new(bump_u128_for_same_nonce_competitor(max_priority_fee.into_u128()))
+}
+
+/// True when a send-at-nonce payload is the canonical cancel shape - a value-0
+/// self-send with no calldata and no blobs - and should clear the nonce through the
+/// cancel machinery rather than replace it.
+fn is_cancel_shaped(request: &RelayTransactionRequest, relayer_address: &EvmAddress) -> bool {
+    request.to == *relayer_address
+        && request.value.is_zero()
+        && request.data == TransactionData::empty()
+        && request.blobs.as_ref().is_none_or(|blobs| blobs.is_empty())
+}
+
+/// Resolves the expiry window for a transaction: the operator's global expiration
+/// unless the request carries a SHORTER per-transaction expiry. The global setting
+/// stays the operator ceiling - a per-transaction value can only tighten the window,
+/// never extend it (longer or unrepresentable values clamp to the global window).
+fn resolve_expiry_duration(
+    global_expiration: chrono::Duration,
+    expires_in_seconds: Option<u64>,
+) -> chrono::Duration {
+    let Some(seconds) = expires_in_seconds else {
+        return global_expiration;
+    };
+
+    let per_transaction = i64::try_from(seconds).ok().and_then(chrono::Duration::try_seconds);
+
+    match per_transaction {
+        Some(duration) if duration < global_expiration => duration,
+        _ => global_expiration,
+    }
+}
+
+/// Guard rails for send-at-nonce: the nonce must still be in flight (not yet consumed
+/// on chain) and held by a transaction a same-nonce replacement can act on. Returns
+/// the holder to replace.
+fn validate_exact_nonce_target(
+    relayer_id: &RelayerId,
+    nonce: TransactionNonce,
+    onchain_nonce: TransactionNonce,
+    holder: InflightNonceHolder,
+) -> Result<Transaction, SendTransactionAtNonceError> {
+    if nonce.into_inner() < onchain_nonce.into_inner() {
+        return Err(SendTransactionAtNonceError::NonceAlreadyUsedOnchain(
+            nonce,
+            *relayer_id,
+            onchain_nonce,
+        ));
+    }
+
+    match holder {
+        InflightNonceHolder::Pending(transaction)
+        | InflightNonceHolder::InmempoolHead(transaction) => Ok(transaction),
+        InflightNonceHolder::InmempoolBehindHead(_) => {
+            Err(SendTransactionAtNonceError::NonceBehindInmempoolHead(nonce, *relayer_id))
+        }
+        InflightNonceHolder::NotFound => {
+            Err(SendTransactionAtNonceError::NonceNotPending(nonce, *relayer_id))
+        }
+    }
 }
 
 /// Container for managing multiple transaction queues across different relayers.
@@ -231,52 +296,56 @@ impl TransactionsQueues {
         Ok(())
     }
 
-    fn expires_at(&self) -> DateTime<Utc> {
-        let expiration = std::env::var("RRELAYER_TRANSACTION_EXPIRATION_SECONDS")
+    /// The operator-wide expiration window: RRELAYER_TRANSACTION_EXPIRATION_SECONDS,
+    /// defaulting to 12 hours. This is the CEILING for every transaction - a
+    /// per-transaction expiry can only tighten it.
+    fn global_expiration() -> chrono::Duration {
+        std::env::var("RRELAYER_TRANSACTION_EXPIRATION_SECONDS")
             .ok()
             .and_then(|value| value.parse::<i64>().ok())
             .filter(|seconds| *seconds > 0)
             // try_seconds guards against values chrono::Duration::seconds would panic on
             .and_then(chrono::Duration::try_seconds)
-            .unwrap_or_else(|| chrono::Duration::hours(12));
-
-        Utc::now() + expiration
+            .unwrap_or_else(|| chrono::Duration::hours(12))
     }
 
-    /// Replaces the content of an existing transaction with new parameters.
-    fn transaction_replace(
+    /// Deadline for a transaction queued now: the global expiration unless the request
+    /// carries a shorter per-transaction expiry.
+    fn expires_at(&self, expires_in_seconds: Option<u64>) -> DateTime<Utc> {
+        Utc::now() + resolve_expiry_duration(Self::global_expiration(), expires_in_seconds)
+    }
+
+    /// True when some other transaction for this relayer already owns `external_id`.
+    /// `except_id` is the row being updated in place (a pending replace keeps its id).
+    async fn external_id_conflicts(
         &self,
-        current_transaction: &mut Transaction,
-        replace_with: &RelayTransactionRequest,
-    ) -> Result<(), ReplaceTransactionError> {
-        let blobs = replace_with
-            .blobs
-            .as_ref()
-            .map(|blob_strings| {
-                blob_strings
-                    .iter()
-                    .map(|blob_hex| TransactionBlob::from_hex(blob_hex))
-                    .collect::<Result<Vec<_>, _>>()
-            })
-            .transpose()
-            .map_err(|e| {
-                ReplaceTransactionError::SendTransactionError(
-                    TransactionQueueSendTransactionError::TransactionConversionError(format!(
-                        "Failed to convert blob hex strings to TransactionBlob: {}",
-                        e
-                    )),
-                )
-            })?;
+        relayer_id: &RelayerId,
+        external_id: &str,
+        except_id: Option<&TransactionId>,
+    ) -> Result<bool, crate::postgres::PostgresError> {
+        match self.db.get_transaction_by_relayer_and_external_id(relayer_id, external_id).await? {
+            Some(existing) => Ok(except_id != Some(&existing.id)),
+            None => Ok(false),
+        }
+    }
 
-        current_transaction.to = replace_with.to;
-        current_transaction.data = replace_with.data.clone();
-        current_transaction.value = replace_with.value;
-        current_transaction.is_noop = current_transaction.from == current_transaction.to;
-        current_transaction.blobs = blobs;
-        current_transaction.gas_limit = None;
-        current_transaction.external_id = replace_with.external_id.clone();
-
-        Ok(())
+    /// External id for a same-nonce cancel/replace row when the caller did not
+    /// supply one. The first attempt keeps the historical `{prefix}_{original}`
+    /// form; a retry (that id is already stored) appends the new transaction id
+    /// so the unique index does not reject the second competitor.
+    async fn generated_competitor_external_id(
+        &self,
+        prefix: &str,
+        relayer_id: &RelayerId,
+        original_id: &TransactionId,
+        new_id: &TransactionId,
+    ) -> Result<String, crate::postgres::PostgresError> {
+        let generated = format!("{prefix}_{original_id}");
+        if self.external_id_conflicts(relayer_id, &generated, None).await? {
+            Ok(format!("{prefix}_{original_id}_{new_id}"))
+        } else {
+            Ok(generated)
+        }
     }
 
     /// Computes gas prices for a transaction based on its type.
@@ -382,7 +451,7 @@ impl TransactionsQueues {
         relayer_id: &RelayerId,
         transaction_to_send: &TransactionToSend,
     ) -> Result<Transaction, AddTransactionError> {
-        let expires_at = self.expires_at();
+        let expires_at = self.expires_at(transaction_to_send.expires_in_seconds);
 
         let queue_arc = self
             .get_transactions_queue(relayer_id)
@@ -400,6 +469,26 @@ impl TransactionsQueues {
                 message: "EIP-4844 blob transactions are not supported by this wallet manager"
                     .to_string(),
             });
+        }
+
+        // Reject duplicate external ids before a nonce is reserved: the unique index
+        // (idx_transaction_relayer_external_id) is the authoritative guard on save, but by
+        // then the nonce manager has already been incremented and the rejected transaction
+        // would strand its reserved nonce. The per-relayer queue lock is held here, so the
+        // check cannot race other inserts for this relayer within this process.
+        if let Some(external_id) = &transaction_to_send.external_id {
+            let existing = self
+                .db
+                .get_transaction_by_relayer_and_external_id(relayer_id, external_id)
+                .await
+                .map_err(AddTransactionError::CouldNotReadExternalIdFromDb)?;
+
+            if existing.is_some() {
+                return Err(AddTransactionError::DuplicateExternalId(
+                    *relayer_id,
+                    external_id.clone(),
+                ));
+            }
         }
 
         // Sync nonce manager with on-chain nonce to ensure consistency
@@ -438,14 +527,30 @@ impl TransactionsQueues {
             external_id: transaction_to_send.external_id.clone(),
             cancelled_by_transaction_id: None,
             failed_reason: None,
+            gas_price_ceiling: transaction_to_send.gas_price_ceiling,
+            gas_price_ceiling_hit: false,
         };
 
-        let (gas_price, blob_gas_price) = Self::compute_transaction_gas_prices(
+        let (mut gas_price, blob_gas_price) = Self::compute_transaction_gas_prices(
             &transactions_queue,
             &transaction,
             &transaction_to_send.speed,
         )
         .await?;
+
+        // Honest first-bid handling for the per-transaction gas price ceiling: freeze
+        // rejects a request whose first market bid is already above the ceiling
+        // (queueing it would only park a nonce we are not willing to bid), while cap
+        // clamps the estimation bid exactly like the send path will.
+        if transaction.apply_gas_price_ceiling(&mut gas_price)
+            == GasPriceCeilingOutcome::BlockedByCeiling
+        {
+            return Err(AddTransactionError::GasPriceCeilingBelowMarket(
+                *relayer_id,
+                gas_price.max_fee,
+            ));
+        }
+        let gas_price = gas_price;
 
         let estimated_gas_limit = Self::estimate_and_validate_gas(
             &mut transactions_queue,
@@ -491,10 +596,22 @@ impl TransactionsQueues {
         transaction.known_transaction_hash =
             Some(transactions_queue.compute_tx_hash(&transaction_request).await?);
 
-        self.db
-            .save_transaction(relayer_id, &transaction)
-            .await
-            .map_err(AddTransactionError::CouldNotSaveTransactionDb)?;
+        if let Err(error) = self.db.save_transaction(relayer_id, &transaction).await {
+            // The nonce was reserved before the insert. The row was not saved and
+            // was not queued, so leaving the manager incremented would skip this
+            // nonce forever and wedge every later send. The queue lock is held,
+            // so nothing else in this process has taken the next nonce.
+            transactions_queue.nonce_manager.rollback_increment(assigned_nonce).await;
+
+            if error.is_unique_violation_on("idx_transaction_relayer_external_id") {
+                return Err(AddTransactionError::DuplicateExternalId(
+                    *relayer_id,
+                    transaction.external_id.clone().unwrap_or_default(),
+                ));
+            }
+
+            return Err(AddTransactionError::CouldNotSaveTransactionDb(error));
+        }
 
         transactions_queue.add_pending_transaction(transaction.clone()).await;
         self.invalidate_transaction_cache(&transaction.id).await;
@@ -571,7 +688,16 @@ impl TransactionsQueues {
                     }
                     EditableTransactionType::Inmempool => {
                         let cancel_transaction_id = TransactionId::new();
-                        let expires_at = self.expires_at();
+                        let expires_at = self.expires_at(None);
+                        let external_id = self
+                            .generated_competitor_external_id(
+                                "cancel",
+                                &transaction.relayer_id,
+                                &transaction.id,
+                                &cancel_transaction_id,
+                            )
+                            .await
+                            .map_err(CancelTransactionError::CouldNotUpdateTransactionDb)?;
 
                         let mut cancel_transaction = Transaction {
                             id: cancel_transaction_id,
@@ -601,9 +727,12 @@ impl TransactionsQueues {
                             is_noop: true,
                             sent_with_gas: None,
                             sent_with_blob_gas: None,
-                            external_id: Some(format!("cancel_{}", transaction.id)),
+                            external_id: Some(external_id),
                             cancelled_by_transaction_id: None,
                             failed_reason: None,
+                            // A cancel must be able to outbid the original - never ceiling it
+                            gas_price_ceiling: None,
+                            gas_price_ceiling_hit: false,
                         };
 
                         info!("cancel_transaction: creating higher gas cancel transaction for inmempool tx with same nonce {:?}", cancel_transaction.nonce);
@@ -781,12 +910,91 @@ impl TransactionsQueues {
                 match result.type_name {
                     EditableTransactionType::Pending => {
                         let original_transaction = result.transaction.clone();
-                        self.transaction_replace(&mut result.transaction, replace_with)?;
+
+                        // Reject a colliding external id before the queue entry is
+                        // rewritten. The same id on this row is an in-place update.
+                        if let Some(external_id) = &replace_with.external_id {
+                            let conflicts = self
+                                .external_id_conflicts(
+                                    &transaction.relayer_id,
+                                    external_id,
+                                    Some(&transaction.id),
+                                )
+                                .await
+                                .map_err(ReplaceTransactionError::CouldNotUpdateTransactionInDb)?;
+                            if conflicts {
+                                return Err(ReplaceTransactionError::DuplicateExternalId(
+                                    transaction.relayer_id,
+                                    external_id.clone(),
+                                ));
+                            }
+                        }
+
+                        // Swap the payload in the queue entry itself - editing only the
+                        // looked-up clone would leave the ORIGINAL payload queued for
+                        // broadcast while reporting success. A replacement declaring its
+                        // own expiry gets a fresh deadline from now (still clamped to
+                        // the global window); otherwise the slot keeps its deadline.
+                        let new_expires_at = replace_with
+                            .expires_in_seconds
+                            .map(|_| self.expires_at(replace_with.expires_in_seconds));
+                        let updated_transaction = match transactions_queue
+                            .replace_pending_transaction_payload(
+                                &transaction.id,
+                                replace_with,
+                                new_expires_at,
+                            )
+                            .await
+                        {
+                            Ok(Some(updated)) => updated,
+                            Ok(None) => {
+                                // Left the pending queue between lookup and edit
+                                return Ok(ReplaceTransactionResult::failed());
+                            }
+                            Err(message) => {
+                                return Err(ReplaceTransactionError::SendTransactionError(
+                                    TransactionQueueSendTransactionError::TransactionConversionError(
+                                        message,
+                                    ),
+                                ));
+                            }
+                        };
+
+                        if let Err(db_error) =
+                            self.db.transaction_update(&updated_transaction).await
+                        {
+                            // The queue already carries the replacement. Put the original
+                            // back so a rejected write cannot broadcast a payload the
+                            // database refused.
+                            if !transactions_queue
+                                .update_pending_transaction(original_transaction.clone())
+                                .await
+                            {
+                                error!(
+                                    "replace_transaction: failed to restore pending transaction {} after a rejected save: {}",
+                                    transaction.id, db_error
+                                );
+                            }
+
+                            if db_error
+                                .is_unique_violation_on("idx_transaction_relayer_external_id")
+                            {
+                                return Err(ReplaceTransactionError::DuplicateExternalId(
+                                    transaction.relayer_id,
+                                    updated_transaction.external_id.clone().unwrap_or_default(),
+                                ));
+                            }
+
+                            return Err(ReplaceTransactionError::CouldNotUpdateTransactionInDb(
+                                db_error,
+                            ));
+                        }
+
                         self.invalidate_transaction_cache(&transaction.id).await;
 
                         if let Some(webhook_manager) = &self.webhook_manager {
                             let webhook_manager = webhook_manager.clone();
-                            let new_transaction = result.transaction.clone();
+                            let new_transaction = updated_transaction.clone();
                             let original_transaction_clone = original_transaction.clone();
                             tokio::spawn(async move {
                                 let webhook_manager = webhook_manager.lock().await;
@@ -801,13 +1009,37 @@ impl TransactionsQueues {
 
                         Ok(ReplaceTransactionResult {
                             success: true,
-                            replace_transaction_id: Some(result.transaction.id),
-                            replace_transaction_hash: result.transaction.known_transaction_hash,
+                            replace_transaction_id: Some(updated_transaction.id),
+                            // The precomputed hash belonged to the old payload; the real
+                            // hash exists once the replacement broadcasts
+                            replace_transaction_hash: updated_transaction.known_transaction_hash,
                         })
                     }
                     EditableTransactionType::Inmempool => {
                         let replace_transaction_id = TransactionId::new();
-                        let expires_at = self.expires_at();
+                        let expires_at = self.expires_at(replace_with.expires_in_seconds);
+                        let external_id = if let Some(requested) = &replace_with.external_id {
+                            let conflicts = self
+                                .external_id_conflicts(&transaction.relayer_id, requested, None)
+                                .await
+                                .map_err(ReplaceTransactionError::CouldNotUpdateTransactionInDb)?;
+                            if conflicts {
+                                return Err(ReplaceTransactionError::DuplicateExternalId(
+                                    transaction.relayer_id,
+                                    requested.clone(),
+                                ));
+                            }
+                            requested.clone()
+                        } else {
+                            self.generated_competitor_external_id(
+                                "replace",
+                                &transaction.relayer_id,
+                                &transaction.id,
+                                &replace_transaction_id,
+                            )
+                            .await
+                            .map_err(ReplaceTransactionError::CouldNotUpdateTransactionInDb)?
+                        };
 
                         let mut replace_transaction = Transaction {
                             id: replace_transaction_id,
@@ -851,12 +1083,11 @@ impl TransactionsQueues {
                             is_noop: false,
                             sent_with_gas: None,
                             sent_with_blob_gas: None,
-                            external_id: replace_with
-                                .external_id
-                                .clone()
-                                .or_else(|| Some(format!("replace_{}", transaction.id))),
+                            external_id: Some(external_id),
                             cancelled_by_transaction_id: None,
                             failed_reason: None,
+                            gas_price_ceiling: replace_with.gas_price_ceiling,
+                            gas_price_ceiling_hit: false,
                         };
 
                         info!("replace_transaction: creating competitive replace transaction for inmempool tx with same nonce {:?}", replace_transaction.nonce);
@@ -965,6 +1196,27 @@ impl TransactionsQueues {
                         replace_transaction.known_transaction_hash = Some(transaction_sent.hash);
                         replace_transaction.sent_at = Some(Utc::now());
 
+                        // Persist before the queue adopts the competitor. A unique-index
+                        // rejection (or any other save failure) must not leave an
+                        // unpersisted transaction as the active same-nonce bid.
+                        if let Err(db_error) = self
+                            .db
+                            .save_transaction(&transaction.relayer_id, &replace_transaction)
+                            .await
+                        {
+                            if db_error
+                                .is_unique_violation_on("idx_transaction_relayer_external_id")
+                            {
+                                return Err(ReplaceTransactionError::DuplicateExternalId(
+                                    transaction.relayer_id,
+                                    replace_transaction.external_id.clone().unwrap_or_default(),
+                                ));
+                            }
+                            return Err(ReplaceTransactionError::CouldNotUpdateTransactionInDb(
+                                db_error,
+                            ));
+                        }
+
                         transactions_queue
                             .add_competitor_to_inmempool_transaction(
                                 &transaction.id,
@@ -973,11 +1225,6 @@ impl TransactionsQueues {
                             )
                             .await
                             .map_err(ReplaceTransactionError::SendTransactionError)?;
-
-                        self.db
-                            .save_transaction(&transaction.relayer_id, &replace_transaction)
-                            .await
-                            .map_err(ReplaceTransactionError::CouldNotUpdateTransactionInDb)?;
 
                         result.transaction.cancelled_by_transaction_id =
                             Some(replace_transaction_id);
@@ -1023,6 +1270,87 @@ impl TransactionsQueues {
         }
     }
 
+    /// Submits a transaction at an explicit nonce already held by an in-flight
+    /// transaction for the relayer, bypassing nonce allocation - the break-glass
+    /// primitive for clearing a wedged nonce. A value-0 self-send with empty calldata
+    /// goes through the cancel machinery (the holder resolves CANCELLED); any other
+    /// payload goes through the replace machinery (the holder resolves REPLACED).
+    /// Both bid a competitive fee above the holder's live bid and are signed,
+    /// broadcast and tracked exactly like any other transaction.
+    ///
+    /// Guard rails: nonces below the relayer's current on-chain nonce are rejected
+    /// (already consumed), as are nonces not held by an in-flight transaction -
+    /// out-of-band broadcasts the queue is not tracking cannot be targeted. Inmempool
+    /// nonces queued behind the head are rejected too: nonces resolve in order, so
+    /// only the head can be wedging the relayer.
+    pub async fn send_transaction_at_nonce(
+        &mut self,
+        relayer_id: &RelayerId,
+        nonce: TransactionNonce,
+        replace_with: &RelayTransactionRequest,
+    ) -> Result<SendTransactionAtNonceResult, SendTransactionAtNonceError> {
+        let queue_arc = self
+            .get_transactions_queue(relayer_id)
+            .ok_or(SendTransactionAtNonceError::RelayerNotFound(*relayer_id))?;
+
+        // Read everything needed under the queue lock, then drop it - the cancel and
+        // replace paths below re-take it themselves.
+        let (relayer_address, onchain_nonce, holder) = {
+            let transactions_queue = queue_arc.lock().await;
+
+            if transactions_queue.is_paused() {
+                return Err(SendTransactionAtNonceError::RelayerIsPaused(*relayer_id));
+            }
+
+            // The MINED nonce (`latest` tag): the `pending` tag counts this
+            // relayer's own broadcast-but-unmined transactions, which would make
+            // every INMEMPOOL holder look "already used on chain" and refuse the
+            // exact replace/cancel this endpoint exists for.
+            let onchain_nonce = transactions_queue.get_mined_nonce().await.map_err(|e| {
+                SendTransactionAtNonceError::CouldNotGetCurrentOnChainNonce(*relayer_id, e)
+            })?;
+
+            (
+                transactions_queue.relay_address(),
+                onchain_nonce,
+                transactions_queue.find_inflight_transaction_by_nonce(&nonce).await,
+            )
+        };
+
+        let holder = validate_exact_nonce_target(relayer_id, nonce, onchain_nonce, holder)?;
+
+        info!(
+            "send_transaction_at_nonce: replacing transaction {} holding nonce {} for relayer {}",
+            holder.id,
+            nonce.into_inner(),
+            relayer_id
+        );
+
+        if is_cancel_shaped(replace_with, &relayer_address) {
+            let result = self.cancel_transaction(&holder).await?;
+            if !result.success {
+                return Err(SendTransactionAtNonceError::HolderNoLongerInFlight(nonce));
+            }
+
+            Ok(SendTransactionAtNonceResult {
+                replaced_transaction_id: holder.id,
+                transaction_id: result.cancel_transaction_id.unwrap_or(holder.id),
+                hash: None,
+            })
+        } else {
+            let result = self.replace_transaction(&holder, replace_with).await?;
+            if !result.success {
+                return Err(SendTransactionAtNonceError::HolderNoLongerInFlight(nonce));
+            }
+
+            Ok(SendTransactionAtNonceResult {
+                replaced_transaction_id: holder.id,
+                transaction_id: result.replace_transaction_id.unwrap_or(holder.id),
+                hash: result.replace_transaction_hash,
+            })
+        }
+    }
+
     async fn recover_nonce_synchronization(
         &mut self,
         relayer_id: &RelayerId,
@@ -1062,6 +1390,7 @@ impl TransactionsQueues {
     /// dropping it would strand the nonce and wedge every transaction queued behind it.
     /// The DB row stays PENDING (with failed_reason set) so a crash before the no-op
     /// mines still rehydrates it; the no-op's receipt then resolves the status to FAILED.
+    #[allow(clippy::result_large_err)]
     async fn close_out_pending_transaction_as_noop(
         &mut self,
         transactions_queue: &mut TransactionsQueue,
@@ -1126,6 +1455,7 @@ impl TransactionsQueues {
     /// Moves it into the inmempool queue under the mined hash so normal receipt
     /// resolution completes it - reassigning a fresh nonce here would broadcast the
     /// payload a second time.
+    #[allow(clippy::result_large_err)]
     async fn resolve_pending_transaction_mined(
         &mut self,
         relayer_id: &RelayerId,
@@ -1201,6 +1531,7 @@ impl TransactionsQueues {
         ))
     }
 
+    #[allow(clippy::result_large_err)]
     pub async fn process_single_pending(
         &mut self,
         relayer_id: &RelayerId,
@@ -1256,6 +1587,18 @@ impl TransactionsQueues {
                                 Ok(ProcessResult::<ProcessPendingStatus>::other(
                                     ProcessPendingStatus::GasPriceTooHigh,
                                     self.relayer_block_times_ms.get(relayer_id), // gas to high check back on the next block - do not do the / 10 part
+                                ))
+                            }
+                            TransactionQueueSendTransactionError::GasPriceCeilingReached => {
+                                // Freeze semantics on the first bid: never broadcast above
+                                // the per-transaction ceiling. The nonce is reserved, so
+                                // stay queued and re-check next block; if the market never
+                                // comes back down the transaction expires through the
+                                // normal no-op machinery with gas_price_ceiling_hit set.
+                                self.invalidate_transaction_cache(&transaction.id).await;
+                                Ok(ProcessResult::<ProcessPendingStatus>::other(
+                                    ProcessPendingStatus::GasPriceCeilingReached,
+                                    self.relayer_block_times_ms.get(relayer_id),
                                 ))
                             }
                             TransactionQueueSendTransactionError::GasCalculationError => {
@@ -1525,6 +1868,7 @@ impl TransactionsQueues {
     }
 
     /// Processes a single in-mempool transaction for the specified relayer.
+    #[allow(clippy::result_large_err)]
     pub async fn process_single_inmempool(
         &mut self,
         relayer_id: &RelayerId,
@@ -1689,6 +2033,21 @@ impl TransactionsQueues {
                                         .await
                                     {
                                         Ok(tx_sent) => tx_sent,
+                                        Err(TransactionQueueSendTransactionError::GasPriceCeilingReached) => {
+                                            // The per-transaction ceiling bound this bump
+                                            // (freeze keeps the last compliant bid live; cap is
+                                            // already bidding exactly the ceiling). Leave the
+                                            // live bid to race until it mines or expires.
+                                            info!(
+                                                "Transaction {} gas price ceiling reached during bump for relayer: {} - keeping current bid",
+                                                transaction.id, transactions_queue.relayer_name()
+                                            );
+                                            self.invalidate_transaction_cache(&transaction.id).await;
+                                            return Ok(ProcessResult::<ProcessInmempoolStatus>::other(
+                                                ProcessInmempoolStatus::StillInmempool,
+                                                self.relayer_block_times_ms.get(relayer_id),
+                                            ));
+                                        }
                                         Err(TransactionQueueSendTransactionError::TransactionSendError(error)) => {
                                             let error_msg = error.to_string().to_lowercase();
                                             let error_class = classify_send_error(&error_msg);
@@ -1858,6 +2217,7 @@ impl TransactionsQueues {
     }
 
     /// Processes a single mined transaction for the specified relayer.
+    #[allow(clippy::result_large_err)]
     pub async fn process_single_mined(
         &mut self,
         relayer_id: &RelayerId,
@@ -1969,5 +2329,203 @@ impl TransactionsQueues {
         } else {
             Err(ProcessMinedTransactionError::RelayerTransactionsQueueNotFound(*relayer_id))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SendTransactionAtNonceError;
+    use super::{
+        is_cancel_shaped, resolve_expiry_duration, validate_exact_nonce_target, InflightNonceHolder,
+    };
+    use crate::relayer::RelayerId;
+    use crate::shared::common_types::EvmAddress;
+    use crate::transaction::api::RelayTransactionRequest;
+    use crate::transaction::types::{
+        test_fixtures::test_transaction, TransactionData, TransactionNonce, TransactionStatus,
+        TransactionValue,
+    };
+
+    fn relayer_address() -> EvmAddress {
+        EvmAddress::from(alloy::primitives::Address::repeat_byte(0x11))
+    }
+
+    fn request(to: EvmAddress, value: u128, data: TransactionData) -> RelayTransactionRequest {
+        RelayTransactionRequest {
+            to,
+            value: TransactionValue::new(alloy::primitives::U256::from(value)),
+            data,
+            speed: None,
+            external_id: None,
+            blobs: None,
+            gas_price_ceiling: None,
+            expires_in_seconds: None,
+        }
+    }
+
+    #[test]
+    fn a_value_zero_self_send_with_no_calldata_is_cancel_shaped() {
+        let address = relayer_address();
+        assert!(is_cancel_shaped(&request(address, 0, TransactionData::empty()), &address));
+
+        let mut with_empty_blobs = request(address, 0, TransactionData::empty());
+        with_empty_blobs.blobs = Some(vec![]);
+        assert!(is_cancel_shaped(&with_empty_blobs, &address));
+    }
+
+    #[test]
+    fn other_payloads_are_not_cancel_shaped() {
+        let address = relayer_address();
+        let other = EvmAddress::from(alloy::primitives::Address::repeat_byte(0x22));
+
+        // Not a self-send
+        assert!(!is_cancel_shaped(&request(other, 0, TransactionData::empty()), &address));
+        // Carries value
+        assert!(!is_cancel_shaped(&request(address, 1, TransactionData::empty()), &address));
+        // Carries calldata
+        assert!(!is_cancel_shaped(
+            &request(address, 0, TransactionData::new(vec![0x01].into())),
+            &address
+        ));
+        // Carries blobs
+        let mut with_blobs = request(address, 0, TransactionData::empty());
+        with_blobs.blobs = Some(vec!["0x01".to_string()]);
+        assert!(!is_cancel_shaped(&with_blobs, &address));
+    }
+
+    #[test]
+    fn exact_nonce_send_rejects_nonces_already_used_on_chain() {
+        let relayer_id = RelayerId::new();
+        let holder = test_transaction(4, TransactionStatus::INMEMPOOL);
+
+        let result = validate_exact_nonce_target(
+            &relayer_id,
+            TransactionNonce::new(4),
+            TransactionNonce::new(5),
+            InflightNonceHolder::InmempoolHead(holder),
+        );
+
+        assert!(matches!(
+            result,
+            Err(SendTransactionAtNonceError::NonceAlreadyUsedOnchain(_, _, _))
+        ));
+    }
+
+    // Regression test: the guard must compare against the MINED (latest-tag) nonce.
+    // The pending tag counts the relayer's own broadcast-but-unmined transactions -
+    // it reads N+1 for an inmempool holder at nonce N, which made every exact-nonce
+    // cancel/replace of a stuck broadcast trip NonceAlreadyUsedOnchain.
+    #[test]
+    fn exact_nonce_send_allows_replacing_a_broadcast_but_unmined_holder() {
+        let relayer_id = RelayerId::new();
+
+        // Broadcast but unmined: the mined nonce is still 7 (the pending-tag nonce
+        // would already read 8 and wrongly reject the holder)
+        let holder = test_transaction(7, TransactionStatus::INMEMPOOL);
+        let resolved = validate_exact_nonce_target(
+            &relayer_id,
+            TransactionNonce::new(7),
+            TransactionNonce::new(7),
+            InflightNonceHolder::InmempoolHead(holder.clone()),
+        )
+        .expect("a broadcast-but-unmined holder must stay replaceable at its nonce");
+        assert_eq!(resolved.id, holder.id);
+
+        // Genuinely mined past the nonce: the mined nonce moved to 8, the slot is gone
+        let result = validate_exact_nonce_target(
+            &relayer_id,
+            TransactionNonce::new(7),
+            TransactionNonce::new(8),
+            InflightNonceHolder::InmempoolHead(test_transaction(7, TransactionStatus::INMEMPOOL)),
+        );
+        assert!(matches!(
+            result,
+            Err(SendTransactionAtNonceError::NonceAlreadyUsedOnchain(_, _, _))
+        ));
+    }
+
+    #[test]
+    fn exact_nonce_send_rejects_nonces_not_held_by_an_inflight_transaction() {
+        let relayer_id = RelayerId::new();
+
+        let result = validate_exact_nonce_target(
+            &relayer_id,
+            TransactionNonce::new(9),
+            TransactionNonce::new(5),
+            InflightNonceHolder::NotFound,
+        );
+
+        assert!(matches!(result, Err(SendTransactionAtNonceError::NonceNotPending(_, _))));
+    }
+
+    #[test]
+    fn exact_nonce_send_rejects_inmempool_nonces_behind_the_head() {
+        let relayer_id = RelayerId::new();
+        let holder = test_transaction(6, TransactionStatus::INMEMPOOL);
+
+        let result = validate_exact_nonce_target(
+            &relayer_id,
+            TransactionNonce::new(6),
+            TransactionNonce::new(5),
+            InflightNonceHolder::InmempoolBehindHead(holder),
+        );
+
+        assert!(matches!(result, Err(SendTransactionAtNonceError::NonceBehindInmempoolHead(_, _))));
+    }
+
+    #[test]
+    fn exact_nonce_send_accepts_pending_and_inmempool_head_holders() {
+        let relayer_id = RelayerId::new();
+
+        let pending = test_transaction(5, TransactionStatus::PENDING);
+        let resolved = validate_exact_nonce_target(
+            &relayer_id,
+            TransactionNonce::new(5),
+            TransactionNonce::new(5),
+            InflightNonceHolder::Pending(pending.clone()),
+        )
+        .expect("a pending holder at the current nonce should be replaceable");
+        assert_eq!(resolved.id, pending.id);
+
+        let head = test_transaction(5, TransactionStatus::INMEMPOOL);
+        let resolved = validate_exact_nonce_target(
+            &relayer_id,
+            TransactionNonce::new(5),
+            TransactionNonce::new(5),
+            InflightNonceHolder::InmempoolHead(head.clone()),
+        )
+        .expect("the inmempool head should be replaceable");
+        assert_eq!(resolved.id, head.id);
+    }
+
+    #[test]
+    fn per_transaction_expiry_overrides_the_global_default() {
+        let global = chrono::Duration::hours(12);
+
+        let resolved = resolve_expiry_duration(global, Some(300));
+
+        assert_eq!(resolved, chrono::Duration::seconds(300));
+    }
+
+    #[test]
+    fn per_transaction_expiry_longer_than_global_clamps_to_global() {
+        let global = chrono::Duration::hours(12);
+
+        let thirteen_hours = 13 * 60 * 60;
+        assert_eq!(resolve_expiry_duration(global, Some(thirteen_hours)), global);
+
+        // Equal to the global window is the global window
+        let twelve_hours = 12 * 60 * 60;
+        assert_eq!(resolve_expiry_duration(global, Some(twelve_hours)), global);
+
+        // Values chrono cannot represent clamp to the operator ceiling too
+        assert_eq!(resolve_expiry_duration(global, Some(u64::MAX)), global);
+    }
+
+    #[test]
+    fn absent_per_transaction_expiry_keeps_the_global_window() {
+        let global = chrono::Duration::hours(12);
+
+        assert_eq!(resolve_expiry_duration(global, None), global);
     }
 }

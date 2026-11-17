@@ -10,7 +10,9 @@ pub mod network;
 mod postgres;
 pub use postgres::{PostgresClient, PostgresConnectionError};
 mod provider;
-pub use provider::create_retry_client;
+pub use provider::{
+    create_retry_client, EndpointHealthSnapshot, EndpointSelector, RelayerProvider,
+};
 pub mod relayer;
 pub mod safe_proxy;
 pub mod server;
@@ -21,9 +23,9 @@ pub use yaml::{
     SigningProvider, UserRateLimitConfig,
 };
 mod shared;
-pub use shared::{common_types, utils::get_chain_id};
+pub use shared::{common_types, utils::get_chain_id, HttpError};
 mod startup;
-pub use startup::{start, StartError};
+pub use startup::{build, start, NetworkEndpointHealth, Relayer, StartError};
 mod docker;
 mod environment;
 mod file;

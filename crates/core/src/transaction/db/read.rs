@@ -113,9 +113,36 @@ impl PostgresClient {
                 "
                     SELECT *
                     FROM relayer.transaction
-                    WHERE external_id = $1;
+                    WHERE external_id = $1
+                    ORDER BY queued_at DESC
+                    LIMIT 1;
                 ",
                 &[&external_id],
+            )
+            .await?;
+
+        match row {
+            None => Ok(None),
+            Some(row) => Ok(Some(build_transaction_from_transaction_view(&row))),
+        }
+    }
+
+    pub async fn get_transaction_by_relayer_and_external_id(
+        &self,
+        relayer_id: &RelayerId,
+        external_id: &str,
+    ) -> Result<Option<Transaction>, PostgresError> {
+        let row = self
+            .query_one_or_none(
+                "
+                    SELECT *
+                    FROM relayer.transaction
+                    WHERE relayer_id = $1
+                    AND external_id = $2
+                    ORDER BY queued_at DESC
+                    LIMIT 1;
+                ",
+                &[relayer_id, &external_id],
             )
             .await?;
 

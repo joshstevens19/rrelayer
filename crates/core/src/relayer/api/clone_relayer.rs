@@ -30,26 +30,34 @@ pub async fn clone_relayer(
 ) -> Result<Json<CreateRelayerResult>, HttpError> {
     state.validate_basic_auth_valid(&headers)?;
 
-    let provider = find_provider_for_chain_id(&state.evm_providers, &relayer.chain_id)
+    let result =
+        clone_relayer_core(&state, &relayer_id, &relayer.chain_id, &relayer.new_relayer_name)
+            .await?;
+
+    Ok(Json(result))
+}
+
+/// Core clone logic shared by the HTTP endpoint and the embedded [`crate::Relayer`] handle.
+pub(crate) async fn clone_relayer_core(
+    state: &Arc<AppState>,
+    relayer_id: &RelayerId,
+    chain_id: &ChainId,
+    new_relayer_name: &str,
+) -> Result<CreateRelayerResult, HttpError> {
+    let provider = find_provider_for_chain_id(&state.evm_providers, chain_id)
         .await
         .ok_or(not_found("Could not find provider for the chain id".to_string()))?;
 
-    let chain_id = relayer.chain_id;
     let relayer = state
         .db
-        .create_relayer(
-            &relayer.new_relayer_name,
-            &chain_id,
-            provider,
-            CreateRelayerMode::Clone(relayer_id),
-        )
+        .create_relayer(new_relayer_name, chain_id, provider, CreateRelayerMode::Clone(*relayer_id))
         .await?;
 
     let id = relayer.id;
     let address = relayer.address;
 
     invalidate_relayer_cache(&state.cache, &id).await;
-    start_relayer_queue(&state, relayer, provider, &chain_id).await?;
+    start_relayer_queue(state, relayer, provider, chain_id).await?;
 
-    Ok(Json(CreateRelayerResult { id, address }))
+    Ok(CreateRelayerResult { id, address })
 }
