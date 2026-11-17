@@ -160,8 +160,14 @@ impl TurnkeyWalletManager {
         Ok(encoded_stamp)
     }
 
-    fn get_timestamp_ms() -> String {
-        SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis().to_string()
+    fn get_timestamp_ms() -> Result<String, WalletError> {
+        Ok(SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|e| WalletError::ApiError {
+                message: format!("System time is before UNIX epoch: {}", e),
+            })?
+            .as_millis()
+            .to_string())
     }
 
     async fn load_accounts(&self) -> Result<(), WalletError> {
@@ -246,7 +252,7 @@ impl WalletManagerTrait for TurnkeyWalletManager {
             }
         }
 
-        let timestamp = Self::get_timestamp_ms();
+        let timestamp = Self::get_timestamp_ms()?;
         let request = serde_json::json!({
             "type": "ACTIVITY_TYPE_CREATE_WALLET_ACCOUNTS",
             "timestampMs": timestamp,
@@ -461,7 +467,7 @@ impl WalletManagerTrait for TurnkeyWalletManager {
 
         info!("Turnkey sign_transaction: unsigned transaction hex: {}", unsigned_transaction_hex);
 
-        let timestamp = Self::get_timestamp_ms();
+        let timestamp = Self::get_timestamp_ms()?;
         let request = serde_json::json!({
             "type": "ACTIVITY_TYPE_SIGN_TRANSACTION_V2",
             "organizationId": self.organization_id,
@@ -608,7 +614,7 @@ impl WalletManagerTrait for TurnkeyWalletManager {
 
         info!("Turnkey sign_text: message='{}', hash=0x{}", message, hex::encode(message_hash));
 
-        let timestamp = Self::get_timestamp_ms();
+        let timestamp = Self::get_timestamp_ms()?;
         let request = serde_json::json!({
             "type": "ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2",
             "organizationId": self.organization_id,
@@ -732,7 +738,7 @@ impl WalletManagerTrait for TurnkeyWalletManager {
             WalletError::ApiError { message: format!("Failed to serialize typed data: {}", e) }
         })?;
 
-        let timestamp = Self::get_timestamp_ms();
+        let timestamp = Self::get_timestamp_ms()?;
         let accounts = self.accounts.lock().await;
         let account = accounts.get(&wallet_index).ok_or_else(|| {
             error!("Turnkey sign_typed_data: wallet not found for index {}", wallet_index);

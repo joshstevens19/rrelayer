@@ -669,7 +669,13 @@ impl<'de> Deserialize<'de> for AllOrOneOrManyAddresses {
 
                 match addresses.len() {
                     0 => Ok(AllOrOneOrManyAddresses::Many(addresses)), // Empty array
-                    1 => Ok(AllOrOneOrManyAddresses::One(addresses.into_iter().next().unwrap())),
+                    1 => {
+                        let address = addresses
+                            .into_iter()
+                            .next()
+                            .ok_or_else(|| de::Error::custom("expected a single address"))?;
+                        Ok(AllOrOneOrManyAddresses::One(address))
+                    }
                     _ => Ok(AllOrOneOrManyAddresses::Many(addresses)),
                 }
             }
@@ -1082,18 +1088,25 @@ pub struct SetupConfig {
     pub cron_jobs: Option<Vec<CronJobConfig>>,
 }
 
-fn substitute_env_variables(contents: &str) -> Result<String, regex::Error> {
+fn substitute_env_variables(contents: &str) -> Result<String, ReadYamlError> {
     let re = Regex::new(r"\$\{([^}]+)\}")?;
+    let mut missing_var: Option<String> = None;
     let result = re.replace_all(contents, |caps: &Captures| {
         let var_name = &caps[1];
         match env::var(var_name) {
             Ok(val) => val,
             Err(_) => {
                 rrelayer_error!("Environment variable {} not found", var_name);
-                panic!("Environment variable {} not found", var_name)
+                if missing_var.is_none() {
+                    missing_var = Some(var_name.to_string());
+                }
+                String::new()
             }
         }
     });
+    if let Some(var_name) = missing_var {
+        return Err(ReadYamlError::EnvironmentVariableNotFound(var_name));
+    }
     Ok(result.into_owned())
 }
 
@@ -1108,8 +1121,11 @@ pub enum ReadYamlError {
     #[error("Setup config is invalid yaml and does not match the struct - {0}")]
     SetupConfigInvalidYaml(String),
 
-    #[error("Environment variable {} not found", {0})]
-    EnvironmentVariableNotFound(#[from] regex::Error),
+    #[error("Environment variable {0} not found")]
+    EnvironmentVariableNotFound(String),
+
+    #[error("Invalid environment variable substitution pattern: {0}")]
+    EnvironmentVariableRegex(#[from] regex::Error),
 
     #[error("No networks enabled in the yaml")]
     NoNetworksEnabled,

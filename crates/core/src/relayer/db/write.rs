@@ -152,44 +152,69 @@ impl PostgresClient {
                 })?;
             }
             CreateRelayerMode::Create => {
-                let evm_provider_clone = evm_provider.clone();
-                let new_relayer_id_val = new_relayer_id;
-                let name_val = name.to_string();
-                let chain_id_val = *chain_id;
+                let db_error = |e: PostgresError| {
+                    CreateRelayerError::CouldNotSaveRelayerDb(name.to_string(), *chain_id, e)
+                };
 
-                self.with_transaction(move |tx| {
-                    Box::pin(async move {
-                        let query = "
-                            WITH new_wallet_index AS (
-                                SELECT COALESCE(MAX(wallet_index), -1) + 1 AS wallet_index
-                                FROM relayer.record
-                                WHERE chain_id = $3
-                            )
-                            INSERT INTO relayer.record (id, name, chain_id, wallet_index, is_private_key)
-                            SELECT $1, $2, $3, wallet_index, false
-                            FROM new_wallet_index
-                            RETURNING wallet_index";
+                let mut conn = self
+                    .pool
+                    .get()
+                    .await
+                    .map_err(|e| db_error(PostgresError::ConnectionPoolError(e)))?;
+                let tx =
+                    conn.transaction().await.map_err(|e| db_error(PostgresError::PgError(e)))?;
 
-                        let rows = tx.query(query, &[&new_relayer_id_val, &name_val, &chain_id_val]).await.map_err(PostgresError::PgError)?;
+                let query = "
+                    WITH new_wallet_index AS (
+                        SELECT COALESCE(MAX(wallet_index), -1) + 1 AS wallet_index
+                        FROM relayer.record
+                        WHERE chain_id = $3
+                    )
+                    INSERT INTO relayer.record (id, name, chain_id, wallet_index, is_private_key)
+                    SELECT $1, $2, $3, wallet_index, false
+                    FROM new_wallet_index
+                    RETURNING wallet_index";
 
-                        let wallet_index: i32 = rows.first()
-                            .map(|row| row.get("wallet_index"))
-                            .unwrap_or_else(|| panic!("No wallet index returned"));
+                let rows = tx
+                    .query(query, &[&new_relayer_id, &name, chain_id])
+                    .await
+                    .map_err(|e| db_error(PostgresError::PgError(e)))?;
 
-                        let address = evm_provider_clone.create_wallet(wallet_index as u32).await
-                            .unwrap_or_else(|e| panic!("Wallet creation failed: {}", e));
-
-                        tx.execute(
-                            "UPDATE relayer.record SET address = $1 WHERE chain_id = $2 AND wallet_index = $3",
-                            &[&address, &chain_id_val, &wallet_index],
+                let wallet_index: i32 =
+                    rows.first().map(|row| row.get("wallet_index")).ok_or_else(|| {
+                        error!("No wallet index returned - name: {}, chainId: {}", name, chain_id);
+                        CreateRelayerError::NoSaveRelayerInitInfoReturnedDb(
+                            name.to_string(),
+                            *chain_id,
                         )
-                        .await.map_err(PostgresError::PgError)?;
+                    })?;
 
-                        Ok(())
-                    })
-                })
+                let address = match evm_provider.create_wallet(wallet_index as u32).await {
+                    Ok(address) => address,
+                    Err(e) => {
+                        error!("Wallet creation failed: {}", e);
+                        if let Err(rollback_error) = tx.rollback().await {
+                            error!(
+                                "Failed to rollback relayer creation transaction: {}",
+                                rollback_error
+                            );
+                        }
+                        return Err(CreateRelayerError::WalletError(
+                            name.to_string(),
+                            *chain_id,
+                            Box::new(e),
+                        ));
+                    }
+                };
+
+                tx.execute(
+                    "UPDATE relayer.record SET address = $1 WHERE chain_id = $2 AND wallet_index = $3",
+                    &[&address, chain_id, &wallet_index],
+                )
                 .await
-                .map_err(|e| CreateRelayerError::CouldNotSaveRelayerDb(name.to_string(), *chain_id, e))?
+                .map_err(|e| db_error(PostgresError::PgError(e)))?;
+
+                tx.commit().await.map_err(|e| db_error(PostgresError::PgError(e)))?;
             }
             CreateRelayerMode::PrivateKeyImport(wallet_index) => {
                 // Convert negative wallet index to positive private key index for address lookup

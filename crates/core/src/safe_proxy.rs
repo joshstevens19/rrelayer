@@ -311,7 +311,7 @@ impl SafeProxyManager {
         //     ))),
         // }
 
-        unimplemented!("Safe signatures are not supported yet.")
+        Err(SafeProxyError::SignatureError("Safe signatures are not supported yet.".to_string()))
     }
 
     /// Creates a Safe transaction with proper nonce and signature, ready for execution.

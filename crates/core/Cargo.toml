@@ -1,6 +1,6 @@
 [package]
 name = "rrelayer_core"
-version = "0.13.0"
+version = "0.14.0"
 resolver = "2"
 edition = "2021"
 authors = ["joshstevens19@hotmail.co.uk"]
@@ -66,6 +66,12 @@ secrecy = "0.8"
 jsonwebtoken = "9.3"
 rsa = "0.9"
 
+[build-dependencies]
+chrono = "0.4.19"
+
 [dev-dependencies]
 # test-util enables tokio::test(start_paused) so timeout-path tests run instantly
 tokio = { version = "1", features = ["full", "test-util"] }
+
+[lints]
+workspace = true

@@ -426,18 +426,10 @@ impl TenderlyGasFeeEstimator {
     async fn request_gas_estimate(
         &self,
         chain_id: &ChainId,
-    ) -> Result<TenderlyGasEstimatePriceResult, reqwest::Error> {
-        let url = match self.build_suggested_gas_price_endpoint(chain_id) {
-            Ok(url) => url,
-            Err(_) => {
-                let client = reqwest::Client::new();
-                let result = client.get("http://").send().await;
-                match result {
-                    Err(error) => return Err(error),
-                    Ok(_) => unreachable!("This should always fail"),
-                }
-            }
-        };
+    ) -> Result<TenderlyGasEstimatePriceResult, GasEstimatorError> {
+        let url = self
+            .build_suggested_gas_price_endpoint(chain_id)
+            .map_err(GasEstimatorError::CustomError)?;
         println!("Tenderly gas estimate url: {}", url);
         let client = reqwest::Client::new();
 

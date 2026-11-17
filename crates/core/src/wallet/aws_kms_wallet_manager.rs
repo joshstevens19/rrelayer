@@ -314,7 +314,11 @@ impl AwsKmsWalletManager {
                 .policy(policy.clone());
 
             for (k, v) in &plan.tags {
-                let tag = Tag::builder().tag_key(k).tag_value(v).build().unwrap();
+                let tag = Tag::builder().tag_key(k).tag_value(v).build().map_err(|e| {
+                    WalletError::ApiError {
+                        message: format!("Failed to build KMS tag ({}={}): {}", k, v, e),
+                    }
+                })?;
                 create_key_builder = create_key_builder.tags(tag);
             }
 

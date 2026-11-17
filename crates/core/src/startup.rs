@@ -6,6 +6,7 @@ use crate::gas::{BlobGasOracleCache, GasOracleCache};
 use crate::network::{create_network_routes, ChainId};
 use crate::provider::EndpointHealthSnapshot;
 use crate::rate_limiting::RATE_LIMIT_HEADER_NAME;
+use crate::server::create_server_routes;
 use crate::shared::{bad_request, not_found, HttpError};
 use crate::webhooks::WebhookManager;
 use crate::yaml::{AllOrOneOrManyAddresses, ApiKey, NetworkPermissionsConfig, ReadYamlError};
@@ -47,6 +48,7 @@ use axum::{
     routing::get,
     Json, Router,
 };
+use chrono::Utc;
 use dotenv::dotenv;
 use rustls::crypto::ring::default_provider;
 use rustls::crypto::CryptoProvider;
@@ -193,6 +195,7 @@ async fn start_api(api_config: ApiConfig, app_state: Arc<AppState>) -> Result<()
         .nest("/networks", create_network_routes())
         .nest("/relayers", create_relayer_routes())
         .nest("/transactions", create_transactions_routes())
+        .nest("/server", create_server_routes())
         .nest("/signing", create_signing_routes());
 
     let app = Router::new()
@@ -212,23 +215,36 @@ async fn start_api(api_config: ApiConfig, app_state: Arc<AppState>) -> Result<()
 
     let shutdown_signal = async {
         let ctrl_c = async {
-            tokio::signal::ctrl_c().await.expect("failed to install Ctrl+C handler");
+            if let Err(e) = tokio::signal::ctrl_c().await {
+                error!("failed to install Ctrl+C handler: {}", e);
+                std::future::pending::<()>().await;
+            }
         };
 
         #[cfg(unix)]
         let terminate = async {
-            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-                .expect("failed to install signal handler")
-                .recv()
-                .await;
+            match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+                Ok(mut signal) => {
+                    signal.recv().await;
+                }
+                Err(e) => {
+                    error!("failed to install signal handler: {}", e);
+                    std::future::pending::<()>().await;
+                }
+            }
         };
 
         #[cfg(windows)]
         let terminate = async {
-            tokio::signal::windows::ctrl_break()
-                .expect("failed to install Ctrl+Break handler")
-                .recv()
-                .await;
+            match tokio::signal::windows::ctrl_break() {
+                Ok(mut signal) => {
+                    signal.recv().await;
+                }
+                Err(e) => {
+                    error!("failed to install Ctrl+Break handler: {}", e);
+                    std::future::pending::<()>().await;
+                }
+            }
         };
 
         #[cfg(not(any(unix, windows)))]
@@ -304,6 +320,9 @@ pub enum StartError {
 
     #[error("To run rrelayer you need to define at least one network in the yaml file")]
     NoNetworksDefinedInYaml,
+
+    #[error("Could not install default Crypto Provider. Are you already using it?")]
+    CryptoProviderInstallError,
 }
 
 /// Builds a full rrelayer instance without binding the HTTP API, returning a [`Relayer`]
@@ -334,9 +353,15 @@ pub async fn build(project_path: &Path) -> Result<Relayer, StartError> {
     info!("Applied database schema");
 
     if CryptoProvider::get_default().is_none() {
-        // Ignore the AlreadyInstalled race: another part of the process (e.g. an embedder)
-        // may have installed a provider between the check and the install.
-        let _ = CryptoProvider::install_default(default_provider());
+        // Embedded hosts may install a rustls provider before boot. Only fail when
+        // install itself fails and no provider is present afterwards — that is the
+        // error master's panic ban introduced, without rejecting a host that already
+        // installed one (including a race between the check and the install).
+        if CryptoProvider::install_default(default_provider()).is_err()
+            && CryptoProvider::get_default().is_none()
+        {
+            return Err(StartError::CryptoProviderInstallError);
+        }
     }
 
     let cache = Arc::new(Cache::new().await);
@@ -474,6 +499,7 @@ pub async fn build(project_path: &Path) -> Result<Relayer, StartError> {
         .collect();
 
     let app_state = Arc::new(AppState {
+        started_at: Utc::now(),
         db: postgres_client,
         evm_providers: providers,
         gas_oracle_cache,

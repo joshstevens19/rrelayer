@@ -11,7 +11,8 @@ fn build_relayer_cache_key(id: &RelayerId) -> String {
 
 pub async fn get_relayer_cache(cache: &Arc<Cache>, relayer_id: &RelayerId) -> Option<Relayer> {
     if let Some(cached_result) = cache.get(&build_relayer_cache_key(relayer_id).to_string()).await {
-        return cached_result.to_relayer();
+        // flatten: a cached `None` relayer and an unexpected cache variant both yield `None`
+        return cached_result.to_relayer().flatten();
     }
 
     None

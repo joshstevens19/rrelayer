@@ -15,6 +15,7 @@ pub use provider::{
 };
 pub mod relayer;
 pub mod safe_proxy;
+pub mod server;
 pub use safe_proxy::{SafeProxyError, SafeProxyManager, SafeTransaction};
 pub use yaml::{
     read, ApiConfig, AwsKmsSigningProviderConfig, GasProviders, NetworkSetupConfig,

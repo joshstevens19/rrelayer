@@ -94,11 +94,16 @@ async fn handle_add(project_path: &ProjectLocation) -> Result<(), NetworkError> 
         .allow_empty(true)
         .interact_text()?;
 
+    let first_provider_url = provider_urls.first().ok_or_else(|| {
+        NetworkError::InvalidConfig("At least one provider URL is required".to_string())
+    })?;
+    let chain_id = get_chain_id(first_provider_url).await.map_err(|e| {
+        NetworkError::ConnectionFailed(format!("Could not read from rpc for the chain id: {}", e))
+    })?;
+
     setup_config.networks.push(NetworkSetupConfig {
         name: network_name.clone(),
-        chain_id: get_chain_id(provider_urls.first().unwrap())
-            .await
-            .expect("Could not read from rpc for the chain id"),
+        chain_id,
         signing_provider: None,
         provider_urls,
         block_explorer_url: if block_explorer.is_empty() { None } else { Some(block_explorer) },

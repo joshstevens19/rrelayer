@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use tokio::sync::Mutex;
 
 use crate::common_types::EvmAddress;
@@ -56,6 +57,8 @@ impl RelayersAllowedForRandom {
 }
 
 pub struct AppState {
+    /// Timestamp when server was started
+    pub started_at: DateTime<Utc>,
     /// Database client with connection pooling
     pub db: Arc<PostgresClient>,
     /// EVM blockchain provider connections
