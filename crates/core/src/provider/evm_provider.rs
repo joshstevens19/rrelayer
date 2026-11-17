@@ -1,7 +1,7 @@
 use crate::gas::BLOB_GAS_PER_BLOB;
 use crate::provider::endpoint_health::{
-    spawn_endpoint_prober, EndpointClient, EndpointHealth, EndpointHealthSnapshot,
-    EndpointSelector, StickyBroadcasts,
+    redact_provider_url, redact_provider_url_in_text, spawn_endpoint_prober, EndpointClient,
+    EndpointHealth, EndpointHealthSnapshot, EndpointSelector, StickyBroadcasts,
 };
 use crate::provider::layer_extensions::RpcLoggingLayer;
 use crate::relayer::Relayer;
@@ -232,7 +232,7 @@ fn verify_endpoint_chain_ids(
             Ok(got) => {
                 return Err(EvmProviderNewError::ChainIdMismatch {
                     network: network.to_string(),
-                    url: url.clone(),
+                    url: redact_provider_url(url),
                     expected: expected.u64(),
                     got: *got,
                 });
@@ -240,7 +240,9 @@ fn verify_endpoint_chain_ids(
             Err(error) => {
                 warn!(
                     "Provider url {} for network {} is unreachable at boot ({}) - continuing without it until it recovers",
-                    url, network, error
+                    redact_provider_url(url),
+                    network,
+                    redact_provider_url_in_text(url, error)
                 );
                 verified.push(false);
             }
@@ -397,7 +399,9 @@ impl EvmProvider {
                 Err(error) => {
                     warn!(
                         "Could not measure block time on provider url {} for network {}: {} - trying the next url",
-                        endpoint.url, network_setup_config.name, error
+                        redact_provider_url(&endpoint.url),
+                        network_setup_config.name,
+                        redact_provider_url_in_text(&endpoint.url, &error.to_string())
                     );
                 }
             }

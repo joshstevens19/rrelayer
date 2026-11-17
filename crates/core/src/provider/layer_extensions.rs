@@ -12,7 +12,9 @@ use std::{
 use tower::{Layer, Service};
 use tracing::{error, info};
 
-use super::endpoint_health::{now_ms, EndpointHealth};
+use super::endpoint_health::{
+    now_ms, redact_provider_url, redact_provider_url_in_text, EndpointHealth,
+};
 
 #[derive(Clone)]
 pub struct RpcLoggingLayer {
@@ -93,7 +95,9 @@ where
                     if duration.as_secs() >= 10 {
                         info!(
                             "SLOW RPC call - method: {}, duration: {:?}, url: {}",
-                            method_name, duration, rpc_url
+                            method_name,
+                            duration,
+                            redact_provider_url(&rpc_url)
                         );
                     }
 
@@ -107,18 +111,20 @@ where
                         health.record_failure(now_ms());
                     }
 
+                    let logged_url = redact_provider_url(&rpc_url);
+                    let logged_error = redact_provider_url_in_text(&rpc_url, &error_str);
                     if error_str.contains("timeout") || error_str.contains("timed out") {
                         error!("RPC TIMEOUT (free public nodes do this a lot consider a using a paid node) - method: {}, duration: {:?}, url: {}, error: {}",
-                                       method_name, duration, rpc_url, err);
+                                       method_name, duration, logged_url, logged_error);
                     } else if error_str.contains("429") || error_str.contains("rate limit") {
                         error!("RPC RATE LIMITED (free public nodes do this a lot consider a using a paid node) - method: {}, duration: {:?}, url: {}, error: {}",
-                                      method_name, duration, rpc_url, err);
+                                      method_name, duration, logged_url, logged_error);
                     } else if error_str.contains("connection") || error_str.contains("network") {
                         error!("RPC CONNECTION ERROR (free public nodes do this a lot consider a using a paid node) - method: {}, duration: {:?}, url: {}, error: {}",
-                                       method_name, duration, rpc_url, err);
+                                       method_name, duration, logged_url, logged_error);
                     } else {
                         error!("RPC ERROR (free public nodes do this a lot consider a using a paid node) - method: {}, duration: {:?}, url: {}, error: {}",
-                                       method_name, duration, rpc_url, err);
+                                       method_name, duration, logged_url, logged_error);
                     }
 
                     Err(err)

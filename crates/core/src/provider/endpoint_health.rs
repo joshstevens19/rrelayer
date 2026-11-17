@@ -315,6 +315,18 @@ pub(crate) fn redact_provider_url(url: &str) -> String {
     redacted
 }
 
+/// Replaces a raw provider url inside free text (RPC error strings, log lines)
+/// with its credential-redacted form. Leaves the text unchanged when the url has
+/// nothing to hide or does not occur in it.
+pub(crate) fn redact_provider_url_in_text(url: &str, text: &str) -> String {
+    let redacted = redact_provider_url(url);
+    if redacted == url {
+        text.to_string()
+    } else {
+        text.replace(url, &redacted)
+    }
+}
+
 impl EndpointHealth {
     fn snapshot(&self, url: &str) -> EndpointHealthSnapshot {
         let now = now_ms();
@@ -385,14 +397,25 @@ impl StickyBroadcasts {
     }
 
     pub(crate) fn record(&mut self, hash: alloy::primitives::B256, endpoint_index: usize) {
-        if self.by_hash.insert(hash, endpoint_index).is_none() {
-            self.order.push_back(hash);
+        self.by_hash.insert(hash, endpoint_index);
+        // Refresh recency instead of appending a second order entry. A forget
+        // leaves the hash in `order`; recording it again used to push a
+        // duplicate, and capacity eviction then treated the stale leading copy
+        // as the live pin and dropped a receipt that was still in flight.
+        if self.order.contains(&hash) {
+            self.order.retain(|ordered| ordered != &hash);
         }
+        self.order.push_back(hash);
 
         while self.by_hash.len() > STICKY_BROADCAST_CAPACITY {
             let Some(oldest) = self.order.pop_front() else {
                 break;
             };
+            // A forgotten hash can still sit ahead of its replacement, and only
+            // the last order entry owns the live pin.
+            if self.order.contains(&oldest) {
+                continue;
+            }
             self.by_hash.remove(&oldest);
         }
     }
@@ -529,14 +552,16 @@ async fn probe_endpoints_once(
                 Ok(Ok(got)) if got == expected_chain_id.u64() => {
                     info!(
                         "Provider url {} for network {} recovered and verified for chain {} - entering rotation",
-                        endpoint.url, network, got
+                        redact_provider_url(&endpoint.url),
+                        network,
+                        got
                     );
                     endpoint.health.mark_chain_verified();
                 }
                 Ok(Ok(got)) => {
                     error!(
                         "Provider url {} for network {} recovered serving chain id {} but the config expects {} - permanently disabling it",
-                        endpoint.url,
+                        redact_provider_url(&endpoint.url),
                         network,
                         got,
                         expected_chain_id.u64()
@@ -592,7 +617,7 @@ async fn probe_endpoints_once(
         if lagging && !was_lagging {
             warn!(
                 "Provider url {} for network {} lags the best tip by {} blocks (own {}, best {}) - removing it from rotation until it catches up",
-                endpoint.url,
+                redact_provider_url(&endpoint.url),
                 network,
                 best_tip.saturating_sub(tip),
                 tip,
@@ -601,7 +626,10 @@ async fn probe_endpoints_once(
         } else if !lagging && was_lagging {
             info!(
                 "Provider url {} for network {} caught back up (own {}, best {}) - returning it to rotation",
-                endpoint.url, network, tip, best_tip
+                redact_provider_url(&endpoint.url),
+                network,
+                tip,
+                best_tip
             );
         }
     }
@@ -737,6 +765,35 @@ mod tests {
     }
 
     #[test]
+    fn sticky_rerecord_after_forget_survives_capacity_eviction() {
+        use alloy::primitives::B256;
+
+        let mut sticky = StickyBroadcasts::new();
+        let mut bytes = [0u8; 32];
+        bytes[31] = 0xff;
+        let hash = B256::from(bytes);
+
+        sticky.record(hash, 0);
+        sticky.forget(&hash);
+
+        // Fill the live map. The forgotten hash still leads the order list.
+        for index in 0..STICKY_BROADCAST_CAPACITY {
+            let mut bytes = [0u8; 32];
+            bytes[..8].copy_from_slice(&(index as u64 + 1).to_be_bytes());
+            sticky.record(B256::from(bytes), 1);
+        }
+
+        // Re-recording must refresh recency. The stale leading order entry must
+        // not be treated as this pin and evict it immediately.
+        sticky.record(hash, 2);
+        assert_eq!(
+            sticky.endpoint_for(&hash),
+            Some(2),
+            "a re-recorded pin must not be dropped by the stale order entry forget left behind"
+        );
+    }
+
+    #[test]
     fn sticky_preference_respects_endpoint_health() {
         use super::super::evm_provider::connect_endpoints;
 
@@ -801,6 +858,14 @@ mod tests {
 
         // Garbage never leaks through
         assert_eq!(redact_provider_url("not a url"), "<unparseable-url-redacted>");
+
+        let raw = "https://eth-mainnet.g.alchemy.com/v2/SUPERSECRETKEY";
+        let scrubbed = redact_provider_url_in_text(
+            raw,
+            &format!("http error calling {raw}: connection reset"),
+        );
+        assert!(!scrubbed.contains("SUPERSECRETKEY"));
+        assert!(scrubbed.contains("[redacted-"));
     }
 
     #[test]

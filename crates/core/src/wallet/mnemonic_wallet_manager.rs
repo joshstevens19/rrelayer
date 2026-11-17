@@ -7,13 +7,13 @@ use alloy::network::TxSigner;
 use alloy::primitives::Signature;
 use alloy::signers::{
     local::{
-        coins_bip39::{English, Mnemonic},
+        coins_bip39::{English, Entropy, Mnemonic},
         LocalSignerError, MnemonicBuilder, PrivateKeySigner,
     },
     Signer,
 };
 use async_trait::async_trait;
-use rand::thread_rng;
+use rand::{thread_rng, RngCore};
 use std::collections::HashMap;
 use tokio::sync::Mutex;
 
@@ -140,9 +140,14 @@ impl WalletManagerTrait for MnemonicWalletManager {
 
 /// Generates a new 24-word BIP39 mnemonic seed phrase.
 pub fn generate_seed_phrase() -> Result<String, WalletError> {
+    // coins-bip39 0.14 dropped `Mnemonic::new_with_count` (it took the project's
+    // rand 0.8 rng). Fill 32 bytes (24 words) from the existing rng and parse
+    // them through the new entropy constructor. The returned phrase is unchanged.
     let mut rng = thread_rng();
-    let mnemonic = Mnemonic::<English>::new_with_count(&mut rng, 24)
-        .map_err(|e| WalletError::MnemonicError(format!("Failed to generate mnemonic: {}", e)))?;
-    let phrase = mnemonic.to_phrase();
-    Ok(phrase)
+    let mut entropy_bytes = [0u8; 32];
+    rng.fill_bytes(&mut entropy_bytes);
+    let entropy = Entropy::from_slice(&entropy_bytes)
+        .map_err(|e| WalletError::MnemonicError(format!("Failed to generate mnemonic: {e}")))?;
+    let mnemonic = Mnemonic::<English>::new_from_entropy(entropy);
+    Ok(mnemonic.to_phrase().as_str().to_owned())
 }

@@ -163,30 +163,37 @@ fn snapshot_inflight_transactions(
     transactions
 }
 
+/// Decodes a replacement's blobs before any queue entry is touched. Invalid hex
+/// must fail the replace, not panic the process or leave a half-applied payload.
+fn replacement_blobs(
+    replace_with: &RelayTransactionRequest,
+) -> Result<Option<Vec<TransactionBlob>>, String> {
+    match &replace_with.blobs {
+        Some(blob_strings) => blob_strings
+            .iter()
+            .map(|blob_hex| TransactionBlob::from_hex(blob_hex))
+            .collect::<Result<Vec<_>, _>>()
+            .map(Some)
+            .map_err(|e| format!("Failed to convert blob hex strings to TransactionBlob: {e}")),
+        None => Ok(None),
+    }
+}
+
 /// Rewrites a transaction's payload with the replacement request. The gas limit is
 /// cleared so the send path re-estimates for the new payload, and `is_noop` is
 /// recomputed from the new destination. The replacement carries its own gas price
-/// ceiling terms, so a previous ceiling hit no longer applies.
+/// ceiling terms, so a previous ceiling hit no longer applies. `blobs` is decoded
+/// by the caller so a conversion failure cannot mutate the queued transaction.
 fn apply_replacement_payload(
     transaction: &mut Transaction,
     replace_with: &RelayTransactionRequest,
+    blobs: Option<Vec<TransactionBlob>>,
 ) {
     transaction.to = replace_with.to;
     transaction.data = replace_with.data.clone();
     transaction.value = replace_with.value;
     transaction.is_noop = transaction.from == transaction.to;
-
-    if let Some(ref blob_strings) = replace_with.blobs {
-        transaction.blobs = Some(
-            blob_strings
-                .iter()
-                .map(|blob_hex| TransactionBlob::from_hex(blob_hex))
-                .collect::<Result<Vec<_>, _>>()
-                .expect("Failed to convert blob hex strings to TransactionBlob"),
-        );
-    } else {
-        transaction.blobs = None;
-    }
+    transaction.blobs = blobs;
     transaction.gas_limit = None;
     transaction.external_id = replace_with.external_id.clone();
     transaction.gas_price_ceiling = replace_with.gas_price_ceiling;
@@ -194,19 +201,23 @@ fn apply_replacement_payload(
 }
 
 /// Swaps a PENDING transaction's payload in the queue itself, returning the updated
-/// transaction for persistence, or `None` when the id is no longer pending. The
-/// precomputed hash is cleared - it belongs to the old payload; the send path
-/// computes the real hash when the replacement broadcasts. Kept free of
-/// `TransactionsQueue` so the in-place swap stays unit-testable without a provider.
+/// transaction for persistence, or `Ok(None)` when the id is no longer pending.
+/// Invalid blob hex is `Err` and leaves the queue untouched. The precomputed hash
+/// is cleared - it belongs to the old payload; the send path computes the real hash
+/// when the replacement broadcasts. Kept free of `TransactionsQueue` so the in-place
+/// swap stays unit-testable without a provider.
 fn replace_pending_transaction_payload_in_queue(
     pending: &mut VecDeque<Transaction>,
     transaction_id: &TransactionId,
     replace_with: &RelayTransactionRequest,
     new_expires_at: Option<chrono::DateTime<Utc>>,
-) -> Option<Transaction> {
-    let transaction = pending.iter_mut().find(|tx| tx.id == *transaction_id)?;
+) -> Result<Option<Transaction>, String> {
+    let blobs = replacement_blobs(replace_with)?;
+    let Some(transaction) = pending.iter_mut().find(|tx| tx.id == *transaction_id) else {
+        return Ok(None);
+    };
 
-    apply_replacement_payload(transaction, replace_with);
+    apply_replacement_payload(transaction, replace_with, blobs);
     transaction.known_transaction_hash = None;
     // Only a replacement that declares its own expiry moves the deadline - otherwise
     // the queued slot keeps the deadline the original request was admitted with
@@ -214,7 +225,7 @@ fn replace_pending_transaction_payload_in_queue(
         transaction.expires_at = expires_at;
     }
 
-    Some(transaction.clone())
+    Ok(Some(transaction.clone()))
 }
 
 /// Converts a transaction into the same-nonce close-out no-op: a value-0 empty-data
@@ -431,21 +442,22 @@ impl TransactionsQueue {
 
     /// Swaps a PENDING transaction's payload for the replacement request IN THE QUEUE
     /// ITSELF and returns the updated transaction for the caller to persist. Returns
-    /// `None` when the transaction is no longer pending (it broadcast or was removed
-    /// between lookup and edit).
+    /// `Ok(None)` when the transaction is no longer pending (it broadcast or was
+    /// removed between lookup and edit). Invalid blob hex is `Err` and leaves the
+    /// queued payload unchanged.
     pub async fn replace_pending_transaction_payload(
         &mut self,
         transaction_id: &TransactionId,
         replace_with: &RelayTransactionRequest,
         new_expires_at: Option<chrono::DateTime<Utc>>,
-    ) -> Option<Transaction> {
+    ) -> Result<Option<Transaction>, String> {
         let mut pending = self.pending_transactions.lock().await;
         let replaced = replace_pending_transaction_payload_in_queue(
             &mut pending,
             transaction_id,
             replace_with,
             new_expires_at,
-        );
+        )?;
 
         if replaced.is_some() {
             info!(
@@ -454,7 +466,7 @@ impl TransactionsQueue {
             );
         }
 
-        replaced
+        Ok(replaced)
     }
 
     /// Locates the in-flight transaction currently holding a nonce, classifying where
@@ -509,6 +521,10 @@ impl TransactionsQueue {
         }
     }
 
+    // Error variants embed a full Transaction. The per-transaction ceiling fields
+    // pushed that over clippy's result_large_err threshold; boxing them would
+    // churn every match site for no behavior change.
+    #[allow(clippy::result_large_err)]
     pub async fn move_pending_to_inmempool(
         &mut self,
         transaction: &Transaction,
@@ -744,6 +760,7 @@ impl TransactionsQueue {
         }
     }
 
+    #[allow(clippy::result_large_err)]
     pub async fn move_inmempool_to_mining(
         &mut self,
         id: &TransactionId,
@@ -2265,6 +2282,7 @@ mod tests {
             &replace_with,
             None,
         )
+        .expect("valid replacement")
         .expect("the pending holder should be replaceable");
 
         // Only one transaction remains queued at the nonce - nothing extra broadcasts
@@ -2292,8 +2310,47 @@ mod tests {
             &test_transaction(8, TransactionStatus::PENDING).id,
             &replace_with,
             None,
-        );
+        )
+        .expect("valid replacement");
         assert!(missing.is_none());
+    }
+
+    #[test]
+    fn pending_replace_rejects_invalid_blobs_without_touching_the_queue() {
+        use crate::shared::common_types::EvmAddress;
+        use crate::transaction::types::{TransactionData, TransactionValue};
+
+        let mut original = test_transaction(7, TransactionStatus::PENDING);
+        original.data = TransactionData::new(vec![0x01, 0x02].into());
+        let snapshot = original.clone();
+
+        let replace_with = RelayTransactionRequest {
+            to: EvmAddress::from(alloy::primitives::Address::repeat_byte(0x33)),
+            value: TransactionValue::new(alloy::primitives::U256::from(42u64)),
+            data: TransactionData::new(vec![0xde, 0xad].into()),
+            speed: None,
+            external_id: Some("replaced".to_string()),
+            blobs: Some(vec!["0xnot-a-blob".to_string()]),
+            gas_price_ceiling: None,
+            expires_in_seconds: None,
+        };
+
+        let mut pending: VecDeque<_> = vec![original].into();
+        let error = replace_pending_transaction_payload_in_queue(
+            &mut pending,
+            &snapshot.id,
+            &replace_with,
+            None,
+        )
+        .expect_err("invalid blob hex must not panic");
+
+        assert!(error.contains("TransactionBlob"), "{error}");
+        let queued = pending.front().expect("queue should still hold the transaction");
+        assert_eq!(queued.to, snapshot.to);
+        assert_eq!(queued.data, snapshot.data);
+        assert_eq!(queued.value, snapshot.value);
+        assert_eq!(queued.blobs, snapshot.blobs);
+        assert_eq!(queued.external_id, snapshot.external_id);
     }
 
     // A transaction expired by its per-transaction expiry goes through the normal

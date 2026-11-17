@@ -30,6 +30,9 @@ pub enum ReplaceTransactionError {
     #[error("Could not read allowlists from db: {0}")]
     CouldNotReadAllowlistsFromDb(PostgresError),
 
+    #[error("Transaction with external id {1} already exists for relayer {0}")]
+    DuplicateExternalId(RelayerId, String),
+
     #[error("Relayer {0} is paused")]
     RelayerIsPaused(RelayerId),
 
@@ -48,6 +51,10 @@ impl From<ReplaceTransactionError> for HttpError {
 
         if matches!(value, ReplaceTransactionError::RelayerIsPaused(_)) {
             return forbidden(value.to_string());
+        }
+
+        if matches!(value, ReplaceTransactionError::DuplicateExternalId(_, _)) {
+            return conflict(value.to_string());
         }
 
         internal_server_error(Some(value.to_string()))

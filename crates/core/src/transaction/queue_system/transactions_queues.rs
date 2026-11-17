@@ -315,6 +315,39 @@ impl TransactionsQueues {
         Utc::now() + resolve_expiry_duration(Self::global_expiration(), expires_in_seconds)
     }
 
+    /// True when some other transaction for this relayer already owns `external_id`.
+    /// `except_id` is the row being updated in place (a pending replace keeps its id).
+    async fn external_id_conflicts(
+        &self,
+        relayer_id: &RelayerId,
+        external_id: &str,
+        except_id: Option<&TransactionId>,
+    ) -> Result<bool, crate::postgres::PostgresError> {
+        match self.db.get_transaction_by_relayer_and_external_id(relayer_id, external_id).await? {
+            Some(existing) => Ok(except_id != Some(&existing.id)),
+            None => Ok(false),
+        }
+    }
+
+    /// External id for a same-nonce cancel/replace row when the caller did not
+    /// supply one. The first attempt keeps the historical `{prefix}_{original}`
+    /// form; a retry (that id is already stored) appends the new transaction id
+    /// so the unique index does not reject the second competitor.
+    async fn generated_competitor_external_id(
+        &self,
+        prefix: &str,
+        relayer_id: &RelayerId,
+        original_id: &TransactionId,
+        new_id: &TransactionId,
+    ) -> Result<String, crate::postgres::PostgresError> {
+        let generated = format!("{prefix}_{original_id}");
+        if self.external_id_conflicts(relayer_id, &generated, None).await? {
+            Ok(format!("{prefix}_{original_id}_{new_id}"))
+        } else {
+            Ok(generated)
+        }
+    }
+
     /// Computes gas prices for a transaction based on its type.
     async fn compute_transaction_gas_prices(
         transactions_queue: &TransactionsQueue,
@@ -563,16 +596,22 @@ impl TransactionsQueues {
         transaction.known_transaction_hash =
             Some(transactions_queue.compute_tx_hash(&transaction_request).await?);
 
-        self.db.save_transaction(relayer_id, &transaction).await.map_err(|e| {
-            if e.is_unique_violation_on("idx_transaction_relayer_external_id") {
-                return AddTransactionError::DuplicateExternalId(
+        if let Err(error) = self.db.save_transaction(relayer_id, &transaction).await {
+            // The nonce was reserved before the insert. The row was not saved and
+            // was not queued, so leaving the manager incremented would skip this
+            // nonce forever and wedge every later send. The queue lock is held,
+            // so nothing else in this process has taken the next nonce.
+            transactions_queue.nonce_manager.rollback_increment(assigned_nonce).await;
+
+            if error.is_unique_violation_on("idx_transaction_relayer_external_id") {
+                return Err(AddTransactionError::DuplicateExternalId(
                     *relayer_id,
                     transaction.external_id.clone().unwrap_or_default(),
-                );
+                ));
             }
 
-            AddTransactionError::CouldNotSaveTransactionDb(e)
-        })?;
+            return Err(AddTransactionError::CouldNotSaveTransactionDb(error));
+        }
 
         transactions_queue.add_pending_transaction(transaction.clone()).await;
         self.invalidate_transaction_cache(&transaction.id).await;
@@ -650,6 +689,15 @@ impl TransactionsQueues {
                     EditableTransactionType::Inmempool => {
                         let cancel_transaction_id = TransactionId::new();
                         let expires_at = self.expires_at(None);
+                        let external_id = self
+                            .generated_competitor_external_id(
+                                "cancel",
+                                &transaction.relayer_id,
+                                &transaction.id,
+                                &cancel_transaction_id,
+                            )
+                            .await
+                            .map_err(CancelTransactionError::CouldNotUpdateTransactionDb)?;
 
                         let mut cancel_transaction = Transaction {
                             id: cancel_transaction_id,
@@ -679,7 +727,7 @@ impl TransactionsQueues {
                             is_noop: true,
                             sent_with_gas: None,
                             sent_with_blob_gas: None,
-                            external_id: Some(format!("cancel_{}", transaction.id)),
+                            external_id: Some(external_id),
                             cancelled_by_transaction_id: None,
                             failed_reason: None,
                             // A cancel must be able to outbid the original - never ceiling it
@@ -863,6 +911,25 @@ impl TransactionsQueues {
                     EditableTransactionType::Pending => {
                         let original_transaction = result.transaction.clone();
 
+                        // Reject a colliding external id before the queue entry is
+                        // rewritten. The same id on this row is an in-place update.
+                        if let Some(external_id) = &replace_with.external_id {
+                            let conflicts = self
+                                .external_id_conflicts(
+                                    &transaction.relayer_id,
+                                    external_id,
+                                    Some(&transaction.id),
+                                )
+                                .await
+                                .map_err(ReplaceTransactionError::CouldNotUpdateTransactionInDb)?;
+                            if conflicts {
+                                return Err(ReplaceTransactionError::DuplicateExternalId(
+                                    transaction.relayer_id,
+                                    external_id.clone(),
+                                ));
+                            }
+                        }
+
                         // Swap the payload in the queue entry itself - editing only the
                         // looked-up clone would leave the ORIGINAL payload queued for
                         // broadcast while reporting success. A replacement declaring its
@@ -871,23 +938,57 @@ impl TransactionsQueues {
                         let new_expires_at = replace_with
                             .expires_in_seconds
                             .map(|_| self.expires_at(replace_with.expires_in_seconds));
-                        let updated_transaction = transactions_queue
+                        let updated_transaction = match transactions_queue
                             .replace_pending_transaction_payload(
                                 &transaction.id,
                                 replace_with,
                                 new_expires_at,
                             )
-                            .await;
-
-                        let Some(updated_transaction) = updated_transaction else {
-                            // Left the pending queue between lookup and edit
-                            return Ok(ReplaceTransactionResult::failed());
+                            .await
+                        {
+                            Ok(Some(updated)) => updated,
+                            Ok(None) => {
+                                // Left the pending queue between lookup and edit
+                                return Ok(ReplaceTransactionResult::failed());
+                            }
+                            Err(message) => {
+                                return Err(ReplaceTransactionError::SendTransactionError(
+                                    TransactionQueueSendTransactionError::TransactionConversionError(
+                                        message,
+                                    ),
+                                ));
+                            }
                         };
 
-                        self.db
-                            .transaction_update(&updated_transaction)
-                            .await
-                            .map_err(ReplaceTransactionError::CouldNotUpdateTransactionInDb)?;
+                        if let Err(db_error) =
+                            self.db.transaction_update(&updated_transaction).await
+                        {
+                            // The queue already carries the replacement. Put the original
+                            // back so a rejected write cannot broadcast a payload the
+                            // database refused.
+                            if !transactions_queue
+                                .update_pending_transaction(original_transaction.clone())
+                                .await
+                            {
+                                error!(
+                                    "replace_transaction: failed to restore pending transaction {} after a rejected save: {}",
+                                    transaction.id, db_error
+                                );
+                            }
+
+                            if db_error
+                                .is_unique_violation_on("idx_transaction_relayer_external_id")
+                            {
+                                return Err(ReplaceTransactionError::DuplicateExternalId(
+                                    transaction.relayer_id,
+                                    updated_transaction.external_id.clone().unwrap_or_default(),
+                                ));
+                            }
+
+                            return Err(ReplaceTransactionError::CouldNotUpdateTransactionInDb(
+                                db_error,
+                            ));
+                        }
 
                         self.invalidate_transaction_cache(&transaction.id).await;
 
@@ -917,6 +1018,28 @@ impl TransactionsQueues {
                     EditableTransactionType::Inmempool => {
                         let replace_transaction_id = TransactionId::new();
                         let expires_at = self.expires_at(replace_with.expires_in_seconds);
+                        let external_id = if let Some(requested) = &replace_with.external_id {
+                            let conflicts = self
+                                .external_id_conflicts(&transaction.relayer_id, requested, None)
+                                .await
+                                .map_err(ReplaceTransactionError::CouldNotUpdateTransactionInDb)?;
+                            if conflicts {
+                                return Err(ReplaceTransactionError::DuplicateExternalId(
+                                    transaction.relayer_id,
+                                    requested.clone(),
+                                ));
+                            }
+                            requested.clone()
+                        } else {
+                            self.generated_competitor_external_id(
+                                "replace",
+                                &transaction.relayer_id,
+                                &transaction.id,
+                                &replace_transaction_id,
+                            )
+                            .await
+                            .map_err(ReplaceTransactionError::CouldNotUpdateTransactionInDb)?
+                        };
 
                         let mut replace_transaction = Transaction {
                             id: replace_transaction_id,
@@ -960,10 +1083,7 @@ impl TransactionsQueues {
                             is_noop: false,
                             sent_with_gas: None,
                             sent_with_blob_gas: None,
-                            external_id: replace_with
-                                .external_id
-                                .clone()
-                                .or_else(|| Some(format!("replace_{}", transaction.id))),
+                            external_id: Some(external_id),
                             cancelled_by_transaction_id: None,
                             failed_reason: None,
                             gas_price_ceiling: replace_with.gas_price_ceiling,
@@ -1076,6 +1196,27 @@ impl TransactionsQueues {
                         replace_transaction.known_transaction_hash = Some(transaction_sent.hash);
                         replace_transaction.sent_at = Some(Utc::now());
 
+                        // Persist before the queue adopts the competitor. A unique-index
+                        // rejection (or any other save failure) must not leave an
+                        // unpersisted transaction as the active same-nonce bid.
+                        if let Err(db_error) = self
+                            .db
+                            .save_transaction(&transaction.relayer_id, &replace_transaction)
+                            .await
+                        {
+                            if db_error
+                                .is_unique_violation_on("idx_transaction_relayer_external_id")
+                            {
+                                return Err(ReplaceTransactionError::DuplicateExternalId(
+                                    transaction.relayer_id,
+                                    replace_transaction.external_id.clone().unwrap_or_default(),
+                                ));
+                            }
+                            return Err(ReplaceTransactionError::CouldNotUpdateTransactionInDb(
+                                db_error,
+                            ));
+                        }
+
                         transactions_queue
                             .add_competitor_to_inmempool_transaction(
                                 &transaction.id,
@@ -1084,11 +1225,6 @@ impl TransactionsQueues {
                             )
                             .await
                             .map_err(ReplaceTransactionError::SendTransactionError)?;
-
-                        self.db
-                            .save_transaction(&transaction.relayer_id, &replace_transaction)
-                            .await
-                            .map_err(ReplaceTransactionError::CouldNotUpdateTransactionInDb)?;
 
                         result.transaction.cancelled_by_transaction_id =
                             Some(replace_transaction_id);
@@ -1254,6 +1390,7 @@ impl TransactionsQueues {
     /// dropping it would strand the nonce and wedge every transaction queued behind it.
     /// The DB row stays PENDING (with failed_reason set) so a crash before the no-op
     /// mines still rehydrates it; the no-op's receipt then resolves the status to FAILED.
+    #[allow(clippy::result_large_err)]
     async fn close_out_pending_transaction_as_noop(
         &mut self,
         transactions_queue: &mut TransactionsQueue,
@@ -1318,6 +1455,7 @@ impl TransactionsQueues {
     /// Moves it into the inmempool queue under the mined hash so normal receipt
     /// resolution completes it - reassigning a fresh nonce here would broadcast the
     /// payload a second time.
+    #[allow(clippy::result_large_err)]
     async fn resolve_pending_transaction_mined(
         &mut self,
         relayer_id: &RelayerId,
@@ -1393,6 +1531,7 @@ impl TransactionsQueues {
         ))
     }
 
+    #[allow(clippy::result_large_err)]
     pub async fn process_single_pending(
         &mut self,
         relayer_id: &RelayerId,
@@ -1729,6 +1868,7 @@ impl TransactionsQueues {
     }
 
     /// Processes a single in-mempool transaction for the specified relayer.
+    #[allow(clippy::result_large_err)]
     pub async fn process_single_inmempool(
         &mut self,
         relayer_id: &RelayerId,
@@ -2077,6 +2217,7 @@ impl TransactionsQueues {
     }
 
     /// Processes a single mined transaction for the specified relayer.
+    #[allow(clippy::result_large_err)]
     pub async fn process_single_mined(
         &mut self,
         relayer_id: &RelayerId,

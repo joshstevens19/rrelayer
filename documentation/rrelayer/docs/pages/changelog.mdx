@@ -23,6 +23,12 @@
 
 ### Bug fixes
 
+- fix: a duplicate external id no longer skips the reserved nonce, a second cancel or replace of the same transaction no longer collides with the first competitor's external id, and databases that already contain duplicate external ids can boot
+
+- fix: a pending replacement with invalid blob data returns an error instead of crashing, and a failed save keeps the original queued payload
+
+- fix: provider urls with embedded credentials are redacted in boot, probe, and rpc error logs
+
 ---
 
 ### Breaking changes
