@@ -63,4 +63,28 @@ mod tests {
         manager.rollback_increment(first).await;
         assert_eq!(manager.get_current_nonce().await.into_inner(), 7);
     }
+
+    #[tokio::test]
+    async fn failed_save_reuses_the_nonce_and_a_landed_save_does_not_skip() {
+        let manager = NonceManager::new(TransactionNonce::new(4));
+
+        let preview = manager.get_current_nonce().await;
+        let reserved = manager.get_and_increment().await;
+        assert_eq!(preview, reserved);
+        // Definite pre-commit failure: roll the reservation back once.
+        manager.rollback_increment(reserved).await;
+        assert_eq!(manager.get_current_nonce().await, preview);
+
+        let reserved = manager.get_and_increment().await;
+        // The row landed. Syncing to reserved + 1 must not skip ahead of it.
+        manager.sync_with_onchain_nonce(reserved + 1).await;
+        assert_eq!(manager.get_current_nonce().await.into_inner(), 5);
+
+        // The next admission takes 5. Rolling the already-saved nonce back now
+        // must leave 5's reservation in place.
+        let later = manager.get_and_increment().await;
+        assert_eq!(later.into_inner(), 5);
+        manager.rollback_increment(reserved).await;
+        assert_eq!(manager.get_current_nonce().await.into_inner(), 6);
+    }
 }
