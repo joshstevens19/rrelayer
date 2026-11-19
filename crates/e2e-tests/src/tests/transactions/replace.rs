@@ -2,6 +2,7 @@ use crate::tests::test_runner::TestRunner;
 use anyhow::Context;
 use rrelayer_core::transaction::api::{RelayTransactionRequest, TransactionSpeed};
 use rrelayer_core::transaction::types::{TransactionData, TransactionStatus};
+use std::time::Duration;
 use tracing::info;
 
 impl TestRunner {
@@ -37,6 +38,46 @@ impl TestRunner {
 
         let transaction_id = &send_result.id;
 
+        // Send returns once the transaction is queued. Broadcast happens on the
+        // relayer's pending loop, so an immediate replace often still sees
+        // PENDING. A pending replace rewrites that same row in place, and the
+        // mined status is then MINED. This test asserts the in-mempool
+        // competition (original REPLACED, new transaction MINED), so wait
+        // until the original has been broadcast. Mining while waiting would
+        // include the original before the replacement can compete.
+        let mut attempts = 0;
+        loop {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            let status = relayer
+                .transaction()
+                .get_status(transaction_id)
+                .await?
+                .context("Original transaction status not found")?;
+
+            match status.status {
+                TransactionStatus::INMEMPOOL => {
+                    info!("Original transaction is in mempool; replacing it");
+                    break;
+                }
+                TransactionStatus::PENDING => {
+                    attempts += 1;
+                    if attempts > 100 {
+                        anyhow::bail!(
+                            "Original transaction {} stayed PENDING and was never broadcast",
+                            transaction_id
+                        );
+                    }
+                }
+                other => {
+                    anyhow::bail!(
+                        "Original transaction {} became {} before it could be replaced",
+                        transaction_id,
+                        other
+                    );
+                }
+            }
+        }
+
         let replacement_request = RelayTransactionRequest {
             to: self.config.anvil_accounts[1],
             value: alloy::primitives::utils::parse_ether("0.2")?.into(),
@@ -71,11 +112,19 @@ impl TestRunner {
         self.anvil_manager.mine_and_wait().await?;
         self.anvil_manager.mine_and_wait().await?;
 
+        let replace_transaction_id = replace_result
+            .replace_transaction_id
+            .context("Replace succeeded without a replacement transaction id")?;
+        if replace_transaction_id == send_result.id {
+            anyhow::bail!(
+                "Replace updated transaction {} in place; expected a competing in-mempool transaction",
+                send_result.id
+            );
+        }
+
         let first_transaction = self.relayer_client.get_transaction(&send_result.id).await?;
-        let replace_transaction = self
-            .relayer_client
-            .get_transaction(&replace_result.replace_transaction_id.unwrap())
-            .await?;
+        let replace_transaction =
+            self.relayer_client.get_transaction(&replace_transaction_id).await?;
 
         if first_transaction.status != TransactionStatus::REPLACED {
             return Err(anyhow::anyhow!(format!(
