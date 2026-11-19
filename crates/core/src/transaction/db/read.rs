@@ -7,6 +7,41 @@ use crate::{
 };
 
 impl PostgresClient {
+    /// Drain saves from the previous process before taking the startup snapshot.
+    /// Like the queues themselves, startup assumes one active process owns the
+    /// relayers; this barrier settles old backends, not active-active admission.
+    pub(crate) async fn wait_for_transaction_admissions(&self) -> Result<(), PostgresError> {
+        let mut conn = self.pool.get().await?;
+        let trans = conn
+            .build_transaction()
+            .isolation_level(tokio_postgres::IsolationLevel::ReadCommitted)
+            .start()
+            .await?;
+        trans.query_one("SELECT pg_advisory_xact_lock(1919249506, 0)", &[]).await?;
+        trans.commit().await?;
+        Ok(())
+    }
+
+    /// Settle an admission after a lost COMMIT response. The lock waits for the
+    /// original save transaction to commit or roll back before checking its row.
+    /// A plain SELECT could observe absence while that COMMIT was still running.
+    pub(crate) async fn settle_transaction_admission(
+        &self,
+        id: &TransactionId,
+    ) -> Result<Option<Transaction>, PostgresError> {
+        let mut conn = self.pool.get().await?;
+        let trans = conn
+            .build_transaction()
+            .isolation_level(tokio_postgres::IsolationLevel::ReadCommitted)
+            .start()
+            .await?;
+        super::write::lock_transaction_admission(&trans, id).await?;
+        let row = trans.query_opt("SELECT * FROM relayer.transaction WHERE id = $1", &[id]).await?;
+        let result = row.as_ref().map(build_transaction_from_transaction_view);
+        trans.commit().await?;
+        Ok(result)
+    }
+
     pub async fn get_transaction(
         &self,
         id: &TransactionId,

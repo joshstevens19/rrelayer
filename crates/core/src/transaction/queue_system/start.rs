@@ -516,6 +516,14 @@ pub async fn startup_transactions_queues(
         .await
         .map_err(StartTransactionsQueuesError::CouldNotLoadRelayersFromDatabase)?;
 
+    // Settle saves still committing from a previous process before the nonce
+    // snapshot below. One process owns the relayers; this is not an
+    // active-active admission lock.
+    postgres
+        .wait_for_transaction_admissions()
+        .await
+        .map_err(StartTransactionsQueuesError::CouldNotLoadRelayersFromDatabase)?;
+
     let mut transaction_relayer_setups: Vec<TransactionRelayerSetup> = Vec::new();
 
     for relayer in relays {

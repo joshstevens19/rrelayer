@@ -7,7 +7,7 @@ use crate::network::{create_network_routes, ChainId};
 use crate::provider::EndpointHealthSnapshot;
 use crate::rate_limiting::RATE_LIMIT_HEADER_NAME;
 use crate::server::create_server_routes;
-use crate::shared::{bad_request, not_found, HttpError};
+use crate::shared::{bad_request, internal_server_error, not_found, HttpError};
 use crate::webhooks::WebhookManager;
 use crate::yaml::{AllOrOneOrManyAddresses, ApiKey, NetworkPermissionsConfig, ReadYamlError};
 use crate::{
@@ -611,6 +611,22 @@ impl Relayer {
         relayer_id: &RelayerId,
         external_id: &str,
     ) -> Result<Option<Transaction>, HttpError> {
+        // A cancelled caller may have detached a save that still owns this
+        // queue. Do not report absence until it has saved or been rejected;
+        // embedders use absence to decide whether a business action can retry.
+        let unresolved = {
+            let queue =
+                self.app_state.transactions_queues.lock().await.get_transactions_queue(relayer_id);
+            match &queue {
+                Some(queue) => queue.lock().await.has_unresolved_admission(),
+                None => false,
+            }
+        };
+        if unresolved {
+            return Err(internal_server_error(Some(
+                "Transaction admission is unresolved; restart the relayer to recover before retrying".to_string(),
+            )));
+        }
         let transaction = self
             .app_state
             .db

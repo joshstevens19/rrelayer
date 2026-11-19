@@ -1,6 +1,8 @@
 use std::{
     collections::{HashMap, VecDeque},
+    future::Future,
     sync::Arc,
+    time::Duration,
 };
 
 use alloy::{
@@ -55,9 +57,10 @@ use crate::{
         cache::Cache,
         common_types::{EvmAddress, WalletOrProviderError},
     },
-    shutdown::enter_critical_operation,
+    shutdown::{enter_critical_operation, is_shutdown_in_progress, subscribe_to_shutdown},
     transaction::{
         cache::invalidate_transaction_no_state_cache,
+        db::SaveTransactionError,
         nonce_manager::NonceManager,
         queue_system::types::TransactionQueueSendTransactionError,
         types::{
@@ -70,6 +73,36 @@ use crate::{
 
 const SAME_NONCE_BUMP_DIVISOR: u128 = 5;
 const MIN_SAME_NONCE_GAS_BUMP_WEI: u128 = 1_000_000_000;
+
+/// Dropping the caller only detaches this task. Once persistence starts, saving,
+/// settling an ambiguous commit, and queue adoption must finish as one operation.
+async fn shield_admission<T: Send + 'static, F: Future<Output = T> + Send + 'static>(
+    operation: impl FnOnce(tokio::sync::oneshot::Sender<()>) -> F + Send + 'static,
+) -> Result<T, tokio::task::JoinError> {
+    let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
+    let task = tokio::spawn(operation(ready_tx));
+    // Keep the receiver alive until the save owns its durable startup barrier.
+    // Cancellation before this point tells the worker to skip persistence.
+    let _ = ready_rx.await;
+    task.await
+}
+
+/// Next nonce after a restart. `onchain` is the RPC pending count, which lags
+/// behind transactions this process queued or broadcast but the node has not
+/// counted yet. Pending, in-mempool, and mined nonces are included because the
+/// queue will still send them. Confirmed nonces are left to the RPC count:
+/// they are no longer queued. Failed gas-estimation rows are omitted too — they
+/// record the not-yet-reserved nonce and must not open a gap.
+fn restored_next_nonce(
+    onchain: TransactionNonce,
+    inflight_nonces: impl Iterator<Item = TransactionNonce>,
+) -> TransactionNonce {
+    TransactionNonce::new(
+        inflight_nonces.fold(onchain.into_inner(), |next, nonce| {
+            next.max(nonce.into_inner().saturating_add(1))
+        }),
+    )
+}
 
 fn bump_u128_for_same_nonce_competitor(value: u128) -> u128 {
     value
@@ -173,11 +206,27 @@ impl TransactionsQueues {
         let mut relayer_block_times_ms = HashMap::new();
 
         for setup in setups {
-            let current_nonce = setup.evm_provider.get_nonce(&setup.relayer).await?;
+            let onchain_nonce = setup.evm_provider.get_nonce(&setup.relayer).await?;
+            // Queued and in-mempool nonces, plus mined nonces the pending count
+            // may not have observed yet. Same-nonce cancel/replace no-ops stay
+            // in these queues, so a restart cannot reuse a nonce issue #99
+            // closed by converting a cancelled pending transaction into a no-op.
+            let current_nonce = restored_next_nonce(
+                onchain_nonce,
+                setup
+                    .pending_transactions
+                    .iter()
+                    .map(|tx| tx.nonce)
+                    .chain(setup.inmempool_transactions.iter().map(|tx| tx.original.nonce))
+                    .chain(setup.mined_transactions.values().map(|tx| tx.nonce)),
+            );
 
             info!(
-                "Startup nonce synchronization for relayer {} ({}): synchronizing nonce manager with on-chain nonce {}",
-                setup.relayer.name, setup.relayer.id, current_nonce.into_inner()
+                "Startup nonce synchronization for relayer {} ({}): next nonce {}, on-chain nonce {}",
+                setup.relayer.name,
+                setup.relayer.id,
+                current_nonce.into_inner(),
+                onchain_nonce.into_inner()
             );
 
             relayer_block_times_ms.insert(setup.relayer.id, setup.evm_provider.blocks_every);
@@ -457,7 +506,7 @@ impl TransactionsQueues {
             .get_transactions_queue(relayer_id)
             .ok_or(AddTransactionError::RelayerNotFound(*relayer_id))?;
 
-        let mut transactions_queue = queue_arc.lock().await;
+        let mut transactions_queue = queue_arc.lock_owned().await;
 
         if transactions_queue.is_paused() {
             return Err(AddTransactionError::RelayerIsPaused(*relayer_id));
@@ -471,11 +520,9 @@ impl TransactionsQueues {
             });
         }
 
-        // Reject duplicate external ids before a nonce is reserved: the unique index
-        // (idx_transaction_relayer_external_id) is the authoritative guard on save, but by
-        // then the nonce manager has already been incremented and the rejected transaction
-        // would strand its reserved nonce. The per-relayer queue lock is held here, so the
-        // check cannot race other inserts for this relayer within this process.
+        // Reject duplicate external ids before signing. The unique index remains the
+        // authoritative guard; a rejection there rolls the reservation back. The
+        // per-relayer queue lock serializes admissions in this process.
         if let Some(external_id) = &transaction_to_send.external_id {
             let existing = self
                 .db
@@ -581,7 +628,10 @@ impl TransactionsQueues {
             }
         };
 
-        let assigned_nonce = transactions_queue.nonce_manager.get_and_increment().await;
+        // Preview only. The reservation happens inside the shielded task, after
+        // this queue lock has moved with it, so a dropped caller cannot strand
+        // the nonce between increment and save. Signing can still fail first.
+        let assigned_nonce = transactions_queue.nonce_manager.get_current_nonce().await;
         transaction.nonce = assigned_nonce;
         transaction.gas_limit = Some(estimated_gas_limit);
 
@@ -596,36 +646,125 @@ impl TransactionsQueues {
         transaction.known_transaction_hash =
             Some(transactions_queue.compute_tx_hash(&transaction_request).await?);
 
-        if let Err(error) = self.db.save_transaction(relayer_id, &transaction).await {
-            // The nonce was reserved before the insert. The row was not saved and
-            // was not queued, so leaving the manager incremented would skip this
-            // nonce forever and wedge every later send. The queue lock is held,
-            // so nothing else in this process has taken the next nonce.
-            transactions_queue.nonce_manager.rollback_increment(assigned_nonce).await;
+        let critical_operation =
+            enter_critical_operation().ok_or(AddTransactionError::RelayerIsPaused(*relayer_id))?;
+        let mut db = PostgresClient { pool: self.db.pool.clone() };
+        let cache = self.cache.clone();
+        let webhook_manager = self.webhook_manager.clone();
+        let relayer_id = *relayer_id;
 
-            if error.is_unique_violation_on("idx_transaction_relayer_external_id") {
-                return Err(AddTransactionError::DuplicateExternalId(
-                    *relayer_id,
-                    transaction.external_id.clone().unwrap_or_default(),
-                ));
+        shield_admission(move |ready| async move {
+            let _critical_operation = critical_operation;
+            let mut shutdown = subscribe_to_shutdown();
+            if is_shutdown_in_progress() {
+                return Err(AddTransactionError::AdmissionInterrupted(transaction.id));
             }
 
-            return Err(AddTransactionError::CouldNotSaveTransactionDb(error));
-        }
+            // Reserve now that this task owns the queue lock. A save that fails
+            // before COMMIT, or an ambiguous commit that settles as absent, rolls
+            // this back (the failed-save protection). A commit that landed is
+            // adopted and is not rolled back — rolling it back as well would
+            // hand the same nonce to the next admission.
+            transactions_queue.admission_pending = true;
+            let reserved = transactions_queue.nonce_manager.get_and_increment().await;
+            if reserved != assigned_nonce {
+                transactions_queue.nonce_manager.rollback_increment(reserved).await;
+                transactions_queue.admission_pending = false;
+                return Err(AddTransactionError::AdmissionInterrupted(transaction.id));
+            }
 
-        transactions_queue.add_pending_transaction(transaction.clone()).await;
-        self.invalidate_transaction_cache(&transaction.id).await;
+            let save_result = tokio::select! {
+                biased;
+                result = db.save_transaction_for_admission(&relayer_id, &transaction, Some(ready)) => result,
+                _ = shutdown.recv() => {
+                    // The save future is dropped here, so COMMIT may or may not
+                    // have landed. Keep the reservation and the fence; restart
+                    // reconciles from the durable row.
+                    return Err(AddTransactionError::AdmissionInterrupted(transaction.id));
+                }
+            };
 
-        if let Some(webhook_manager) = &self.webhook_manager {
-            let webhook_manager = webhook_manager.clone();
-            let transaction_clone = transaction.clone();
-            tokio::spawn(async move {
-                let webhook_manager = webhook_manager.lock().await;
-                webhook_manager.on_transaction_queued(&transaction_clone).await;
-            });
-        }
+            if matches!(save_result, Ok(false)) {
+                // Caller left before the startup barrier. Nothing was written.
+                transactions_queue.nonce_manager.rollback_increment(reserved).await;
+                transactions_queue.admission_pending = false;
+                return Err(AddTransactionError::AdmissionCallerCancelled(transaction.id));
+            }
 
-        Ok(transaction)
+            if let Err(save_error) = save_result {
+                let save_error = match save_error {
+                    SaveTransactionError::BeforeCommit(error) => {
+                        transactions_queue.nonce_manager.rollback_increment(reserved).await;
+                        transactions_queue.admission_pending = false;
+                        return Err(
+                            if error.is_unique_violation_on("idx_transaction_relayer_external_id") {
+                                AddTransactionError::DuplicateExternalId(
+                                    relayer_id,
+                                    transaction.external_id.clone().unwrap_or_default(),
+                                )
+                            } else {
+                                AddTransactionError::CouldNotSaveTransactionDb(error)
+                            },
+                        );
+                    }
+                    SaveTransactionError::CommitOutcomeUnknown(error) => error,
+                };
+
+                loop {
+                    if is_shutdown_in_progress() {
+                        return Err(AddTransactionError::AdmissionInterrupted(transaction.id));
+                    }
+                    let settled = tokio::select! {
+                        biased;
+                        result = db.settle_transaction_admission(&transaction.id) => result,
+                        _ = shutdown.recv() => {
+                            return Err(AddTransactionError::AdmissionInterrupted(transaction.id));
+                        }
+                    };
+                    match settled {
+                        Ok(Some(saved)) => {
+                            transaction = saved;
+                            break;
+                        }
+                        Ok(None) => {
+                            transactions_queue.nonce_manager.rollback_increment(reserved).await;
+                            transactions_queue.admission_pending = false;
+                            return Err(AddTransactionError::CouldNotSaveTransactionDb(save_error));
+                        }
+                        Err(error) => {
+                            warn!(%relayer_id, transaction_id = %transaction.id, %error,
+                                "Cannot settle transaction admission; retaining nonce fence and retrying");
+                            tokio::select! {
+                                biased;
+                                _ = tokio::time::sleep(Duration::from_secs(1)) => {}
+                                _ = shutdown.recv() => {
+                                    return Err(AddTransactionError::AdmissionInterrupted(transaction.id));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // The reservation already moved the manager to reserved + 1. Sync
+            // only moves forward, so a settled row cannot double-advance it,
+            // and a higher nonce loaded from the database is still honored.
+            let adopted_next =
+                TransactionNonce::new(transaction.nonce.into_inner().saturating_add(1));
+            transactions_queue.nonce_manager.sync_with_onchain_nonce(adopted_next).await;
+            transactions_queue.add_pending_transaction(transaction.clone()).await;
+            transactions_queue.admission_pending = false;
+            invalidate_transaction_no_state_cache(&cache, &transaction.id).await;
+
+            if let Some(webhook_manager) = webhook_manager {
+                let transaction_clone = transaction.clone();
+                tokio::spawn(async move {
+                    webhook_manager.lock().await.on_transaction_queued(&transaction_clone).await;
+                });
+            }
+            Ok(transaction)
+        })
+        .await?
     }
 
     /// Cancels an existing transaction.
@@ -2333,10 +2472,15 @@ impl TransactionsQueues {
 }
 
 #[cfg(test)]
+#[path = "admission_tests.rs"]
+mod admission_tests;
+
+#[cfg(test)]
 mod tests {
     use super::SendTransactionAtNonceError;
     use super::{
-        is_cancel_shaped, resolve_expiry_duration, validate_exact_nonce_target, InflightNonceHolder,
+        is_cancel_shaped, resolve_expiry_duration, restored_next_nonce, shield_admission,
+        validate_exact_nonce_target, InflightNonceHolder,
     };
     use crate::relayer::RelayerId;
     use crate::shared::common_types::EvmAddress;
@@ -2345,6 +2489,70 @@ mod tests {
         test_fixtures::test_transaction, TransactionData, TransactionNonce, TransactionStatus,
         TransactionValue,
     };
+
+    #[test]
+    fn restored_admissions_preserve_nonce_high_water() {
+        let next = restored_next_nonce(
+            TransactionNonce::new(3),
+            [5, 3, 4].into_iter().map(TransactionNonce::new),
+        );
+        assert_eq!(next, TransactionNonce::new(6));
+        assert_eq!(
+            restored_next_nonce(
+                TransactionNonce::new(9),
+                [3].into_iter().map(TransactionNonce::new)
+            ),
+            TransactionNonce::new(9),
+        );
+        assert_eq!(
+            restored_next_nonce(TransactionNonce::new(3), std::iter::empty()),
+            TransactionNonce::new(3),
+        );
+    }
+
+    #[test]
+    fn restart_keeps_queued_inmempool_and_mined_nonces_ahead_of_a_lagging_rpc() {
+        // Pending count 4 has not yet observed the queued no-op at 4 (a cancelled
+        // pending transaction still occupies its nonce), the in-mempool tx at 5,
+        // or the mined tx at 6. The next admission must be 7, not 4.
+        let next = restored_next_nonce(
+            TransactionNonce::new(4),
+            [4, 5, 6].into_iter().map(TransactionNonce::new),
+        );
+        assert_eq!(next, TransactionNonce::new(7));
+    }
+
+    #[tokio::test]
+    async fn cancelling_caller_keeps_admission_lock_until_adoption_finishes() {
+        use std::sync::Arc;
+        use tokio::sync::{oneshot, Mutex};
+
+        let queue = Arc::new(Mutex::new(Vec::new()));
+        let (started_tx, started_rx) = oneshot::channel();
+        let (persist_tx, persist_rx) = oneshot::channel();
+        let (adopted_tx, adopted_rx) = oneshot::channel();
+        let queue_clone = queue.clone();
+        let request = tokio::spawn(async move {
+            let mut queue = queue_clone.lock_owned().await;
+            shield_admission(move |ready| async move {
+                ready.send(()).expect("caller is awaiting the barrier");
+                started_tx.send(()).expect("test is awaiting start");
+                persist_rx.await.expect("persistence is released by the test");
+                queue.push(0);
+                adopted_tx.send(()).expect("test is awaiting adoption");
+            })
+            .await
+        });
+        started_rx.await.expect("admission should reach the barrier");
+        request.abort();
+        let cancelled = request.await;
+        assert!(cancelled.is_err_and(|error| error.is_cancelled()));
+        // A subsequent admission cannot overtake an in-progress durable save.
+        assert!(queue.try_lock().is_err());
+        persist_tx.send(()).expect("admission is waiting to finish");
+        adopted_rx.await.expect("detached admission should adopt");
+        assert_eq!(*queue.lock().await, [0]);
+    }
 
     fn relayer_address() -> EvmAddress {
         EvmAddress::from(alloy::primitives::Address::repeat_byte(0x11))

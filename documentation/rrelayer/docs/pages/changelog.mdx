@@ -22,6 +22,8 @@
 
 ### Bug fixes
 
+- fix: preserve nonce continuity when an admission is cancelled or its save fails, and restore the next nonce from queued, in-mempool, and mined transactions after restart
+
 - fix: a duplicate external id no longer skips the reserved nonce, a second cancel or replace of the same transaction no longer collides with the first competitor's external id, and databases that already contain duplicate external ids can boot
 
 - fix: a pending replacement with invalid blob data returns an error instead of crashing, and a failed save keeps the original queued payload
